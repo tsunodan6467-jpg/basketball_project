@@ -1791,9 +1791,44 @@ def run_main_menu_ui_mode(
 
     def advance_one_round():
         if season.season_finished:
-            print_separator("UIモード通知")
-            print("この試験実装では、レギュラーシーズン終了後のオフシーズン遷移はまだ未接続です。")
-            print("続きは従来CLIモードで進めてください。")
+            import tkinter as tk
+            from tkinter import messagebox
+
+            root = tk._default_root
+            if root is not None:
+                ok = messagebox.askokcancel(
+                    "オフシーズン",
+                    "オフシーズン処理（再契約・FA・ドラフト等）を開始します。\n"
+                    "数分かかる場合があり、その間ウィンドウが応答しなくなることがあります。\n\n"
+                    "続けますか？",
+                    parent=root,
+                )
+                if not ok:
+                    return
+            print_separator("オフシーズン開始（UIモード）")
+            try:
+                offseason = Offseason(teams, free_agents)
+                offseason.run()
+            except Exception as exc:
+                print(f"オフシーズン処理中にエラー: {exc}")
+                if root is not None:
+                    messagebox.showerror(
+                        "エラー",
+                        f"オフシーズン処理でエラーが発生しました:\n{exc}",
+                        parent=root,
+                    )
+                return
+            print_separator("オフシーズン完了")
+            print_player_career_tracking(user_team, tracked_player_name=tracked_player_name)
+            print_user_team_history(user_team)
+            if root is not None:
+                messagebox.showinfo(
+                    "完了",
+                    "オフシーズンが終わりました。\n"
+                    "次シーズン・セーブはターミナル（CLI）の年度進行メニューから行ってください。\n"
+                    "このウィンドウは閉じても構いません。",
+                    parent=root,
+                )
             return
         season.simulate_next_round()
         print(f"[MAIN_MENU] round={season.current_round}/{season.total_rounds}")
@@ -1804,6 +1839,7 @@ def run_main_menu_ui_mode(
 
     print_separator("主画面UIモード開始")
     print("『日程』または『次へ進む』で1ラウンド進行します。")
+    print("シーズン終了後は『オフシーズンを実行』からオフシーズンへ（完了後の次シーズン・セーブはCLIの年度進行メニュー）。")
     print("他メニューは段階的に接続します。")
 
     launch_main_menu(

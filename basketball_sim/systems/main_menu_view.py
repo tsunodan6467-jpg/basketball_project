@@ -330,6 +330,7 @@ class MainMenuView:
                 self._refresh_history_window()
         except Exception:
             pass
+        self._refresh_advance_button()
 
     def run(self) -> None:
         self.root.mainloop()
@@ -381,10 +382,19 @@ class MainMenuView:
             else:
                 var.set("")
 
-        if count > 0:
+        season_finished = bool(self._safe_get(self.season, "season_finished", False))
+        if season_finished:
+            self.advance_hint_var.set(
+                "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
+            )
+        elif count > 0:
             self.advance_hint_var.set(f"未処理案件が {count} 件あります。必要なら先に確認してください。")
         else:
             self.advance_hint_var.set("")
+
+    def _refresh_advance_button(self) -> None:
+        fin = bool(self._safe_get(self.season, "season_finished", False))
+        self.advance_button.configure(text="オフシーズンを実行" if fin else "次へ進む")
 
     def _refresh_news(self) -> None:
         news = self._get_news_items()[:4]
