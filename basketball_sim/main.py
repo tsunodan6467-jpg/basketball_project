@@ -1870,7 +1870,7 @@ def run_main_menu_ui_mode(
 def simulate():
     _settings = ensure_settings_file_exists()
     apply_settings_to_environment(_settings)
-    setup_application_logging()
+    setup_application_logging(_settings)
     try_init_steam()
     print_separator("Basketball GM Simulation")
     print("1. 新しいゲームを始める")

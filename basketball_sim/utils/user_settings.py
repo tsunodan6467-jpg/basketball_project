@@ -8,13 +8,15 @@
 ファイルの場所:
 - %USERPROFILE%\\.basketball_sim\\settings.json
   （エクスプローラーで %USERPROFILE%\\.basketball_sim と入力すると開けます）
+- ログ: 同じフォルダ直下の logs\\game.log（ローテーション）／未処理例外の直近全文は logs\\last_crash.txt
 
 操作方法:
 - ゲームを終了したあと、メモ帳で settings.json を編集して保存 → 次回起動で反映。
 - ログの詳しさ: log_level に "DEBUG" / "INFO" / "WARNING" / "ERROR"
   （環境変数 BASKETBALL_SIM_LOG_LEVEL がある場合はそちらが優先）
 - ウィンドウ: window.width / window.height（既定 1420x860）、fullscreen（tkinter 主画面に反映）
-- 主画面: Esc でフォーカス中のサブウィンドウを閉じる（key_bindings の予定枠・将来拡張用）
+- キー割り当て: key_bindings.close_subwindow に Tk のバインド文字列（例: "<Escape>" 既定、 "<F1>" ）
+  無効な値は無視され既定に戻ります。
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, Tuple
@@ -31,6 +34,9 @@ from basketball_sim.utils.paths import settings_path
 LOG = logging.getLogger("basketball_sim.settings")
 
 SETTINGS_VERSION = 1
+
+# settings.json の key_bindings で使うアクション名（MainMenuView などが参照）
+KEY_ACTION_CLOSE_SUBWINDOW = "close_subwindow"
 
 _DEFAULTS: Dict[str, Any] = {
     "schema_version": SETTINGS_VERSION,
@@ -131,6 +137,30 @@ def resolve_window_geometry(settings: Dict[str, Any]) -> Tuple[int, int, int, in
     min_w = max(640, min(1200, w))
     min_h = max(480, min(760, h))
     return w, h, min_w, min_h
+
+
+_TK_BIND_RE = re.compile(r"^<[^>]{1,48}>$")
+
+
+def tk_binding_for(settings: Dict[str, Any], action: str, default: str) -> str:
+    """
+    key_bindings[action] から Tkinter の bind 用シーケンスを返す。
+    不正な型・形式・長さは default にフォールバック。
+    """
+    if not isinstance(action, str) or not action.strip():
+        return default
+    kb = settings.get("key_bindings")
+    if not isinstance(kb, dict):
+        return default
+    raw = kb.get(action)
+    if not isinstance(raw, str):
+        return default
+    seq = raw.strip()
+    if not seq or len(seq) > 64:
+        return default
+    if not _TK_BIND_RE.fullmatch(seq):
+        return default
+    return seq
 
 
 def apply_tk_window_settings(root: Any, settings: Dict[str, Any]) -> None:

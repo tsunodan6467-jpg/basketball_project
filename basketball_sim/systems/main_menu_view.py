@@ -32,7 +32,12 @@ from tkinter import ttk, messagebox
 from datetime import datetime, date
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
-from basketball_sim.utils.user_settings import apply_tk_window_settings, load_user_settings
+from basketball_sim.utils.user_settings import (
+    KEY_ACTION_CLOSE_SUBWINDOW,
+    apply_tk_window_settings,
+    load_user_settings,
+    tk_binding_for,
+)
 
 
 MenuCallback = Callable[[], None]
@@ -108,7 +113,8 @@ class MainMenuView:
         self._configure_styles()
         self._build_ui()
         self.refresh()
-        self.root.bind("<Escape>", self._on_escape_close_topmost)
+        _close_seq = tk_binding_for(cfg, KEY_ACTION_CLOSE_SUBWINDOW, "<Escape>")
+        self.root.bind(_close_seq, self._on_close_subwindow_hotkey)
 
     # ------------------------------------------------------------------
     # UI build
@@ -2186,8 +2192,8 @@ class MainMenuView:
             return
         messagebox.showinfo("未接続", "次へ進む処理は main.py 接続時に追加します。")
 
-    def _on_escape_close_topmost(self, event: Any = None) -> str:
-        """Esc: フォーカスがある Toplevel を閉じる（メインウィンドウは閉じない）。"""
+    def _on_close_subwindow_hotkey(self, event: Any = None) -> str:
+        """key_bindings.close_subwindow（既定 Esc）: フォーカスがある Toplevel を閉じる。"""
         try:
             w = self.root.focus_get()
         except Exception:

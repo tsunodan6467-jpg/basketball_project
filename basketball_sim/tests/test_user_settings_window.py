@@ -1,6 +1,10 @@
-"""user_settings のウィンドウ寸法解決（tk なし）。"""
+"""user_settings のウィンドウ寸法・キーバインド解決（tk なし）。"""
 
-from basketball_sim.utils.user_settings import resolve_window_geometry
+from basketball_sim.utils.user_settings import (
+    KEY_ACTION_CLOSE_SUBWINDOW,
+    resolve_window_geometry,
+    tk_binding_for,
+)
 
 
 def test_resolve_window_geometry_clamps() -> None:
@@ -17,3 +21,32 @@ def test_resolve_window_geometry_defaults_inside() -> None:
     s = {"window": {}, "fullscreen": False}
     w, h, _, _ = resolve_window_geometry(s)
     assert w == 1420 and h == 860
+
+
+def test_tk_binding_for_custom_and_fallback() -> None:
+    default = "<Escape>"
+    assert tk_binding_for({}, KEY_ACTION_CLOSE_SUBWINDOW, default) == default
+    assert (
+        tk_binding_for(
+            {"key_bindings": {KEY_ACTION_CLOSE_SUBWINDOW: "<F1>"}},
+            KEY_ACTION_CLOSE_SUBWINDOW,
+            default,
+        )
+        == "<F1>"
+    )
+    assert (
+        tk_binding_for(
+            {"key_bindings": {KEY_ACTION_CLOSE_SUBWINDOW: "bogus"}},
+            KEY_ACTION_CLOSE_SUBWINDOW,
+            default,
+        )
+        == default
+    )
+    assert (
+        tk_binding_for(
+            {"key_bindings": {KEY_ACTION_CLOSE_SUBWINDOW: "<<bad>>"}},
+            KEY_ACTION_CLOSE_SUBWINDOW,
+            default,
+        )
+        == default
+    )
