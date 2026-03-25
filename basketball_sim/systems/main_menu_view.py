@@ -108,6 +108,7 @@ class MainMenuView:
         self._configure_styles()
         self._build_ui()
         self.refresh()
+        self.root.bind("<Escape>", self._on_escape_close_topmost)
 
     # ------------------------------------------------------------------
     # UI build
@@ -2184,6 +2185,22 @@ class MainMenuView:
             self.refresh()
             return
         messagebox.showinfo("未接続", "次へ進む処理は main.py 接続時に追加します。")
+
+    def _on_escape_close_topmost(self, event: Any = None) -> str:
+        """Esc: フォーカスがある Toplevel を閉じる（メインウィンドウは閉じない）。"""
+        try:
+            w = self.root.focus_get()
+        except Exception:
+            return ""
+        while w is not None and w != self.root:
+            if isinstance(w, tk.Toplevel):
+                try:
+                    w.destroy()
+                except tk.TclError:
+                    pass
+                return "break"
+            w = getattr(w, "master", None)
+        return ""
 
     # ------------------------------------------------------------------
     # Safe data access

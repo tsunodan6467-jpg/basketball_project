@@ -14,6 +14,7 @@
 - ログの詳しさ: log_level に "DEBUG" / "INFO" / "WARNING" / "ERROR"
   （環境変数 BASKETBALL_SIM_LOG_LEVEL がある場合はそちらが優先）
 - ウィンドウ: window.width / window.height（既定 1420x860）、fullscreen（tkinter 主画面に反映）
+- 主画面: Esc でフォーカス中のサブウィンドウを閉じる（key_bindings の予定枠・将来拡張用）
 """
 
 from __future__ import annotations
