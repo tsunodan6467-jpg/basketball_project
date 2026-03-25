@@ -40,7 +40,7 @@ if (-not (Test-Path $gh)) {
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "GitHub CLI にログインしていません。次を実行してから、もう一度このスクリプトを実行してください。"
-    Write-Host "  & `"$gh`" auth login -h github.com -p https -w"
+    Write-Host ('  ' + $gh + ' auth login -h github.com -p https -w')
     Write-Host ""
     exit 1
 }
