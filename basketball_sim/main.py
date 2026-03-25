@@ -1612,9 +1612,11 @@ def run_interactive_season(
     user_team=None,
     tracked_player_name=None,
     resume: Optional[Dict[str, Any]] = None,
+    start_at_annual_menu: bool = False,
 ):
     """
     CLI シーズンループ。resume を渡すとセーブから続行（年度進行メニュー直後から再開可）。
+    start_at_annual_menu: UI でオフシーズンまで済ませた直後など、年度進行メニューから開始する。
     """
     skip_to_annual_menu = False
     if resume is not None:
@@ -1630,6 +1632,8 @@ def run_interactive_season(
         if teams is None or free_agents is None or user_team is None:
             raise ValueError("run_interactive_season: teams / free_agents / user_team が必要です（resume 未指定時）")
         season_count = 1
+        if start_at_annual_menu:
+            skip_to_annual_menu = True
 
     while True:
         if not skip_to_annual_menu:
@@ -1788,6 +1792,7 @@ def run_main_menu_ui_mode(
         return
 
     season = Season(teams, free_agents)
+    ui_flow = {"offseason_completed": False}
 
     def advance_one_round():
         if season.season_finished:
@@ -1821,12 +1826,13 @@ def run_main_menu_ui_mode(
             print_separator("オフシーズン完了")
             print_player_career_tracking(user_team, tracked_player_name=tracked_player_name)
             print_user_team_history(user_team)
+            ui_flow["offseason_completed"] = True
             if root is not None:
                 messagebox.showinfo(
                     "完了",
                     "オフシーズンが終わりました。\n"
-                    "次シーズン・セーブはターミナル（CLI）の年度進行メニューから行ってください。\n"
-                    "このウィンドウは閉じても構いません。",
+                    "メインウィンドウを閉じると、ターミナルに年度進行メニューが続きます。\n"
+                    "次シーズン・セーブはそこから操作できます。",
                     parent=root,
                 )
             return
@@ -1839,7 +1845,7 @@ def run_main_menu_ui_mode(
 
     print_separator("主画面UIモード開始")
     print("『日程』または『次へ進む』で1ラウンド進行します。")
-    print("シーズン終了後は『オフシーズンを実行』からオフシーズンへ（完了後の次シーズン・セーブはCLIの年度進行メニュー）。")
+    print("シーズン終了後は『オフシーズンを実行』→ 完了後、ウィンドウを閉じるとターミナルで年度進行メニューが続きます。")
     print("他メニューは段階的に接続します。")
 
     launch_main_menu(
@@ -1849,6 +1855,16 @@ def run_main_menu_ui_mode(
         menu_callbacks=menu_callbacks,
         user_settings=user_settings,
     )
+
+    if ui_flow["offseason_completed"]:
+        print_separator("UIでのオフシーズン完了 → CLI 年度進行メニュー")
+        run_interactive_season(
+            teams=teams,
+            free_agents=free_agents,
+            user_team=user_team,
+            tracked_player_name=tracked_player_name,
+            start_at_annual_menu=True,
+        )
 
 
 def simulate():
