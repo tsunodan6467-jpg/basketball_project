@@ -13,6 +13,7 @@
 - ゲームを終了したあと、メモ帳で settings.json を編集して保存 → 次回起動で反映。
 - ログの詳しさ: log_level に "DEBUG" / "INFO" / "WARNING" / "ERROR"
   （環境変数 BASKETBALL_SIM_LOG_LEVEL がある場合はそちらが優先）
+- ウィンドウ: window.width / window.height（既定 1420x860）、fullscreen（tkinter 主画面に反映）
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import logging
 import os
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from basketball_sim.utils.paths import settings_path
 
@@ -34,8 +35,8 @@ _DEFAULTS: Dict[str, Any] = {
     "schema_version": SETTINGS_VERSION,
     "log_level": "INFO",
     "window": {
-        "width": 1280,
-        "height": 720,
+        "width": 1420,
+        "height": 860,
     },
     "fullscreen": False,
     "key_bindings": {},
@@ -44,10 +45,11 @@ _DEFAULTS: Dict[str, Any] = {
 
 def _clamp_window(w: Dict[str, Any]) -> None:
     try:
-        width = int(w.get("width", 1280))
-        height = int(w.get("height", 720))
+        width = int(w.get("width", _DEFAULTS["window"]["width"]))
+        height = int(w.get("height", _DEFAULTS["window"]["height"]))
     except (TypeError, ValueError):
-        width, height = 1280, 720
+        width = int(_DEFAULTS["window"]["width"])
+        height = int(_DEFAULTS["window"]["height"])
     w["width"] = max(640, min(7680, width))
     w["height"] = max(480, min(4320, height))
 
@@ -62,7 +64,10 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
         out["log_level"] = lvl
     win = data.get("window")
     if isinstance(win, dict):
-        out["window"] = {"width": win.get("width", 1280), "height": win.get("height", 720)}
+        out["window"] = {
+            "width": win.get("width", _DEFAULTS["window"]["width"]),
+            "height": win.get("height", _DEFAULTS["window"]["height"]),
+        }
         _clamp_window(out["window"])
     out["fullscreen"] = bool(data.get("fullscreen", False))
     kb = data.get("key_bindings")
@@ -107,6 +112,38 @@ def ensure_settings_file_exists(path: Path | None = None) -> Dict[str, Any]:
     except OSError as exc:
         LOG.warning("設定ファイルを作成できませんでした: %s (%s)", p, exc)
     return data
+
+
+def resolve_window_geometry(settings: Dict[str, Any]) -> Tuple[int, int, int, int]:
+    """
+    settings から (幅, 高さ, min幅, min高さ) を返す。
+    主画面 tkinter のレイアウト想定に合わせた下限付き。
+    """
+    win = settings.get("window") or {}
+    try:
+        w = int(win.get("width", _DEFAULTS["window"]["width"]))
+        h = int(win.get("height", _DEFAULTS["window"]["height"]))
+    except (TypeError, ValueError):
+        w, h = int(_DEFAULTS["window"]["width"]), int(_DEFAULTS["window"]["height"])
+    w = max(640, min(7680, w))
+    h = max(480, min(4320, h))
+    min_w = max(640, min(1200, w))
+    min_h = max(480, min(760, h))
+    return w, h, min_w, min_h
+
+
+def apply_tk_window_settings(root: Any, settings: Dict[str, Any]) -> None:
+    """
+    tk.Tk に geometry / minsize / フルスクリーンを適用する。
+    """
+    w, h, min_w, min_h = resolve_window_geometry(settings)
+    root.geometry(f"{w}x{h}")
+    root.minsize(min_w, min_h)
+    if bool(settings.get("fullscreen", False)):
+        try:
+            root.attributes("-fullscreen", True)
+        except Exception:
+            LOG.debug("fullscreen 非対応の環境のためスキップ", exc_info=True)
 
 
 def apply_settings_to_environment(settings: Dict[str, Any]) -> None:

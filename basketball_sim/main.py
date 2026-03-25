@@ -1763,7 +1763,13 @@ def choose_game_launch_mode():
         print("1 か 2 を入力してください。")
 
 
-def run_main_menu_ui_mode(teams, free_agents, user_team, tracked_player_name=None):
+def run_main_menu_ui_mode(
+    teams,
+    free_agents,
+    user_team,
+    tracked_player_name=None,
+    user_settings: Optional[Dict[str, Any]] = None,
+):
     if launch_main_menu is None:
         print("main_menu_view.py の読み込みに失敗しました。CLIモードで続行します。")
         run_interactive_season(
@@ -1798,6 +1804,7 @@ def run_main_menu_ui_mode(teams, free_agents, user_team, tracked_player_name=Non
         season=season,
         on_advance=advance_one_round,
         menu_callbacks=menu_callbacks,
+        user_settings=user_settings,
     )
 
 
@@ -1850,6 +1857,7 @@ def simulate():
             free_agents=free_agents,
             user_team=user_team,
             tracked_player_name=icon_player.name,
+            user_settings=_settings,
         )
         return
 

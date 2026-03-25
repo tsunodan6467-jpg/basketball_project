@@ -32,6 +32,8 @@ from tkinter import ttk, messagebox
 from datetime import datetime, date
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
+from basketball_sim.utils.user_settings import apply_tk_window_settings, load_user_settings
+
 
 MenuCallback = Callable[[], None]
 AdvanceCallback = Callable[[], None]
@@ -82,6 +84,7 @@ class MainMenuView:
         news_items: Optional[List[str]] = None,
         tasks: Optional[List[str]] = None,
         title: str = "国内バスケGM - 主画面",
+        user_settings: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.team = team
         self.season = season
@@ -92,8 +95,8 @@ class MainMenuView:
 
         self.root = root or tk.Tk()
         self.root.title(title)
-        self.root.geometry("1420x860")
-        self.root.minsize(1200, 760)
+        cfg = user_settings if user_settings is not None else load_user_settings()
+        apply_tk_window_settings(self.root, cfg)
         self.root.configure(bg="#15171c")
 
         self.style = ttk.Style(self.root)
@@ -2490,6 +2493,7 @@ def launch_main_menu(
     menu_callbacks: Optional[Dict[str, MenuCallback]] = None,
     news_items: Optional[List[str]] = None,
     tasks: Optional[List[str]] = None,
+    user_settings: Optional[Dict[str, Any]] = None,
 ) -> MainMenuView:
     """Convenience launcher used by future main.py wiring."""
     view = MainMenuView(
@@ -2499,6 +2503,7 @@ def launch_main_menu(
         menu_callbacks=menu_callbacks,
         news_items=news_items,
         tasks=tasks,
+        user_settings=user_settings,
     )
     view.run()
     return view
