@@ -1,7 +1,8 @@
+import logging
 import random
 from typing import List
 
-print("[DEV-SYSTEM] VERSION 20260312-E LOADED")
+_logger = logging.getLogger(__name__)
 
 
 class DevelopmentSystem:
@@ -362,3 +363,6 @@ class DevelopmentSystem:
             delta += 1
 
         return delta * sign
+
+
+_logger.debug("DevelopmentSystem loaded (version %s)", DevelopmentSystem.VERSION)
