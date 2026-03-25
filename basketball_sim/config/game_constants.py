@@ -24,3 +24,10 @@ FORFEIT_SCORE = 20
 
 # 試合成立に必要なアクティブ登録の最低人数（Match と整合）
 MINIMUM_ACTIVE_PLAYERS_FOR_GAME = 7
+
+# B リーグ風・国内リーグ基準（試合登録 / オンコート）
+# Match.COMPETITION_RULES の regular_season / playoff / final_boss と整合
+LEAGUE_ROSTER_FOREIGN_CAP = 3
+LEAGUE_ROSTER_ASIA_NATURALIZED_CAP = 1
+LEAGUE_ONCOURT_FOREIGN_CAP = 2
+LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP = 1

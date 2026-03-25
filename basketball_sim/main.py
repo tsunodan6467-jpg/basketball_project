@@ -4,7 +4,11 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from basketball_sim.config.game_constants import PAYLOAD_SCHEMA_VERSION
+from basketball_sim.config.game_constants import (
+    LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
+    LEAGUE_ROSTER_FOREIGN_CAP,
+    PAYLOAD_SCHEMA_VERSION,
+)
 from basketball_sim.models.season import Season
 from basketball_sim.models.offseason import Offseason
 from basketball_sim.systems.generator import (
@@ -276,8 +280,8 @@ def print_roster_rule_summary(players):
     print("\n[ロスター内訳]")
     for pos in ["PG", "SG", "SF", "PF", "C"]:
         print(f"{pos}: {pos_counter.get(pos, 0)}")
-    print(f"Foreign: {counts['Foreign']}/3")
-    print(f"Asia/Naturalized: {counts['AsiaNat']}/1")
+    print(f"Foreign: {counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP}")
+    print(f"Asia/Naturalized: {counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}")
 
 
 def auto_draft_players(pool, user_team, icon_player):
@@ -344,7 +348,7 @@ def nationality_check(player, counts):
     if nat == "Foreign" and counts["Foreign"] >= 3:
         return False
 
-    if nat in ("Asia", "Naturalized") and counts["AsiaNat"] >= 1:
+    if nat in ("Asia", "Naturalized") and counts["AsiaNat"] >= LEAGUE_ROSTER_ASIA_NATURALIZED_CAP:
         return False
 
     return True
@@ -378,8 +382,8 @@ def draft_players(pool, user_team, icon_player):
     while len(selected) < 12:
         print(f"\n現在 {len(selected)}/12人")
         print(
-            f"国籍枠: Foreign {counts['Foreign']}/3 | "
-            f"Asia/Naturalized {counts['AsiaNat']}/1"
+            f"国籍枠: Foreign {counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP} | "
+            f"Asia/Naturalized {counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}"
         )
 
         print("\nポジション選択")
@@ -539,7 +543,10 @@ def choose_cpu_roster_candidate(candidates, counts, stronger=False, required_pos
 
 def summarize_roster_nationality_counts(players):
     counts = build_japan_rule_counts(players)
-    return f"Foreign:{counts['Foreign']}/3 | Asia/Naturalized:{counts['AsiaNat']}/1"
+    return (
+        f"Foreign:{counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP} | "
+        f"Asia/Naturalized:{counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}"
+    )
 
 
 def ensure_cpu_pool_viability(pool, team_count):

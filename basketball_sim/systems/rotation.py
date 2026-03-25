@@ -1,5 +1,9 @@
 from typing import List, Optional, Dict, Tuple
 
+from basketball_sim.config.game_constants import (
+    LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
+    LEAGUE_ONCOURT_FOREIGN_CAP,
+)
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 
@@ -389,7 +393,10 @@ class RotationSystem:
         foreign = self._count_foreign(new_lineup)
         asia_nat = self._count_asia_nat(new_lineup)
 
-        return foreign <= 2 and asia_nat <= 1
+        return (
+            foreign <= LEAGUE_ONCOURT_FOREIGN_CAP
+            and asia_nat <= LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP
+        )
 
     def _pair_swap_blocked(self, out_player: Player, in_player: Player, possession: int) -> bool:
         if self._get_minutes(in_player) <= 2.0:

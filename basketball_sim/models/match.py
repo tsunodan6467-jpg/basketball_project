@@ -7,6 +7,10 @@ from .player import Player
 from basketball_sim.config.game_constants import (
     CLOCK_SECONDS_PER_REGULATION_QUARTER,
     FORFEIT_SCORE,
+    LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
+    LEAGUE_ONCOURT_FOREIGN_CAP,
+    LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
+    LEAGUE_ROSTER_FOREIGN_CAP,
     MINIMUM_ACTIVE_PLAYERS_FOR_GAME,
 )
 from basketball_sim.systems.rotation import RotationSystem
@@ -1313,16 +1317,46 @@ class Match:
 
     COMPETITION_RULES = {
         "regular_season": {
-            "active": {"foreign_max": 3, "special_max": 1, "asia_as_foreign": False, "special_label": "Asia/帰化"},
-            "on_court": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "Asia/帰化"},
+            "active": {
+                "foreign_max": LEAGUE_ROSTER_FOREIGN_CAP,
+                "special_max": LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
+                "asia_as_foreign": False,
+                "special_label": "Asia/帰化",
+            },
+            "on_court": {
+                "foreign_max": LEAGUE_ONCOURT_FOREIGN_CAP,
+                "special_max": LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
+                "asia_as_foreign": False,
+                "special_label": "Asia/帰化",
+            },
         },
         "playoff": {
-            "active": {"foreign_max": 3, "special_max": 1, "asia_as_foreign": False, "special_label": "Asia/帰化"},
-            "on_court": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "Asia/帰化"},
+            "active": {
+                "foreign_max": LEAGUE_ROSTER_FOREIGN_CAP,
+                "special_max": LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
+                "asia_as_foreign": False,
+                "special_label": "Asia/帰化",
+            },
+            "on_court": {
+                "foreign_max": LEAGUE_ONCOURT_FOREIGN_CAP,
+                "special_max": LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
+                "asia_as_foreign": False,
+                "special_label": "Asia/帰化",
+            },
         },
         "final_boss": {
-            "active": {"foreign_max": 3, "special_max": 1, "asia_as_foreign": False, "special_label": "Asia/帰化"},
-            "on_court": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "Asia/帰化"},
+            "active": {
+                "foreign_max": LEAGUE_ROSTER_FOREIGN_CAP,
+                "special_max": LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
+                "asia_as_foreign": False,
+                "special_label": "Asia/帰化",
+            },
+            "on_court": {
+                "foreign_max": LEAGUE_ONCOURT_FOREIGN_CAP,
+                "special_max": LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
+                "asia_as_foreign": False,
+                "special_label": "Asia/帰化",
+            },
         },
         "emperor_cup": {
             "active": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": True, "special_label": "帰化"},
