@@ -1,0 +1,33 @@
+# basketball_project — Phase 0: 依存関係・実行環境の固定
+# ランタイムは標準ライブラリ + tkinter のみ（pip パッケージなし）
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "basketball-sim"
+version = "0.1.0"
+description = "国内プロバスケGMシミュレーション（開発中）"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+basketball-sim = "basketball_sim.main:simulate"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0,<9",
+]
+build = [
+    "pyinstaller>=6.0,<8",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["basketball_sim*"]
+
+[tool.pytest.ini_options]
+testpaths = ["basketball_sim/tests"]
+python_files = ["test_*.py"]
+addopts = "-q"

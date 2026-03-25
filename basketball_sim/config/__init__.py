@@ -1,0 +1,19 @@
+"""ゲーム全体の定数・設定の集約（Phase 0 土台）。"""
+
+from basketball_sim.config.game_constants import (
+    CLOCK_SECONDS_PER_REGULATION_QUARTER,
+    FORFEIT_SCORE,
+    GAME_ID,
+    MINIMUM_ACTIVE_PLAYERS_FOR_GAME,
+    PAYLOAD_SCHEMA_VERSION,
+    REGULATION_QUARTERS,
+)
+
+__all__ = [
+    "CLOCK_SECONDS_PER_REGULATION_QUARTER",
+    "FORFEIT_SCORE",
+    "GAME_ID",
+    "MINIMUM_ACTIVE_PLAYERS_FOR_GAME",
+    "PAYLOAD_SCHEMA_VERSION",
+    "REGULATION_QUARTERS",
+]

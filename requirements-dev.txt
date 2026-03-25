@@ -1,0 +1,8 @@
+# 開発・テスト用（ランタイムには不要）
+# インストール: pip install -r requirements-dev.txt
+# または:       pip install -e ".[dev]"
+
+pytest>=8.3.0,<9
+
+# exe ビルド（pyproject の [project.optional-dependencies] build と同内容）
+pyinstaller>=6.0,<8

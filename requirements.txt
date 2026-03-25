@@ -1,0 +1,19 @@
+# =============================================================================
+# ランタイム依存（固定）
+# =============================================================================
+# 現状、pip で入れるサードパーティはありません。
+# 使用環境: Python 3.10 以上（list[X] / X | Y 形式の型ヒントを使用）
+# GUI: tkinter（python.org 版 Windows インストーラでは同梱）
+#
+# このリポジトリをパッケージとして扱う場合（任意）:
+#   pip install -e .
+#
+# 開発用（pytest 等）は requirements-dev.txt を参照。
+#
+# 単一 exe のビルド試験（任意・Phase 0）:
+#   pip install -e ".[build]"
+#   python -m PyInstaller --noconfirm BasketballGM.spec
+#   → dist\BasketballGM.exe （または scripts\build_windows.ps1）
+#
+# ログの詳しさ（任意）: 環境変数 BASKETBALL_SIM_LOG_LEVEL=DEBUG など（既定は INFO）
+# または %USERPROFILE%\.basketball_sim\settings.json の log_level（環境変数が優先）

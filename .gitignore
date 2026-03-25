@@ -1,0 +1,14 @@
+# PyInstaller / ビルド成果物
+/build/
+/dist/
+*.spec.bak
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# エディタ
+.idea/
+.vscode/
