@@ -45,6 +45,12 @@ python -m basketball_sim --smoke
 
 同等: `python -m basketball_sim.main --smoke`
 
+Steam 連携の診断（DLL 検出・Init・BIsSubscribed の状態確認）:
+
+```bash
+python -m basketball_sim --steam-diag
+```
+
 開発用テスト:
 
 ```bash

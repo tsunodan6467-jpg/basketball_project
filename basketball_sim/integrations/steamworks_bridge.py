@@ -47,6 +47,7 @@ LOG = logging.getLogger("basketball_sim.steam")
 _initialized: bool = False
 _app_id_hint: Optional[int] = None
 _steam_dll: Optional[ctypes.CDLL] = None
+_steam_dll_path: Optional[str] = None
 _steam_apps_ptr: Optional[int] = None
 _steam_user_stats_ptr: Optional[int] = None
 
@@ -162,7 +163,7 @@ def _try_get_isteam_user_stats(dll: ctypes.CDLL) -> Optional[int]:
 
 def _try_native_init() -> bool:
     """DLL が利用可能なら SteamAPI_Init まで試す。成功時のみ True。"""
-    global _steam_dll, _initialized, _steam_apps_ptr, _steam_user_stats_ptr
+    global _steam_dll, _steam_dll_path, _initialized, _steam_apps_ptr, _steam_user_stats_ptr
 
     if platform.system() != "Windows":
         LOG.debug("Steam: ネイティブ DLL は Windows のみ対象です。")
@@ -197,6 +198,7 @@ def _try_native_init() -> bool:
             )
             continue
         _steam_dll = dll
+        _steam_dll_path = resolved
         _initialized = True
         _steam_apps_ptr = _try_get_isteam_apps(dll)
         if _steam_apps_ptr is None:
@@ -212,6 +214,11 @@ def _try_native_init() -> bool:
         LOG.info("Steam: ネイティブ API 初期化 OK (%s)", path)
         return True
     return False
+
+
+def steam_loaded_dll_path() -> Optional[str]:
+    """ネイティブ接続時に読み込んだ DLL の絶対パス。未接続なら None。"""
+    return _steam_dll_path
 
 
 def steam_is_subscribed() -> Optional[bool]:
@@ -373,7 +380,7 @@ def shutdown_steam() -> None:
     SteamAPI_Shutdown（ネイティブ接続時）と内部状態のクリア。
     フェイク初期化のみの場合はフラグのみオフ。
     """
-    global _initialized, _steam_dll, _steam_apps_ptr, _steam_user_stats_ptr
+    global _initialized, _steam_dll, _steam_dll_path, _steam_apps_ptr, _steam_user_stats_ptr
     dll = _steam_dll
     if dll is not None:
         try:
@@ -381,6 +388,7 @@ def shutdown_steam() -> None:
         except Exception as exc:
             LOG.debug("Steam: Shutdown: %s", exc)
         _steam_dll = None
+    _steam_dll_path = None
     _steam_apps_ptr = None
     _steam_user_stats_ptr = None
     _initialized = False

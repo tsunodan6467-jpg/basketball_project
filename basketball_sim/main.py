@@ -1963,7 +1963,31 @@ def run_smoke() -> int:
     return 0
 
 
+def run_steam_diag() -> int:
+    """
+    Steam 連携の診断（手元確認用）。
+
+    Steamworks パートナー側の App 作成前でも実行できる（未接続ならその旨が出るだけ）。
+    """
+    from basketball_sim.integrations.steamworks_bridge import (
+        steam_is_subscribed,
+        steam_loaded_dll_path,
+        steam_native_loaded,
+        try_init_steam,
+    )
+
+    ok = try_init_steam()
+    print("steam_diag:")
+    print(f"  try_init_steam: {ok}")
+    print(f"  steam_native_loaded: {steam_native_loaded()}")
+    print(f"  steam_loaded_dll_path: {steam_loaded_dll_path()}")
+    print(f"  steam_is_subscribed: {steam_is_subscribed()}")
+    return 0
+
+
 if __name__ == "__main__":
     if "--smoke" in sys.argv:
         raise SystemExit(run_smoke())
+    if "--steam-diag" in sys.argv:
+        raise SystemExit(run_steam_diag())
     simulate()
