@@ -167,6 +167,8 @@ Steam 実装の優先度（ライセンス・実績・クラウド要否）、`s
 
 **EULA・プライバシー**はストア／Steamworks を主に整備する方針で、チェックリストは `STEAMWORKS_DESIGN.md` §6 を参照してください（ゲーム内の同意 UI は現状未実装）。
 
+Steam パートナー画面の**起動に使う実行ファイル名**は、PyInstaller の出力（既定 **`BasketballGM.exe`**）と揃えてください。リネームする場合は `BasketballGM.spec` と `installer/BasketballGM.iss` を同じ名前に更新する旨は **`STEAMWORKS_DESIGN.md`**（「Steam クライアントの起動と実行ファイル名」）にあります。
+
 ---
 
 ## ライセンス

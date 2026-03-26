@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller 用。プロジェクトルートで: python -m PyInstaller --noconfirm BasketballGM.spec
 # 成果物: dist/BasketballGM.exe（build/ は中間生成）
+# Steam 起動設定の実行ファイル名は本 name= と一致させる（STEAMWORKS_DESIGN.md 参照）。
 # 回帰: pip install -r requirements-dev.txt && python -m pytest basketball_sim/tests -q
 #        dist\\BasketballGM.exe --smoke（ビルド後の起動確認・対話なし）
 # 目的: 単一 exe で CLI を配布試験する（Phase 0: パッケージング）
