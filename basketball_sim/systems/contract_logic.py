@@ -29,6 +29,49 @@ SALARY_CAP_DEFAULT = LEAGUE_SALARY_CAP
 MIN_SALARY_DEFAULT = 300_000
 MAX_CONTRACT_YEARS_DEFAULT = 5
 
+# FA: _offer_score に対する受諾ロール（スコア下限, 採択確率）。free_agency が参照。
+FA_ACCEPT_SCORE_TIERS: Tuple[Tuple[float, float], ...] = (
+    (68.0, 0.92),
+    (63.0, 0.78),
+    (58.0, 0.58),
+    (54.0, 0.38),
+    (50.0, 0.22),
+)
+
+
+def fa_roll_accept_offer(score: float) -> bool:
+    """
+    FA 交渉スコアに基づくランダム受諾。再契約の get_resign_threshold とは別スケール。
+    """
+    import random
+
+    for floor, prob in FA_ACCEPT_SCORE_TIERS:
+        if float(score) >= floor:
+            return random.random() < prob
+    return False
+
+
+def calculate_fa_retention_bonus(player: object, team: object) -> float:
+    """
+    旧所属がオファー先と同じ（引き留め・復帰）ときのボーナス。
+    last_contract_team_id == team.team_id のときのみ。
+    """
+    tid = getattr(team, "team_id", None)
+    if tid is None:
+        return 0.0
+    if getattr(player, "last_contract_team_id", None) != tid:
+        return 0.0
+    loyalty = safe_getattr_int(player, "loyalty", 50)
+    league_years = safe_getattr_int(player, "league_years", 0)
+    tenure = min(12, max(0, league_years))
+    base = 5.0 + (loyalty / 100.0) * 12.0
+    if tenure >= 5:
+        base += 5.0
+    elif tenure >= 3:
+        base += 2.5
+    return float(min(24.0, base))
+
+
 POTENTIAL_BONUS = {
     "S": 18_000_000,
     "A": 10_000_000,

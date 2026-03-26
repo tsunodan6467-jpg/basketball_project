@@ -3,6 +3,7 @@
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems import free_agency as fa
+from basketball_sim.systems.contract_logic import calculate_fa_retention_bonus, fa_roll_accept_offer
 
 
 def _player(pid: int, desired_salary: int, **kwargs) -> Player:
@@ -61,3 +62,20 @@ def test_offer_score_respects_money_priority():
     s2 = fa._offer_score(hi_win, team, 5_000_000, 2)
     # 同条件でも金志向の方が年俸スコア寄与が強い（極端な重み差）
     assert s1 != s2
+
+
+def test_retention_bonus_same_last_team():
+    team = _team()
+    p = _player(5, 4_000_000, last_contract_team_id=1, league_years=4, loyalty=70)
+    b = calculate_fa_retention_bonus(p, team)
+    assert b > 0
+
+
+def test_retention_bonus_other_team():
+    team = _team()
+    p = _player(6, 4_000_000, last_contract_team_id=999)
+    assert calculate_fa_retention_bonus(p, team) == 0.0
+
+
+def test_fa_roll_rejects_low_score():
+    assert fa_roll_accept_offer(20) is False

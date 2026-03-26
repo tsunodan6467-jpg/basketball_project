@@ -8,6 +8,8 @@ from basketball_sim.models.player import Player
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
     SALARY_SOFT_LIMIT_MULTIPLIER,
+    calculate_fa_retention_bonus,
+    fa_roll_accept_offer,
     get_team_payroll,
 )
 
@@ -365,9 +367,8 @@ def _offer_score(player: Player, team: Team, salary: int, years: int) -> float:
         security_score += 6.0
     security_score = max(20.0, min(100.0, security_score))
 
-    loyalty_bonus = 0.0
-    if getattr(player, "last_contract_team_id", None) == getattr(team, "team_id", None):
-        loyalty_bonus += int(profile.get("loyalty", 50)) * 0.12
+    # 旧所属クラブからのオファー（引き留め・復帰）
+    loyalty_bonus = float(calculate_fa_retention_bonus(player, team))
 
     popularity = getattr(team, "popularity", 50)
     market_score = max(20.0, min(100.0, popularity * 0.9 + float(getattr(team, "market_size", 1.0)) * 8.0))
@@ -579,18 +580,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
                 f"| status_before={status_before} | status_after={status_after}"
             )
 
-            accept = False
-
-            if score >= 68:
-                accept = random.random() < 0.92
-            elif score >= 63:
-                accept = random.random() < 0.78
-            elif score >= 58:
-                accept = random.random() < 0.58
-            elif score >= 54:
-                accept = random.random() < 0.38
-            elif score >= 50:
-                accept = random.random() < 0.22
+            accept = fa_roll_accept_offer(score)
 
             if accept:
                 if not can_team_sign_player_by_japan_rule(team, candidate):
