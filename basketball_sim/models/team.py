@@ -77,6 +77,7 @@ class Team:
     )
     youth_prospect_ids: List[int] = field(default_factory=list)
     youth_rights_players: List[Player] = field(default_factory=list)
+    icon_youth_return_reservations: List[dict] = field(default_factory=list)
 
     regular_wins: int = 0
     regular_losses: int = 0
@@ -134,6 +135,8 @@ class Team:
             self.youth_players = []
         if not hasattr(self, "youth_callups") or self.youth_callups is None:
             self.youth_callups = []
+        if not hasattr(self, "icon_youth_return_reservations") or self.icon_youth_return_reservations is None:
+            self.icon_youth_return_reservations = []
 
         inv = getattr(self, "youth_investment", None)
         if not isinstance(inv, dict):

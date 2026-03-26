@@ -18,7 +18,7 @@ from basketball_sim.systems.generator import (
     sync_player_id_counter_from_world,
 )
 from basketball_sim.systems.helpers import print_separator
-from basketball_sim.systems.trade_logic import TradeSystem
+from basketball_sim.systems.trade_logic import TradeSystem, MultiTradeOffer
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
     SALARY_SOFT_LIMIT_MULTIPLIER,
@@ -1411,6 +1411,41 @@ def choose_player_from_list(players, prompt):
         print("正しい番号を入力してください。")
 
 
+def choose_players_from_list(players, prompt, count):
+    """
+    players から count 個を選ぶ（カンマ区切り、例: 1,3,4）
+    """
+    if not players or count <= 0:
+        return []
+
+    while True:
+        raw = input(prompt).strip()
+        if not raw:
+            print("入力が空です。")
+            continue
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+        try:
+            idxs = [int(p) - 1 for p in parts]
+        except ValueError:
+            print("番号は整数で入力してください。")
+            continue
+
+        if any(i < 0 or i >= len(players) for i in idxs):
+            print("範囲外の番号があります。")
+            continue
+
+        unique_idxs = list(dict.fromkeys(idxs))
+        if len(unique_idxs) != count:
+            print(f"{count} 個ちょうど選んでください。")
+            continue
+
+        picked = [players[i] for i in unique_idxs]
+        if len(picked) != count:
+            print(f"{count} 個ちょうど選んでください。")
+            continue
+        return picked
+
+
 def print_trade_evaluation_summary(user_eval, ai_eval):
     print_separator("トレード評価")
     print(f"あなた側評価  : {'ACCEPT' if user_eval.accepts else 'REJECT'} | Score {user_eval.score}")
@@ -1480,7 +1515,122 @@ def propose_trade(all_teams, user_team):
         print("トレード実行に失敗しました。")
 
 
-def run_trade_menu(all_teams, user_team):
+def propose_multi_trade(all_teams, user_team, free_agents):
+    trade_system = TradeSystem()
+
+    print_separator("トレード提案（複数人数＋現金＋RB）")
+    ai_team = choose_trade_team(all_teams, user_team)
+    if ai_team is None:
+        return
+
+    ai_players = print_tradeable_players(ai_team, f"{ai_team.name} のトレード候補")
+    if not ai_players:
+        return
+
+    user_players = print_tradeable_players(user_team, "自チームの放出候補")
+    if not user_players:
+        return
+
+    print("人数ルール: 自分が出す人数 と 自分が受け取る人数 は 1〜3で、差は最大1")
+    while True:
+        try:
+            n_out = int(input("自分が出す人数(1-3): ").strip())
+            n_in = int(input("自分が受け取る人数(1-3): ").strip())
+        except ValueError:
+            print("数字を正しく入力してください。")
+            continue
+        if not (1 <= n_out <= 3 and 1 <= n_in <= 3):
+            print("人数は 1〜3 の範囲で入力してください。")
+            continue
+        if abs(n_out - n_in) > 1:
+            print("差が大きすぎます（最大1）。")
+            continue
+        if len(user_players) < n_out:
+            print(f"放出候補が足りません（必要: {n_out}, 候補: {len(user_players)}）。")
+            continue
+        if len(ai_players) < n_in:
+            print(f"相手候補が足りません（必要: {n_in}, 候補: {len(ai_players)}）。")
+            continue
+        break
+
+    user_gives = choose_players_from_list(
+        user_players,
+        prompt=f"放出する選手番号を {n_out} 個（例: 1,3）: ",
+        count=n_out,
+    )
+    ai_receives = choose_players_from_list(
+        ai_players,
+        prompt=f"獲得したい選手番号を {n_in} 個（例: 1,3）: ",
+        count=n_in,
+    )
+
+    max_cash = int(getattr(user_team, "money", 0) or 0)
+    while True:
+        try:
+            cash = int(input(f"現金移転（自分→相手, 0〜{max_cash}）: ").strip() or 0)
+        except ValueError:
+            print("整数で入力してください。")
+            continue
+        if 0 <= cash <= max_cash:
+            break
+        print("上限を超えています。")
+
+    max_rb = int(getattr(user_team, "rookie_budget_remaining", 0) or 0)
+    while True:
+        try:
+            rb = int(input(f"RB移転（自分→相手, 0〜{max_rb}）: ").strip() or 0)
+        except ValueError:
+            print("整数で入力してください。")
+            continue
+        if 0 <= rb <= max_rb:
+            break
+        print("上限を超えています。")
+
+    offer = MultiTradeOffer(
+        team_a_gives_players=user_gives,
+        team_a_receives_players=ai_receives,
+        cash_a_to_b=cash,
+        rookie_budget_a_to_b=rb,
+    )
+
+    user_eval, ai_eval = trade_system.evaluate_multi_trade(
+        team_a=user_team,
+        team_b=ai_team,
+        offer=offer,
+    )
+    print_trade_evaluation_summary(user_eval, ai_eval)
+
+    accepted, reason, ai_eval2 = trade_system.should_ai_accept_multi_trade(
+        team_a=user_team,
+        team_b=ai_team,
+        offer=offer,
+    )
+
+    if not accepted:
+        print_separator("トレード結果")
+        print(f"AIが拒否しました: {reason}")
+        return
+
+    confirm = input("このトレードを成立させますか？ (y/n): ").strip().lower()
+    if confirm != "y":
+        print("トレードを中止しました。")
+        return
+
+    success = trade_system.execute_multi_trade(
+        team_a=user_team,
+        team_b=ai_team,
+        offer=offer,
+        free_agents=free_agents,
+    )
+    print_separator("トレード結果")
+    if success:
+        print(f"成立: {', '.join(p.name for p in user_gives)} -> {ai_team.name} / "
+              f"{', '.join(p.name for p in ai_receives)} 来た")
+    else:
+        print("トレード実行に失敗しました（ロスター/上限/安全確認NG）。")
+
+
+def run_trade_menu(all_teams, user_team, free_agents):
     while True:
         print_separator("トレードメニュー")
         print("1. 相手チーム一覧を見る")
@@ -1492,7 +1642,7 @@ def run_trade_menu(all_teams, user_team):
         if choice == "1":
             print_trade_team_list(all_teams, user_team)
         elif choice == "2":
-            propose_trade(all_teams, user_team)
+            propose_multi_trade(all_teams, user_team, free_agents)
         elif choice == "3":
             return
         else:
@@ -1625,7 +1775,7 @@ def run_facility_investment_menu(user_team):
             print("正しい番号を入力してください。")
 
 
-def run_gm_menu(all_teams, user_team):
+def run_gm_menu(all_teams, user_team, free_agents):
     while True:
         print_separator("GMメニュー")
         print("1. チーム情報を見る")
@@ -1662,7 +1812,7 @@ def run_gm_menu(all_teams, user_team):
         elif choice == "9":
             change_bench_order(user_team)
         elif choice == "10":
-            run_trade_menu(all_teams, user_team)
+            run_trade_menu(all_teams, user_team, free_agents)
         elif choice == "11":
             run_facility_investment_menu(user_team)
         elif choice == "12":
@@ -1753,7 +1903,7 @@ def run_interactive_season(
                 elif choice == "7":
                     print_player_career_tracking(user_team, tracked_player_name=tracked_player_name)
                 elif choice == "8":
-                    run_gm_menu(teams, user_team)
+                    run_gm_menu(teams, user_team, free_agents)
                 elif choice == "9":
                     season.simulate_to_end()
                 else:
@@ -1788,7 +1938,7 @@ def run_interactive_season(
             print_player_career_tracking(user_team, tracked_player_name=tracked_player_name)
             continue
         elif next_choice == "4":
-            run_gm_menu(teams, user_team)
+            run_gm_menu(teams, user_team, free_agents)
             continue
         elif next_choice == "6":
             save_path = _prompt_save_path()

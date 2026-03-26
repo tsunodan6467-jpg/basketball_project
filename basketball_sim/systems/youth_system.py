@@ -40,6 +40,8 @@ def ensure_team_youth_profile(team: Team) -> None:
         team.youth_prospect_ids = []
     if not hasattr(team, "youth_rights_players") or getattr(team, "youth_rights_players", None) is None:
         team.youth_rights_players = []
+    if not hasattr(team, "icon_youth_return_reservations") or getattr(team, "icon_youth_return_reservations", None) is None:
+        team.icon_youth_return_reservations = []
 
 
 def _investment_bonus(inv: Dict[str, int]) -> float:
@@ -122,6 +124,67 @@ def generate_youth_intake_for_team(team: Team) -> List[Player]:
 
     team.youth_players.extend(created)
     return created
+
+
+def process_icon_youth_returns_for_team(team: Team) -> List[Player]:
+    """
+    アイコンのユース復帰予約を進め、0になったらユースへ再登場させる。
+    v1: まずは「生成して youth_players に積む」まで。
+    """
+    ensure_team_youth_profile(team)
+    reservations = list(getattr(team, "icon_youth_return_reservations", []) or [])
+    if not reservations:
+        return []
+
+    produced: List[Player] = []
+    kept: List[dict] = []
+
+    for r in reservations:
+        try:
+            years_left = int(r.get("years_left", 0))
+        except Exception:
+            years_left = 0
+        years_left -= 1
+        if years_left > 0:
+            r["years_left"] = years_left
+            kept.append(r)
+            continue
+
+        peak = int(r.get("peak_ovr", 70) or 70)
+        base_ovr = int(max(55, min(70, peak * random.uniform(0.68, 0.75) + random.randint(-2, 2))))
+        age = random.choice([16, 17, 18])
+        pos = str(r.get("position", "SF") or "SF")
+        p = generate_single_player(age_override=age, base_ovr_override=base_ovr, position_override=pos, nationality_override="Japan")
+        p.name = str(r.get("from_name", p.name) or p.name)
+        p.is_icon = True
+        p.icon_locked = True
+        p.acquisition_type = "youth"
+        p.acquisition_note = "icon_youth_return"
+        # UI/ログで目立たせるための内部バッジ（v1土台）
+        p.nickname_title = "ICON LEGACY"
+        p.title_level = max(int(getattr(p, "title_level", 0) or 0), 3)
+        p.youth_team_id = getattr(team, "team_id", None)
+        p.team_id = None
+        p.salary = 0
+        p.contract_years_left = 0
+        p.contract_total_years = 0
+        p.potential = random.choices(["S", "A", "B"], weights=[45, 45, 10], k=1)[0]
+        p.youth_reputation = "A"
+        p.youth_hidden_score = 80.0 + random.uniform(-2.0, 2.0)
+        produced.append(p)
+
+    team.icon_youth_return_reservations = kept
+    if produced:
+        # If youth is full, drop lowest non-icon youth first.
+        cap = int(getattr(team, "youth_capacity", 10))
+        for p in produced:
+            if len(team.youth_players) >= cap:
+                non_icon = [x for x in team.youth_players if not bool(getattr(x, "is_icon", False))]
+                if non_icon:
+                    drop = min(non_icon, key=lambda x: int(getattr(x, "ovr", 0) or 0))
+                    team.youth_players.remove(drop)
+            team.youth_players.append(p)
+    return produced
 
 
 def _score_youth_prospect(team: Team, player: Player) -> float:
@@ -286,6 +349,7 @@ def run_youth_offseason_update_for_teams(teams: List[Team], free_agents: Optiona
     for t in teams:
         ensure_team_youth_profile(t)
         advance_youth_year_for_team(t)
+        process_icon_youth_returns_for_team(t)
         # 卒業→(一部は自クラブがプロ契約＝通常ロスター枠) / それ以外はドラフトへ
         before_rights = len(getattr(t, "youth_rights_players", []) or [])
         draft_entrants.extend(graduate_youth_players_for_team(t))

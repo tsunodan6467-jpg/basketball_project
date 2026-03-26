@@ -2031,6 +2031,33 @@ class Offseason:
                 f"[RETIRE] {p.name} / Age:{p.age} / OVR:{p.ovr} / Nat:{getattr(p, 'nationality', 'Japan')}"
             )
 
+            # Icon player: do NOT go to normal reincarnation/draft.
+            # Instead, reserve a guaranteed youth return for the same club.
+            if getattr(p, "is_icon", False) and team_before_retire is not None:
+                try:
+                    peak = int(getattr(p, "peak_ovr", getattr(p, "ovr", 0)) or 0)
+                    # 仕様: アイコンの空白期間をなくすため、翌年必ずユース復帰予約（遅延は固定1年）
+                    years_left = 1
+                    team_before_retire.icon_youth_return_reservations.append(
+                        {
+                            "from_name": getattr(p, "name", "Unknown"),
+                            "from_player_id": getattr(p, "player_id", None),
+                            "position": getattr(p, "position", "SF"),
+                            "archetype": getattr(p, "archetype", "Balanced"),
+                            "peak_ovr": peak,
+                            "years_left": years_left,
+                        }
+                    )
+                    print(
+                        f"[ICON-YOUTH-RESERVE] {team_before_retire.name} | "
+                        f"{getattr(p, 'name', 'Unknown')} -> youth return in {years_left}y"
+                    )
+                except Exception as exc:
+                    print(f"[ICON-YOUTH-RESERVE] failed: {exc}")
+
+                self._remove_player_from_current_place(p)
+                continue
+
             self._store_reincarnation_candidate(p)
             self._remove_player_from_current_place(p)
 
