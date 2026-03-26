@@ -58,6 +58,18 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 .\dist\BasketballGM.exe).Hash.ToLower()
           "$hash  BasketballGM.exe" | Out-File -Encoding ascii .\dist\BasketballGM.exe.sha256.txt
 
+      - name: Write job summary (SHA256)
+        shell: pwsh
+        run: |
+          $line = Get-Content .\dist\BasketballGM.exe.sha256.txt
+          "## BasketballGM-windows-exe" | Out-File -Encoding utf8 $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File -Encoding utf8 $env:GITHUB_STEP_SUMMARY -Append
+          "SHA256:" | Out-File -Encoding utf8 $env:GITHUB_STEP_SUMMARY -Append
+          "" | Out-File -Encoding utf8 $env:GITHUB_STEP_SUMMARY -Append
+          "``````" | Out-File -Encoding utf8 $env:GITHUB_STEP_SUMMARY -Append
+          $line | Out-File -Encoding utf8 $env:GITHUB_STEP_SUMMARY -Append
+          "``````" | Out-File -Encoding utf8 $env:GITHUB_STEP_SUMMARY -Append
+
       - name: Upload artifact (BasketballGM.exe)
         uses: actions/upload-artifact@v4
         with:
@@ -66,3 +78,4 @@ jobs:
             dist/BasketballGM.exe
             dist/BasketballGM.exe.sha256.txt
           if-no-files-found: error
+          retention-days: 14
