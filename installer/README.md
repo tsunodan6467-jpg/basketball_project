@@ -21,3 +21,24 @@
 6. **Publish release** で公開する。
 
 **注意**: `.gitignore` で `dist/` を除外しているため、**exe はリポジトリにコミットせず**、上記のように Release へ手動添付する運用が基本です。リリースのたびにローカルまたは信頼できるビルド環境で生成したバイナリを使ってください。CI から Release へ自動アップロードする場合は、別途 workflow とシークレット（署名鍵など）の設計が必要です。
+
+## リリースノート雛形（コピペ用）
+
+GitHub Release の本文に、そのまま貼って埋める用（日本語）。必要に応じて調整してください。
+
+```text
+## 変更点
+- （例）Steam ライセンスチェックを追加
+- （例）Actions で Windows exe を自動ビルド
+
+## 動作確認
+- [ ] `BasketballGM.exe --smoke` → `smoke ok`
+- [ ] （任意）`BasketballGM.exe --steam-diag`（Steam DLL 未同梱なら False/None でOK）
+
+## ダウンロードした exe の確認（任意・推奨）
+- SHA256:
+  - （例）<ここに `BasketballGM.exe.sha256.txt` の 1 行を貼る>
+
+## 既知の問題
+- （例）未署名のため初回起動時に SmartScreen が出る場合があります（「詳細情報」→「実行」で続行）。
+```
