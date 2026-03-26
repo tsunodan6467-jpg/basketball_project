@@ -88,6 +88,8 @@ class Player:
     # 獲得経路（将来のユース / 特別指定 / 履歴システム用）
     acquisition_type: str = "normal"  # normal / draft / trade / free_agent / youth / special_designation / international / reborn
     acquisition_note: str = ""
+    # 直近の契約更新種別（Step 2: 再契約 vs 延長の区別用）
+    contract_last_action: str = ""
 
     # ユース（v1土台）
     youth_team_id: Optional[int] = None
@@ -228,6 +230,7 @@ class Player:
         self.desired_salary = int(max(0, self.desired_salary))
         self.desired_years = int(max(0, self.desired_years))
         self.contract_role_expectation = self._normalize_contract_role_expectation(self.contract_role_expectation)
+        self.contract_last_action = str(getattr(self, "contract_last_action", "") or "")
 
         if self.contract_total_years <= 0 and self.contract_years_left > 0:
             self.contract_total_years = self.contract_years_left
@@ -664,6 +667,21 @@ class Player:
         疲労によるマイナス補正を適用した状態のOVRを計算します。
         """
         return max(0, self.ovr + self._get_fatigue_penalty())
+
+    def get_roster_sort_weight(self) -> float:
+        """
+        登録・スターター候補の並び順。
+        特別指定は市場グレードで主力寄り（SS）／ローテ寄り（S）の位置づけを反映。
+        """
+        base = float(self.get_effective_ovr())
+        if str(getattr(self, "acquisition_type", "") or "") != "special_designation":
+            return base
+        g = str(getattr(self, "draft_market_grade", "") or "").upper().strip()
+        if g == "SS":
+            return base + 10.0
+        if g == "S":
+            return base + 4.0
+        return base + 3.0
 
     def get_adjusted_attribute(self, attr_name: str) -> int:
         """

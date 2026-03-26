@@ -51,7 +51,7 @@ class RotationSystem:
 
         sorted_players = sorted(
             self.active_players,
-            key=lambda p: p.get_effective_ovr(),
+            key=lambda p: p.get_roster_sort_weight(),
             reverse=True
         )
 
@@ -168,7 +168,7 @@ class RotationSystem:
     def _get_rank_map(self) -> Dict[int, int]:
         sorted_players = sorted(
             self.active_players,
-            key=lambda p: p.get_effective_ovr(),
+            key=lambda p: p.get_roster_sort_weight(),
             reverse=True
         )
         return {self._player_key(p): idx for idx, p in enumerate(sorted_players)}
@@ -231,7 +231,7 @@ class RotationSystem:
     def _build_target_minutes_map(self) -> Dict[int, float]:
         sorted_players = sorted(
             self.active_players,
-            key=lambda p: p.get_effective_ovr(),
+            key=lambda p: p.get_roster_sort_weight(),
             reverse=True
         )
 
@@ -319,6 +319,26 @@ class RotationSystem:
             elif not is_starter:
                 target += bench_bonus_map.get(key, 0.0) * 0.55
 
+            # 特別指定: SSは主力寄り、Sはローテ寄り。育成優先チームは若手枠を優先して薄く出す。
+            if str(getattr(p, "acquisition_type", "") or "") == "special_designation":
+                grade = str(getattr(p, "draft_market_grade", "") or "").upper().strip()
+                if usage_policy == "development":
+                    if grade == "SS":
+                        target = min(target, 17.0)
+                        target -= 5.0
+                    else:
+                        target = min(target, 11.0)
+                        target -= 3.0
+                else:
+                    if grade == "SS":
+                        target = max(target, 26.0)
+                        target += 6.0
+                        if usage_policy == "win_now":
+                            target += 1.5
+                    else:
+                        target = max(target, 14.0)
+                        target += 3.5
+
             targets[key] = self._clamp_target_minutes(target)
 
         return targets
@@ -356,6 +376,15 @@ class RotationSystem:
         if (
             self._get_usage_policy() == "development"
             and str(getattr(player, "acquisition_type", "") or "") == "youth"
+            and not self._is_late_game(possession, total_possessions)
+        ):
+            cooldown_possessions = min(cooldown_possessions, 6)
+
+        # 特別指定SSは主力扱いで交代で入りやすい（育成モードでは若手優先のため対象外）
+        if (
+            self._get_usage_policy() != "development"
+            and str(getattr(player, "acquisition_type", "") or "") == "special_designation"
+            and str(getattr(player, "draft_market_grade", "") or "").upper().strip() == "SS"
             and not self._is_late_game(possession, total_possessions)
         ):
             cooldown_possessions = min(cooldown_possessions, 6)

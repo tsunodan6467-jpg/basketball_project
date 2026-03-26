@@ -25,9 +25,20 @@ FORFEIT_SCORE = 20
 # 試合成立に必要なアクティブ登録の最低人数（Match と整合）
 MINIMUM_ACTIVE_PLAYERS_FOR_GAME = 7
 
+# 本契約ロスター（Step 1: ユース・特別指定は別リスト）
+CONTRACT_ROSTER_MAX = 13
+# シーズン開幕時の最低人数（未達は警告・将来の強制用に予約）
+CONTRACT_ROSTER_MIN_SEASON = 10
+
 # B リーグ風・国内リーグ基準（試合登録 / オンコート）
 # Match.COMPETITION_RULES の regular_season / playoff / final_boss と整合
 LEAGUE_ROSTER_FOREIGN_CAP = 3
 LEAGUE_ROSTER_ASIA_NATURALIZED_CAP = 1
 LEAGUE_ONCOURT_FOREIGN_CAP = 2
 LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP = 1
+
+# サラリー（Step 3: リーグキャップ・ソフト上限・贅沢税の単一ソース）
+LEAGUE_SALARY_CAP = 15_000_000
+SALARY_SOFT_LIMIT_MULTIPLIER = 1.20
+# ソフトキャップ超過分に掛ける率（v1: 超過ペイロール全体に対する簡易税）
+LUXURY_TAX_RATE = 0.50

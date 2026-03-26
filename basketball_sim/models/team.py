@@ -79,6 +79,22 @@ class Team:
     youth_rights_players: List[Player] = field(default_factory=list)
     icon_youth_return_reservations: List[dict] = field(default_factory=list)
 
+    # -------------------------
+    # Special designation (v1)
+    # - ドラフト候補から「1年だけ・0円」で加入できる特別枠（13人枠外）
+    # -------------------------
+    special_designation_players: List[Player] = field(default_factory=list)
+
+    # 負傷者リスト（本契約13枠に含む。試合の登録対象から外すのみ）
+    injured_reserve_ids: List[int] = field(default_factory=list)
+
+    # -------------------------
+    # League shared state (v1 minimal)
+    # - 将来拡張を避けるため、リーグ共通の一部状態を Team に載せて永続化する
+    # -------------------------
+    league_future_draft_pool: List[Player] = field(default_factory=list)
+    league_future_draft_year: int = 0
+
     regular_wins: int = 0
     regular_losses: int = 0
     regular_points_for: int = 0
@@ -137,6 +153,15 @@ class Team:
             self.youth_callups = []
         if not hasattr(self, "icon_youth_return_reservations") or self.icon_youth_return_reservations is None:
             self.icon_youth_return_reservations = []
+        if not hasattr(self, "special_designation_players") or self.special_designation_players is None:
+            self.special_designation_players = []
+        if not hasattr(self, "injured_reserve_ids") or self.injured_reserve_ids is None:
+            self.injured_reserve_ids = []
+
+        if not hasattr(self, "league_future_draft_pool") or self.league_future_draft_pool is None:
+            self.league_future_draft_pool = []
+        if not hasattr(self, "league_future_draft_year") or self.league_future_draft_year is None:
+            self.league_future_draft_year = 0
 
         inv = getattr(self, "youth_investment", None)
         if not isinstance(inv, dict):
@@ -806,7 +831,21 @@ class Team:
 
         return True
 
-    def add_player(self, player: Player):
+    def add_player(self, player: Player, *, force: bool = False):
+        """
+        本契約ロスターへ追加。force=True はドラフト/トレード処理など、
+        直後に枠調整する内部経路のみ。
+        """
+        if player in self.players:
+            return
+
+        if not force:
+            from basketball_sim.systems.roster_rules import RosterViolationError, can_add_contract_player
+
+            ok, reason = can_add_contract_player(self, player)
+            if not ok:
+                raise RosterViolationError(reason)
+
         self.players.append(player)
         player.team_id = self.team_id
 
@@ -816,6 +855,8 @@ class Team:
             player.team_id = None
 
         player_id = getattr(player, "player_id", None)
+        if player_id is not None and getattr(self, "injured_reserve_ids", None):
+            self.injured_reserve_ids = [pid for pid in self.injured_reserve_ids if pid != player_id]
         if player_id in self.starting_lineup:
             self.starting_lineup = [
                 pid for pid in self.starting_lineup

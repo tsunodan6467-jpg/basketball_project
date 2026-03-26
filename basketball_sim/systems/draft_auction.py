@@ -225,7 +225,7 @@ def _set_drafted_player_contract(player: Player, slot: str, bid: int) -> None:
 
 
 def _add_player_to_team_and_trim(team: Team, player: Player, free_agents: List[Player]) -> None:
-    team.add_player(player)
+    team.add_player(player, force=True)
 
     # 13人超なら、最低OVRの非アイコンをFAへ。
     roster = list(getattr(team, "players", []) or [])

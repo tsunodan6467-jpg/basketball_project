@@ -127,6 +127,12 @@ class FASystem:
 
     def sign_player(self, team, player, salary, years):
 
+        from basketball_sim.systems.roster_rules import can_add_contract_player
+
+        ok, _ = can_add_contract_player(team, player)
+        if not ok:
+            return False
+
         if hasattr(team, "add_player"):
             team.add_player(player)
 

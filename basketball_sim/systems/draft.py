@@ -589,7 +589,7 @@ def _add_drafted_player_contract(player: Player, pick_num: int):
 def _finalize_team_addition(team: Team, player: Player, pick_num: int):
     _set_draft_acquisition(player, team, pick_num)
     _record_team_draft_history(team, player, pick_num)
-    team.add_player(player)
+    team.add_player(player, force=True)
     _record_player_draft_career(player, team, pick_num)
 
 

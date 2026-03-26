@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
+from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP, SALARY_SOFT_LIMIT_MULTIPLIER
+
 
 # =========================================================
 # Contract System (Safe Foundation)
@@ -20,10 +22,10 @@ from typing import Iterable, List, Optional, Tuple
 
 
 # -----------------------------
-# constants
+# constants（数値の正本は config.game_constants）
 # -----------------------------
-SALARY_CAP_DEFAULT = 9_000_000  # 開発用仮スケール: 現在の年俸水準に合わせたキャップ
-SALARY_SOFT_LIMIT_MULTIPLIER = 1.20
+SALARY_CAP_DEFAULT = LEAGUE_SALARY_CAP
+# SALARY_SOFT_LIMIT_MULTIPLIER は game_constants と同一オブジェクトを参照
 MIN_SALARY_DEFAULT = 300_000
 MAX_CONTRACT_YEARS_DEFAULT = 5
 
@@ -489,6 +491,33 @@ def evaluate_resign(
 
 
 
+def apply_contract_extension(
+    team: object,
+    player: object,
+    add_years: int = 1,
+    season_label: Optional[int] = None,
+) -> None:
+    """
+    同一条件の契約延長（年俸・役割は据え置き、残り年数のみ加算）。
+    再契約（apply_resign）とは別ルート。
+    """
+    add_years = clamp_int(int(add_years), 1, MAX_CONTRACT_YEARS_DEFAULT)
+    cur = safe_getattr_int(player, "contract_years_left", 0)
+    setattr(player, "contract_years_left", cur + add_years)
+    total = safe_getattr_int(player, "contract_total_years", 0)
+    setattr(player, "contract_total_years", max(total, 0) + add_years)
+    setattr(player, "last_contract_team_id", getattr(team, "team_id", getattr(player, "last_contract_team_id", None)))
+    setattr(player, "contract_last_action", "extension")
+    if hasattr(player, "add_career_entry"):
+        season = season_label if season_label is not None else max(1, safe_getattr_int(player, "years_pro", 0))
+        player.add_career_entry(
+            season=season,
+            team_name=getattr(team, "name", "Unknown Team"),
+            event="Contract Extension",
+            note=f"+{add_years}Y (same terms)",
+        )
+
+
 def apply_resign(
     team: object,
     player: object,
@@ -506,6 +535,7 @@ def apply_resign(
     setattr(player, "desired_salary", int(offer_salary))
     setattr(player, "desired_years", int(offer_years))
     setattr(player, "contract_role_expectation", infer_role_expectation(team, player))
+    setattr(player, "contract_last_action", "resign")
 
     if hasattr(player, "add_career_entry"):
         season = season_label if season_label is not None else max(1, safe_getattr_int(player, "years_pro", 0))
@@ -552,3 +582,42 @@ def initialize_contract_foundations_for_league(teams: Iterable[object], free_age
         for player in free_agents:
             set_contract_foundation_fields(player, None)
             update_player_contract_demand(player, None)
+
+
+# -----------------------------
+# offseason.py 向け互換ラッパー（名前を固定）
+# -----------------------------
+def calculate_desired_contract_terms(player: object) -> Tuple[int, int]:
+    return calculate_desired_salary(player), calculate_desired_years(player)
+
+
+def evaluate_resign_offer(
+    *,
+    player: object,
+    team: object,
+    offered_salary: int,
+    offered_years: int,
+    salary_cap: int = SALARY_CAP_DEFAULT,
+) -> dict:
+    decision = evaluate_resign(team, player, offer_salary=offered_salary, offer_years=offered_years, salary_cap=salary_cap)
+    return {
+        "score": float(decision.score),
+        "threshold": float(decision.threshold),
+        "accepted": bool(decision.accepted),
+        "reason": str(decision.reason),
+    }
+
+
+def apply_resign_offer(
+    *,
+    player: object,
+    team: object,
+    salary: int,
+    years: int,
+    season_label: Optional[int] = None,
+) -> None:
+    apply_resign(team, player, int(salary), int(years), season_label=season_label)
+
+
+# 旧名互換（ensure_contract_fields）
+ensure_contract_fields = set_contract_foundation_fields

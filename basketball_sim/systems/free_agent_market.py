@@ -225,13 +225,22 @@ def can_team_sign_player_by_japan_rule(team: Team, player: Player) -> bool:
     日本独自ルール用の安全チェック。
 
     優先順位:
-    1. Team に can_add_player_by_japan_rule があればそれを使う
-    2. なければ nationality を読んで安全側で判定する
+    1. roster_rules.can_add_contract_player（本契約13＋国籍）
+    2. Team の can_add_player_by_japan_rule
+    3. nationality フォールバック
 
     目的は CPU FA が明確な枠超過契約をしないようにすること。
     """
     ensure_team_fa_market_fields(team)
     ensure_fa_market_fields(player)
+
+    try:
+        from basketball_sim.systems.roster_rules import can_add_contract_player
+
+        ok, _ = can_add_contract_player(team, player)
+        return bool(ok)
+    except Exception:
+        pass
 
     can_add = getattr(team, "can_add_player_by_japan_rule", None)
     if callable(can_add):
@@ -299,6 +308,9 @@ def sign_free_agent(team: Team, player: Player) -> None:
         return
 
     salary = estimate_fa_market_value(player)
+    signing_room = int(get_team_fa_signing_limit(team))
+    if salary > signing_room:
+        return
     years = estimate_fa_contract_years(player)
 
     player.salary = salary

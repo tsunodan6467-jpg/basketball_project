@@ -2,6 +2,7 @@ import random
 from typing import List
 from collections import defaultdict
 
+from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
 from basketball_sim.systems.contract_logic import (
@@ -372,11 +373,23 @@ def _offer_score(player: Player, team: Team, salary: int, years: int) -> float:
 
 
 def can_team_sign_player_by_japan_rule(team: Team, player: Player) -> bool:
+    try:
+        from basketball_sim.systems.roster_rules import can_add_contract_player
+
+        ok, _ = can_add_contract_player(team, player)
+        return bool(ok)
+    except Exception:
+        pass
+
     if hasattr(team, "can_add_player_by_japan_rule"):
         try:
-            return bool(team.can_add_player_by_japan_rule(player))
+            if not bool(team.can_add_player_by_japan_rule(player)):
+                return False
         except Exception:
             pass
+
+    if len(getattr(team, "players", []) or []) >= CONTRACT_ROSTER_MAX:
+        return False
 
     nationality = str(getattr(player, "nationality", "") or "")
     foreign_count = 0
@@ -498,6 +511,20 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
 
             if offer <= 0:
                 break
+
+            try:
+                from basketball_sim.systems.free_agent_market import get_team_fa_signing_limit
+
+                signing_room = int(get_team_fa_signing_limit(team))
+            except Exception:
+                signing_room = max(0, _soft_cap() - payroll_before)
+
+            if offer > signing_room:
+                print(
+                    f"[FA-CAP] {team.name} skipped {candidate.name} "
+                    f"(offer ${offer:,} > room ${signing_room:,})"
+                )
+                continue
 
             payroll_after = payroll_before + offer
             status_after = _cap_status(payroll_after)

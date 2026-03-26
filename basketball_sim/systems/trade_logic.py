@@ -695,9 +695,9 @@ class TradeSystem:
             team_b.remove_player(p)
 
         for p in receives_a:
-            team_a.add_player(p)
+            team_a.add_player(p, force=True)
         for p in receives_b:
-            team_b.add_player(p)
+            team_b.add_player(p, force=True)
 
         # 現金 / rookie budget 移転
         team_a.money = int(getattr(team_a, "money", 0) or 0) - cash

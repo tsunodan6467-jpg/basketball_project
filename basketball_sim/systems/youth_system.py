@@ -362,7 +362,7 @@ def run_youth_offseason_update_for_teams(teams: List[Team], free_agents: Optiona
             p.salary = 300_000
             p.contract_years_left = 2
             p.contract_total_years = 2
-            t.add_player(p)
+            t.add_player(p, force=True)
             _trim_team_roster_to_13(t, free_agents=free_agents)
 
         generate_youth_intake_for_team(t)

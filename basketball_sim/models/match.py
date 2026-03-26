@@ -1459,6 +1459,18 @@ class Match:
 
     def _select_active_roster(self, team: Team):
         players = [p for p in team.players if not p.is_injured() and not p.is_retired]
+        il_ids = set(getattr(team, "injured_reserve_ids", []) or [])
+        if il_ids:
+            players = [p for p in players if getattr(p, "player_id", None) not in il_ids]
+
+        # Special designation players are outside the normal 13-man roster,
+        # but are available for games for 1 season.
+        special_pool = [
+            p for p in (getattr(team, "special_designation_players", []) or [])
+            if not p.is_injured() and not p.is_retired
+        ]
+        if special_pool:
+            players.extend(special_pool)
 
         # Youth callups (16〜18) are not part of the normal 13-man roster,
         # but can be registered for games when the team is in development mode.
@@ -1473,7 +1485,7 @@ class Match:
                 if not p.is_injured() and not p.is_retired
             ]
 
-        players = sorted(players, key=lambda p: p.get_effective_ovr(), reverse=True)
+        players = sorted(players, key=lambda p: p.get_roster_sort_weight(), reverse=True)
         focus = str(getattr(team, "youth_policy_focus", "balanced") or "balanced")
         global_policy = str(getattr(team, "youth_policy_global", "balanced") or "balanced")
 
@@ -1566,7 +1578,7 @@ class Match:
         return active, inactive
 
     def _get_starting_five_from_players(self, players: List[Player]) -> List[Player]:
-        sorted_players = sorted(players, key=lambda p: p.get_effective_ovr(), reverse=True)
+        sorted_players = sorted(players, key=lambda p: p.get_roster_sort_weight(), reverse=True)
 
         starters = []
         rule = self._get_competition_rule("on_court")

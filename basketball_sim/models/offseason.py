@@ -1,5 +1,8 @@
 import random
 from typing import List, Optional, Dict
+
+from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP
+
 from .team import Team
 from .player import Player
 from .match import Match
@@ -11,11 +14,13 @@ from basketball_sim.systems.top_prospect_generator import generate_top_prospects
 
 try:
     from basketball_sim.systems.contract_logic import (
-        ensure_contract_fields,
-        calculate_desired_contract_terms,
-        evaluate_resign_offer,
-        apply_resign_offer,
         advance_contract_years,
+        apply_contract_extension,
+        apply_resign_offer,
+        calculate_desired_contract_terms,
+        ensure_contract_fields,
+        evaluate_resign_offer,
+        get_team_player_rank,
     )
 except Exception:
     ensure_contract_fields = None
@@ -23,6 +28,8 @@ except Exception:
     evaluate_resign_offer = None
     apply_resign_offer = None
     advance_contract_years = None
+    apply_contract_extension = None
+    get_team_player_rank = None
 
 try:
     from basketball_sim.systems.free_agent_market import (
@@ -152,6 +159,8 @@ class Offseason:
         self.teams = teams
         self.free_agents = free_agents
         self.draft_pool: List[Player] = []
+        # 来年のドラフト候補（次オフのドラフトで使う）をリーグ状態として保持するための一時バッファ
+        self.future_draft_pool: List[Player] = []
         self.youth_draft_entrants: List[Player] = []
         self.re_signed_player_ids = set()
 
@@ -193,10 +202,232 @@ class Offseason:
 
         # 国際マイルストーンの詳細デバッグ出力は本番では行わない
 
+    def _get_league_state_holder_team(self) -> Optional[Team]:
+        if not self.teams:
+            return None
+        return min(self.teams, key=lambda t: int(getattr(t, "team_id", 0) or 0))
+
+    def _bootstrap_current_draft_pool_from_league_state(self) -> None:
+        """
+        前年オフに生成して保持しておいた「来年ドラフトプール」を、
+        今年オフのドラフトプールとして取り込む（＝1年先行生成を実現）。
+        """
+        holder = self._get_league_state_holder_team()
+        if holder is None:
+            return
+        pool = list(getattr(holder, "league_future_draft_pool", []) or [])
+        if not pool:
+            return
+        self.draft_pool.extend(pool)
+        holder.league_future_draft_pool = []
+
+    def _ensure_future_draft_pool_for_next_year(self) -> None:
+        """
+        次オフのドラフトに使うプールを、このオフのうちに先行生成して保持する。
+        特別指定の招待候補はこのプールから選ばれる。
+        """
+        holder = self._get_league_state_holder_team()
+        if holder is None:
+            return
+        existing = list(getattr(holder, "league_future_draft_pool", []) or [])
+        if existing:
+            self.future_draft_pool = existing
+            return
+
+        # v1: 先行生成は「通常のドラフトプール生成」と同じ思想で作る（世界観を崩さない）
+        # ただし youth_draft_entrants は“今年の卒業生”なので、来年プールには入れない。
+        backup_pool = self.draft_pool
+        backup_youth = self.youth_draft_entrants
+        try:
+            self.draft_pool = []
+            self.youth_draft_entrants = []
+            self._generate_draft_pool()
+            self.future_draft_pool = list(self.draft_pool)
+            holder.league_future_draft_pool = list(self.future_draft_pool)
+        finally:
+            self.draft_pool = backup_pool
+            self.youth_draft_entrants = backup_youth
+
+    def _release_special_designation_players_to_draft_pool(self) -> None:
+        """
+        前年に特別指定で加入していた選手は、必ずこのオフで離脱し、
+        当年ドラフトプールへ復帰する（ドラフト有利などは付けない）。
+        """
+        moved = 0
+        for team in self.teams:
+            special = list(getattr(team, "special_designation_players", []) or [])
+            if not special:
+                continue
+            team.special_designation_players = []
+            for p in special:
+                # ドラフト候補へ戻す
+                p.team_id = None
+                p.salary = 0
+                p.contract_years_left = 0
+                p.contract_total_years = max(int(getattr(p, "contract_total_years", 0) or 0), 1)
+                p.acquisition_type = "normal"
+                p.acquisition_note = "special_designation_left"
+                # ラベルだけ残す（評価は通常のまま）
+                p.draft_profile_label = str(getattr(p, "draft_profile_label", "") or "通常新人")
+                if "特別指定" not in p.draft_profile_label:
+                    p.draft_profile_label = f"{p.draft_profile_label} / 特別指定(前年)"
+                self.draft_pool.append(p)
+                moved += 1
+        if moved:
+            print(f"[SPECIAL-DESIGNATION] leavers_to_draft_pool={moved}")
+
+    def _build_special_designation_visible_row(self, p: Player, team: Team) -> str:
+        """
+        特別指定はドラフトより情報を曖昧にする（v1）。
+        scout_level が高いほどレンジが狭くなる。
+        """
+        scout = int(getattr(team, "scout_level", 50) or 50)
+        ovr = int(getattr(p, "ovr", 60) or 60)
+        # 低スカウト: ±10〜14 / 高スカウト: ±6〜8
+        wiggle = 14 - int(round((scout - 1) / 99 * 8))  # 14 -> 6
+        low = max(40, ovr - wiggle)
+        high = min(99, ovr + wiggle)
+        age = int(getattr(p, "age", 19) or 19)
+        pos = str(getattr(p, "position", "SF") or "SF")
+        mg = str(getattr(p, "draft_market_grade", "") or "").upper().strip()
+        rumor = ""
+        if mg == "SS":
+            rumor = " 噂:上位層"
+        elif mg == "S":
+            rumor = " 噂:上位〜中位"
+        # 市場グレードの数値は見せない（ドラフト以上に曖昧）
+        return f"{getattr(p, 'name', 'Candidate'):<15} {pos:<2} Age:{age:<2} OVR:{low:>2}〜{high:<2}{rumor}"
+
+    def _run_special_designation_invitations(self) -> None:
+        """
+        特別指定選手（0〜1人/年）を、来年ドラフト候補プールから契約する。
+        - 0円
+        - 1年契約（必ず次オフで離脱→当年ドラフトへ復帰）
+        - 13人枠外（team.special_designation_players へ）
+        """
+        holder = self._get_league_state_holder_team()
+        if holder is None:
+            return
+
+        pool = list(getattr(holder, "league_future_draft_pool", []) or [])
+        if not pool:
+            return
+
+        # 強いクラブほど “上位候補に手が届く” ようにする
+        def candidate_score(p: Player) -> float:
+            ovr = float(getattr(p, "ovr", 0) or 0)
+            pot = str(getattr(p, "potential", "C") or "C").upper()
+            pot_bonus = {"S": 6.0, "A": 4.0, "B": 2.0, "C": 0.5, "D": 0.0}.get(pot, 0.0)
+            prospect_bonus = 3.0 if bool(getattr(p, "is_draft_prospect", False)) else 0.0
+            mg = str(getattr(p, "draft_market_grade", "") or "").upper().strip()
+            grade_bonus = {"SS": 8.0, "S": 4.0}.get(mg, 0.0)
+            return ovr + pot_bonus + prospect_bonus + grade_bonus
+
+        pool_sorted = sorted(pool, key=candidate_score, reverse=True)
+
+        for team in sorted(self.teams, key=lambda t: (int(getattr(t, "league_level", 3) or 3), -int(getattr(t, "popularity", 50) or 50))):
+            # 1年に1人だけ
+            if len(getattr(team, "special_designation_players", []) or []) >= 1:
+                continue
+
+            popularity = int(getattr(team, "popularity", 50) or 50)
+            # 人気が高いほど候補リストが増える（v1）
+            n = 3 + (popularity // 12)  # 3〜11程度
+            n = max(2, min(12, n))
+
+            shortlist = pool_sorted[:min(n, len(pool_sorted))]
+            if not shortlist:
+                continue
+
+            picked: Optional[Player] = None
+
+            if bool(getattr(team, "is_user_team", False)):
+                print("\n=== 特別指定選手（来年ドラフト候補から招待）===")
+                print(f"クラブ: {team.name} | 人気:{popularity} | 候補:{len(shortlist)}人")
+                print("0. 見送る")
+                for i, p in enumerate(shortlist, 1):
+                    print(f"{i}. {self._build_special_designation_visible_row(p, team)}")
+                while True:
+                    try:
+                        raw = input("番号: ").strip()
+                    except EOFError:
+                        raw = "0"
+                    if raw == "0":
+                        picked = None
+                        break
+                    try:
+                        idx = int(raw) - 1
+                    except ValueError:
+                        idx = -999
+                    if 0 <= idx < len(shortlist):
+                        picked = shortlist[idx]
+                        break
+                    print("正しい番号を入力してください。")
+            else:
+                # AI: 人気・上位リーグ・勝ち筋ほど取りやすいが、育成優先チームは基本的に見送りがち。
+                # ノーリスク強化でSS級は特に引きが強い。
+                league_level = int(getattr(team, "league_level", 3) or 3)
+                is_dev = (
+                    getattr(team, "coach_style", "balanced") == "development"
+                    or getattr(team, "usage_policy", "balanced") == "development"
+                )
+                usage = str(getattr(team, "usage_policy", "balanced") or "balanced")
+                top = shortlist[0]
+                grade = str(getattr(top, "draft_market_grade", "") or "").upper().strip()
+
+                if is_dev:
+                    take_prob = 0.05 + popularity / 400.0
+                    if grade == "SS":
+                        take_prob += 0.06
+                    elif grade == "S":
+                        take_prob += 0.02
+                    take_prob = min(0.18, max(0.04, take_prob))
+                else:
+                    take_prob = 0.18 + popularity / 120.0
+                    take_prob += {1: 0.12, 2: 0.06, 3: 0.02}.get(league_level, 0.02)
+                    if usage == "win_now":
+                        take_prob += 0.12
+                    elif usage == "balanced":
+                        take_prob += 0.04
+                    if grade == "SS":
+                        take_prob += 0.12
+                    elif grade == "S":
+                        take_prob += 0.05
+                    take_prob = min(0.88, max(0.12, take_prob))
+
+                if random.random() < take_prob:
+                    picked = shortlist[0]
+
+            if picked is None:
+                continue
+
+            # 契約（0円/1年）してプールから抜く
+            if picked not in pool_sorted:
+                continue
+            pool_sorted.remove(picked)
+            if picked in pool:
+                pool.remove(picked)
+
+            picked.team_id = getattr(team, "team_id", None)
+            picked.salary = 0
+            picked.contract_years_left = 1
+            picked.contract_total_years = max(int(getattr(picked, "contract_total_years", 0) or 0), 1)
+            picked.acquisition_type = "special_designation"
+            picked.acquisition_note = "special_designation_1y"
+            picked.draft_profile_label = str(getattr(picked, "draft_profile_label", "") or "通常新人")
+            if "特別指定" not in picked.draft_profile_label:
+                picked.draft_profile_label = f"{picked.draft_profile_label} / 特別指定"
+
+            team.special_designation_players.append(picked)
+            print(f"[SPECIAL-DESIGNATION] {team.name} signed {picked.name} (1y/0$) from next draft pool")
+
+        holder.league_future_draft_pool = list(pool_sorted)
+
     def run(self):
         print("\n--- Offseason Processing ---")
         self.re_signed_player_ids.clear()
         self.draft_pool = []
+        self.future_draft_pool = []
         self.youth_draft_entrants = []
         self.top_prospects = []
         self.retired_star_pool = []
@@ -213,6 +444,9 @@ class Offseason:
         self._latest_offseason_asia_cup_top2_teams = []
         self._latest_intercontinental_champion = None
         self._latest_international_milestone_targets = []
+
+        # 前年に先行生成しておいたドラフトプールを取り込む（あれば）
+        self._bootstrap_current_draft_pool_from_league_state()
 
         for team in self.teams:
             if hasattr(team, "reset_rookie_budget"):
@@ -233,13 +467,21 @@ class Offseason:
             self.youth_draft_entrants = run_youth_offseason_update_for_teams(self.teams, free_agents=self.free_agents)
         except Exception as exc:
             print(f"[YOUTH] skipped due to error: {exc}")
+        self._offer_cpu_contract_extensions()
         self._resign_players()
         self._assign_scout_dispatches()
+        # 来年のドラフト候補プールを先行生成し、特別指定の招待を行う
+        self._ensure_future_draft_pool_for_next_year()
+        self._run_special_designation_invitations()
         self._reset_team_stats()
         self._reset_player_stats()
         self._decrease_contracts()
         self._refresh_international_market()
-        self._generate_draft_pool()
+        # 特別指定（前年加入）はこのオフで必ず離脱→当年ドラフトに復帰
+        self._release_special_designation_players_to_draft_pool()
+        # 今年のドラフトプールが無ければ通常生成（初年度など）
+        if not self.draft_pool:
+            self._generate_draft_pool()
         self._run_draft_combine()
         # 正本: docs/DRAFT_AUCTION_SYSTEM.md
         conduct_auction_draft(self.teams, self.draft_pool, self.free_agents)
@@ -255,6 +497,8 @@ class Offseason:
         self._review_team_coaches()
         assign_team_strategies(self.teams)
         print_team_strategies(self.teams)
+
+        self._log_contract_roster_integrity()
 
         print("--- Offseason Finished ---\n")
 
@@ -1611,9 +1855,45 @@ class Offseason:
 
         return base_score + retention_bonus
 
+    def _offer_cpu_contract_extensions(self):
+        """
+        Step 2: 再契約の前に、CPU が同一条件の延長（+1年）を試みる。
+        主力・高OVRは対象外（再契約交渉に回す）。
+        """
+        if apply_contract_extension is None or get_team_player_rank is None:
+            return
+
+        for team in self.teams:
+            if self._is_user_team(team):
+                continue
+
+            for player in list(team.players):
+                if getattr(player, "contract_years_left", 0) != 1:
+                    continue
+                if bool(getattr(player, "icon_locked", False)):
+                    continue
+                if int(getattr(player, "ovr", 0) or 0) > 64:
+                    continue
+                try:
+                    rank = int(get_team_player_rank(team, player))
+                except Exception:
+                    rank = 99
+                if rank <= 7:
+                    continue
+                if int(getattr(player, "loyalty", 50) or 50) < 58:
+                    continue
+                if random.random() > 0.32:
+                    continue
+
+                apply_contract_extension(team, player, add_years=1)
+                print(
+                    f"[CONTRACT-EXT] {team.name} extended {player.name} +1y (same salary) "
+                    f"| OVR:{getattr(player, 'ovr', 0)} rank:{rank}"
+                )
+
     def _resign_players(self):
         print("Conducting Re-signing...")
-        salary_cap = 15_000_000
+        salary_cap = int(LEAGUE_SALARY_CAP)
 
         user_teams = [team for team in self.teams if self._is_user_team(team)]
         if not user_teams:
@@ -1696,6 +1976,7 @@ class Offseason:
                         team=team,
                         offered_salary=player.desired_salary,
                         offered_years=player.desired_years,
+                        salary_cap=salary_cap,
                     )
                     resign_score = float(result.get("score", 0.0))
                     threshold = float(result.get("threshold", 50.0))
@@ -1786,15 +2067,8 @@ class Offseason:
 
     def _decrease_contracts(self):
         if advance_contract_years is not None:
-            for team in self.teams:
-                remaining_players, leaving_players = advance_contract_years(
-                    players=list(team.players),
-                    skip_player_ids=self.re_signed_player_ids,
-                )
-                team.players = remaining_players
-                for p in leaving_players:
-                    p.team_id = None
-                    self.free_agents.append(p)
+            skip_ids = set(self.re_signed_player_ids) if self.re_signed_player_ids else set()
+            advance_contract_years(self.teams, self.free_agents, skip_player_ids=skip_ids)
             return
 
         for team in self.teams:
@@ -1813,6 +2087,19 @@ class Offseason:
             for p in leaving:
                 team.remove_player(p)
                 self.free_agents.append(p)
+
+    def _log_contract_roster_integrity(self):
+        """Step 1: オフ終了時に本契約枠の違反があればログする。"""
+        try:
+            from basketball_sim.systems.roster_rules import is_contract_roster_valid, validate_contract_roster
+        except Exception:
+            return
+        for team in self.teams:
+            if is_contract_roster_valid(team):
+                continue
+            errs = validate_contract_roster(team)
+            name = getattr(team, "name", "?")
+            print(f"[ROSTER-INVALID] {name}: " + " | ".join(errs))
 
     def _player_progression(self):
         print("Processing Player Growth and Decline...")
@@ -2991,6 +3278,17 @@ class Offseason:
     def _process_team_finances(self):
         print("\n[Finance Settlement]")
 
+        try:
+            from basketball_sim.systems.salary_cap_budget import (
+                cap_status,
+                compute_luxury_tax,
+                is_payroll_over_club_budget,
+            )
+        except Exception:
+            compute_luxury_tax = None
+            cap_status = None
+            is_payroll_over_club_budget = None
+
         sorted_teams = sorted(self.teams, key=lambda t: (getattr(t, "league_level", 3), getattr(t, "name", "")))
 
         for team in sorted_teams:
@@ -3017,11 +3315,26 @@ class Offseason:
                     + getattr(team, "fan_base", 50) * 3_600
                 )
             )
+
+            luxury_tax = 0
+            if compute_luxury_tax is not None:
+                luxury_tax = int(compute_luxury_tax(payroll))
+            cap_label = ""
+            if cap_status is not None:
+                cap_label = cap_status(int(payroll))
             team.owner_expectation = self._normalize_owner_expectation_for_missions(
                 self._get_owner_expectation_label(team, wins)
             )
 
-            team.money = int(getattr(team, "money", 0) + cashflow)
+            team.money = int(getattr(team, "money", 0) + cashflow - luxury_tax)
+
+            if is_payroll_over_club_budget is not None and is_payroll_over_club_budget(
+                payroll, int(getattr(team, "payroll_budget", 0))
+            ):
+                print(
+                    f"[PAYROLL-BUDGET] {team.name} roster payroll ${payroll:,} exceeds "
+                    f"guideline ${int(getattr(team, 'payroll_budget', 0)):,}"
+                )
 
             if hasattr(team, "record_financial_result"):
                 try:
@@ -3064,10 +3377,13 @@ class Offseason:
                     "facility_maintenance": facility_maintenance,
                 })
 
+            fin_extra = f" | Cap:{cap_label}" if cap_label else ""
+            tax_extra = f" | LuxuryTax:${luxury_tax:,}" if luxury_tax else ""
             print(
                 f"[FINANCE] D{getattr(team, 'league_level', 3)} | {team.name} | "
                 f"Revenue:${revenue:,} | Expense:${expense:,} | Payroll:${payroll:,} | "
                 f"Facility:${facility_maintenance:,} | Cashflow:${cashflow:,} | Money:${int(getattr(team, 'money', 0)):,}"
+                f"{fin_extra}{tax_extra}"
             )
 
             if self._is_user_team(team):
