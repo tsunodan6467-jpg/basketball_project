@@ -17,6 +17,8 @@
 - ウィンドウ: window.width / window.height（既定 1420x860）、fullscreen（tkinter 主画面に反映）
 - キー割り当て: key_bindings.close_subwindow に Tk のバインド文字列（例: "<Escape>" 既定、 "<F1>" ）
   無効な値は無視され既定に戻ります。
+- Steam 配布向け: steam_require_license を true にすると、ネイティブ Steam 接続時に
+  未購入（BIsSubscribed が false）で起動終了。環境変数 BASKETBALL_SIM_REQUIRE_STEAM_LICENSE=1 でも有効。
 """
 
 from __future__ import annotations
@@ -47,6 +49,7 @@ _DEFAULTS: Dict[str, Any] = {
     },
     "fullscreen": False,
     "key_bindings": {},
+    "steam_require_license": False,
 }
 
 
@@ -79,6 +82,7 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
     out["fullscreen"] = bool(data.get("fullscreen", False))
     kb = data.get("key_bindings")
     out["key_bindings"] = kb if isinstance(kb, dict) else {}
+    out["steam_require_license"] = bool(data.get("steam_require_license", False))
     return out
 
 

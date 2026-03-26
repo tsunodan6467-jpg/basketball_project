@@ -340,7 +340,26 @@ class MainMenuView:
         self._refresh_advance_button()
 
     def run(self) -> None:
+        self._schedule_steam_callback_pump()
         self.root.mainloop()
+
+    def _schedule_steam_callback_pump(self) -> None:
+        """ネイティブ Steam 接続時のみ RunCallbacks を定期実行する。"""
+        try:
+            from basketball_sim.integrations.steamworks_bridge import (
+                pump_steam_callbacks,
+                steam_native_loaded,
+            )
+
+            if not steam_native_loaded():
+                return
+            pump_steam_callbacks()
+        except Exception:
+            pass
+        try:
+            self.root.after(100, self._schedule_steam_callback_pump)
+        except tk.TclError:
+            pass
 
     # ------------------------------------------------------------------
     # Refresh helpers

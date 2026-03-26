@@ -2,9 +2,18 @@
 
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
+    load_user_settings,
     resolve_window_geometry,
     tk_binding_for,
 )
+
+
+def test_load_user_settings_steam_require_license(tmp_path) -> None:
+    p = tmp_path / "settings.json"
+    p.write_text('{"steam_require_license": 1}', encoding="utf-8")
+    assert load_user_settings(p)["steam_require_license"] is True
+    p.write_text('{"steam_require_license": false}', encoding="utf-8")
+    assert load_user_settings(p)["steam_require_license"] is False
 
 
 def test_resolve_window_geometry_clamps() -> None:

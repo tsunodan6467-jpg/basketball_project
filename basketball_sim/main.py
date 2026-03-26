@@ -43,7 +43,7 @@ from basketball_sim.persistence.save_load import (
     save_world,
     validate_payload,
 )
-from basketball_sim.integrations.steamworks_bridge import try_init_steam
+from basketball_sim.integrations.steamworks_bridge import enforce_steam_license, try_init_steam
 from basketball_sim.utils.game_logging import setup_application_logging
 from basketball_sim.utils.sim_rng import get_last_simulation_seed, init_simulation_random
 from basketball_sim.utils.user_settings import apply_settings_to_environment, ensure_settings_file_exists
@@ -1872,6 +1872,7 @@ def simulate():
     apply_settings_to_environment(_settings)
     setup_application_logging(_settings)
     try_init_steam()
+    enforce_steam_license(_settings)
     print_separator("Basketball GM Simulation")
     print("1. 新しいゲームを始める")
     print("2. セーブデータを読み込んで続きから")
