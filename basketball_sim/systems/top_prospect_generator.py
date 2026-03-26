@@ -35,14 +35,11 @@ def generate_homage_count() -> int:
 def generate_legend_rookie_count() -> int:
     """
     現実で引退している選手“風”のレジェンドルーキー。
-    毎年必ず出すのではなく、たまに混ざる前提（最大2人）。
+    毎年必ず出すのではなく、たまに混ざる前提（基本は 0 か 1）。
+    他の出自（転生/オマージュ）にも SS級が入り得るため、ここは「年に一人出るか出ないか」寄りに抑える。
     """
     r = random.random()
-    if r < 0.40:
-        return 0
-    if r < 0.85:
-        return 1
-    return 2
+    return 1 if r < 0.42 else 0
 
 
 def calculate_rookie_ovr_from_peak(peak_ovr: int, entry_type: str) -> int:
@@ -344,7 +341,17 @@ def generate_legend_rookie_prospect() -> Dict[str, Any]:
     # 同年に2人出る時は「役割がかぶり過ぎない」を優先するため、
     # 呼び出し側で used_names/used_archetypes を持てるが、ここは単体生成なので
     # まずは候補の偏りを避けるために軽いシャッフルのみ行う。
-    t = random.choice(templates)
+    # 市場評価 SS は毎年出すと強すぎるので、SS の抽選は控えめにする
+    weights = []
+    for row in templates:
+        g = str(row.get("market_grade", "A") or "A").upper()
+        if g == "SS":
+            weights.append(0.25)
+        elif g == "S":
+            weights.append(0.85)
+        else:
+            weights.append(1.00)
+    t = random.choices(templates, weights=weights, k=1)[0]
     return {
         "type": "legend_rookie",
         "name": t["name"],
