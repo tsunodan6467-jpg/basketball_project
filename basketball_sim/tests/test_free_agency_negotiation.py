@@ -1,0 +1,63 @@
+"""FA 交渉スコア: 希望条件・fa_priority の反映。"""
+
+from basketball_sim.models.player import Player
+from basketball_sim.models.team import Team
+from basketball_sim.systems import free_agency as fa
+
+
+def _player(pid: int, desired_salary: int, **kwargs) -> Player:
+    p = Player(
+        player_id=pid,
+        name=f"P{pid}",
+        age=27,
+        nationality="Japan",
+        position="SF",
+        height_cm=200.0,
+        weight_kg=90.0,
+        shoot=60,
+        three=60,
+        drive=60,
+        passing=60,
+        rebound=60,
+        defense=60,
+        ft=60,
+        stamina=60,
+        ovr=72,
+        potential="B",
+        archetype="wing",
+        usage_base=20,
+        salary=4_000_000,
+        desired_salary=desired_salary,
+        desired_years=2,
+    )
+    for k, v in kwargs.items():
+        setattr(p, k, v)
+    return p
+
+
+def _team() -> Team:
+    return Team(team_id=1, name="T", league_level=2, popularity=55, market_size=1.0)
+
+
+def test_salary_score_penalizes_below_desired():
+    p = _player(1, 8_000_000)
+    high = fa._estimate_salary_score(p, 8_000_000)
+    low = fa._estimate_salary_score(p, 4_000_000)
+    assert high > low
+
+
+def test_negotiation_weights_blend_priorities():
+    p = _player(2, 5_000_000, fa_priority_money=90, fa_priority_winning=30)
+    profile = {"money": 50, "role": 50, "winning": 50, "fit": 50, "security": 50}
+    w = fa._negotiation_weights(p, profile)
+    assert w["money"] > w["winning"]
+
+
+def test_offer_score_respects_money_priority():
+    team = _team()
+    hi_money = _player(3, 5_000_000, fa_priority_money=95, fa_priority_winning=20)
+    hi_win = _player(4, 5_000_000, fa_priority_money=20, fa_priority_winning=95)
+    s1 = fa._offer_score(hi_money, team, 5_000_000, 2)
+    s2 = fa._offer_score(hi_win, team, 5_000_000, 2)
+    # 同条件でも金志向の方が年俸スコア寄与が強い（極端な重み差）
+    assert s1 != s2

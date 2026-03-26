@@ -42,21 +42,51 @@ def _get_fa_profile(player: Player) -> dict:
         try:
             profile = player.get_free_agency_profile()
             if isinstance(profile, dict):
-                return profile
+                return _merge_fa_profile_defaults(player, profile)
         except Exception:
             pass
 
-    return {
-        "money": 50,
-        "role": 50,
-        "winning": 50,
-        "fit": 50,
-        "security": 50,
-        "loyalty": int(getattr(player, "loyalty", 50)),
-        "preferred_team_style": "",
-        "preferred_coach_style": "",
-        "fa_personality": "balanced",
-    }
+    return _merge_fa_profile_defaults(
+        player,
+        {
+            "money": 50,
+            "role": 50,
+            "winning": 50,
+            "fit": 50,
+            "security": 50,
+            "loyalty": int(getattr(player, "loyalty", 50)),
+            "preferred_team_style": "",
+            "preferred_coach_style": "",
+            "fa_personality": "balanced",
+        },
+    )
+
+
+def _merge_fa_profile_defaults(player: Player, profile: dict) -> dict:
+    """get_free_agency_profile の結果に、Player 側の志向（表示・重みは _negotiation_weights で合成）。"""
+    out = dict(profile)
+    pts = str(getattr(player, "preferred_team_style", "") or "").strip()
+    pcs = str(getattr(player, "preferred_coach_style", "") or "").strip()
+    if pts and not str(out.get("preferred_team_style", "") or "").strip():
+        out["preferred_team_style"] = pts
+    if pcs and not str(out.get("preferred_coach_style", "") or "").strip():
+        out["preferred_coach_style"] = pcs
+    pers = str(getattr(player, "fa_personality", "") or "").strip()
+    if pers and pers != "balanced":
+        out["fa_personality"] = pers
+    return out
+
+
+def _negotiation_weights(player: Player, profile: dict) -> dict:
+    """
+    交渉スコアの重み。プロファイル値と fa_priority_* の平均（希望条件の差が出やすい）。
+    """
+    weights: dict = {}
+    for key in ("money", "role", "winning", "fit", "security"):
+        base = int(profile.get(key, 50) or 50)
+        fp = int(getattr(player, f"fa_priority_{key}", 50) or 50)
+        weights[key] = max(1, min(99, (base + fp) // 2))
+    return weights
 
 
 def _estimate_role_opportunity(team: Team, player: Player) -> float:
@@ -91,7 +121,12 @@ def _estimate_salary_score(player: Player, salary: int) -> float:
     current_salary = int(getattr(player, "salary", 0) or 0)
     baseline = max(300_000, desired_salary, current_salary)
     ratio = salary / max(1, baseline)
-    return max(15.0, min(100.0, 52.0 * ratio))
+    score = max(15.0, min(100.0, 52.0 * ratio))
+    # 希望年俸を下回るオファーは交渉スコアを下げる（差が大きいほど不満）
+    if desired_salary > 0 and salary < desired_salary:
+        gap = (desired_salary - salary) / max(1, desired_salary)
+        score -= min(38.0, gap * 58.0)
+    return max(15.0, min(100.0, score))
 
 
 def _determine_contract_years(player: Player, team: Team, offer: int) -> int:
@@ -322,7 +357,8 @@ def _offer_score(player: Player, team: Team, salary: int, years: int) -> float:
     desired_years = int(getattr(player, "desired_years", 0) or 0)
     security_score = 55.0
     if desired_years > 0:
-        security_score += max(-18.0, min(20.0, (years - desired_years) * 7.0))
+        # 提示年数が希望より短いほど「安定志向（security 重み）」で減点が効く
+        security_score += max(-22.0, min(24.0, (years - desired_years) * 8.5))
     else:
         security_score += (years - 2) * 8.0
     if years >= 3:
@@ -336,13 +372,7 @@ def _offer_score(player: Player, team: Team, salary: int, years: int) -> float:
     popularity = getattr(team, "popularity", 50)
     market_score = max(20.0, min(100.0, popularity * 0.9 + float(getattr(team, "market_size", 1.0)) * 8.0))
 
-    weights = {
-        "money": int(profile.get("money", 50)),
-        "role": int(profile.get("role", 50)),
-        "winning": int(profile.get("winning", 50)),
-        "fit": int(profile.get("fit", 50)),
-        "security": int(profile.get("security", 50)),
-    }
+    weights = _negotiation_weights(player, profile)
     total_weight = max(1, sum(weights.values()))
 
     weighted_score = (
