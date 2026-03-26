@@ -50,6 +50,7 @@ class MainMenuView:
     MENU_ITEMS = [
         "日程",
         "人事",
+        "GM",
         "経営",
         "強化",
         "戦術",
@@ -151,7 +152,19 @@ class MainMenuView:
         outer.pack(fill="both", expand=True)
 
         self.top_bar = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
-        self.top_bar.pack(fill="x", pady=(0, 12))
+        self.top_bar.pack(fill="x", pady=(0, 6))
+
+        self.season_status_var = tk.StringVar(value="")
+        season_strip = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 6))
+        season_strip.pack(fill="x", pady=(0, 12))
+        ttk.Label(
+            season_strip,
+            textvariable=self.season_status_var,
+            background="#1d2129",
+            foreground="#a8b8d0",
+            font=("Yu Gothic UI", 10),
+            anchor="w",
+        ).pack(fill="x")
 
         body = ttk.Frame(outer, style="Root.TFrame")
         body.pack(fill="both", expand=True)
@@ -303,6 +316,7 @@ class MainMenuView:
     # ------------------------------------------------------------------
     def refresh(self) -> None:
         self._refresh_top_bar()
+        self._refresh_season_status()
         self._refresh_next_game()
         self._refresh_club_summary()
         self._refresh_tasks()
@@ -386,6 +400,46 @@ class MainMenuView:
             f"要対応: {task_count}件"
         )
         self.top_bar_var.set(text)
+
+    def _refresh_season_status(self) -> None:
+        """消化ラウンドとレギュラー中トレード／インシーズンFA可否を表示。"""
+        if not hasattr(self, "season_status_var"):
+            return
+        if self.season is None:
+            self.season_status_var.set(
+                "シーズン: —  |  トレード／インシーズンFA: （シーズン未接続）"
+            )
+            return
+        if bool(self._safe_get(self.season, "season_finished", False)):
+            self.season_status_var.set(
+                "シーズン: 終了  |  トレード／インシーズンFA: オフシーズン（『次へ進む』でオフ処理）"
+            )
+            return
+        cr = int(self._safe_get(self.season, "current_round", 0) or 0)
+        tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
+        try:
+            from basketball_sim.systems.season_transaction_rules import inseason_roster_moves_unlocked
+
+            unlocked = inseason_roster_moves_unlocked(self.season)
+        except Exception:
+            unlocked = True
+        tx = "可（ラウンド22消化後まで）" if unlocked else "期限切れ（シーズン終了まで不可）"
+        self.season_status_var.set(f"消化ラウンド: {cr}/{tr}  |  トレード／インシーズンFA: {tx}")
+
+    def _roster_transaction_status_text(self) -> str:
+        """情報画面用の短い文言。"""
+        if self.season is None:
+            return "—"
+        if bool(self._safe_get(self.season, "season_finished", False)):
+            return "オフシーズン（制限なし）"
+        try:
+            from basketball_sim.systems.season_transaction_rules import inseason_roster_moves_unlocked
+
+            if inseason_roster_moves_unlocked(self.season):
+                return "可（ラウンド22消化後まで）"
+            return "期限切れ（シーズン終了まで不可）"
+        except Exception:
+            return "判定不可"
 
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
@@ -1476,7 +1530,7 @@ class MainMenuView:
         self.info_comp_panel = self._create_panel(outer, "大会進行状況")
         self.info_comp_panel.pack(fill="x")
 
-        self.info_progress_lines = self._make_line_vars(self.info_progress_panel, 6)
+        self.info_progress_lines = self._make_line_vars(self.info_progress_panel, 7)
         self.info_schedule_lines = self._make_line_vars(self.info_schedule_panel, 8)
         self.info_d1_lines = self._make_line_vars(self.info_d1_panel, 10)
         self.info_d2_lines = self._make_line_vars(self.info_d2_panel, 10)
@@ -1534,6 +1588,7 @@ class MainMenuView:
 
         progress_lines = [
             f"現在ラウンド: {current_round}/{total_rounds}",
+            f"トレード／インシーズンFA: {self._roster_transaction_status_text()}",
             f"フェーズ: {phase}",
             f"累計試合数: {game_count}",
             f"シーズン終了: {'はい' if season_finished else 'いいえ'}",
@@ -1570,6 +1625,7 @@ class MainMenuView:
 
         self.information_hint_var.set(
             "読み取り専用の情報画面です。シーズン進行 / 順位表 / 次ラウンド予定 / カップ戦進行を確認できます。"
+            " トレード／インシーズンFAの期限は消化ラウンド22以降でロック（3月第2週終了相当）。"
         )
 
     def _build_information_schedule_lines(self) -> List[str]:
@@ -2179,6 +2235,41 @@ class MainMenuView:
     # ------------------------------------------------------------------
     # Interaction handlers
     # ------------------------------------------------------------------
+    def _open_gm_stub_dialog(self) -> None:
+        """GUI からの GM 完全操作は未接続。状況表示と CLI 案内のみ。"""
+        cr = int(self._safe_get(self.season, "current_round", 0) or 0)
+        tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
+        fin = self.season is not None and bool(self._safe_get(self.season, "season_finished", False))
+        unlocked = True
+        if self.season is not None and not fin:
+            try:
+                from basketball_sim.systems.season_transaction_rules import inseason_roster_moves_unlocked
+
+                unlocked = inseason_roster_moves_unlocked(self.season)
+            except Exception:
+                unlocked = True
+        if self.season is None:
+            lock_line = "シーズンが未接続です。"
+        elif fin:
+            lock_line = (
+                "現在はオフシーズンです。トレード・FA はオフシーズン処理（再契約・FA・ドラフト等）で行います。"
+            )
+        elif unlocked:
+            lock_line = (
+                "レギュラー中のトレード／インシーズンFA は「ラウンド22消化後」まで可能です（3月第2週終了相当）。"
+            )
+        else:
+            lock_line = (
+                "レギュラー中のトレード／インシーズンFA は期限切れです。シーズン終了まで人事の強化はできません。"
+            )
+        body = (
+            f"消化ラウンド: {cr}/{tr}\n\n"
+            f"{lock_line}\n\n"
+            "トレード・スタメン・施設投資などのGM操作は、現在はターミナルのシーズンメニュー「8. GMメニュー」から行ってください。\n"
+            "GUI への完全統合は今後の開発で接続予定です。"
+        )
+        messagebox.showinfo("GM", body, parent=self.root)
+
     def _on_menu(self, key: str) -> None:
         callback = self.menu_callbacks.get(key)
         if callback is not None:
@@ -2186,6 +2277,13 @@ class MainMenuView:
             return
         if key == "人事":
             self.open_roster_window()
+            return
+        if key == "GM":
+            cb = self.menu_callbacks.get("GM")
+            if cb is not None:
+                cb()
+                return
+            self._open_gm_stub_dialog()
             return
         if key == "経営":
             self.open_finance_window()
@@ -2589,6 +2687,11 @@ if __name__ == "__main__":
         def __init__(self, team: Any) -> None:
             self.current_date = "2026-10-18"
             self.season_year = 2026
+            self.current_round = 5
+            self.total_rounds = 30
+            self.season_finished = False
+            self.phase = "regular_season"
+            self.game_count = 20
             self.teams = [
                 _DummyOpponent("東京フェニックス", 22, 7),
                 team,

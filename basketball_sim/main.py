@@ -2101,6 +2101,7 @@ def run_main_menu_ui_mode(
         season.simulate_next_round()
         print(f"[MAIN_MENU] round={season.current_round}/{season.total_rounds}")
 
+    # 「日程」: 1ラウンド進行。「GM」は未指定時 main_menu_view 既定（状況表示＋CLI案内）
     menu_callbacks = {
         "日程": advance_one_round,
     }
