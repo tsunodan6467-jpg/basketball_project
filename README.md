@@ -85,6 +85,21 @@ python -m basketball_sim --smoke
 dist\BasketballGM.exe --smoke
 ```
 
+#### GitHub Actions の Artifact から exe を確認（初心者向け）
+
+GitHub 上で自動ビルドされた exe を手元で確認したい場合:
+
+1. GitHub の Actions で最新の CI 実行を開く（例: リポジトリの「Actions」タブ）。
+2. 画面下の **Artifacts** から `BasketballGM-windows-exe` をダウンロードして zip を展開。
+3. 展開したフォルダの空白を **Shift+右クリック** → **「ターミナルをここで開く」**（または PowerShell）。
+4. 次を実行して `smoke ok` が出れば成功:
+
+```powershell
+.\BasketballGM.exe --smoke
+```
+
+**SmartScreen が出た場合**: 「詳細情報」→「実行」で続行できます（未署名 exe のため、開発中は出ることがあります）。
+
 #### GitHub Release（配布 exe の添付）
 
 `git tag`（例: `v0.1.0`）をプッシュしたあと、GitHub の **Releases** にビルドした `dist\BasketballGM.exe` や Inno のセットアップ exe を **Release 資産**として添付する手順は、**`installer/README.md`** の「GitHub Release」を参照してください（`dist/` は `.gitignore` 対象のため、バイナリはコミットせず Release へアップロードする想定です）。
