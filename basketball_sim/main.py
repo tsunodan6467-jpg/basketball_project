@@ -159,43 +159,117 @@ def apply_user_team_to_league(teams, team_name, home_city, market_size):
 
 
 def choose_icon_player():
+    return choose_icon_player_from_league(None)
+
+
+def _build_icon_candidate_rows(teams):
+    rows = []
+    if not teams:
+        for row in ICON_PLAYER_CANDIDATES:
+            rows.append(
+                {
+                    "player": None,
+                    "team": None,
+                    "name": row["name"],
+                    "position": row["position"],
+                    "ovr": int(row["ovr"]),
+                    "nationality": row["nationality"],
+                    "team_name": "固定候補",
+                    "seed_data": row,
+                }
+            )
+        return rows
+
+    for team in teams:
+        for player in getattr(team, "players", []):
+            rows.append(
+                {
+                    "player": player,
+                    "team": team,
+                    "name": getattr(player, "name", "Unknown"),
+                    "position": getattr(player, "position", "SF"),
+                    "ovr": int(getattr(player, "ovr", 0)),
+                    "nationality": getattr(player, "nationality", "Japan"),
+                    "team_name": getattr(team, "name", "Unknown Team"),
+                    "seed_data": None,
+                }
+            )
+    return rows
+
+
+def choose_icon_player_from_league(teams):
     print_separator("アイコンプレイヤー選択")
 
-    for i, p in enumerate(ICON_PLAYER_CANDIDATES, 1):
-        print(f"{i}. {p['name']} {p['position']} OVR:{p['ovr']} {p['nationality']}")
+    all_rows = _build_icon_candidate_rows(teams)
+    if not all_rows:
+        raise ValueError("アイコン候補が見つかりません。")
 
     while True:
+        keyword = input("\n選手名/チーム名で検索（空欄で上位表示）: ").strip().lower()
+        filtered = []
+        for row in all_rows:
+            token = f"{row['name']} {row['team_name']} {row['position']} {row['nationality']}".lower()
+            if not keyword or keyword in token:
+                filtered.append(row)
+
+        if not filtered:
+            print("候補が見つかりません。検索語を変えてください。")
+            continue
+
+        filtered.sort(
+            key=lambda r: (r["ovr"], r["position"], r["name"]),
+            reverse=True,
+        )
+        display = filtered[:40]
+        print("\n候補一覧（最大40件）")
+        for i, row in enumerate(display, 1):
+            print(
+                f"{i}. {row['name']} {row['position']} OVR:{row['ovr']} "
+                f"{row['nationality']} | {row['team_name']}"
+            )
+        print("r: 検索し直す")
+
+        raw = input("番号: ").strip().lower()
+        if raw == "r":
+            continue
         try:
-            choice = int(input("\n番号: "))
-            if 1 <= choice <= len(ICON_PLAYER_CANDIDATES):
-                icon = ICON_PLAYER_CANDIDATES[choice - 1]
-                break
+            idx = int(raw) - 1
         except ValueError:
-            pass
-        print("正しい番号を入力してください。")
+            print("正しい番号を入力してください。")
+            continue
+        if not (0 <= idx < len(display)):
+            print("正しい番号を入力してください。")
+            continue
+        icon = display[idx]
+        break
 
     print_separator("選択されたアイコン")
-    print(icon["name"], icon["position"], icon["ovr"], icon["nationality"])
+    print(icon["name"], icon["position"], icon["ovr"], icon["nationality"], "|", icon["team_name"])
 
     return icon
 
 
 def create_icon_player(icon_data):
-    player = generate_single_player(
-        age_override=27,
-        base_ovr_override=icon_data["ovr"],
-        position_override=icon_data["position"],
-        nationality_override=icon_data["nationality"],
-    )
+    source_player = icon_data.get("player") if isinstance(icon_data, dict) else None
+    if source_player is not None:
+        player = source_player
+    else:
+        seed = icon_data.get("seed_data", icon_data) if isinstance(icon_data, dict) else icon_data
+        player = generate_single_player(
+            age_override=27,
+            base_ovr_override=seed["ovr"],
+            position_override=seed["position"],
+            nationality_override=seed["nationality"],
+        )
+        player.name = seed["name"]
+        player.age = 27
+        player.nationality = seed["nationality"]
+        player.position = seed["position"]
+        player.ovr = seed["ovr"]
 
-    player.name = icon_data["name"]
-    player.age = 27
-    player.nationality = icon_data["nationality"]
-    player.position = icon_data["position"]
-    player.ovr = icon_data["ovr"]
     player.salary = 0
     player.contract_years_left = 99
-    player.years_pro = 5
+    player.years_pro = max(5, int(getattr(player, "years_pro", 0)))
     player.is_icon = True
     player.icon_locked = True
     player.is_retired = False
@@ -218,12 +292,20 @@ def choose_roster_build_mode():
 
 
 def choose_icon_player_auto():
-    japan_candidates = [p for p in ICON_PLAYER_CANDIDATES if p["nationality"] == "Japan"]
-    candidate_pool = japan_candidates if japan_candidates else ICON_PLAYER_CANDIDATES
+    return choose_icon_player_auto_from_league(None)
+
+
+def choose_icon_player_auto_from_league(teams):
+    candidate_pool = _build_icon_candidate_rows(teams)
+    if not candidate_pool:
+        raise ValueError("アイコン候補が存在しません。")
     icon = max(candidate_pool, key=lambda p: (p["ovr"], p["position"], p["name"]))
 
     print_separator("アイコンプレイヤー自動選択")
-    print(f"{icon['name']} {icon['position']} OVR:{icon['ovr']} {icon['nationality']}")
+    print(
+        f"{icon['name']} {icon['position']} OVR:{icon['ovr']} "
+        f"{icon['nationality']} | {icon.get('team_name', '固定候補')}"
+    )
 
     return icon
 
@@ -1743,9 +1825,15 @@ def build_initial_game_world():
     user_team = apply_user_team_to_league(teams, team_name, home_city, market_size)
 
     if roster_build_mode == "auto":
-        icon_data = choose_icon_player_auto()
+        icon_data = choose_icon_player_auto_from_league(teams)
     else:
-        icon_data = choose_icon_player()
+        icon_data = choose_icon_player_from_league(teams)
+
+    source_team = icon_data.get("team") if isinstance(icon_data, dict) else None
+    source_player = icon_data.get("player") if isinstance(icon_data, dict) else None
+    if source_team is not None and source_player is not None and source_player in getattr(source_team, "players", []):
+        source_team.remove_player(source_player)
+
     icon_player = create_icon_player(icon_data)
 
     fictional_pool = create_fictional_player_pool()
