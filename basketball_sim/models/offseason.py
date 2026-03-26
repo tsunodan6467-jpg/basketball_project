@@ -2153,6 +2153,11 @@ class Offseason:
                 base_ovr_override=max(68, int(profile.get("ovr", 72))),
             )
 
+        if profile.get("name"):
+            new_prospect.name = str(profile.get("name") or new_prospect.name)
+        if profile.get("position"):
+            new_prospect.position = str(profile.get("position") or getattr(new_prospect, "position", "SG") or "SG")
+
         new_prospect.age = int(profile.get("age", 21))
         new_prospect.ovr = int(profile.get("ovr", getattr(new_prospect, "ovr", 72)))
         new_prospect.potential = profile.get("potential", "A")
@@ -2162,6 +2167,8 @@ class Offseason:
         new_prospect.draft_priority_bonus = max(getattr(new_prospect, "draft_priority_bonus", 0), 8)
 
         archetype = profile.get("archetype", "Special Prospect")
+        if archetype:
+            new_prospect.archetype = str(archetype)
         label_map = {
             "Sniper": "天才シューター",
             "Floor General": "天才ポイントガード",
@@ -2543,37 +2550,36 @@ class Offseason:
         return f"{low}-{high}"
 
     def _attach_scout_report_for_team(self, team: Team):
-        focus = self._normalize_scout_focus(getattr(team, "scout_focus", "balanced"))
-        scout_level = int(getattr(team, "scout_level", 50))
-        dispatch = self._normalize_scout_dispatch(getattr(team, "scout_dispatch", "college"))
+        # 正本: docs/SCOUT_VISIBILITY_MODEL.md
+        # スカウト出力は systems/scout_logic.py に一本化する（offseason 側の簡易実装は廃止）
+        from basketball_sim.systems.scout_logic import (
+            ensure_team_scout_profile,
+            generate_player_scout_report_for_team,
+            get_scout_focus_label,
+        )
 
+        ensure_team_scout_profile(team)
         for player in self.draft_pool:
             if not hasattr(player, "scout_reports") or player.scout_reports is None:
                 player.scout_reports = {}
 
-            focused_attrs = {
-                "shooting": {"shoot", "three"},
-                "defense": {"defense", "rebound"},
-                "athletic": {"stamina", "drive"},
-                "playmaking": {"passing", "iq"},
-                "balanced": set(),
-            }.get(focus, set())
-
-            ovr_error = max(1, self._get_scout_ovr_error(scout_level) - self._get_dispatch_ovr_error_bonus(dispatch))
-            real_ovr = int(getattr(player, "ovr", 60))
-            low = max(45, real_ovr - ovr_error)
-            high = min(99, real_ovr + ovr_error)
-
+            r = generate_player_scout_report_for_team(player, team)
             report = {
-                "ovr_range": f"{low}-{high}" if low != high else str(low),
-                "potential_view": self._get_dispatch_potential_view(player, dispatch),
-                "shoot_view": self._estimate_attribute(player, "shoot", scout_level, "shoot" in focused_attrs or "three" in focused_attrs, dispatch=dispatch),
-                "defense_view": self._estimate_attribute(player, "defense", scout_level, "defense" in focused_attrs, dispatch=dispatch),
-                "athletic_view": self._estimate_attribute(player, "stamina", scout_level, "stamina" in focused_attrs or "drive" in focused_attrs, dispatch=dispatch),
-                "focus": focus,
-                "focus_label": self._get_scout_focus_label(focus),
-                "dispatch": dispatch,
-                "dispatch_label": self._get_scout_dispatch_label(dispatch),
+                # 既存の表示コード（Combine/UI）が参照しているキーを維持
+                "ovr_range": r.get("scout_ovr_range", "?"),
+                "potential_view": r.get("scout_potential", "?"),
+                "shoot_view": r.get("shoot_range", "?"),
+                "defense_view": r.get("defense_range", "?"),
+                "athletic_view": r.get("athletic_range", "?"),
+                "playmaking_view": r.get("playmaking_range", "?"),
+                "inside_view": r.get("inside_range", "?"),
+                "focus": r.get("focus", getattr(team, "scout_focus", "balanced")),
+                "focus_label": get_scout_focus_label(team),
+                "dispatch": r.get("dispatch", getattr(team, "scout_dispatch", "college")),
+                "dispatch_label": r.get("dispatch_label", "College"),
+                # 新規: プロスペクト/SS候補/確定SS の見え方
+                "prospect_badge": r.get("prospect_badge", ""),
+                "visibility_band": r.get("visibility_band", ""),
             }
             player.scout_reports[getattr(team, "team_id", None)] = report
 
@@ -2627,11 +2633,13 @@ class Offseason:
                 athletic_view = report.get("athletic_view", "?")
                 potential_view = report.get("potential_view", getattr(p, "potential", "C"))
                 dispatch_label = report.get("dispatch_label", "College")
+                badge = report.get("prospect_badge", "")
+                badge_text = f" | {badge}" if badge else ""
                 print(
                     f"{i}. {p.name} | {p.position} | OVR:{ovr_view} | "
                     f"Potential:{potential_view} | "
                     f"Shoot:{shoot_view} | Defense:{defense_view} | Athletic:{athletic_view} | "
-                    f"Dispatch:{dispatch_label} | {label}"
+                    f"Dispatch:{dispatch_label}{badge_text} | {label}"
                 )
             else:
                 print(

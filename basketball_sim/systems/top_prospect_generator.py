@@ -29,7 +29,41 @@ def generate_homage_count() -> int:
     オマージュ目玉新人。
     最大2人。
     """
-    return random.randint(0, 2)
+    # 毎年必ず出す前提ではない（0が多め、たまに1、稀に2）
+    return random.choices([0, 1, 2], weights=[55, 35, 10], k=1)[0]
+
+
+HOMAGE_TEMPLATES: List[Dict[str, str]] = [
+    # 一次案（20人）
+    # 実在人物の再現ではなく「作品オマージュの雰囲気」枠として扱う。
+    # market_grade は SS/S のみ（最終的なSS確定は別ロジックで“SS最大2”に収束）。
+    #
+    # 【ガード陣：コートの支配者】
+    {"name": "宮園 由人", "position": "PG", "archetype": "Athletic Freak", "market_grade": "S"},
+    {"name": "三ツ矢 寿一", "position": "SG", "archetype": "Sniper", "market_grade": "SS"},
+    {"name": "藤代 健吾", "position": "PG", "archetype": "Floor General", "market_grade": "SS"},
+    {"name": "神崎 一馬", "position": "SG", "archetype": "Sniper", "market_grade": "S"},
+    {"name": "越谷 宏", "position": "SG", "archetype": "Defensive Monster", "market_grade": "S"},
+    {"name": "深町 成也", "position": "PG", "archetype": "Floor General", "market_grade": "S"},
+    #
+    # 【フォワード陣：華麗なスコアラー】
+    {"name": "流山 楓馬", "position": "SF", "archetype": "Athletic Freak", "market_grade": "SS"},
+    {"name": "千石 彰人", "position": "SF", "archetype": "Point Forward", "market_grade": "SS"},
+    {"name": "清家 貴史", "position": "SG", "archetype": "Athletic Freak", "market_grade": "S"},
+    {"name": "南雲 蓮", "position": "SG", "archetype": "Sniper", "market_grade": "S"},
+    {"name": "松岡 稔", "position": "SF", "archetype": "Point Forward", "market_grade": "S"},
+    {"name": "沢渡 栄治", "position": "SF", "archetype": "Athletic Freak", "market_grade": "SS"},
+    #
+    # 【ビッグマン：インサイドの要】
+    {"name": "桜庭 晴道", "position": "PF", "archetype": "Athletic Freak", "market_grade": "S"},
+    {"name": "赤嶺 剛士", "position": "C", "archetype": "Defensive Monster", "market_grade": "SS"},
+    {"name": "魚谷 純一", "position": "C", "archetype": "Athletic Freak", "market_grade": "S"},
+    {"name": "花菱 俊哉", "position": "C", "archetype": "Stretch Big", "market_grade": "S"},
+    {"name": "高梨 一見", "position": "C", "archetype": "Defensive Monster", "market_grade": "S"},
+    {"name": "河村 正樹", "position": "C", "archetype": "Stretch Big", "market_grade": "SS"},
+    {"name": "森定 昌弘", "position": "C", "archetype": "Athletic Freak", "market_grade": "SS"},
+    {"name": "河村 公一", "position": "C", "archetype": "Athletic Freak", "market_grade": "S"},
+]
 
 
 def generate_legend_rookie_count() -> int:
@@ -289,23 +323,31 @@ def build_prospect_profile(player: Player, peak_ovr: int) -> Dict[str, Any]:
 
 def generate_homage_prospect() -> Dict[str, Any]:
     """
-    旧土台互換用。
+    オマージュ枠（漫画/名作スポ根など“風味”の新人）。
+    実在選手の直接再現は禁止。テンプレは完全架空の別名のみを持つ。
     """
-    archetypes = [
-        "Sniper",
-        "Floor General",
-        "Defensive Monster",
-        "Athletic Freak",
-        "Point Forward",
-        "Stretch Big",
-    ]
+    weights: List[float] = []
+    for row in HOMAGE_TEMPLATES:
+        g = str(row.get("market_grade", "S") or "S").upper().strip()
+        if g == "SS":
+            weights.append(0.9)  # SSテンプレは“存在”はするが選ばれ過ぎない
+        else:
+            weights.append(1.0)
+
+    t = random.choices(HOMAGE_TEMPLATES, weights=weights, k=1)[0]
+
+    hinted = str(t.get("market_grade", "S") or "S").upper().strip()
+    hinted = hinted if hinted in {"SS", "S"} else "S"
 
     return {
         "type": "homage",
-        "archetype": random.choice(archetypes),
-        "age": random.randint(19, 22),
-        "ovr": random.randint(70, 75),
-        "potential": random.choice(["A", "S"]),
+        "name": t["name"],
+        "position": t["position"],
+        "archetype": t["archetype"],
+        "market_grade_hint": hinted,
+        "age": random.choice([19, 20, 21, 22]),
+        "ovr": random.randint(70, 76) if hinted == "SS" else random.randint(68, 74),
+        "potential": random.choice(["S", "A"]) if hinted == "SS" else random.choice(["A", "B", "S"]),
     }
 
 
@@ -441,7 +483,7 @@ def generate_top_prospects(retired_players: List[Player]) -> List[Dict[str, Any]
         if t == "reincarnation":
             return 1.8
         if t == "homage":
-            return 1.6
+            return 2.0 if hint == "SS" else 1.6 if hint == "S" else 1.2
         return 1.0
 
     ss_candidates = prospects[:]

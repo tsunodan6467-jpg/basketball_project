@@ -41,6 +41,50 @@ def ensure_team_scout_profile(team: Team) -> None:
         team.scout_dispatch = "college"
 
 
+def get_scout_visibility_band(team: Team) -> str:
+    """
+    docs/SCOUT_VISIBILITY_MODEL.md の正本に合わせた可視化バンド。
+    - low: 1〜39
+    - mid: 40〜69
+    - high: 70〜100
+    """
+    ensure_team_scout_profile(team)
+    v = int(getattr(team, "scout_level", 50))
+    if v <= 39:
+        return "low"
+    if v <= 69:
+        return "mid"
+    return "high"
+
+
+def get_visible_prospect_badge_for_team(team: Team, player: Player) -> str:
+    """
+    プロスペクト/市場評価（SS/S）の“見え方”だけを返す。
+    非プロスペクトは空文字（UIで無駄にうるさくしない）。
+    """
+    band = get_scout_visibility_band(team)
+    is_prospect = bool(getattr(player, "is_draft_prospect", False))
+    if not is_prospect:
+        return ""
+
+    grade = str(getattr(player, "draft_market_grade", "") or "").upper().strip()
+    if band == "low":
+        return "プロスペクト"
+
+    if band == "mid":
+        # 「年1回程度」をコード上で“少数”の入れ替わりとして表現（個別候補に小確率で発生）
+        if grade == "SS":
+            return "S濃厚" if random.random() < 0.08 else "SS候補"
+        if grade == "S":
+            return "SS候補" if random.random() < 0.05 else "S濃厚"
+        return "プロスペクト"
+
+    # high
+    if grade in ("SS", "S"):
+        return grade
+    return "プロスペクト"
+
+
 def get_scout_focus_label(team: Team) -> str:
     ensure_team_scout_profile(team)
     return SCOUT_FOCUS_OPTIONS.get(getattr(team, "scout_focus", "balanced"), "Balanced")
@@ -410,6 +454,8 @@ def generate_player_scout_report_for_team(player: Player, team: Team) -> Dict[st
     else:
         shown_potential = _dispatch_potential_view(player, dispatch)
 
+    prospect_badge = get_visible_prospect_badge_for_team(team, player)
+
     return {
         "player_id": getattr(player, "player_id", None),
         "player_name": getattr(player, "name", "Unknown"),
@@ -418,6 +464,8 @@ def generate_player_scout_report_for_team(player: Player, team: Team) -> Dict[st
         "dispatch_label": SCOUT_DISPATCH_OPTIONS.get(dispatch, "College"),
         "scout_level": scout_score_value,
         "scout_tier": level,
+        "visibility_band": get_scout_visibility_band(team),
+        "prospect_badge": prospect_badge,
         "scout_grade": _grade_from_score(scout_top_score),
         "scout_top_score": round(scout_top_score, 1),
         "scout_ovr_range": _make_range_text(actual_ovr, ovr_err),

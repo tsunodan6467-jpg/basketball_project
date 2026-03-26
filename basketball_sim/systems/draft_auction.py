@@ -403,8 +403,10 @@ def conduct_auction_draft(
                     pot = str(getattr(p, "potential", "C"))
                     label = str(getattr(p, "draft_profile_label", "") or "")
                     label_text = f" | {label}" if label else ""
-                    grade = str(getattr(p, "draft_market_grade", "") or "")
-                    grade_text = f" [{grade}]" if grade in ("SS", "S") else ""
+                    from basketball_sim.systems.scout_logic import get_visible_prospect_badge_for_team
+
+                    badge = get_visible_prospect_badge_for_team(team, p)
+                    grade_text = f" [{badge}]" if badge else ""
                     print(
                         f"{i:>2}. {p.name:<16} {getattr(p,'position','-'):<2} "
                         f"OVR:{getattr(p,'ovr',0):<2} Pot:{pot} | "
