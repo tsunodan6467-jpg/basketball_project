@@ -99,10 +99,18 @@ Get-FileHash -Algorithm SHA256 .\BasketballGM.exe
 Get-Content .\BasketballGM.exe.sha256.txt
 ```
 
-4. 次を実行して `smoke ok` が出れば成功:
+出力された SHA256 は **大文字/小文字が違っても同じ値**です（内容が一致していればOK）。
+
+5. 次を実行して `smoke ok` が出れば成功:
 
 ```powershell
 .\BasketballGM.exe --smoke
+```
+
+6. （任意）Steam 連携の診断も同じ exe で実行できる（本人確認待ちでもOK）:
+
+```powershell
+.\BasketballGM.exe --steam-diag
 ```
 
 **SmartScreen が出た場合**: 「詳細情報」→「実行」で続行できます（未署名 exe のため、開発中は出ることがあります）。
