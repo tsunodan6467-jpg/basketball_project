@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
 from .player import Player
 
 
@@ -57,6 +57,27 @@ class Team:
     rookie_budget: int = 40000000
     rookie_budget_remaining: int = 40000000
 
+    # -------------------------
+    # Youth system (v1 foundation)
+    # 正本: docs/YOUTH_SYSTEM_V1.md
+    # -------------------------
+    youth_players: List[Player] = field(default_factory=list)
+    # 16〜18歳のコールアップ（ユース枠）: 通常ロスター13人枠とは別管理
+    youth_callups: List[Player] = field(default_factory=list)
+    youth_capacity: int = 10
+    youth_callups_limit_per_year: int = 2
+    youth_callups_used_this_year: int = 0
+    youth_graduate_rights_limit_per_year: int = 2
+    youth_graduate_rights_used_this_year: int = 0
+
+    youth_policy_global: str = "balanced"  # technical / physical / balanced
+    youth_policy_focus: str = "balanced"   # pg / shooter / big / defender / balanced
+    youth_investment: Dict[str, int] = field(
+        default_factory=lambda: {"facility": 50, "coaching": 50, "scout": 50, "community": 50}
+    )
+    youth_prospect_ids: List[int] = field(default_factory=list)
+    youth_rights_players: List[Player] = field(default_factory=list)
+
     regular_wins: int = 0
     regular_losses: int = 0
     regular_points_for: int = 0
@@ -101,6 +122,30 @@ class Team:
         self.rookie_budget = int(max(0, getattr(self, "rookie_budget", 40000000)))
         # ソフトキャップ運用のため、remaining はマイナスも許容する（税を含めた支出管理）
         self.rookie_budget_remaining = int(getattr(self, "rookie_budget_remaining", self.rookie_budget))
+
+        # youth defaults / safety
+        self.youth_capacity = int(max(0, getattr(self, "youth_capacity", 10)))
+        self.youth_callups_limit_per_year = int(max(0, getattr(self, "youth_callups_limit_per_year", 2)))
+        self.youth_callups_used_this_year = int(max(0, getattr(self, "youth_callups_used_this_year", 0)))
+        self.youth_graduate_rights_limit_per_year = int(max(0, getattr(self, "youth_graduate_rights_limit_per_year", 2)))
+        self.youth_graduate_rights_used_this_year = int(max(0, getattr(self, "youth_graduate_rights_used_this_year", 0)))
+
+        if not hasattr(self, "youth_players") or self.youth_players is None:
+            self.youth_players = []
+        if not hasattr(self, "youth_callups") or self.youth_callups is None:
+            self.youth_callups = []
+
+        inv = getattr(self, "youth_investment", None)
+        if not isinstance(inv, dict):
+            inv = {"facility": 50, "coaching": 50, "scout": 50, "community": 50}
+        for k in ("facility", "coaching", "scout", "community"):
+            inv[k] = int(max(0, min(100, inv.get(k, 50))))
+        self.youth_investment = inv
+
+        if getattr(self, "youth_policy_global", "balanced") not in {"technical", "physical", "balanced"}:
+            self.youth_policy_global = "balanced"
+        if getattr(self, "youth_policy_focus", "balanced") not in {"pg", "shooter", "big", "defender", "balanced"}:
+            self.youth_policy_focus = "balanced"
 
         self.fan_base = int(max(0, getattr(self, "fan_base", 5000)))
         self.season_ticket_base = int(max(0, getattr(self, "season_ticket_base", 2500)))

@@ -276,6 +276,9 @@ def _find_release_candidate(team: Team) -> Optional[Player]:
     for player in getattr(team, "players", []):
         if getattr(player, "icon_locked", False):
             continue
+        # ユース枠はロスター上限整理の対象外（既存選手を削らず受け入れる）
+        if str(getattr(player, "acquisition_type", "") or "") == "youth":
+            continue
         candidates.append(player)
 
     if not candidates:

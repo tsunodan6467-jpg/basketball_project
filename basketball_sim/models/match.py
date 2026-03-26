@@ -1458,12 +1458,71 @@ class Match:
         )
 
     def _select_active_roster(self, team: Team):
-        players = [
-            p for p in team.players
-            if not p.is_injured() and not p.is_retired
-        ]
+        players = [p for p in team.players if not p.is_injured() and not p.is_retired]
+
+        # Youth callups (16〜18) are not part of the normal 13-man roster,
+        # but can be registered for games when the team is in development mode.
+        allow_youth = (
+            getattr(team, "coach_style", "balanced") == "development"
+            or getattr(team, "usage_policy", "balanced") == "development"
+        )
+        youth_pool = []
+        if allow_youth:
+            youth_pool = [
+                p for p in (getattr(team, "youth_callups", []) or [])
+                if not p.is_injured() and not p.is_retired
+            ]
 
         players = sorted(players, key=lambda p: p.get_effective_ovr(), reverse=True)
+        focus = str(getattr(team, "youth_policy_focus", "balanced") or "balanced")
+        global_policy = str(getattr(team, "youth_policy_global", "balanced") or "balanced")
+
+        def youth_sort_key(p: Player):
+            pos = str(getattr(p, "position", "") or "")
+            # v1: 方針に合わせて「選ぶ1人」を寄せる（能力配分は後で詰める）
+            focus_bonus = 0
+            if focus == "pg":
+                focus_bonus = 4 if pos == "PG" else 1 if pos in {"SG"} else 0
+            elif focus == "shooter":
+                focus_bonus = 4 if pos in {"SG", "SF"} else 1 if pos in {"PG"} else 0
+            elif focus == "big":
+                focus_bonus = 4 if pos in {"C", "PF"} else 1 if pos in {"SF"} else 0
+            elif focus == "defender":
+                focus_bonus = 3 if pos in {"SF", "PF"} else 2 if pos in {"SG", "PG"} else 1 if pos == "C" else 0
+            else:
+                focus_bonus = 1
+
+            # v1: 全体方針（technical/physical）も「候補の選ばれ方」にだけ反映
+            # - technical: shoot/three/passing/iq 寄りの選手が少し優先される
+            # - physical : stamina/drive/rebound/defense 寄りの選手が少し優先される
+            skill_bonus = 0.0
+            try:
+                if global_policy == "technical":
+                    skill_bonus = (
+                        p.get_adjusted_attribute("shoot") * 0.04
+                        + p.get_adjusted_attribute("three") * 0.03
+                        + p.get_adjusted_attribute("passing") * 0.03
+                        + p.get_adjusted_attribute("iq") * 0.02
+                    )
+                elif global_policy == "physical":
+                    skill_bonus = (
+                        p.get_adjusted_attribute("stamina") * 0.03
+                        + p.get_adjusted_attribute("drive") * 0.03
+                        + p.get_adjusted_attribute("rebound") * 0.02
+                        + p.get_adjusted_attribute("defense") * 0.02
+                    )
+            except Exception:
+                skill_bonus = 0.0
+
+            return (
+                focus_bonus,
+                round(float(skill_bonus), 2),
+                p.get_effective_ovr(),
+                -int(getattr(p, "age", 18) or 18),
+                str(getattr(p, "name", "")),
+            )
+
+        youth_pool = sorted(youth_pool, key=youth_sort_key, reverse=True)
 
         active = []
         rule = self._get_competition_rule("active")
@@ -1483,6 +1542,25 @@ class Match:
                 continue
 
             active.append(p)
+
+        # At most 1 youth callup can be registered (v1 safety).
+        if allow_youth and youth_pool and len(active) >= 12:
+            y = youth_pool[0]
+            bucket = self._get_player_regulation_bucket(y, "active")
+            current_foreign, current_special = self._count_regulation_slots(active, "active")
+            can_add = True
+            if bucket == "foreign" and current_foreign >= foreign_max:
+                can_add = False
+            if bucket == "special" and current_special >= special_max:
+                can_add = False
+
+            if can_add:
+                # replace the lowest effective OVR player in active (never replace icon)
+                replace_candidates = [p for p in active if not bool(getattr(p, "icon_locked", False))]
+                if replace_candidates:
+                    drop = min(replace_candidates, key=lambda p: p.get_effective_ovr())
+                    active.remove(drop)
+                    active.append(y)
 
         inactive = [p for p in players if p not in active]
         return active, inactive

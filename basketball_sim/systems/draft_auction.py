@@ -232,7 +232,12 @@ def _add_player_to_team_and_trim(team: Team, player: Player, free_agents: List[P
     if len(roster) <= 13:
         return
 
-    candidates = [p for p in roster if not bool(getattr(p, "icon_locked", False))]
+    # ユース枠（acquisition_type=youth）はロスター上限整理の対象外（既存選手を削らず受け入れる）
+    candidates = [
+        p for p in roster
+        if not bool(getattr(p, "icon_locked", False))
+        and str(getattr(p, "acquisition_type", "") or "") != "youth"
+    ]
     if not candidates:
         return
 

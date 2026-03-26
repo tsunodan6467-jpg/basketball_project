@@ -295,6 +295,11 @@ class RotationSystem:
                 elif age <= 27:
                     target += 0.8
 
+                # Youth callups (16〜18) should get some floor time
+                # when the team is explicitly in development mode.
+                if str(getattr(p, "acquisition_type", "") or "") == "youth":
+                    target = max(target, 8.0)
+
                 if rank <= 2 and ovr >= 78:
                     target -= 2.5
                 elif rank <= 4 and ovr >= 74:
@@ -345,6 +350,14 @@ class RotationSystem:
             cooldown_possessions = min(cooldown_possessions, 8)
 
         if self._get_minutes(player) <= 0.1 and not self._is_late_game(possession, total_possessions):
+            cooldown_possessions = min(cooldown_possessions, 6)
+
+        # Development policy: youth callups rotate in a bit more easily
+        if (
+            self._get_usage_policy() == "development"
+            and str(getattr(player, "acquisition_type", "") or "") == "youth"
+            and not self._is_late_game(possession, total_possessions)
+        ):
             cooldown_possessions = min(cooldown_possessions, 6)
 
         return (possession - last_out) >= cooldown_possessions

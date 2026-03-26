@@ -152,6 +152,7 @@ class Offseason:
         self.teams = teams
         self.free_agents = free_agents
         self.draft_pool: List[Player] = []
+        self.youth_draft_entrants: List[Player] = []
         self.re_signed_player_ids = set()
 
         self.international_reborn_pool = {
@@ -196,6 +197,7 @@ class Offseason:
         print("\n--- Offseason Processing ---")
         self.re_signed_player_ids.clear()
         self.draft_pool = []
+        self.youth_draft_entrants = []
         self.top_prospects = []
         self.retired_star_pool = []
         self.international_reborn_pool = {"Foreign": [], "Asia": []}
@@ -224,6 +226,13 @@ class Offseason:
         self._player_progression()
         self._process_naturalization()
         self._retire_and_reincarnate()
+        # Youth system v1: yearly update + graduation + intake + prospects
+        try:
+            from basketball_sim.systems.youth_system import run_youth_offseason_update_for_teams
+
+            self.youth_draft_entrants = run_youth_offseason_update_for_teams(self.teams, free_agents=self.free_agents)
+        except Exception as exc:
+            print(f"[YOUTH] skipped due to error: {exc}")
         self._resign_players()
         self._assign_scout_dispatches()
         self._reset_team_stats()
@@ -2267,6 +2276,10 @@ class Offseason:
 
         profiles = generate_top_prospects(self.retired_star_pool)
         self.top_prospects = []
+
+        # Youth graduates (go to draft unless reserved by club rights)
+        for p in list(getattr(self, "youth_draft_entrants", []) or []):
+            self.draft_pool.append(p)
 
         for profile in profiles:
             player = self._build_player_from_top_profile(profile)

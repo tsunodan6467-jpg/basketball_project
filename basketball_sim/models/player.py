@@ -89,6 +89,11 @@ class Player:
     acquisition_type: str = "normal"  # normal / draft / trade / free_agent / youth / special_designation / international / reborn
     acquisition_note: str = ""
 
+    # ユース（v1土台）
+    youth_team_id: Optional[int] = None
+    youth_reputation: str = ""  # A/B/C/D（有力候補のみ）
+    youth_hidden_score: float = 0.0
+
     # 成長土台
     growth_type: str = "normal"       # normal / steady / late_bloomer / boom_bust / early_peak
     peak_age: int = 28
