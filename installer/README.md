@@ -7,6 +7,8 @@
 
 **バージョン番号**: リリース時は `BasketballGM.iss` 先頭の `#define MyAppVersion` とルート **`pyproject.toml` の `[project].version`** を同じ値に揃える（出力ファイル名 `BasketballGM_Setup_<version>.exe` と表示に反映される）。
 
+**Steam へのアップロード（SteamPipe）**: デポの作成・初回ビルド・コンテンツルートの考え方は **`basketball_sim/integrations/STEAMWORKS_DESIGN.md`** の「Steam デポ」と「Steamworks パートナーでのデポ・初回ビルド（チェックリスト）」を参照する（パートナー画面での作業）。
+
 ## GitHub Release（配布物の添付）
 
 1. ローカルで PyInstaller（および必要なら Inno・署名）を実行し、`dist\BasketballGM.exe` などを用意する。`--smoke` で動作確認してからアップロードすると安全です。
