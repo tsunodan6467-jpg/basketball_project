@@ -3,6 +3,7 @@ import random
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.season_transaction_rules import cpu_inseason_fa_allowed_for_simulated_round
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
     SALARY_SOFT_LIMIT_MULTIPLIER,
@@ -462,11 +463,21 @@ def run_cpu_fa_market_cycle(
     teams: List[Team],
     free_agents: List[Player],
     max_signings_per_team: int = 1,
+    *,
+    simulated_round: Optional[int] = None,
 ) -> List[str]:
     """
     CPUチームがFAを拾う簡易サイクル。
     シーズン中FA補強の土台として使える安全版。
+
+    simulated_round: シーズンシミュレーション中のラウンド番号（1始まり）を渡すと、
+    レギュラー中トレード/FA締切後は処理しない（空リストを返す）。オフ等で呼ぶ場合は None。
     """
+    if simulated_round is not None and not cpu_inseason_fa_allowed_for_simulated_round(
+        int(simulated_round)
+    ):
+        return []
+
     logs: List[str] = []
     market = normalize_free_agents(free_agents)
 

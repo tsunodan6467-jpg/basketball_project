@@ -33,7 +33,10 @@ def cpu_inseason_fa_allowed_for_simulated_round(round_number: int) -> bool:
     return int(round_number) <= REGULAR_SEASON_TRANSACTION_CUTOFF_ROUND
 
 
-# CLI 用（main.py）
-INSEASON_TRADE_LOCK_MESSAGE_JA = (
-    "トレード期限を過ぎています（3月第2週終了・ラウンド22消化後はシーズン終了まで不可）。"
+# CLI 用（main.py）。トレード・インシーズンFA 共通。
+INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA = (
+    "レギュラー中のトレード・インシーズンFAは期限を過ぎています"
+    "（3月第2週終了・ラウンド22消化後はシーズン終了まで不可）。"
 )
+# 互換名（import 先が多い場合向け）
+INSEASON_TRADE_LOCK_MESSAGE_JA = INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA

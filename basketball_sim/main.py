@@ -19,7 +19,7 @@ from basketball_sim.systems.generator import (
 )
 from basketball_sim.systems.helpers import print_separator
 from basketball_sim.systems.season_transaction_rules import (
-    INSEASON_TRADE_LOCK_MESSAGE_JA,
+    INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
 )
 from basketball_sim.systems.trade_logic import TradeSystem, MultiTradeOffer
@@ -1458,7 +1458,11 @@ def print_trade_evaluation_summary(user_eval, ai_eval):
     print(f"AI側理由       : {', '.join(ai_eval.reasons)}")
 
 
-def propose_trade(all_teams, user_team):
+def propose_trade(all_teams, user_team, season=None):
+    if not inseason_roster_moves_unlocked(season):
+        print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
+        return
+
     trade_system = TradeSystem()
 
     print_separator("トレード提案")
@@ -1521,7 +1525,7 @@ def propose_trade(all_teams, user_team):
 
 def propose_multi_trade(all_teams, user_team, free_agents, season=None):
     if not inseason_roster_moves_unlocked(season):
-        print(INSEASON_TRADE_LOCK_MESSAGE_JA)
+        print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
         return
 
     trade_system = TradeSystem()
@@ -1643,7 +1647,7 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
         print_separator("トレードメニュー")
         locked = not inseason_roster_moves_unlocked(season)
         if locked:
-            print(INSEASON_TRADE_LOCK_MESSAGE_JA)
+            print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
         print("1. 相手チーム一覧を見る")
         print("2. トレード提案")
         print("3. 戻る")
@@ -1654,7 +1658,7 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
             print_trade_team_list(all_teams, user_team)
         elif choice == "2":
             if locked:
-                print(INSEASON_TRADE_LOCK_MESSAGE_JA)
+                print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
                 continue
             propose_multi_trade(all_teams, user_team, free_agents, season=season)
         elif choice == "3":
