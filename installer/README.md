@@ -15,6 +15,7 @@
 2. GitHub リポジトリの **Releases** → **Draft a new release** を開く。
 3. **Choose a tag** で `v0.1.0` など、既に `git push` 済みのタグを選ぶ（タグが無い場合は画面の指示で作成してもよい）。
 4. リリースタイトル・説明文（変更点・既知の問題）を記入する。
+   - **推奨**: `BasketballGM.exe.sha256.txt` の 1 行を本文に貼る（改ざん検知のため）。
 5. **Release 資産（Assets）** に、次をドラッグ＆ドロップで添付する。
    - **`BasketballGM.exe`** … `dist\` にある単体 exe（ポータブル配布向け）
    - （任意）**`BasketballGM_Setup_<version>.exe`** … Inno で生成したインストーラ
