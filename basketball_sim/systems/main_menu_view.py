@@ -32,6 +32,11 @@ from tkinter import ttk, messagebox
 from datetime import datetime, date
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
+from basketball_sim.systems.gm_dashboard_text import (
+    format_gm_roster_text,
+    format_salary_cap_text,
+    format_team_identity_text,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -349,6 +354,11 @@ class MainMenuView:
         try:
             if getattr(self, "_history_window", None) is not None and self._history_window.winfo_exists():
                 self._refresh_history_window()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_gm_window", None) is not None and self._gm_window.winfo_exists():
+                self._refresh_gm_dashboard_window()
         except Exception:
             pass
         self._refresh_advance_button()
@@ -2235,8 +2245,8 @@ class MainMenuView:
     # ------------------------------------------------------------------
     # Interaction handlers
     # ------------------------------------------------------------------
-    def _open_gm_stub_dialog(self) -> None:
-        """GUI からの GM 完全操作は未接続。状況表示と CLI 案内のみ。"""
+    def _format_gm_cli_hint_block(self) -> str:
+        """シーズン状況＋CLI 案内（GM ウィンドウ上部）。"""
         cr = int(self._safe_get(self.season, "current_round", 0) or 0)
         tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
         fin = self.season is not None and bool(self._safe_get(self.season, "season_finished", False))
@@ -2262,13 +2272,128 @@ class MainMenuView:
             lock_line = (
                 "レギュラー中のトレード／インシーズンFA は期限切れです。シーズン終了まで人事の強化はできません。"
             )
-        body = (
-            f"消化ラウンド: {cr}/{tr}\n\n"
+        return (
+            f"消化ラウンド: {cr}/{tr}\n"
             f"{lock_line}\n\n"
-            "トレード・スタメン・施設投資などのGM操作は、現在はターミナルのシーズンメニュー「8. GMメニュー」から行ってください。\n"
-            "GUI への完全統合は今後の開発で接続予定です。"
+            "下記タブは読み取り専用です。トレード・スタメン・施設投資などの操作は、"
+            "ターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
         )
-        messagebox.showinfo("GM", body, parent=self.root)
+
+    @staticmethod
+    def _gm_set_readonly_text(widget: tk.Text, content: str) -> None:
+        widget.configure(state="normal")
+        widget.delete("1.0", "end")
+        widget.insert("1.0", content)
+        widget.configure(state="disabled")
+
+    def _refresh_gm_dashboard_window(self) -> None:
+        if getattr(self, "_gm_window", None) is None or self.team is None:
+            return
+        try:
+            if not self._gm_window.winfo_exists():
+                return
+        except Exception:
+            return
+        self._gm_set_readonly_text(self._gm_hint_text, self._format_gm_cli_hint_block())
+        self._gm_set_readonly_text(self._gm_text_team, format_team_identity_text(self.team))
+        self._gm_set_readonly_text(self._gm_text_cap, format_salary_cap_text(self.team))
+        self._gm_set_readonly_text(self._gm_text_roster, format_gm_roster_text(self.team))
+
+    def _on_close_gm_window(self) -> None:
+        w = getattr(self, "_gm_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        except Exception:
+            pass
+        self._gm_window = None
+
+    def _open_gm_dashboard_window(self) -> None:
+        """読み取り専用 GM（チーム情報・キャップ・ロスター）。操作系は CLI。"""
+        if self.team is None:
+            messagebox.showwarning("GM", "チームが未接続です。", parent=self.root)
+            return
+
+        existing = getattr(self, "_gm_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_gm_dashboard_window()
+                return
+        except Exception:
+            pass
+
+        window = tk.Toplevel(self.root)
+        window.title(f"GM - {self._team_name()}")
+        window.geometry("920x720")
+        window.minsize(800, 560)
+        window.configure(bg="#15171c")
+        try:
+            window.transient(self.root)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(window, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+
+        hint_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=10)
+        hint_wrap.pack(fill="x", pady=(0, 10))
+
+        self._gm_hint_text = tk.Text(
+            hint_wrap,
+            height=5,
+            wrap="word",
+            bg="#1d2129",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            padx=8,
+            pady=8,
+        )
+        self._gm_hint_text.pack(fill="x")
+
+        nb = ttk.Notebook(outer)
+        nb.pack(fill="both", expand=True)
+
+        def _make_tab(title: str) -> tk.Text:
+            tab = ttk.Frame(nb, style="Root.TFrame", padding=6)
+            nb.add(tab, text=title)
+            txt = tk.Text(
+                tab,
+                wrap="none",
+                bg="#222834",
+                fg="#e8ecf0",
+                insertbackground="#e8ecf0",
+                font=("Consolas", 10),
+                relief="flat",
+                padx=10,
+                pady=10,
+            )
+            vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
+            hsb = ttk.Scrollbar(tab, orient="horizontal", command=txt.xview)
+            txt.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+            txt.grid(row=0, column=0, sticky="nsew")
+            vsb.grid(row=0, column=1, sticky="ns")
+            hsb.grid(row=1, column=0, sticky="ew")
+            tab.rowconfigure(0, weight=1)
+            tab.columnconfigure(0, weight=1)
+            return txt
+
+        self._gm_text_team = _make_tab("チーム情報")
+        self._gm_text_cap = _make_tab("サラリーキャップ")
+        self._gm_text_roster = _make_tab("ロスター")
+
+        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=10)
+        bottom.pack(fill="x", pady=(10, 0))
+        ttk.Button(bottom, text="閉じる", style="Menu.TButton", command=self._on_close_gm_window).pack(
+            anchor="e"
+        )
+
+        self._gm_window = window
+        window.protocol("WM_DELETE_WINDOW", self._on_close_gm_window)
+        self._refresh_gm_dashboard_window()
 
     def _on_menu(self, key: str) -> None:
         callback = self.menu_callbacks.get(key)
@@ -2283,7 +2408,7 @@ class MainMenuView:
             if cb is not None:
                 cb()
                 return
-            self._open_gm_stub_dialog()
+            self._open_gm_dashboard_window()
             return
         if key == "経営":
             self.open_finance_window()

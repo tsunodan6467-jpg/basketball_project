@@ -28,6 +28,11 @@ from basketball_sim.systems.contract_logic import (
     SALARY_SOFT_LIMIT_MULTIPLIER,
     get_team_payroll,
 )
+from basketball_sim.systems.gm_dashboard_text import (
+    format_gm_roster_text,
+    format_salary_cap_text,
+    format_team_identity_text,
+)
 
 try:
     from basketball_sim.systems.main_menu_view import launch_main_menu
@@ -841,49 +846,12 @@ def print_user_team_history(user_team):
 
 def print_team_identity(user_team):
     print_separator("GMチーム情報")
-    print(f"クラブ名      : {user_team.name}")
-    print(f"拠点地        : {getattr(user_team, 'home_city', 'Unknown')}")
-    print(f"市場規模      : {getattr(user_team, 'market_size', 1.0):.2f}")
-    print(f"人気          : {getattr(user_team, 'popularity', 0)}")
-    print(f"資金          : ${getattr(user_team, 'money', 0):,}")
-    print(f"戦術          : {getattr(user_team, 'strategy', 'balanced')}")
-    print(f"HCスタイル    : {getattr(user_team, 'coach_style', 'balanced')}")
-    usage_label = getattr(user_team, "get_usage_policy_label", lambda: getattr(user_team, "usage_policy", "balanced"))()
-    print(f"起用方針      : {usage_label}")
+    print(format_team_identity_text(user_team))
 
 
 def print_salary_cap_status(user_team):
     print_separator("Salary Cap Status")
-
-    payroll = int(get_team_payroll(user_team))
-    hard_cap = int(SALARY_CAP_DEFAULT)
-    soft_cap = int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER)
-
-    if payroll > soft_cap:
-        status = "OVER SOFT CAP"
-    elif payroll > hard_cap:
-        status = "OVER CAP"
-    else:
-        status = "UNDER CAP"
-
-    cap_space = hard_cap - payroll
-    soft_room = soft_cap - payroll
-
-    print(f"Team Payroll : ${payroll:,}")
-    print(f"Hard Cap     : ${hard_cap:,}")
-    print(f"Soft Cap     : ${soft_cap:,}")
-    print()
-    print(f"Status       : {status}")
-
-    if cap_space >= 0:
-        print(f"Cap Space    : ${cap_space:,}")
-    else:
-        print(f"Cap Over     : ${abs(cap_space):,}")
-
-    if soft_room >= 0:
-        print(f"Soft Room    : ${soft_room:,}")
-    else:
-        print(f"Soft Over    : ${abs(soft_room):,}")
+    print(format_salary_cap_text(user_team))
 
 
 def choose_option_from_list(title, items):
@@ -1006,37 +974,7 @@ def print_current_bench_order(user_team):
 
 def print_gm_roster_view(user_team):
     print_separator("GMロスター確認")
-
-    roster = sort_roster_for_gm_view(getattr(user_team, "players", []))
-    if not roster:
-        print("ロスターが存在しません。")
-        return
-
-    starter_ids = get_starting_player_ids(user_team)
-    sixth_man = get_current_sixth_man(user_team)
-    sixth_man_id = getattr(sixth_man, "player_id", None) if sixth_man is not None else None
-
-    for i, p in enumerate(roster, 1):
-        player_id = getattr(p, "player_id", None)
-
-        if player_id in starter_ids:
-            role_mark = "★"
-        elif player_id == sixth_man_id:
-            role_mark = "6"
-        else:
-            role_mark = " "
-
-        print(
-            f"{i:>2}. {role_mark} {p.name:<15} "
-            f"{p.position:<2} "
-            f"OVR:{getattr(p, 'ovr', 0):<2} "
-            f"Age:{getattr(p, 'age', 0):<2} "
-            f"{getattr(p, 'nationality', 'Japan'):<12} "
-            f"Salary:${getattr(p, 'salary', 0):,}"
-        )
-
-    print("\n★ = current starter")
-    print("6 = current sixth man")
+    print(format_gm_roster_text(user_team))
 
 
 def print_current_starting_five(user_team):
