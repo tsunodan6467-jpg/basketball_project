@@ -151,7 +151,8 @@ def _pick_winner_by_tiebreak(teams: List[Team]) -> Team:
 def _downrank_discount_for_one_pick(team: Team, player_meta: DraftCandidateMeta) -> int:
     """
     下位救済C案: 一本釣り（単独指名）の最低落札額を少し下げる。
-    ここでは「前年勝利数が少ないほど」割引率を上げる簡易式とする。
+    ここでは「所属ディビジョンが下がるほど」割引率を上げる（D1 < D2 < D3）。
+    追加で、前年勝利数が少ないほど割引率を上げる（同一ディビジョン内の差）。
     （順位テーブルをSeason側で持つようになったら差し替える）
     """
     wins = int(getattr(team, "last_season_wins", getattr(team, "regular_wins", 15)) or 0)
@@ -166,6 +167,11 @@ def _downrank_discount_for_one_pick(team: Team, player_meta: DraftCandidateMeta)
         rate = 0.06
     else:
         rate = 0.03
+
+    league_level = int(getattr(team, "league_level", 1) or 1)
+    # D1: +0, D2: +4%, D3: +8%
+    div_bonus = {1: 0.00, 2: 0.04, 3: 0.08}.get(league_level, 0.00)
+    rate = min(0.40, float(rate) + float(div_bonus))
     discount = int(round(player_meta.min_price * rate))
     return max(0, player_meta.min_price - discount)
 
