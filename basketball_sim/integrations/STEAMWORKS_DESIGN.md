@@ -2,6 +2,12 @@
 
 本書は `steamworks_bridge.py` を実 API へ接続するときの**方針と優先順位**を固定する。コードの詳細は実装時に Steamworks ドキュメントと突き合わせる。
 
+## ロードマップとの対応（クラウドセーブ / Rich Presence の要否）
+
+**Steam Remote Storage（クラウドセーブ）** と **Rich Presence** を、いつ・どのスコープで必須とするかは **Phase 0 の土台が固まった時点**で改めて決定する。リポジトリ直下 **`.cursorrules`** の「■ Phase 0（★現在地）— 技術・商業の足場」に、**クラウドセーブ・Rich Presence は Phase 0 末期に要否決定**と記載してあり、本書と整合させる。
+
+**現時点の前提**は **ローカルセーブのみ**・**Rich Presence は未実装**（下記「現状」および「機能別の優先度と判断」の **3. クラウドセーブ** / **4. Rich Presence**）。方針を変える場合は、まず本書と `.cursorrules` を同じ差分で更新してから実装する。
+
 ## 現状
 
 - **Windows** で `steam_api64.dll` / `steam_api.dll` が実行ファイルまたはカレント付近にあり、`SteamAPI_Init` が成功した場合は **ctypes 実接続**（`SteamAPI_RunCallbacks` / `Shutdown` 含む）。失敗・DLL なし・非 Windows は **False で継続**（クラッシュしない）。ネイティブ接続時は `ISteamUserStats` が取れれば **`unlock_achievement` から SetAchievement/StoreStats**。
