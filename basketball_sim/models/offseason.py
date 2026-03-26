@@ -4,6 +4,7 @@ from .team import Team
 from .player import Player
 from .match import Match
 from basketball_sim.systems.draft import conduct_draft
+from basketball_sim.systems.draft_auction import conduct_auction_draft
 from basketball_sim.systems.free_agency import conduct_free_agency
 from basketball_sim.systems.development import DevelopmentSystem
 from basketball_sim.systems.top_prospect_generator import generate_top_prospects
@@ -231,7 +232,8 @@ class Offseason:
         self._refresh_international_market()
         self._generate_draft_pool()
         self._run_draft_combine()
-        conduct_draft(self.teams, self.draft_pool, self.free_agents)
+        # 正本: docs/DRAFT_AUCTION_SYSTEM.md
+        conduct_auction_draft(self.teams, self.draft_pool, self.free_agents)
 
         from basketball_sim.systems.trade import conduct_trades
         conduct_trades(self.teams)

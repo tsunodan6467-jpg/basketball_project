@@ -54,8 +54,8 @@ class Team:
     scout_focus: str = "balanced"
     scout_dispatch: str = "college"
 
-    rookie_budget: int = 30000000
-    rookie_budget_remaining: int = 30000000
+    rookie_budget: int = 40000000
+    rookie_budget_remaining: int = 40000000
 
     regular_wins: int = 0
     regular_losses: int = 0
@@ -98,10 +98,9 @@ class Team:
         if getattr(self, "scout_dispatch", "college") not in valid_scout_dispatches:
             self.scout_dispatch = "college"
 
-        self.rookie_budget = int(max(0, getattr(self, "rookie_budget", 30000000)))
-        self.rookie_budget_remaining = int(
-            max(0, getattr(self, "rookie_budget_remaining", self.rookie_budget))
-        )
+        self.rookie_budget = int(max(0, getattr(self, "rookie_budget", 40000000)))
+        # ソフトキャップ運用のため、remaining はマイナスも許容する（税を含めた支出管理）
+        self.rookie_budget_remaining = int(getattr(self, "rookie_budget_remaining", self.rookie_budget))
 
         self.fan_base = int(max(0, getattr(self, "fan_base", 5000)))
         self.season_ticket_base = int(max(0, getattr(self, "season_ticket_base", 2500)))
@@ -262,9 +261,7 @@ class Team:
         self.rookie_budget_remaining = int(max(0, self.rookie_budget))
 
     def spend_rookie_budget(self, amount: int):
-        self.rookie_budget_remaining = int(
-            max(0, self.rookie_budget_remaining - max(0, int(amount)))
-        )
+        self.rookie_budget_remaining = int(self.rookie_budget_remaining - max(0, int(amount)))
 
     def get_financial_profile(self) -> dict:
         self._ensure_history_fields()
