@@ -8,6 +8,7 @@ from .player import Player
 from .match import Match
 from basketball_sim.systems.player_stats import PlayerStatsManager
 from basketball_sim.systems.free_agent_market import run_cpu_fa_market_cycle
+from basketball_sim.systems.season_transaction_rules import cpu_inseason_fa_allowed_for_simulated_round
 
 
 @dataclass
@@ -2402,8 +2403,10 @@ class Season:
     # =========================
     # In-season FA
     # =========================
-    def _process_inseason_free_agency(self):
+    def _process_inseason_free_agency(self, round_number: int):
         if not self.free_agents:
+            return
+        if not cpu_inseason_fa_allowed_for_simulated_round(round_number):
             return
 
         logs = run_cpu_fa_market_cycle(
@@ -2474,7 +2477,7 @@ class Season:
             round_points += (home_score + away_score)
             round_game_count += 1
 
-        self._process_inseason_free_agency()
+        self._process_inseason_free_agency(round_number)
 
         if self._should_play_easl_this_round(round_number):
             self._play_easl_stage(round_number)

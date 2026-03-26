@@ -18,6 +18,10 @@ from basketball_sim.systems.generator import (
     sync_player_id_counter_from_world,
 )
 from basketball_sim.systems.helpers import print_separator
+from basketball_sim.systems.season_transaction_rules import (
+    INSEASON_TRADE_LOCK_MESSAGE_JA,
+    inseason_roster_moves_unlocked,
+)
 from basketball_sim.systems.trade_logic import TradeSystem, MultiTradeOffer
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
@@ -1515,7 +1519,11 @@ def propose_trade(all_teams, user_team):
         print("トレード実行に失敗しました。")
 
 
-def propose_multi_trade(all_teams, user_team, free_agents):
+def propose_multi_trade(all_teams, user_team, free_agents, season=None):
+    if not inseason_roster_moves_unlocked(season):
+        print(INSEASON_TRADE_LOCK_MESSAGE_JA)
+        return
+
     trade_system = TradeSystem()
 
     print_separator("トレード提案（複数人数＋現金＋RB）")
@@ -1630,9 +1638,12 @@ def propose_multi_trade(all_teams, user_team, free_agents):
         print("トレード実行に失敗しました（ロスター/上限/安全確認NG）。")
 
 
-def run_trade_menu(all_teams, user_team, free_agents):
+def run_trade_menu(all_teams, user_team, free_agents, season=None):
     while True:
         print_separator("トレードメニュー")
+        locked = not inseason_roster_moves_unlocked(season)
+        if locked:
+            print(INSEASON_TRADE_LOCK_MESSAGE_JA)
         print("1. 相手チーム一覧を見る")
         print("2. トレード提案")
         print("3. 戻る")
@@ -1642,7 +1653,10 @@ def run_trade_menu(all_teams, user_team, free_agents):
         if choice == "1":
             print_trade_team_list(all_teams, user_team)
         elif choice == "2":
-            propose_multi_trade(all_teams, user_team, free_agents)
+            if locked:
+                print(INSEASON_TRADE_LOCK_MESSAGE_JA)
+                continue
+            propose_multi_trade(all_teams, user_team, free_agents, season=season)
         elif choice == "3":
             return
         else:
@@ -1775,9 +1789,11 @@ def run_facility_investment_menu(user_team):
             print("正しい番号を入力してください。")
 
 
-def run_gm_menu(all_teams, user_team, free_agents):
+def run_gm_menu(all_teams, user_team, free_agents, season=None):
     while True:
         print_separator("GMメニュー")
+        trade_locked = season is not None and not inseason_roster_moves_unlocked(season)
+        trade_label = "10. トレード（期限切れ）" if trade_locked else "10. トレード"
         print("1. チーム情報を見る")
         print("2. 戦術を変更する")
         print("3. HCスタイルを変更する")
@@ -1787,7 +1803,7 @@ def run_gm_menu(all_teams, user_team, free_agents):
         print("7. スタメン変更")
         print("8. 6thマン変更")
         print("9. ベンチ序列変更")
-        print("10. トレード")
+        print(trade_label)
         print("11. 施設投資")
         print("12. 戻る")
 
@@ -1812,7 +1828,7 @@ def run_gm_menu(all_teams, user_team, free_agents):
         elif choice == "9":
             change_bench_order(user_team)
         elif choice == "10":
-            run_trade_menu(all_teams, user_team, free_agents)
+            run_trade_menu(all_teams, user_team, free_agents, season=season)
         elif choice == "11":
             run_facility_investment_menu(user_team)
         elif choice == "12":
@@ -1903,7 +1919,7 @@ def run_interactive_season(
                 elif choice == "7":
                     print_player_career_tracking(user_team, tracked_player_name=tracked_player_name)
                 elif choice == "8":
-                    run_gm_menu(teams, user_team, free_agents)
+                    run_gm_menu(teams, user_team, free_agents, season=season)
                 elif choice == "9":
                     season.simulate_to_end()
                 else:

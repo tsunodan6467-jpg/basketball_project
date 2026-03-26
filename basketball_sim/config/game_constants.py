@@ -43,6 +43,7 @@ SALARY_SOFT_LIMIT_MULTIPLIER = 1.20
 # ソフトキャップ超過分に掛ける率（v1: 超過ペイロール全体に対する簡易税）
 LUXURY_TAX_RATE = 0.50
 
-# レギュラーシーズン中のトレード/FA 期限（将来: 3月第2週終了まで可 → それ以降はシーズン終了までロック）
-# 実装時はシーズン週番号またはカレンダーと連動させる
-# REGULAR_SEASON_TRANSACTION_DEADLINE_WEEK: int | None = None  # 例: 22 など
+# レギュラーシーズン中のトレード/インシーズンFA 期限（ROUND_CONFIG 準拠）
+# ラウンド22＝3月第2週相当。消化済み current_round がこの値以上ならロック（ラウンド23〜シーズン終了まで）。
+# シミュレーション対象ラウンド番号（1始まり）がこの値以下なら CPU インシーズンFA を実行する。
+REGULAR_SEASON_TRANSACTION_CUTOFF_ROUND = 22
