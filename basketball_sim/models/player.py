@@ -138,6 +138,11 @@ class Player:
     draft_origin_type: str = ""
     draft_profile_label: str = ""
     draft_priority_bonus: int = 0
+    # ドラフト市場での注目度（正本: docs/DRAFT_AUCTION_SYSTEM.md）
+    # "SS" / "S" / ""（通常候補）
+    draft_market_grade: str = ""
+    # その年の「プロスペクト（6〜10人）」枠かどうか
+    is_draft_prospect: bool = False
     reborn_from: Optional[str] = None
 
     # 試合・シーズンステータス

@@ -2136,6 +2136,9 @@ class Offseason:
         new_prospect.draft_priority_bonus = max(getattr(new_prospect, "draft_priority_bonus", 0), 4)
         entry_type = profile.get("entry_type", "college")
         new_prospect.draft_profile_label = f"転生新人 / 元:{new_prospect.reborn_from} / {entry_type}"
+        # プロスペクト（注目候補）枠
+        new_prospect.is_draft_prospect = True
+        new_prospect.draft_market_grade = str(profile.get("market_grade", "S") or "S").upper()
 
         return new_prospect
 
@@ -2169,6 +2172,8 @@ class Offseason:
         }
         # 呼び名（固定）: 完全架空選手は「通常新人」。オマージュ枠はその亜種として扱う。
         new_prospect.draft_profile_label = f"通常新人 / オマージュ:{label_map.get(archetype, archetype)}"
+        new_prospect.is_draft_prospect = True
+        new_prospect.draft_market_grade = str(profile.get("market_grade", "S") or "S").upper()
         return new_prospect
 
     def _build_legend_rookie_prospect(self, profile: dict) -> Player:
@@ -2210,8 +2215,10 @@ class Offseason:
             "Attacking PG": "攻撃型司令塔",
             "Glue Guy": "万能職人",
         }
-        grade = str(profile.get("market_grade", "A") or "A").upper()
-        grade = grade if grade in {"SS", "S", "A"} else "A"
+        grade = str(profile.get("market_grade", "S") or "S").upper()
+        grade = grade if grade in {"SS", "S"} else "S"
+        new_prospect.is_draft_prospect = True
+        new_prospect.draft_market_grade = grade
         new_prospect.draft_profile_label = f"レジェンドルーキー({grade}) / {label_map.get(archetype, '特別枠')}"
         return new_prospect
 
@@ -2228,6 +2235,8 @@ class Offseason:
         new_prospect.draft_priority_bonus = max(getattr(new_prospect, "draft_priority_bonus", 0), 1)
         if not hasattr(new_prospect, "draft_profile_label"):
             new_prospect.draft_profile_label = "通常新人"
+        new_prospect.is_draft_prospect = True
+        new_prospect.draft_market_grade = str(profile.get("market_grade", "S") or "S").upper()
         return new_prospect
 
     def _build_player_from_top_profile(self, profile: dict) -> Optional[Player]:

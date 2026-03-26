@@ -341,23 +341,24 @@ def generate_legend_rookie_prospect() -> Dict[str, Any]:
     # 同年に2人出る時は「役割がかぶり過ぎない」を優先するため、
     # 呼び出し側で used_names/used_archetypes を持てるが、ここは単体生成なので
     # まずは候補の偏りを避けるために軽いシャッフルのみ行う。
-    # 市場評価 SS は毎年出すと強すぎるので、SS の抽選は控えめにする
+    # この時点の market_grade は「候補の格（ヒント）」として扱い、
+    # 最終的な SS/S の確定は generate_top_prospects 側で「SS最大2」ルールにより決める。
     weights = []
     for row in templates:
         g = str(row.get("market_grade", "A") or "A").upper()
         if g == "SS":
-            weights.append(0.25)
+            weights.append(0.8)
         elif g == "S":
-            weights.append(0.85)
+            weights.append(1.0)
         else:
-            weights.append(1.00)
+            weights.append(1.0)
     t = random.choices(templates, weights=weights, k=1)[0]
     return {
         "type": "legend_rookie",
         "name": t["name"],
         "archetype": t["archetype"],
         "position": t["position"],
-        "market_grade": t.get("market_grade", "A"),
+        "market_grade_hint": str(t.get("market_grade", "A") or "A").upper(),
         "age": random.choice([20, 21, 22]),
         "ovr": random.randint(70, 76) if t.get("market_grade") in ("SS", "S") else random.randint(68, 74),
         "potential": random.choice(["S", "A"]) if t.get("market_grade") in ("SS", "S") else random.choice(["A", "B"]),
@@ -419,6 +420,43 @@ def generate_top_prospects(retired_players: List[Player]) -> List[Dict[str, Any]
 
     while len(prospects) < total_count:
         prospects.append(generate_generic_prospect())
+
+    # -------------------------
+    # 市場評価（SS/S）を最終確定
+    # 仕様: その年のプロスペクト（6〜10人）は SS/S のみ。SSは最大2。
+    # 当たり年・外れ年の揺らぎとして、SS人数は 0〜2 で変動する。
+    # -------------------------
+    ss_target = random.choices([0, 1, 2], weights=[55, 35, 10], k=1)[0]
+
+    # まず全員 S 扱いにする（A等はこの枠では使わない）
+    for p in prospects:
+        p["market_grade"] = "S"
+
+    # SS候補の重み（出自で少し偏りを作る）
+    def ss_weight(p: Dict[str, Any]) -> float:
+        t = str(p.get("type", "generic") or "generic")
+        hint = str(p.get("market_grade_hint", "A") or "A").upper()
+        if t == "legend_rookie":
+            return 2.2 if hint == "SS" else 1.4 if hint == "S" else 1.0
+        if t == "reincarnation":
+            return 1.8
+        if t == "homage":
+            return 1.6
+        return 1.0
+
+    ss_candidates = prospects[:]
+    if ss_target > 0 and ss_candidates:
+        chosen = []
+        working = ss_candidates[:]
+        for _ in range(min(2, ss_target)):
+            weights = [ss_weight(p) for p in working]
+            pick = random.choices(working, weights=weights, k=1)[0]
+            chosen.append(pick)
+            working.remove(pick)
+            if not working:
+                break
+        for p in chosen:
+            p["market_grade"] = "SS"
 
     random.shuffle(prospects)
     return prospects
