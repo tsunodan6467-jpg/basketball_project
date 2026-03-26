@@ -40,3 +40,9 @@ def test_trade_soft_cap_probe():
 def test_payroll_budget_warning():
     assert is_payroll_over_club_budget(100, 50) is True
     assert is_payroll_over_club_budget(40, 50) is False
+
+
+def test_offseason_phase_list_matches_run():
+    from basketball_sim.systems.offseason_phases import OFFSEASON_PHASES
+
+    assert len(OFFSEASON_PHASES) == 17

@@ -423,6 +423,18 @@ class Offseason:
 
         holder.league_future_draft_pool = list(pool_sorted)
 
+    def _off_phase(self, phase_no: int) -> None:
+        """オフフェーズ見出し（順序の正本は systems/offseason_phases.OFFSEASON_PHASES）。"""
+        try:
+            from basketball_sim.systems.offseason_phases import OFFSEASON_PHASES, print_phase_banner
+
+            idx = int(phase_no) - 1
+            if 0 <= idx < len(OFFSEASON_PHASES):
+                pid, title = OFFSEASON_PHASES[idx]
+                print_phase_banner(phase_no, pid, title)
+        except Exception:
+            pass
+
     def run(self):
         print("\n--- Offseason Processing ---")
         self.re_signed_player_ids.clear()
@@ -446,58 +458,75 @@ class Offseason:
         self._latest_international_milestone_targets = []
 
         # 前年に先行生成しておいたドラフトプールを取り込む（あれば）
+        self._off_phase(1)
         self._bootstrap_current_draft_pool_from_league_state()
 
         for team in self.teams:
             if hasattr(team, "reset_rookie_budget"):
                 team.reset_rookie_budget()
 
+        self._off_phase(2)
         self._run_offseason_asia_cup()
         self._run_intercontinental_cup()
         self._run_final_boss_match()
         self._run_summer_national_team_event()
+        self._off_phase(3)
         self._age_players()
         self._player_progression()
         self._process_naturalization()
         self._retire_and_reincarnate()
         # Youth system v1: yearly update + graduation + intake + prospects
+        self._off_phase(4)
         try:
             from basketball_sim.systems.youth_system import run_youth_offseason_update_for_teams
 
             self.youth_draft_entrants = run_youth_offseason_update_for_teams(self.teams, free_agents=self.free_agents)
         except Exception as exc:
             print(f"[YOUTH] skipped due to error: {exc}")
+        self._off_phase(5)
         self._offer_cpu_contract_extensions()
         self._resign_players()
+        self._off_phase(6)
         self._assign_scout_dispatches()
         # 来年のドラフト候補プールを先行生成し、特別指定の招待を行う
         self._ensure_future_draft_pool_for_next_year()
         self._run_special_designation_invitations()
+        self._off_phase(7)
         self._reset_team_stats()
         self._reset_player_stats()
+        self._off_phase(8)
         self._decrease_contracts()
+        self._off_phase(9)
         self._refresh_international_market()
         # 特別指定（前年加入）はこのオフで必ず離脱→当年ドラフトに復帰
+        self._off_phase(10)
         self._release_special_designation_players_to_draft_pool()
         # 今年のドラフトプールが無ければ通常生成（初年度など）
+        self._off_phase(11)
         if not self.draft_pool:
             self._generate_draft_pool()
         self._run_draft_combine()
         # 正本: docs/DRAFT_AUCTION_SYSTEM.md
         conduct_auction_draft(self.teams, self.draft_pool, self.free_agents)
 
+        self._off_phase(12)
         from basketball_sim.systems.trade import conduct_trades
         conduct_trades(self.teams)
 
+        self._off_phase(13)
         conduct_free_agency(self.teams, self.free_agents)
+        self._off_phase(14)
         self._maintain_free_agent_market()
+        self._off_phase(15)
         self._process_team_finances()
         self._process_owner_missions()
+        self._off_phase(16)
         self._heal_players()
         self._review_team_coaches()
         assign_team_strategies(self.teams)
         print_team_strategies(self.teams)
 
+        self._off_phase(17)
         self._log_contract_roster_integrity()
 
         print("--- Offseason Finished ---\n")
