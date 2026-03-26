@@ -92,6 +92,13 @@ GitHub 上で自動ビルドされた exe を手元で確認したい場合:
 1. GitHub の Actions で最新の CI 実行を開く（例: リポジトリの「Actions」タブ）。
 2. 画面下の **Artifacts** から `BasketballGM-windows-exe` をダウンロードして zip を展開。
 3. 展開したフォルダの空白を **Shift+右クリック** → **「ターミナルをここで開く」**（または PowerShell）。
+4. （任意・推奨）改ざん検知のため、同梱の `BasketballGM.exe.sha256.txt` と照合:
+
+```powershell
+Get-FileHash -Algorithm SHA256 .\BasketballGM.exe
+Get-Content .\BasketballGM.exe.sha256.txt
+```
+
 4. 次を実行して `smoke ok` が出れば成功:
 
 ```powershell
