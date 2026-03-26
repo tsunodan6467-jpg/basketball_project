@@ -18,6 +18,8 @@ Phase 0 を一段落する前に、次を **はい／いいえ／後回し** で
 4. **クラウドを採用する場合**、衝突時の挙動・オフライン・クォータ・セーブ形式バージョンとの整合を **§3 のどの選択肢（A/B/C）に寄せるか** を決め、移行テストの範囲をメモする。
 5. **方針変更後**、ストア説明・FAQ・ゲーム内クレジット／プライバシー表記のうち、**ユーザー向けに直すもののリスト**をチェックし、パートナー画面と同じタイミングで更新する。
 
+**記入用テンプレート**: チェックリスト **3** と **5** を具体化した自分用メモは、リポジトリの **`docs/PHASE0_COMPLETION_TEMPLATE.md`** に用意してある（Phase 0 の「完了」宣言の区切りに使う）。
+
 ## 現状
 
 - **Windows** で `steam_api64.dll` / `steam_api.dll` が実行ファイルまたはカレント付近にあり、`SteamAPI_Init` が成功した場合は **ctypes 実接続**（`SteamAPI_RunCallbacks` / `Shutdown` 含む）。失敗・DLL なし・非 Windows は **False で継続**（クラッシュしない）。ネイティブ接続時は `ISteamUserStats` が取れれば **`unlock_achievement` から SetAchievement/StoreStats**。
