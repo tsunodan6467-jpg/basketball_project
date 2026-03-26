@@ -32,6 +32,14 @@ def generate_homage_count() -> int:
     return random.randint(0, 2)
 
 
+def generate_legend_rookie_count() -> int:
+    """
+    現実で引退している選手“風”のレジェンドルーキー。
+    毎年必ず出すのではなく、たまに混ざる前提（最大1人）。
+    """
+    return 1 if random.random() < 0.55 else 0
+
+
 def calculate_rookie_ovr_from_peak(peak_ovr: int, entry_type: str) -> int:
     """
     転生時OVR計算。
@@ -299,6 +307,29 @@ def generate_homage_prospect() -> Dict[str, Any]:
     }
 
 
+def generate_legend_rookie_prospect() -> Dict[str, Any]:
+    """
+    現実引退選手“風”の新人（実名ではなく別名）。
+    権利回避のため、再現ではなく「それっぽいアーキタイプ」を持つ。
+    """
+    templates = [
+        {"name": "森尾 功太", "archetype": "Sniper", "position": "SG"},
+        {"name": "立花 恒一", "archetype": "Floor General", "position": "PG"},
+        {"name": "南雲 剛", "archetype": "Defensive Monster", "position": "SF"},
+        {"name": "早瀬 大地", "archetype": "Athletic Freak", "position": "SF"},
+    ]
+    t = random.choice(templates)
+    return {
+        "type": "legend_rookie",
+        "name": t["name"],
+        "archetype": t["archetype"],
+        "position": t["position"],
+        "age": random.choice([20, 21, 22]),
+        "ovr": random.randint(69, 75),
+        "potential": random.choice(["A", "S"]),
+    }
+
+
 def generate_generic_prospect() -> Dict[str, Any]:
     """
     旧土台互換用。
@@ -321,6 +352,7 @@ def generate_top_prospects(retired_players: List[Player]) -> List[Dict[str, Any]
     total_count = generate_top_prospect_count()
     reinc_count = min(generate_reincarnation_count(), len(retired_players))
     homage_count = generate_homage_count()
+    legend_count = generate_legend_rookie_count()
 
     reinc_candidates = [
         p for p in retired_players
@@ -338,6 +370,9 @@ def generate_top_prospects(retired_players: List[Player]) -> List[Dict[str, Any]
 
     for _ in range(homage_count):
         prospects.append(generate_homage_prospect())
+
+    for _ in range(legend_count):
+        prospects.append(generate_legend_rookie_prospect())
 
     while len(prospects) < total_count:
         prospects.append(generate_generic_prospect())

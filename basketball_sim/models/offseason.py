@@ -2167,7 +2167,38 @@ class Offseason:
             "Point Forward": "大型ポイントフォワード",
             "Stretch Big": "ストレッチビッグ",
         }
-        new_prospect.draft_profile_label = f"目玉新人 / {label_map.get(archetype, archetype)}"
+        # 呼び名（固定）: 完全架空選手は「通常新人」。オマージュ枠はその亜種として扱う。
+        new_prospect.draft_profile_label = f"通常新人 / オマージュ:{label_map.get(archetype, archetype)}"
+        return new_prospect
+
+    def _build_legend_rookie_prospect(self, profile: dict) -> Player:
+        from basketball_sim.systems.generator import generate_draft_prospect
+
+        new_prospect = generate_draft_prospect(
+            age_override=profile.get("age", 21),
+            base_ovr_override=max(62, int(profile.get("ovr", 70))),
+        )
+
+        new_prospect.name = str(profile.get("name") or new_prospect.name)
+        pos = str(profile.get("position") or getattr(new_prospect, "position", "SG") or "SG")
+        new_prospect.position = pos
+        new_prospect.age = int(profile.get("age", 21))
+        new_prospect.ovr = int(profile.get("ovr", getattr(new_prospect, "ovr", 70)))
+        new_prospect.potential = profile.get("potential", "A")
+
+        archetype = str(profile.get("archetype", "") or "")
+        new_prospect.archetype = archetype or getattr(new_prospect, "archetype", "")
+
+        new_prospect.draft_origin_type = "legend_rookie"
+        new_prospect.draft_priority_bonus = max(getattr(new_prospect, "draft_priority_bonus", 0), 6)
+
+        label_map = {
+            "Sniper": "神シューター",
+            "Floor General": "伝説の司令塔",
+            "Defensive Monster": "守備のレジェンド",
+            "Athletic Freak": "怪物ルーキー",
+        }
+        new_prospect.draft_profile_label = f"レジェンドルーキー / {label_map.get(archetype, '特別枠')}"
         return new_prospect
 
     def _build_generic_top_prospect(self, profile: dict) -> Player:
@@ -2192,6 +2223,8 @@ class Offseason:
             return self._build_top_reincarnation_prospect(profile)
         if profile_type == "homage":
             return self._build_homage_prospect(profile)
+        if profile_type == "legend_rookie":
+            return self._build_legend_rookie_prospect(profile)
         return self._build_generic_top_prospect(profile)
 
     def _generate_draft_pool(self):

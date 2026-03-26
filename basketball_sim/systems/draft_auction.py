@@ -372,7 +372,13 @@ def conduct_auction_draft(
                 for i, m in enumerate(display, 1):
                     p = m.player
                     pot = str(getattr(p, "potential", "C"))
-                    print(f"{i:>2}. {p.name:<16} {getattr(p,'position','-'):<2} OVR:{getattr(p,'ovr',0):<2} Pot:{pot} | {TIER_CONFIGS[m.tier].name} | min:{m.min_price:,}")
+                    label = str(getattr(p, "draft_profile_label", "") or "")
+                    label_text = f" | {label}" if label else ""
+                    print(
+                        f"{i:>2}. {p.name:<16} {getattr(p,'position','-'):<2} "
+                        f"OVR:{getattr(p,'ovr',0):<2} Pot:{pot} | "
+                        f"{TIER_CONFIGS[m.tier].name} | min:{m.min_price:,}{label_text}"
+                    )
                 while True:
                     raw = input("番号: ").strip()
                     if raw == "0":
