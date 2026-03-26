@@ -17,7 +17,8 @@ class DraftTierConfig:
 
 
 TIER_CONFIGS: Dict[str, DraftTierConfig] = {
-    "T1": DraftTierConfig(tier="T1", name="プロスペクト級", min_price_low=20_000_000, min_price_high=26_000_000),
+    # 注意: 「プロスペクト（年6〜10人の注目枠）」は Tier とは別概念。T1 の上位に含まれる。
+    "T1": DraftTierConfig(tier="T1", name="期待級", min_price_low=20_000_000, min_price_high=26_000_000),
     "T2": DraftTierConfig(tier="T2", name="有望株級", min_price_low=9_000_000, min_price_high=14_000_000),
     "T3": DraftTierConfig(tier="T3", name="素材級", min_price_low=3_000_000, min_price_high=7_000_000),
 }
@@ -52,9 +53,15 @@ def _assign_tiers_and_min_prices(draft_pool: List[Player]) -> Dict[int, DraftCan
     """
     draft_pool から tier (T1/T2/T3) と最低落札額を割り当てる。
 
-    - 価値上位 6 人: T1
-    - 次の 10 人: T2
-    - 残り: T3
+    定義（ユーザー合意）:
+    - Tier は「獲得資金相場に関わる大枠」: T1/T2/T3
+    - その年の「プロスペクト（注目候補）」は 6〜10 人で SS/S のみ（SS最大2）。
+      プロスペクトは Tier と別概念だが、実運用では **必ず T1 に含める**。
+
+    実装（安全な初期案）:
+    - 全候補を draft_value で並べる
+    - is_draft_prospect=True の候補は強制的に T1
+    - 残りを上位から T1→T2→T3 に割り当てる（人数は全体比率で決める）
     """
     metas: List[DraftCandidateMeta] = []
     for p in draft_pool:
@@ -63,10 +70,32 @@ def _assign_tiers_and_min_prices(draft_pool: List[Player]) -> Dict[int, DraftCan
 
     metas.sort(key=lambda m: (m.draft_value, getattr(m.player, "ovr", 0)), reverse=True)
 
-    for idx, m in enumerate(metas):
-        if idx < 6:
+    n = len(metas)
+    prospect_metas = [m for m in metas if bool(getattr(m.player, "is_draft_prospect", False))]
+    prospect_count = len(prospect_metas)
+
+    # 48人規模なら概ね T1:16 / T2:16 / T3:残り を想定しつつ、人数が少ないケースにも耐える
+    t1_size = max(prospect_count, max(6, int(round(n * 0.34))))
+    t2_size = max(6, int(round(n * 0.33)))
+    t1_size = min(n, t1_size)
+    t2_size = min(max(0, n - t1_size), t2_size)
+
+    # まずプロスペクトをT1に固定
+    t1_ids = {id(m.player) for m in prospect_metas}
+    remaining = [m for m in metas if id(m.player) not in t1_ids]
+
+    # 残りの上位から T1 枠を埋める
+    for m in remaining[: max(0, t1_size - len(t1_ids))]:
+        t1_ids.add(id(m.player))
+
+    # 残りからT2を埋める
+    remaining2 = [m for m in remaining if id(m.player) not in t1_ids]
+    t2_ids = {id(m.player) for m in remaining2[:t2_size]}
+
+    for m in metas:
+        if id(m.player) in t1_ids:
             tier = "T1"
-        elif idx < 16:
+        elif id(m.player) in t2_ids:
             tier = "T2"
         else:
             tier = "T3"
