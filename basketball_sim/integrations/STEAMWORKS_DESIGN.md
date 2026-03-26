@@ -24,6 +24,18 @@
 
 **注意**: Steamworks SDK のライセンス上、SDK zip 全体を公開リポジトリにコミットしない。CI ではシークレット／プライベート成果物で供給する運用を想定する。
 
+## Steam デポ（SteamPipe）のコンテンツルート
+
+Steamworks の **Depot** にアップロードするファイルは、クライアント PC 上の**インストール先ディレクトリと同じ相対配置**になる（単一 exe 配布の典型）。
+
+| 配置の考え方 | メモ |
+|--------------|------|
+| ルートに `BasketballGM.exe` | PyInstaller の `dist\BasketballGM.exe` をそのまま置く。 |
+| 同じフォルダに `steam_api64.dll` 等 | `steamworks_bridge` が検索するパスと一致させる。SDK が許可する**再配布バイナリのみ**を手元または CI で `dist\` にコピーしてからデポ用フォルダに集約する。 |
+| `steam_appid.txt` | **開発・ローカルテスト用**。本番 Steam ビルドでは通常、クライアントに同梱しない（Steam ドキュメントの推奨に従う）。 |
+
+**運用の目安**: リポジトリに DLL はコミットしない。リリース作業用に、**「PyInstaller 出力＋許可された Steam API DLL を同じディレクトリに揃えたフォルダ」**を 1 つ作り、それを Steam のデポ設定（または `steamcmd` の `build_app`）の **Content Root** に指定する。GitHub Release 用の zip と同じフォルダ構成にすると、差分が減る。
+
 ## 実装方式の選択（推奨順）
 
 1. **C API + `ctypes`（最小）**  

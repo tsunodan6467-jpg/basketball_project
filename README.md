@@ -79,6 +79,10 @@ python -m basketball_sim --smoke
 dist\BasketballGM.exe --smoke
 ```
 
+#### GitHub Release（配布 exe の添付）
+
+`git tag`（例: `v0.1.0`）をプッシュしたあと、GitHub の **Releases** にビルドした `dist\BasketballGM.exe` や Inno のセットアップ exe を **Release 資産**として添付する手順は、**`installer/README.md`** の「GitHub Release」を参照してください（`dist/` は `.gitignore` 対象のため、バイナリはコミットせず Release へアップロードする想定です）。
+
 ### Windows インストーラ（Inno Setup・任意）
 
 配布用のセットアップ exe を作る場合:
