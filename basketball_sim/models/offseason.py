@@ -2260,6 +2260,11 @@ class Offseason:
     def _generate_draft_pool(self):
         from basketball_sim.systems.generator import generate_draft_prospect
 
+        # 長期運営の世界観維持:
+        # ドラフト全体における転生比率をある程度確保し、
+        # 下位帯（非プロスペクト）が完全架空だらけになるのを防ぐ。
+        TARGET_REINCARNATION_SHARE = 0.70
+
         profiles = generate_top_prospects(self.retired_star_pool)
         self.top_prospects = []
 
@@ -2269,6 +2274,66 @@ class Offseason:
                 continue
             self.draft_pool.append(player)
             self.top_prospects.append(player)
+
+        existing_reborn_ids = {
+            getattr(p, "origin_player_id", None)
+            for p in self.top_prospects
+            if getattr(p, "origin_player_id", None) is not None
+        }
+        existing_reborn_names = {
+            str(getattr(p, "reborn_from", "") or "").strip()
+            for p in self.draft_pool
+            if getattr(p, "is_reborn", False)
+        }
+
+        def _build_non_prospect_reincarnation_from_retired() -> Optional[Player]:
+            if not self.retired_star_pool:
+                return None
+
+            candidates = [
+                rp for rp in self.retired_star_pool
+                if getattr(rp, "player_id", None) not in existing_reborn_ids
+                and str(getattr(rp, "name", "") or "").strip() not in existing_reborn_names
+            ]
+            if not candidates:
+                candidates = list(self.retired_star_pool)
+            if not candidates:
+                return None
+
+            retired = random.choice(candidates)
+            p = self._build_japanese_reborn_prospect(retired)
+            peak = int(getattr(retired, "peak_ovr", getattr(retired, "ovr", 70)))
+
+            # 非プロスペクト転生は T2/T3 側に入る帯へ寄せる（OVRを抑える）
+            # ここは能力の最終調整前の“世界観維持”用の暫定レンジ。
+            base = int(peak * random.uniform(0.68, 0.76))
+            p.ovr = max(52, min(68, base + random.randint(-2, 2)))
+            p.potential = random.choice(["A", "B", "C"])
+            p.is_draft_prospect = False
+            p.draft_market_grade = ""
+            p.draft_priority_bonus = max(0, int(getattr(p, "draft_priority_bonus", 0)) - 1)
+            p.draft_profile_label = f"転生新人 / 元:{getattr(retired, 'name', 'Unknown')} / 再出発"
+            setattr(p, "origin_player_id", getattr(retired, "player_id", None))
+
+            existing_reborn_ids.add(getattr(retired, "player_id", None))
+            existing_reborn_names.add(str(getattr(retired, "name", "") or "").strip())
+            return p
+
+        # まず必要人数まで埋める前に、転生比率の目標を満たすよう非プロスペクト転生を追加する。
+        target_total = max(len(self.teams), len(self.draft_pool))
+        target_reborn = int(round(target_total * TARGET_REINCARNATION_SHARE))
+        current_reborn = sum(1 for p in self.draft_pool if getattr(p, "is_reborn", False))
+
+        reborn_safety = 0
+        while len(self.draft_pool) < len(self.teams) and current_reborn < target_reborn:
+            reborn_safety += 1
+            if reborn_safety > len(self.teams) * 3:
+                break
+            reborn_player = _build_non_prospect_reincarnation_from_retired()
+            if reborn_player is None:
+                break
+            self.draft_pool.append(reborn_player)
+            current_reborn += 1
 
         needed = len(self.teams) - len(self.draft_pool)
         for _ in range(max(0, needed)):
