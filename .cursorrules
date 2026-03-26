@@ -64,7 +64,7 @@ Steamworks SDK 統合（実績・クラウドセーブは要否決定）
 オーナーミッション・ノルマシステム（△）
 ドラフト・スカウティング・FA交渉（△）
 アリーナ投資・施設拡充要素（□）
-【将来実装メモ・シーズン中人事】シーズン中もトレード／FAを可能にする想定。**現実と同様、3月第2週終了まで**に期限を切り、**それ以降はシーズン終了まで**トレード・FAを含む人事強化をロックする。ゲーム内カレンダー／週次フェーズと `Season` ガードで統合する（未実装・設計正本はコードコメントと `game_constants` 予約欄を参照）。
+【シーズン中人事（トレード／インシーズンFA 期限）】**3月第2週終了（ラウンド22消化後）まで**可、**それ以降はシーズン終了まで**ロック。**実装済**: `config/game_constants.py` の `REGULAR_SEASON_TRANSACTION_CUTOFF_ROUND`、`systems/season_transaction_rules.py`、CLI の GM／トレード、`Season` の CPU FA（`run_cpu_fa_market_cycle(simulated_round=…)`）。**残**: 主画面 GUI から GM・FA を接続するときも同じガードを通す。
 【Phase 4: UI・演出実装】（△〜□）
 UIデザイン（△ tkinter試作・**製品はGM画面を洗練した現代風GUI**・Steam品質は未）
 **メイン操作のGUI一本化**（CLIは開発・CI・smoke等の補助に限定する方針）

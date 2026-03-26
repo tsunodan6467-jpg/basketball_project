@@ -1895,6 +1895,10 @@ def run_interactive_season(
             while not season.season_finished:
                 print_separator("シーズンメニュー")
                 print(f"現在ラウンド: {season.current_round}/{season.total_rounds}")
+                if not inseason_roster_moves_unlocked(season):
+                    print(
+                        "（レギュラー中のトレード・インシーズンFAは期限切れ・シーズン終了まで不可）"
+                    )
                 print(f"現在年数: {season_count}")
                 print("1. 1ラウンド進める")
                 print("2. 5ラウンド進める")
