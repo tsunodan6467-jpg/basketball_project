@@ -2197,8 +2197,22 @@ class Offseason:
             "Floor General": "伝説の司令塔",
             "Defensive Monster": "守備のレジェンド",
             "Athletic Freak": "怪物ルーキー",
+            "Rim Protector": "帰化レジェンド",
+            "Stretch Big": "万能ビッグ",
+            "Two-Way Wing": "勝利職人ウイング",
+            "Scorer": "勝負強いスコアラー",
+            "Defensive Guard": "守備型コンボガード",
+            "Playmaker": "スピード型ハンドラー",
+            "Post Big": "重量級インサイド",
+            "Point Forward": "ポイントフォワード",
+            "3&D": "3&Dグルーガイ",
+            "Wing Scorer": "フィジカルスコアラー",
+            "Attacking PG": "攻撃型司令塔",
+            "Glue Guy": "万能職人",
         }
-        new_prospect.draft_profile_label = f"レジェンドルーキー / {label_map.get(archetype, '特別枠')}"
+        grade = str(profile.get("market_grade", "A") or "A").upper()
+        grade = grade if grade in {"SS", "S", "A"} else "A"
+        new_prospect.draft_profile_label = f"レジェンドルーキー({grade}) / {label_map.get(archetype, '特別枠')}"
         return new_prospect
 
     def _build_generic_top_prospect(self, profile: dict) -> Player:

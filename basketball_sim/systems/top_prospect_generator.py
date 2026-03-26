@@ -35,9 +35,14 @@ def generate_homage_count() -> int:
 def generate_legend_rookie_count() -> int:
     """
     現実で引退している選手“風”のレジェンドルーキー。
-    毎年必ず出すのではなく、たまに混ざる前提（最大1人）。
+    毎年必ず出すのではなく、たまに混ざる前提（最大2人）。
     """
-    return 1 if random.random() < 0.55 else 0
+    r = random.random()
+    if r < 0.40:
+        return 0
+    if r < 0.85:
+        return 1
+    return 2
 
 
 def calculate_rookie_ovr_from_peak(peak_ovr: int, entry_type: str) -> int:
@@ -312,21 +317,43 @@ def generate_legend_rookie_prospect() -> Dict[str, Any]:
     現実引退選手“風”の新人（実名ではなく別名）。
     権利回避のため、再現ではなく「それっぽいアーキタイプ」を持つ。
     """
+    # 第一次案（20人サンプルリスト）
     templates = [
-        {"name": "森尾 功太", "archetype": "Sniper", "position": "SG"},
-        {"name": "立花 恒一", "archetype": "Floor General", "position": "PG"},
-        {"name": "南雲 剛", "archetype": "Defensive Monster", "position": "SF"},
-        {"name": "早瀬 大地", "archetype": "Athletic Freak", "position": "SF"},
+        {"name": "森尾 玲司", "position": "SG", "archetype": "Sniper", "market_grade": "SS"},
+        {"name": "佐戸 恒一", "position": "PG", "archetype": "Floor General", "market_grade": "SS"},
+        {"name": "桜野 RJ", "position": "C", "archetype": "Rim Protector", "market_grade": "SS"},
+        {"name": "ノック・マジークス", "position": "PF", "archetype": "Stretch Big", "market_grade": "SS"},
+        {"name": "柏森 真司", "position": "PG", "archetype": "Floor General", "market_grade": "S"},
+        {"name": "桜庭 恒一", "position": "SF", "archetype": "Two-Way Wing", "market_grade": "S"},
+        {"name": "大川 敦司", "position": "C", "archetype": "Rim Protector", "market_grade": "S"},
+        {"name": "木里 博人", "position": "SG", "archetype": "Scorer", "market_grade": "A"},
+        {"name": "石原 司", "position": "PG", "archetype": "Defensive Guard", "market_grade": "A"},
+        {"name": "岡寺 直人", "position": "SG", "archetype": "Sniper", "market_grade": "A"},
+        {"name": "正上 隼人", "position": "PG", "archetype": "Playmaker", "market_grade": "A"},
+        {"name": "青峰 文史", "position": "C", "archetype": "Post Big", "market_grade": "A"},
+        {"name": "網代 友成", "position": "SF", "archetype": "Point Forward", "market_grade": "A"},
+        {"name": "竹崎 賢吾", "position": "SF", "archetype": "3&D", "market_grade": "A"},
+        {"name": "栗崎 貴洋", "position": "SF", "archetype": "Wing Scorer", "market_grade": "A"},
+        {"name": "山路 大誠", "position": "PF", "archetype": "Post Big", "market_grade": "A"},
+        {"name": "長谷寺 誠司", "position": "PG", "archetype": "Attacking PG", "market_grade": "S"},
+        {"name": "北嶋 卓真", "position": "SG", "archetype": "Sniper", "market_grade": "A"},
+        {"name": "節間 貴弘", "position": "PG", "archetype": "Floor General", "market_grade": "A"},
+        {"name": "小野寺 秀三", "position": "PF", "archetype": "Glue Guy", "market_grade": "A"},
     ]
+
+    # 同年に2人出る時は「役割がかぶり過ぎない」を優先するため、
+    # 呼び出し側で used_names/used_archetypes を持てるが、ここは単体生成なので
+    # まずは候補の偏りを避けるために軽いシャッフルのみ行う。
     t = random.choice(templates)
     return {
         "type": "legend_rookie",
         "name": t["name"],
         "archetype": t["archetype"],
         "position": t["position"],
+        "market_grade": t.get("market_grade", "A"),
         "age": random.choice([20, 21, 22]),
-        "ovr": random.randint(69, 75),
-        "potential": random.choice(["A", "S"]),
+        "ovr": random.randint(70, 76) if t.get("market_grade") in ("SS", "S") else random.randint(68, 74),
+        "potential": random.choice(["S", "A"]) if t.get("market_grade") in ("SS", "S") else random.choice(["A", "B"]),
     }
 
 
@@ -371,8 +398,17 @@ def generate_top_prospects(retired_players: List[Player]) -> List[Dict[str, Any]
     for _ in range(homage_count):
         prospects.append(generate_homage_prospect())
 
+    # 同年に2人出る場合、できるだけ役割（archetype/position）の被りを避ける
+    used_keys = set()
     for _ in range(legend_count):
-        prospects.append(generate_legend_rookie_prospect())
+        for _retry in range(12):
+            p = generate_legend_rookie_prospect()
+            key = (p.get("archetype"), p.get("position"))
+            if legend_count >= 2 and key in used_keys:
+                continue
+            used_keys.add(key)
+            prospects.append(p)
+            break
 
     while len(prospects) < total_count:
         prospects.append(generate_generic_prospect())
