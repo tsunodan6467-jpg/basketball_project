@@ -61,6 +61,25 @@ Steam クライアントから起動するときの **実行ファイル名**は
 
 **exe 名を変える場合**は、`BasketballGM.spec` の `name`・`BasketballGM.iss` の `#define MyAppExeName`・本書の記述を**同じ変更で**更新する（ズレると「Steam から起動しない」「オーバーレイだけ動く」などの原因になる）。
 
+### Steam 診断コマンド（`--steam-diag`）
+
+Steamworks 側の App 作成待ち（本人確認待ち）でも、ローカルで「いま何が起きているか」を確認できる。
+
+実行（ソース／配布 exe どちらでも同じ）:
+
+```bash
+BasketballGM.exe --steam-diag
+```
+
+**本人確認待ち・DLL 未同梱の期待値（正常）**:
+
+- `try_init_steam: False`
+- `steam_native_loaded: False`
+- `steam_loaded_dll_path: None`
+- `steam_is_subscribed: None`
+
+**将来（App ID 発行後）**に `steam_api64.dll` を同階層へ置き、Steam クライアント起動状態で実行すると、`try_init_steam: True` になり得る。`steam_loaded_dll_path` が埋まれば「DLL を正しく見つけて読めている」証拠になる。
+
 **メモ**: チェックリスト本体はリポジトリ外（Valve のパートナーサイト）の作業であり、コード変更では代替できない。手順が固まったら、チェックリストの文言を実際の画面に合わせて更新する。
 
 ## 実装方式の選択（推奨順）
