@@ -51,15 +51,18 @@ def fa_roll_accept_offer(score: float) -> bool:
     return False
 
 
-def calculate_fa_retention_bonus(player: object, team: object) -> float:
+def tenure_loyalty_bonus_for_team(player: object, team: object) -> float:
     """
-    旧所属がオファー先と同じ（引き留め・復帰）ときのボーナス。
-    last_contract_team_id == team.team_id のときのみ。
+    同一クラブへの残留・復帰の度合い（0〜約24）。
+    - FA: team_id は None だが last_contract_team_id == team.team_id
+    - 再契約: ロスター所属中は team_id == team.team_id（または last が一致）
     """
     tid = getattr(team, "team_id", None)
     if tid is None:
         return 0.0
-    if getattr(player, "last_contract_team_id", None) != tid:
+    same_roster = getattr(player, "team_id", None) == tid
+    same_last = getattr(player, "last_contract_team_id", None) == tid
+    if not same_roster and not same_last:
         return 0.0
     loyalty = safe_getattr_int(player, "loyalty", 50)
     league_years = safe_getattr_int(player, "league_years", 0)
@@ -70,6 +73,15 @@ def calculate_fa_retention_bonus(player: object, team: object) -> float:
     elif tenure >= 3:
         base += 2.5
     return float(min(24.0, base))
+
+
+def calculate_fa_retention_bonus(player: object, team: object) -> float:
+    """FA の _offer_score へ加算。中身は tenure_loyalty_bonus_for_team。"""
+    return tenure_loyalty_bonus_for_team(player, team)
+
+
+# 再契約スコア（calculate_resign_score）へ足すときの係数（重み付き平均に直加算しすぎないよう圧縮）
+RESIGN_TENURE_BONUS_SCALE = 0.42
 
 
 POTENTIAL_BONUS = {
@@ -440,6 +452,10 @@ def calculate_resign_score(
         + context_score * 0.18
         + loyalty_score * 0.12
     )
+    # FA の引き留めボーナスと同じ根（在籍・忠誠）を再契約にも反映（スケールは圧縮）
+    tenure_raw = tenure_loyalty_bonus_for_team(player, team)
+    final_score = final_score + tenure_raw * RESIGN_TENURE_BONUS_SCALE
+
     return round(final_score, 2)
 
 

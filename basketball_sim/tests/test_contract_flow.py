@@ -6,6 +6,7 @@ from basketball_sim.systems.contract_logic import (
     advance_contract_years,
     apply_contract_extension,
     apply_resign,
+    calculate_resign_score,
     evaluate_resign_offer,
 )
 
@@ -88,3 +89,29 @@ def test_apply_resign_sets_action():
     apply_resign(t, p, 6_000_000, 2)
     assert p.contract_years_left == 2
     assert p.contract_last_action == "resign"
+
+
+def test_resign_score_higher_with_longer_tenure():
+    """同一条件で在籍年が長いほど再契約スコアが上がる（引き留めボーナス）。"""
+    team = Team(team_id=1, name="T", league_level=2, last_season_wins=15, regular_wins=15)
+    short = _p(10, 1)
+    short.team_id = 1
+    short.last_contract_team_id = 1
+    short.league_years = 1
+    short.loyalty = 60
+    short.desired_salary = 5_000_000
+    short.desired_years = 2
+
+    long = _p(11, 1)
+    long.team_id = 1
+    long.last_contract_team_id = 1
+    long.league_years = 6
+    long.loyalty = 60
+    long.desired_salary = 5_000_000
+    long.desired_years = 2
+
+    offer = 5_000_000
+    years = 2
+    s_short = calculate_resign_score(team, short, offer, years)
+    s_long = calculate_resign_score(team, long, offer, years)
+    assert s_long > s_short
