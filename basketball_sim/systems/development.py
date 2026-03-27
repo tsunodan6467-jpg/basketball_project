@@ -1,6 +1,8 @@
 import logging
 import random
-from typing import List
+from typing import List, Tuple
+
+from basketball_sim.systems.training_unlocks import player_drill_lock_reason
 
 _logger = logging.getLogger(__name__)
 
@@ -17,7 +19,12 @@ class DevelopmentSystem:
     - FAプール相当の対象を検出した場合、ログ末尾に [FA] を付与
     """
 
-    VERSION = "20260312-E"
+    VERSION = "20260328-A"
+
+    # 施設/HC 条件付きドリル（解放時のみ育成側で微小ボーナス）
+    GATED_DRILLS = frozenset({"speed_agility", "iq_film", "defense_footwork", "strength"})
+    # 安全ロールアウト: 発動率への乗算のみ（最大24%キャップは維持）
+    SPECIAL_GATED_DRILL_PROC_MULTIPLIER = 1.06
 
     POTENTIAL_MAP = {
         "S": 95,
@@ -294,15 +301,17 @@ class DevelopmentSystem:
 
         focus = str(getattr(player, "training_focus", "balanced") or "balanced")
         drill = str(getattr(player, "training_drill", "balanced") or "balanced")
-        if focus == "balanced" and drill == "balanced":
+        drill_resolved = drill if not player_drill_lock_reason(team, drill) else "balanced"
+        if focus == "balanced" and drill_resolved == "balanced":
             return None
 
-        lvl = int(getattr(team, "training_facility_level", 1) or 1)
-        age_mul = cls._get_focus_age_multiplier(age)
-        gp_mul = cls._get_focus_gp_multiplier(gp_ratio)
-        # 低頻度・低振れの安全設計（年齢/出場時間で調整。max 24%）
-        base_proc = 0.05 + lvl * 0.01
-        proc = min(0.24, base_proc * age_mul * gp_mul)
+        proc, _ = cls._compute_focus_micro_proc(
+            team=team,
+            age=age,
+            games_played=games_played,
+            total_season_games=total_season_games,
+            drill=drill,
+        )
         if random.random() >= proc:
             return None
 
@@ -327,7 +336,9 @@ class DevelopmentSystem:
             "speed_agility": ("speed", "handling"),
             "iq_film": ("iq", "passing"),
         }
-        attrs = drill_map.get(drill) if drill != "balanced" else focus_map.get(focus)
+        attrs = (
+            drill_map.get(drill_resolved) if drill_resolved != "balanced" else focus_map.get(focus)
+        )
         if not attrs:
             return None
         target = random.choice(attrs)
@@ -337,6 +348,31 @@ class DevelopmentSystem:
             return None
         setattr(player, target, new_val)
         return target, 1, proc * 100.0
+
+    @classmethod
+    def _compute_focus_micro_proc(
+        cls,
+        team,
+        age: int,
+        games_played: int,
+        total_season_games: int,
+        drill: str,
+    ) -> Tuple[float, bool]:
+        """
+        個別ドリル微小成長の発動確率（乱数前）。
+        解放済みの施設/HC 条件ドリルにだけ、意図的に小さな係数を掛ける。
+        """
+        lvl = int(getattr(team, "training_facility_level", 1) or 1)
+        gp_ratio = min(1.0, games_played / max(1, total_season_games))
+        age_mul = cls._get_focus_age_multiplier(age)
+        gp_mul = cls._get_focus_gp_multiplier(gp_ratio)
+        base_proc = 0.05 + lvl * 0.01
+        proc = min(0.24, base_proc * age_mul * gp_mul)
+        applied = False
+        if drill in cls.GATED_DRILLS and not player_drill_lock_reason(team, drill):
+            proc = min(0.24, proc * cls.SPECIAL_GATED_DRILL_PROC_MULTIPLIER)
+            applied = True
+        return proc, applied
 
     @classmethod
     def _get_focus_age_multiplier(cls, age: int) -> float:

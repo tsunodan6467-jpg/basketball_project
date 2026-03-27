@@ -57,6 +57,7 @@ from basketball_sim.systems.season_transaction_rules import (
     INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
 )
+from basketball_sim.systems.training_unlocks import player_drill_lock_reason
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -2972,19 +2973,7 @@ class MainMenuView:
         return ""
 
     def _player_drill_lock_reason(self, team: Any, drill_key: str) -> str:
-        coach = str(getattr(team, "coach_style", "balanced") or "balanced")
-        tf = int(getattr(team, "training_facility_level", 1) or 1)
-        fo = int(getattr(team, "front_office_level", 1) or 1)
-        med = int(getattr(team, "medical_facility_level", 1) or 1)
-        if drill_key == "speed_agility" and tf < 3:
-            return "トレーニング施設Lv3以上で解放"
-        if drill_key == "iq_film" and fo < 2:
-            return "フロントオフィスLv2以上で解放"
-        if drill_key == "defense_footwork" and coach not in {"defense", "development"}:
-            return "HCが「守備重視」または「育成」で解放"
-        if drill_key == "strength" and med < 2:
-            return "メディカル施設Lv2以上で解放"
-        return ""
+        return player_drill_lock_reason(team, drill_key)
 
     def _open_team_training_editor_window(self) -> None:
         if self.team is None:

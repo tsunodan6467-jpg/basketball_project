@@ -22,6 +22,7 @@ from basketball_sim.systems.season_transaction_rules import (
     INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
 )
+from basketball_sim.systems.training_unlocks import player_drill_lock_reason
 from basketball_sim.systems.trade_logic import TradeSystem, MultiTradeOffer
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
@@ -1634,19 +1635,7 @@ def run_player_training_focus_menu(user_team):
     }
 
     def _drill_requirement_message(drill_key: str) -> str:
-        coach = str(getattr(user_team, "coach_style", "balanced") or "balanced")
-        tf = int(getattr(user_team, "training_facility_level", 1) or 1)
-        fo = int(getattr(user_team, "front_office_level", 1) or 1)
-        med = int(getattr(user_team, "medical_facility_level", 1) or 1)
-        if drill_key == "speed_agility" and tf < 3:
-            return "トレーニング施設Lv3以上で解放"
-        if drill_key == "iq_film" and fo < 2:
-            return "フロントオフィスLv2以上で解放"
-        if drill_key == "defense_footwork" and coach not in {"defense", "development"}:
-            return "HCスタイルが「守備重視」または「育成」で解放"
-        if drill_key == "strength" and med < 2:
-            return "メディカル施設Lv2以上で解放"
-        return ""
+        return player_drill_lock_reason(user_team, drill_key)
 
     while True:
         print_separator("個別育成方針")
