@@ -1539,6 +1539,71 @@ def apply_facility_upgrade(user_team, facility_key):
     print(f"残り資金: {int(getattr(user_team, 'money', 0)):,}円")
 
 
+def run_player_training_focus_menu(user_team):
+    roster = list(getattr(user_team, "players", []) or [])
+    if not roster:
+        print("ロスターが存在しません。")
+        return
+
+    roster_sorted = sorted(
+        roster,
+        key=lambda p: (getattr(p, "position", "SF"), -int(getattr(p, "ovr", 0)), getattr(p, "name", "")),
+    )
+    focus_labels = {
+        "balanced": "バランス",
+        "shooting": "シュート",
+        "playmaking": "司令塔",
+        "defense": "守備",
+        "physical": "フィジカル",
+        "iq_handling": "IQ/ハンドリング",
+    }
+
+    while True:
+        print_separator("個別育成方針")
+        for i, p in enumerate(roster_sorted, 1):
+            f = str(getattr(p, "training_focus", "balanced") or "balanced")
+            print(
+                f"{i:>2}. {getattr(p, 'name', '-'):<16} {getattr(p, 'position', 'SF'):<2} "
+                f"OVR:{int(getattr(p, 'ovr', 0)):<2} | 方針:{focus_labels.get(f, f)}"
+            )
+        print("0. 戻る")
+        raw = input("選手番号: ").strip()
+        if raw == "0":
+            return
+        try:
+            idx = int(raw) - 1
+        except ValueError:
+            print("正しい番号を入力してください。")
+            continue
+        if idx < 0 or idx >= len(roster_sorted):
+            print("範囲外です。")
+            continue
+        p = roster_sorted[idx]
+
+        print("\n育成方針を選択:")
+        print("1. バランス")
+        print("2. シュート")
+        print("3. 司令塔")
+        print("4. 守備")
+        print("5. フィジカル")
+        print("6. IQ/ハンドリング")
+        choice = input("番号: ").strip()
+        mapping = {
+            "1": "balanced",
+            "2": "shooting",
+            "3": "playmaking",
+            "4": "defense",
+            "5": "physical",
+            "6": "iq_handling",
+        }
+        new_focus = mapping.get(choice)
+        if new_focus is None:
+            print("正しい番号を入力してください。")
+            continue
+        setattr(p, "training_focus", new_focus)
+        print(f"{getattr(p, 'name', '-') } の育成方針を {focus_labels[new_focus]} に設定しました。")
+
+
 def run_facility_investment_menu(user_team):
     while True:
         print_facility_status(user_team)
@@ -1594,7 +1659,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         print("9. ベンチ序列変更")
         print(trade_label)
         print("11. 施設投資")
-        print("12. 戻る")
+        print("12. 個別育成方針")
+        print("13. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -1621,6 +1687,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         elif choice == "11":
             run_facility_investment_menu(user_team)
         elif choice == "12":
+            run_player_training_focus_menu(user_team)
+        elif choice == "13":
             break
         else:
             print("正しい番号を入力してください。")

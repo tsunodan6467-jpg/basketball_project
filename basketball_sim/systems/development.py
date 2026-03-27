@@ -213,6 +213,14 @@ class DevelopmentSystem:
             new_ovr = max(40, min(99, old_ovr + final_delta))
 
         setattr(player, "ovr", int(new_ovr))
+        cls._apply_focus_micro_progression(
+            player=player,
+            team=team,
+            age=age,
+            games_played=games_played,
+            total_season_games=total_season_games,
+            branch=branch,
+        )
 
         actual_delta = int(getattr(player, "ovr", 0)) - old_ovr
 
@@ -256,6 +264,52 @@ class DevelopmentSystem:
             f"[DEV-D] {player.name} {sign}{actual_delta} -> OVR {player.ovr} "
             f"(age:{age} gp:{games_played} branch:{branch}){fa_suffix}"
         )
+
+    @classmethod
+    def _apply_focus_micro_progression(
+        cls,
+        player,
+        team,
+        age: int,
+        games_played: int,
+        total_season_games: int,
+        branch: str,
+    ) -> None:
+        """
+        個別育成方針による微小な能力補正（Phase 3）。
+        既存バランスを壊さないよう、年1回の +1 を稀に与えるだけに制限。
+        """
+        if age >= 32:
+            return
+        if branch not in {"young", "prime"}:
+            return
+        gp_ratio = min(1.0, games_played / max(1, total_season_games))
+        if gp_ratio < 0.20:
+            return
+
+        focus = str(getattr(player, "training_focus", "balanced") or "balanced")
+        if focus == "balanced":
+            return
+
+        lvl = int(getattr(team, "training_facility_level", 1) or 1)
+        # 低頻度・低振れの安全設計（max ~20%）
+        proc = min(0.20, 0.05 + lvl * 0.01 + gp_ratio * 0.04)
+        if random.random() >= proc:
+            return
+
+        focus_map = {
+            "shooting": ("shoot", "three", "ft"),
+            "playmaking": ("passing", "drive", "handling"),
+            "defense": ("defense", "rebound", "iq"),
+            "physical": ("stamina", "speed", "power"),
+            "iq_handling": ("iq", "handling", "passing"),
+        }
+        attrs = focus_map.get(focus)
+        if not attrs:
+            return
+        target = random.choice(attrs)
+        old = int(getattr(player, target, 50) or 50)
+        setattr(player, target, int(max(1, min(99, old + 1))))
 
     @classmethod
     def _resolve_potential_value(cls, player) -> int:
