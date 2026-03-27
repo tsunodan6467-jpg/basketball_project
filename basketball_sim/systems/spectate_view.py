@@ -1,6 +1,12 @@
 """
 Minimal 2D spectate UI for Basketball Project.
 
+spectate_mode
+-------------
+- ``full``: 全プレゼンイベント（既定）
+- ``highlight``: ``highlight_selector.build_highlight_override_events_from_match`` による短い列のみ
+- ``result_only``: 従来どおり高速・自動進行向け
+
 Safe improvements in this version
 ---------------------------------
 - Keeps all previously working spectate features
@@ -15,8 +21,9 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Any, Optional
 
-from basketball_sim.systems.presentation_layer import PresentationLayer
 from basketball_sim.systems.highlight_camera_system import HighlightCameraSystem
+from basketball_sim.systems.highlight_selector import build_highlight_override_events_from_match
+from basketball_sim.systems.presentation_layer import PresentationLayer
 
 
 class SpectateView:
@@ -36,7 +43,11 @@ class SpectateView:
         self.spectate_mode = str(spectate_mode or "full").strip().lower()
 
         self.root = tk.Tk()
-        self.root.title("Basketball Project - Spectate View")
+        self.root.title(
+            "Basketball Project - Spectate View (Highlight)"
+            if self.spectate_mode == "highlight"
+            else "Basketball Project - Spectate View"
+        )
         self.root.geometry(f"{width}x{height}")
         self.root.minsize(980, 680)
 
@@ -67,6 +78,9 @@ class SpectateView:
         if override_events is not None:
             self.presentation_layer = None
             self.presentation_events = [dict(event) for event in override_events if isinstance(event, dict)]
+        elif self.spectate_mode == "highlight":
+            self.presentation_layer = None
+            self.presentation_events = build_highlight_override_events_from_match(match)
         else:
             self.presentation_layer = PresentationLayer(match)
             self.presentation_events = self.presentation_layer.build()

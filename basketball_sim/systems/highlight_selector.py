@@ -7,11 +7,15 @@ presentation_events から「見せる価値のあるプレー」を抽出する
 安全設計:
 - 既存システムに一切影響を与えない
 - presentation_layer の出力を読むだけ
+- Match を渡す場合も PresentationLayer を内部で生成するだけ（シミュ結果は変更しない）
 """
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Any, Dict, List
+
+HIGHLIGHT_DEFAULT_MAX_EVENTS = 10
+HIGHLIGHT_DEFAULT_MIN_SCORE = 18
 
 
 class HighlightSelector:
@@ -108,3 +112,47 @@ class HighlightSelector:
                 f"score={e.get('highlight_score')} | "
                 f"{e.get('headline')}"
             )
+
+
+def build_highlight_playlist_events(
+    presentation_events: List[Dict],
+    *,
+    max_events: int = HIGHLIGHT_DEFAULT_MAX_EVENTS,
+    min_score: int = HIGHLIGHT_DEFAULT_MIN_SCORE,
+) -> List[Dict]:
+    """
+    観戦用ハイライト列（docs/HIGHLIGHT_MODE_SPEC.md の第一段階）。
+
+    既存の `highlight_score` を使い、スコア上位を時系列で並べる。
+    候補が空なら min_score を 10、0 と段階的に下げて再試行する。
+    """
+    if not presentation_events:
+        return []
+
+    sel = HighlightSelector(presentation_events)
+    for ms in (min_score, 10, 0):
+        out = sel.select_highlights_timeline(top_n=max_events, min_score=ms)
+        if out:
+            return [dict(e) for e in out]
+    return []
+
+
+def build_highlight_override_events_from_match(
+    match: Any,
+    *,
+    max_events: int = HIGHLIGHT_DEFAULT_MAX_EVENTS,
+    min_score: int = HIGHLIGHT_DEFAULT_MIN_SCORE,
+) -> List[Dict]:
+    """
+    試合からプレゼンイベントを生成し、ハイライト用の短い列だけ返す。
+    シミュレーションは変更しない（PresentationLayer は読み取り変換のみ）。
+    """
+    from basketball_sim.systems.presentation_layer import PresentationLayer
+
+    layer = PresentationLayer(match)
+    events = layer.build()
+    return build_highlight_playlist_events(
+        events,
+        max_events=max_events,
+        min_score=min_score,
+    )
