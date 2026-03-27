@@ -286,7 +286,7 @@ def format_team_identity_text(team: Any) -> str:
         f"拠点地        : {getattr(team, 'home_city', 'Unknown')}",
         f"市場規模      : {float(getattr(team, 'market_size', 1.0)):.2f}",
         f"人気          : {getattr(team, 'popularity', 0)}",
-        f"資金          : ${int(getattr(team, 'money', 0)):,}",
+        f"資金          : {int(getattr(team, 'money', 0)):,}円",
         f"戦術          : {getattr(team, 'strategy', 'balanced')}",
         f"HCスタイル    : {getattr(team, 'coach_style', 'balanced')}",
         f"起用方針      : {usage_label}",
@@ -311,21 +311,22 @@ def format_salary_cap_text(team: Any) -> str:
     soft_room = soft_cap - payroll
 
     lines = [
-        f"Team Payroll : ${payroll:,}",
-        f"Hard Cap     : ${hard_cap:,}",
-        f"Soft Cap     : ${soft_cap:,}",
+        f"Team Payroll : {payroll:,}円",
+        f"Hard Cap     : {hard_cap:,}円",
+        f"Soft Cap     : {soft_cap:,}円",
+        "League Rule  : 全ディビジョン共通 ソフト12億円",
         "",
         f"Status       : {status}",
     ]
     if cap_space >= 0:
-        lines.append(f"Cap Space    : ${cap_space:,}")
+        lines.append(f"Cap Space    : {cap_space:,}円")
     else:
-        lines.append(f"Cap Over     : ${abs(cap_space):,}")
+        lines.append(f"Cap Over     : {abs(cap_space):,}円")
 
     if soft_room >= 0:
-        lines.append(f"Soft Room    : ${soft_room:,}")
+        lines.append(f"Soft Room    : {soft_room:,}円")
     else:
-        lines.append(f"Soft Over    : ${abs(soft_room):,}")
+        lines.append(f"Soft Over    : {abs(soft_room):,}円")
 
     return "\n".join(lines)
 
@@ -356,7 +357,7 @@ def format_gm_roster_text(team: Any) -> str:
             f"OVR:{int(getattr(p, 'ovr', 0)):<2} "
             f"Age:{int(getattr(p, 'age', 0)):<2} "
             f"{str(getattr(p, 'nationality', 'Japan')):<12} "
-            f"Salary:${int(getattr(p, 'salary', 0)):,}"
+            f"Salary:{int(getattr(p, 'salary', 0)):,}円"
         )
 
     lines_out.append("")

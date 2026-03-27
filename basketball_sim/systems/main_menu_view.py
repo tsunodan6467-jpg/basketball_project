@@ -669,7 +669,7 @@ class MainMenuView:
             if floor > 0 and payroll < floor:
                 floor_str = f" | ⚠ ペイロール下限未満（要 {floor:,}円以上・シーズン終了時は降格の対象）"
             return (
-                f"給与合計 {payroll:,}円（ハード {hard:,}円 / ソフト {soft:,}円）"
+                f"給与合計 {payroll:,}円（ハード {hard:,}円 / ソフト {soft:,}円 / 全D共通ソフト12億）"
                 f" | {status_ja} | {room_str}{tax_str}{bud_str}{floor_str}"
             )
         except Exception:
