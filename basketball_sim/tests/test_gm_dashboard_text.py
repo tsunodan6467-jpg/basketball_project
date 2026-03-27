@@ -69,4 +69,5 @@ def test_format_lineup_snapshot_contains_sections():
     snap = format_lineup_snapshot_text(t)
     assert "【スタメン】" in snap
     assert "【ベンチ序列】" in snap
-    assert "変更はターミナル" in snap
+    assert "GMメニュー" in snap
+    assert "自動スタメン" in snap

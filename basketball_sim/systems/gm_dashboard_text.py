@@ -2,6 +2,8 @@
 GM ダッシュボード用の読み取り専用テキスト（CLI main.py と GUI 共通）。
 
 input() を使わない確認系の単一ソースにする。
+
+表示ルール（人事ロスターと共通）の説明: docs/GM_ROSTER_DISPLAY_RULES.md
 """
 
 from __future__ import annotations
@@ -140,7 +142,8 @@ def format_lineup_snapshot_text(team: Any) -> str:
         "",
         format_bench_order_text(team),
         "",
-        "※ 変更はターミナルのシーズンメニュー「8. GMメニュー」から行ってください。",
+        "※ 個別の入れ替えはターミナルのシーズンメニュー「8. GMメニュー」。"
+        "カスタムスタメン解除のみ GUI の「自動スタメンに戻す」からも可能。",
     ]
     return "\n".join(parts)
 

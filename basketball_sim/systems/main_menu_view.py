@@ -37,6 +37,10 @@ from basketball_sim.systems.gm_dashboard_text import (
     format_lineup_snapshot_text,
     format_salary_cap_text,
     format_team_identity_text,
+    get_current_bench_order,
+    get_current_sixth_man,
+    get_current_starting_five,
+    sort_roster_for_gm_view,
 )
 from basketball_sim.systems.gm_ui_constants import (
     COACH_STYLE_OPTIONS,
@@ -711,30 +715,29 @@ class MainMenuView:
             return
 
         players = list(self._safe_get(self.team, "players", []) or [])
-        players_sorted = sorted(
-            players,
-            key=lambda p: (
-                -int(self._safe_get(p, "ovr", 0) or 0),
-                str(self._safe_get(p, "position", "")),
-                str(self._safe_get(p, "name", "")),
-            ),
-        )
+        players_sorted = sort_roster_for_gm_view(players)
 
         starters = self._get_starting_five_players()
         sixth_man = self._get_sixth_man_player()
         bench_order = self._get_bench_order_players()
 
-        starter_ids = {id(p) for p in starters}
-        bench_order_rank = {id(p): idx + 1 for idx, p in enumerate(bench_order)}
+        starter_ids = {getattr(p, "player_id", None) for p in starters}
+        starter_ids.discard(None)
+        sixth_id = getattr(sixth_man, "player_id", None) if sixth_man is not None else None
+        bench_order_rank = {
+            getattr(p, "player_id", None): idx + 1
+            for idx, p in enumerate(bench_order)
+            if getattr(p, "player_id", None) is not None
+        }
 
         for player in players_sorted:
-            pid = id(player)
+            pid = getattr(player, "player_id", None)
             role = "控え"
-            if pid in starter_ids:
+            if pid is not None and pid in starter_ids:
                 role = "先発"
-            elif sixth_man is not None and pid == id(sixth_man):
+            elif sixth_id is not None and pid == sixth_id:
                 role = "6th"
-            elif pid in bench_order_rank:
+            elif pid is not None and pid in bench_order_rank:
                 role = f"控え{bench_order_rank[pid]}"
 
             name = str(self._safe_get(player, "name", "-"))
@@ -763,7 +766,8 @@ class MainMenuView:
             f"{team_name} ロスター一覧    人数: {count}    平均OVR: {avg_ovr:.1f}"
         )
         self.roster_hint_var.set(
-            "先発・6thマン・ベンチ序列を反映した読み取り専用一覧です。詳細編集は後続フェーズで接続します。"
+            "並び: ポジション順(PG→C)→同ポジ内OVR降順（docs/GM_ROSTER_DISPLAY_RULES.md と共通）。"
+            "先発・6th・控え番号は Team の起用ロジックに基づきます。読み取り専用。"
         )
 
     def open_finance_window(self) -> None:
@@ -1446,35 +1450,29 @@ class MainMenuView:
             return 0
 
     def _get_starting_five_players(self) -> List[Any]:
-        getter = getattr(self.team, "get_starting_five", None)
-        if callable(getter):
-            try:
-                result = getter() or []
-                return [p for p in result if p is not None]
-            except Exception:
-                pass
-        players = self._safe_get(self.team, "starting_five", []) or []
-        return [p for p in players if p is not None]
+        """gm_dashboard_text と同一の先発判定（人事ロスターと GM 表示の整合用）。"""
+        if self.team is None:
+            return []
+        try:
+            return [p for p in (get_current_starting_five(self.team) or []) if p is not None]
+        except Exception:
+            return []
 
     def _get_sixth_man_player(self) -> Any:
-        getter = getattr(self.team, "get_sixth_man", None)
-        if callable(getter):
-            try:
-                return getter()
-            except Exception:
-                pass
-        return self._safe_get(self.team, "sixth_man", None)
+        if self.team is None:
+            return None
+        try:
+            return get_current_sixth_man(self.team)
+        except Exception:
+            return None
 
     def _get_bench_order_players(self) -> List[Any]:
-        getter = getattr(self.team, "get_bench_order_players", None)
-        if callable(getter):
-            try:
-                result = getter() or []
-                return [p for p in result if p is not None]
-            except Exception:
-                pass
-        players = self._safe_get(self.team, "bench_order", []) or []
-        return [p for p in players if p is not None]
+        if self.team is None:
+            return []
+        try:
+            return [p for p in (get_current_bench_order(self.team) or []) if p is not None]
+        except Exception:
+            return []
 
     def _format_player_brief(self, player: Any) -> str:
         if player is None:
@@ -2347,6 +2345,38 @@ class MainMenuView:
         self._refresh_gm_dashboard_window()
         messagebox.showinfo("保存", "戦術・HC・起用方針を反映しました。", parent=parent)
 
+    def _on_reset_starting_lineup_gui(self) -> None:
+        """カスタムスタメン解除（Team.clear_starting_lineup）。確認ダイアログ付き。"""
+        if self.team is None:
+            return
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        try:
+            ok = messagebox.askokcancel(
+                "自動スタメンに戻す",
+                "カスタムスタメン（手動設定）を解除し、チームの自動選出に戻しますか？\n\n"
+                "※ 6thマンの設定はそのままです。変更はCLIのGMメニューから行えます。",
+                parent=parent,
+            )
+        except Exception:
+            return
+        if not ok:
+            return
+        clr = getattr(self.team, "clear_starting_lineup", None)
+        if not callable(clr):
+            messagebox.showinfo("未対応", "このチームではスタメン解除を実行できません。", parent=parent)
+            return
+        try:
+            clr()
+        except Exception as exc:
+            messagebox.showerror("エラー", str(exc), parent=parent)
+            return
+        self.refresh()
+        messagebox.showinfo("完了", "スタメンを自動選出に戻しました。", parent=parent)
+
     def _on_close_gm_window(self) -> None:
         w = getattr(self, "_gm_window", None)
         try:
@@ -2429,10 +2459,50 @@ class MainMenuView:
             tab.columnconfigure(0, weight=1)
             return txt
 
+        def _make_lineup_tab() -> None:
+            tab = ttk.Frame(nb, style="Root.TFrame", padding=6)
+            nb.add(tab, text="スタメン・ベンチ")
+            tab.rowconfigure(0, weight=1)
+            tab.columnconfigure(0, weight=1)
+
+            txt = tk.Text(
+                tab,
+                wrap="none",
+                bg="#222834",
+                fg="#e8ecf0",
+                insertbackground="#e8ecf0",
+                font=("Consolas", 10),
+                relief="flat",
+                padx=10,
+                pady=10,
+            )
+            vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
+            hsb = ttk.Scrollbar(tab, orient="horizontal", command=txt.xview)
+            txt.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+            txt.grid(row=0, column=0, sticky="nsew")
+            vsb.grid(row=0, column=1, sticky="ns")
+            hsb.grid(row=1, column=0, columnspan=2, sticky="ew")
+
+            btn_row = ttk.Frame(tab, style="Panel.TFrame", padding=(8, 4))
+            btn_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+            ttk.Button(
+                btn_row,
+                text="自動スタメンに戻す（確認）",
+                style="Menu.TButton",
+                command=self._on_reset_starting_lineup_gui,
+            ).pack(side="left", padx=(0, 8))
+            ttk.Label(
+                btn_row,
+                text="カスタムスタメン解除。個別の入れ替えはCLIのGMメニュー。",
+                font=("Yu Gothic UI", 9),
+            ).pack(side="left")
+
+            self._gm_text_lineup = txt
+
         self._gm_text_team = _make_tab("チーム情報")
         self._gm_text_cap = _make_tab("サラリーキャップ")
         self._gm_text_roster = _make_tab("ロスター")
-        self._gm_text_lineup = _make_tab("スタメン・ベンチ")
+        _make_lineup_tab()
 
         tab_st = ttk.Frame(nb, style="Root.TFrame", padding=14)
         nb.add(tab_st, text="戦術・HC・起用")
