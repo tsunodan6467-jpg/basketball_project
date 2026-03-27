@@ -2854,6 +2854,37 @@ class MainMenuView:
         }
         return labels.get(str(key or "balanced"), str(key or "balanced"))
 
+    def _build_team_training_change_confirm_text(self, old_key: str, new_key: str) -> str:
+        return (
+            "チーム練習方針を変更しますか？\n\n"
+            f"変更前: {self._get_team_training_label(old_key)}\n"
+            f"変更後: {self._get_team_training_label(new_key)}"
+        )
+
+    def _build_player_training_change_confirm_text(self, player: Any, old_drill: str, new_drill: str) -> str:
+        drill_labels = {
+            "balanced": "バランス",
+            "dribble": "ドリブル練習",
+            "rebound": "リバウンド練習",
+            "stamina_run": "走り込み（スタミナ）",
+            "shoot_form": "シュートフォーム",
+            "three_point": "3P特化",
+            "free_throw": "フリースロー",
+            "drive_finish": "ドライブ&フィニッシュ",
+            "passing_read": "パス判断",
+            "defense_footwork": "ディフェンスフットワーク",
+            "strength": "筋力強化",
+            "speed_agility": "スピード&アジリティ",
+            "iq_film": "映像分析（IQ）",
+        }
+        old_label = drill_labels.get(str(old_drill or "balanced"), str(old_drill or "balanced"))
+        new_label = drill_labels.get(str(new_drill or "balanced"), str(new_drill or "balanced"))
+        return (
+            f"{getattr(player, 'name', '-') } の個別練習を変更しますか？\n\n"
+            f"変更前: {old_label}\n"
+            f"変更後: {new_label}"
+        )
+
     def _team_training_lock_reason(self, team: Any, focus_key: str) -> str:
         coach = str(getattr(team, "coach_style", "balanced") or "balanced")
         tf = int(getattr(team, "training_facility_level", 1) or 1)
@@ -2933,10 +2964,19 @@ class MainMenuView:
             if not key:
                 messagebox.showerror("エラー", "方針を選択してください。", parent=w)
                 return
+            old_key = str(getattr(self.team, "team_training_focus", "balanced") or "balanced")
             reason = self._team_training_lock_reason(self.team, key)
             if reason:
                 messagebox.showwarning("未解放", f"この方針は未解放です。\n{reason}", parent=w)
                 return
+            if old_key != key:
+                ok = messagebox.askokcancel(
+                    "確認",
+                    self._build_team_training_change_confirm_text(old_key, key),
+                    parent=w,
+                )
+                if not ok:
+                    return
             setattr(self.team, "team_training_focus", key)
             self._refresh_development_window()
             messagebox.showinfo("完了", f"チーム練習を「{self._get_team_training_label(key)}」に変更しました。", parent=w)
@@ -3041,10 +3081,19 @@ class MainMenuView:
             if not key:
                 messagebox.showerror("エラー", "練習を選択してください。", parent=w)
                 return
+            old_drill = str(getattr(p, "training_drill", "balanced") or "balanced")
             reason = self._player_drill_lock_reason(self.team, key)
             if reason:
                 messagebox.showwarning("未解放", f"この練習は未解放です。\n{reason}", parent=w)
                 return
+            if old_drill != key:
+                ok = messagebox.askokcancel(
+                    "確認",
+                    self._build_player_training_change_confirm_text(p, old_drill, key),
+                    parent=w,
+                )
+                if not ok:
+                    return
             setattr(p, "training_drill", key)
             setattr(p, "training_focus", focus)
             self._refresh_development_window()

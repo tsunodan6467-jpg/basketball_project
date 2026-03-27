@@ -45,3 +45,25 @@ def test_current_special_training_lines_include_summary_header():
     assert "現在HC: 育成" in joined
     assert "解放数:" in joined
     assert "解放中:" in joined
+
+
+def test_training_change_confirm_texts_are_human_readable():
+    team = SimpleNamespace(
+        coach_style="development",
+        training_facility_level=3,
+        front_office_level=2,
+        medical_facility_level=2,
+    )
+    view = _bare_view_with_team(team)
+
+    team_msg = MainMenuView._build_team_training_change_confirm_text(view, "balanced", "transition")
+    assert "変更前: バランス" in team_msg
+    assert "変更後: 速攻強化" in team_msg
+
+    player = SimpleNamespace(name="テスト選手")
+    player_msg = MainMenuView._build_player_training_change_confirm_text(
+        view, player, "dribble", "iq_film"
+    )
+    assert "テスト選手" in player_msg
+    assert "変更前: ドリブル練習" in player_msg
+    assert "変更後: 映像分析（IQ）" in player_msg
