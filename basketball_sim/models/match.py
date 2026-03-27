@@ -2046,7 +2046,10 @@ class Match:
             assist_rate = 0.57
 
         passing_push = (profile["passing"] - 65.0) * 0.0030
-        assist_rate += passing_push
+        iq_avg = sum(p.get_adjusted_attribute("iq") for p in offense_lineup) / max(1, len(offense_lineup))
+        # Phase 2 (safe): iq は小係数でアシスト意思決定にのみ反映
+        iq_push = (iq_avg - 65.0) * 0.0008
+        assist_rate += passing_push + iq_push
 
         if strategy == "balanced":
             assist_rate += 0.01
@@ -2223,6 +2226,8 @@ class Match:
         three_attr = player.get_adjusted_attribute("three")
         drive_attr = player.get_adjusted_attribute("drive")
         passing_attr = player.get_adjusted_attribute("passing")
+        handling_attr = player.get_adjusted_attribute("handling")
+        iq_attr = player.get_adjusted_attribute("iq")
         rebound_attr = player.get_adjusted_attribute("rebound")
 
         position_weights = self._get_position_stat_weights(player)
@@ -2252,6 +2257,9 @@ class Match:
         elif shot_profile == "two":
             weight += int(shoot_attr * 1.1)
             weight += int(drive_attr * 1.2)
+            # Phase 2 (safe): handling / iq は2P判断の重みに薄く反映
+            weight += int(handling_attr * 0.12)
+            weight += int(iq_attr * 0.08)
 
             if position in ("SG", "SF", "PF"):
                 weight += 8
@@ -2269,6 +2277,7 @@ class Match:
             weight += int(drive_attr * 1.0)
             weight += int(shoot_attr * 0.6)
             weight += int(passing_attr * 0.2)
+            weight += int(handling_attr * 0.08)
 
             if position in ("PG", "SG", "SF"):
                 weight += 6
@@ -2834,7 +2843,12 @@ class Match:
 
         defense_pressure = sum(p.get_adjusted_attribute("defense") for p in defense_lineup) / len(defense_lineup)
         offense_ball_security = sum(
-            (p.get_adjusted_attribute("passing") + p.get_adjusted_attribute("drive")) / 2
+            (
+                p.get_adjusted_attribute("passing") * 0.45
+                + p.get_adjusted_attribute("drive") * 0.35
+                + p.get_adjusted_attribute("handling") * 0.12
+                + p.get_adjusted_attribute("iq") * 0.08
+            )
             for p in offense_lineup
         ) / len(offense_lineup)
 
@@ -2923,7 +2937,8 @@ class Match:
             drive_attr = shooter.get_adjusted_attribute("drive")
             pts = 2
             shot_profile = "two"
-            final_rate = 0.273 + (shoot_attr * 0.0014) + (drive_attr * 0.00065) + ((offense_team_offense - defense_team_defense) * 0.00055) + shot_rate_adjust
+            handling_attr = shooter.get_adjusted_attribute("handling")
+            final_rate = 0.273 + (shoot_attr * 0.0014) + (drive_attr * 0.00065) + (handling_attr * 0.00012) + ((offense_team_offense - defense_team_defense) * 0.00055) + shot_rate_adjust
 
         else:
             shooter = self._select_shooter(offense_team, offense_lineup, "ft")

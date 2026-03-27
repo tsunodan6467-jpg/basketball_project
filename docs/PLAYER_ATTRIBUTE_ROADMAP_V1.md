@@ -45,6 +45,27 @@ Phase 1 では、以下のみ実装:
 - Phase 3: 育成UI・強化メニューへの本格接続
 - Phase 4: 必要なら係数再調整（統計検証ベース）
 
+## Phase 2 Coefficients (Current)
+
+`models/match.py` への限定反映:
+
+- `offense_ball_security`
+  - passing: `0.45`
+  - drive: `0.35`
+  - handling: `0.12`
+  - iq: `0.08`
+- `assist_rate`
+  - 既存 passing 補正に加えて `iq` を `0.0008` 係数で追加
+- `two-shot weight`
+  - `handling * 0.12`
+  - `iq * 0.08`
+- `ft-shot weight`
+  - `handling * 0.08`
+- `2P success rate`
+  - `handling * 0.00012`
+
+注: いずれも既存の主係数より小さい値で、即時のバランス崩壊を避ける設定。
+
 ## Risk Controls
 
 - いきなり既存確率式の主変数にしない
