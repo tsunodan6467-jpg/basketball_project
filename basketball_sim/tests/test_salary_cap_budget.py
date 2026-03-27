@@ -29,6 +29,7 @@ def test_hard_cap_by_division():
     assert get_soft_cap(league_level=3) == int(
         round(LEAGUE_SALARY_CAP_BY_DIVISION[3] * 1.20)
     )
+    assert get_hard_cap(league_level=1) == get_hard_cap(league_level=2) == get_hard_cap(league_level=3)
 
 
 def test_cap_status_tiers():
