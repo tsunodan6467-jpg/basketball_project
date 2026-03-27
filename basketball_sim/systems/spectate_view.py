@@ -27,6 +27,10 @@ from basketball_sim.systems.presentation_layer import PresentationLayer
 
 
 class SpectateView:
+    RESULT_ONLY_TARGET_TOTAL_SECONDS = 10.0
+    RESULT_ONLY_MIN_DELAY_MS = 8
+    RESULT_ONLY_MAX_DELAY_MS = 35
+
     def __init__(
         self,
         match: Any,
@@ -43,6 +47,7 @@ class SpectateView:
         self.spectate_mode = str(spectate_mode or "full").strip().lower()
 
         self.root = tk.Tk()
+        self.ui_style = ttk.Style(self.root)
         self.root.title(
             "Basketball Project - Spectate View (Highlight)"
             if self.spectate_mode == "highlight"
@@ -81,6 +86,11 @@ class SpectateView:
         elif self.spectate_mode == "highlight":
             self.presentation_layer = None
             self.presentation_events = build_highlight_override_events_from_match(match)
+        elif self.spectate_mode == "result_only":
+            self.presentation_layer = PresentationLayer(match)
+            base_events = self.presentation_layer.build()
+            self.presentation_events = self._wrap_result_only_events_with_outro(base_events)
+            self.presentation_layer = None
         else:
             self.presentation_layer = PresentationLayer(match)
             self.presentation_events = self.presentation_layer.build()
@@ -151,8 +161,15 @@ class SpectateView:
         self.dribble_step: float = 0.18
         self.dribble_max_phase: float = 1.0
 
+        # Synthetic tipoff mini animation (lightweight; no external assets)
+        self.tipoff_anim_active: bool = False
+        self.tipoff_anim_phase: float = 0.0
+        self.tipoff_anim_step: float = 1.0 / 24.0
+
         self._result_display_snapshot: Optional[dict] = None
         self._btn_skip_result: Optional[ttk.Button] = None
+        self.commentary_style_name: str = "Commentary.TLabel"
+        self.commentary_default_color: str = "#111827"
 
         self._reset_match_cursors()
         self._build_ui()
@@ -269,13 +286,15 @@ class SpectateView:
         if not isinstance(event, dict):
             return False
         ptype = str(event.get("presentation_type") or "")
-        return ptype in {"quarter_start", "quarter_end"}
+        return ptype in {"quarter_start", "quarter_end", "synthetic_tipoff"}
 
     def _build_period_flash_text(self, event: Optional[dict]) -> str:
         if not isinstance(event, dict):
             return ""
         ptype = str(event.get("presentation_type") or "")
         quarter = event.get("quarter")
+        if ptype == "synthetic_tipoff":
+            return "試合開始"
         if ptype == "quarter_start":
             if isinstance(quarter, int) and quarter <= 4:
                 return f"第{quarter}クォーター"
@@ -298,6 +317,22 @@ class SpectateView:
             return
         self.period_flash_frames_remaining = self.period_flash_default_frames
         self.period_flash_text = text
+
+    def _is_synthetic_tipoff_event(self, event: Optional[dict]) -> bool:
+        if not isinstance(event, dict):
+            return False
+        return str(event.get("presentation_type") or "") == "synthetic_tipoff"
+
+    def _sync_tipoff_animation_from_event(self, event: Optional[dict]) -> None:
+        if self._is_synthetic_tipoff_event(event):
+            self.tipoff_anim_active = True
+            self.tipoff_anim_phase = 0.0
+            return
+        self._reset_tipoff_animation()
+
+    def _reset_tipoff_animation(self) -> None:
+        self.tipoff_anim_active = False
+        self.tipoff_anim_phase = 0.0
 
     # =========================================================
     # Public API
@@ -373,12 +408,14 @@ class SpectateView:
         )
 
         self.commentary_var = tk.StringVar(value=self.current_commentary)
+        self.ui_style.configure(self.commentary_style_name, foreground=self.commentary_default_color)
         ttk.Label(
             bottom_frame,
             textvariable=self.commentary_var,
             wraplength=max(700, self.width - 120),
             justify="left",
             font=("Yu Gothic UI", 13),
+            style=self.commentary_style_name,
         ).grid(row=1, column=0, sticky="ew", pady=(0, 12))
 
         controls = ttk.Frame(bottom_frame)
@@ -476,6 +513,7 @@ class SpectateView:
         self.rebound_hold_owner_name = None
         self._reset_player_animation()
         self._reset_dribble_animation()
+        self._reset_tipoff_animation()
 
     def _get_total_plays(self) -> int:
         if self.presentation_events:
@@ -487,6 +525,57 @@ class SpectateView:
             except Exception:
                 return 0
         return 0
+
+    def _build_result_only_outro_event(self) -> dict:
+        hs = 0
+        aws = 0
+        try:
+            hs = int(getattr(self.match, "home_score", 0) or 0)
+            aws = int(getattr(self.match, "away_score", 0) or 0)
+        except (TypeError, ValueError):
+            hs, aws = 0, 0
+
+        quarter_rows: list[dict] = []
+        if isinstance(self.presentation_events, list):
+            by_q: dict[int, tuple[int, int]] = {}
+            for ev in self.presentation_events:
+                if not isinstance(ev, dict):
+                    continue
+                q = ev.get("quarter")
+                h = ev.get("home_score")
+                a = ev.get("away_score")
+                if isinstance(q, int) and isinstance(h, int) and isinstance(a, int):
+                    by_q[q] = (h, a)
+            for q in sorted(by_q.keys()):
+                h, a = by_q[q]
+                prev_h, prev_a = by_q.get(q - 1, (0, 0))
+                quarter_rows.append({"quarter": q, "home": h - prev_h, "away": a - prev_a})
+
+        return {
+            "play_no": 10**9,
+            "quarter": 4,
+            "clock_seconds": 0,
+            "home_score": hs,
+            "away_score": aws,
+            "presentation_type": "highlight_outro",
+            "headline": "試合終了",
+            "main_text": f"最終スコア {hs} - {aws}",
+            "sub_text": "結果画面です。次へ進むで続行できます。",
+            "importance": "high",
+            "highlight_score": 0,
+            "highlight_tags": [],
+            "quarter_score_summary": quarter_rows,
+            "raw_play": {},
+        }
+
+    def _wrap_result_only_events_with_outro(self, events: list[dict]) -> list[dict]:
+        base = [dict(e) for e in events if isinstance(e, dict)]
+        if not base:
+            return base
+        if any(str(e.get("presentation_type") or "") == "highlight_outro" for e in base):
+            return base
+        base.append(self._build_result_only_outro_event())
+        return base
 
     def _advance_one_play(self) -> None:
         if self.finished:
@@ -503,6 +592,7 @@ class SpectateView:
         if next_event is not None:
             self.current_presentation_event = next_event
             self.current_play_index += 1
+            self._sync_tipoff_animation_from_event(next_event)
 
             if 0 <= self.current_play_index < len(self.camera_events):
                 self.current_camera_event = self.camera_events[self.current_play_index]
@@ -534,15 +624,23 @@ class SpectateView:
             if isinstance(raw_play, dict):
                 self.current_play = raw_play
             self.current_commentary = self._build_commentary_from_presentation(next_event)
+            if self._is_result_only_mode():
+                self.current_commentary = self._build_result_only_commentary_from_presentation(next_event)
             self._update_camera_lock_from_current_event()
             if self._is_result_only_mode():
                 self._trigger_score_flash_from_event(next_event)
                 self._trigger_period_flash_from_event(next_event)
         else:
-            if hasattr(self.match, "get_next_play"):
-                next_play = self.match.get_next_play()
-            if hasattr(self.match, "get_next_commentary_entry"):
-                next_commentary = self.match.get_next_commentary_entry()
+            self._reset_tipoff_animation()
+            if self.presentation_layer is None:
+                # override_events 由来の再生は、列末尾で終了とみなす。
+                next_play = None
+                next_commentary = None
+            else:
+                if hasattr(self.match, "get_next_play"):
+                    next_play = self.match.get_next_play()
+                if hasattr(self.match, "get_next_commentary_entry"):
+                    next_commentary = self.match.get_next_commentary_entry()
 
             if next_play is None:
                 self.finished = True
@@ -567,6 +665,7 @@ class SpectateView:
         if next_event is None and next_play is None:
             self.finished = True
             self.is_autoplay = False
+            self._reset_tipoff_animation()
             self.current_camera_event = None
             self.locked_camera_focus_name = None
             self.locked_camera_track_mode = "team_shape"
@@ -880,12 +979,47 @@ class SpectateView:
         self.play_info_var.set(f"Play {max(self.current_play_index, 0)} / {max(self.total_plays - 1, 0)}")
         self.status_var.set("AUTO" if self.is_autoplay else ("END" if self.finished else "MANUAL"))
         self.commentary_var.set(self.current_commentary)
+        self._apply_commentary_color()
         if self._btn_skip_result is not None:
             if self._should_show_skip_to_result_button():
                 self._btn_skip_result.grid()
             else:
                 self._btn_skip_result.grid_remove()
         self._draw_court()
+
+    def _apply_commentary_color(self) -> None:
+        color = self.commentary_default_color
+        if self._is_result_only_mode():
+            color = self._get_result_only_commentary_color()
+        self.ui_style.configure(self.commentary_style_name, foreground=color)
+
+    def _get_result_only_commentary_color(self) -> str:
+        if self.finished:
+            return "#f59e0b"
+        ev = self.current_presentation_event if isinstance(self.current_presentation_event, dict) else {}
+        ptype = str(ev.get("presentation_type") or "")
+        if ptype in {"highlight_outro", "game_end"}:
+            return "#f59e0b"  # amber
+        if ptype in {"synthetic_tipoff", "quarter_start"}:
+            return "#60a5fa"  # sky
+        if ptype == "quarter_end":
+            return "#a78bfa"  # violet
+        if ptype in {"score_make_2", "score_make_3", "score_make_ft"}:
+            return "#fbbf24"  # yellow
+        if ptype in {"steal", "block", "def_rebound"}:
+            return "#34d399"  # emerald
+        if ptype == "turnover":
+            return "#f87171"  # red
+        if ptype == "off_rebound_keep":
+            return "#2dd4bf"  # teal
+        if ev.get("force_tier") == "S":
+            return "#f97316"  # orange
+        tier = str(ev.get("highlight_tier") or "")
+        if tier == "S":
+            return "#f59e0b"
+        if tier == "A":
+            return "#eab308"
+        return self.commentary_default_color
 
     def _draw_court(self) -> None:
         if self._is_special_package_event():
@@ -1203,6 +1337,7 @@ class SpectateView:
                 self.prev_player_positions = dict(target_positions)
 
         self._draw_players_from_positions(player_positions)
+        self._draw_tipoff_mini_animation(mid_x, mid_y, uniform_scale)
         self._draw_ball_icon(player_positions, left_rim, right_rim)
 
         title = self._court_overlay_title()
@@ -1221,6 +1356,27 @@ class SpectateView:
             self.canvas.create_rectangle(left, top, right, top + 10, width=0, fill="#3366cc")
 
         self._draw_big_play_overlay(left, top, right, bottom)
+
+    def _draw_tipoff_mini_animation(self, mid_x: float, mid_y: float, uniform_scale: float) -> None:
+        if not self.tipoff_anim_active:
+            return
+
+        p = max(0.0, min(1.0, self.tipoff_anim_phase))
+        jump_window = max(0.0, 1.0 - (abs((p - 0.5) / 0.22)))
+        jump_offset = -20.0 * jump_window
+
+        center_gap = max(44.0, 0.95 * uniform_scale)
+        home_x = mid_x - center_gap
+        away_x = mid_x + center_gap
+        base_y = mid_y + 16.0
+
+        home_fill = "#4a78d1"
+        away_fill = "#d14a4a"
+        r = 13
+        for x, fill, label in ((home_x, home_fill, "C"), (away_x, away_fill, "C")):
+            y = base_y + jump_offset
+            self.canvas.create_oval(x - r, y - r, x + r, y + r, fill=fill, outline="black", width=2)
+            self.canvas.create_text(x, y, text=label, fill="#ffffff", font=("Yu Gothic UI", 9, "bold"))
 
 
     def _should_show_big_play_overlay(self) -> bool:
@@ -3319,6 +3475,10 @@ class SpectateView:
     def _is_goal_pressure_play(self) -> bool:
         event = self.current_presentation_event if isinstance(self.current_presentation_event, dict) else {}
         camera_event = self.current_camera_event if isinstance(self.current_camera_event, dict) else {}
+        ptype = str(event.get("presentation_type") or "")
+
+        if ptype in {"block", "def_rebound", "off_rebound_keep"}:
+            return True
 
         structure_type = str(event.get("structure_type") or camera_event.get("structure_type") or "")
         transition_action = str(event.get("transition_action") or camera_event.get("transition_action") or "")
@@ -3460,7 +3620,7 @@ class SpectateView:
         else:
             return 1.0
 
-        if ptype in {"quarter_start", "quarter_end", "game_end"}:
+        if ptype in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
             return 1.0
 
         # 見失いやすさを減らすため、全体的に寄りをかなり抑える
@@ -3492,7 +3652,11 @@ class SpectateView:
 
     def _get_current_autoplay_delay_ms(self) -> int:
         if self._is_result_only_mode():
-            return 35
+            # 目標: 1試合を約10秒以内で見切る（イベント数が多いほど自動で短縮）
+            total = max(1, len(self.presentation_events))
+            target_ms = int(self.RESULT_ONLY_TARGET_TOTAL_SECONDS * 1000)
+            computed = target_ms // total
+            return max(self.RESULT_ONLY_MIN_DELAY_MS, min(self.RESULT_ONLY_MAX_DELAY_MS, computed))
 
         delay = int(self.autoplay_interval_ms)
 
@@ -3804,6 +3968,20 @@ class SpectateView:
         left_rim: tuple[float, float],
         right_rim: tuple[float, float],
     ) -> None:
+        if self.tipoff_anim_active:
+            if self.last_court_bounds is None:
+                return
+            left, top, right, bottom = self.last_court_bounds
+            mid_x = (left + right) / 2.0
+            mid_y = (top + bottom) / 2.0
+            p = max(0.0, min(1.0, self.tipoff_anim_phase))
+            base_y = mid_y + 4.0
+            peak = 120.0
+            # Parabola: start/end low, mid high
+            y = base_y - (4.0 * peak * p * (1.0 - p))
+            self._draw_single_ball(mid_x, y)
+            return
+
         current_presentation_type = self._get_current_presentation_type()
 
         if current_presentation_type == "block":
@@ -3894,6 +4072,10 @@ class SpectateView:
         self.root.after(60, self._idle_animation_tick)
 
     def _idle_animation_tick(self) -> None:
+        if self.tipoff_anim_active:
+            self.tipoff_anim_phase += self.tipoff_anim_step
+            if self.tipoff_anim_phase >= 1.0:
+                self._reset_tipoff_animation()
         self._advance_dribble_phase()
         if not self.finished:
             self._refresh_view()
@@ -3923,6 +4105,7 @@ class SpectateView:
             or self.shot_anim_active
             or self.rebound_anim_active
             or self.made_shot_hold_active
+            or self.tipoff_anim_active
         )
 
     def _get_dribble_offset_y(self) -> float:
@@ -4307,7 +4490,7 @@ class SpectateView:
         self.is_autoplay = not self.is_autoplay
         self._refresh_view()
         if self.is_autoplay:
-            self.root.after(self.autoplay_interval_ms, self._autoplay_tick)
+            self.root.after(self._get_current_autoplay_delay_ms(), self._autoplay_tick)
 
     def _reset_view_state(self) -> None:
         self.is_autoplay = False
@@ -4347,13 +4530,70 @@ class SpectateView:
         return f"{result_type} | primary={primary} | secondary={secondary}"
 
     def _build_commentary_from_presentation(self, event: dict) -> str:
+        ptype = str(event.get("presentation_type") or "")
         main_text = event.get("main_text")
         sub_text = event.get("sub_text")
         if isinstance(main_text, str) and main_text.strip():
+            if ptype in {"block", "steal", "turnover", "def_rebound", "off_rebound_keep"}:
+                return main_text
             if isinstance(sub_text, str) and sub_text.strip():
                 return f"{main_text} {sub_text}"
             return main_text
         return self._fallback_commentary_from_play(event.get("raw_play", {}))
+
+    def _build_result_only_commentary_from_presentation(self, event: dict) -> str:
+        """result_only 向けに実況を短く要約する。"""
+        ptype = str(event.get("presentation_type") or "")
+        quarter = event.get("quarter")
+        clock = event.get("clock_seconds")
+        score = self._format_score_from_event(event)
+        period = self._format_period_short(quarter, clock)
+        tier = str(event.get("highlight_tier") or "")
+        mark = ""
+        if event.get("force_tier") == "S":
+            mark = " !!"
+        elif tier == "S":
+            mark = " !"
+
+        if ptype in {"highlight_outro", "game_end"}:
+            return f"{period} END {score}"
+        if ptype in {"synthetic_tipoff", "quarter_start"}:
+            return f"{period} TIP OFF"
+        if ptype == "quarter_end":
+            return f"{period} Q END {score}"
+        if ptype == "score_make_3":
+            return f"{period} 3P! {score}{mark}"
+        if ptype in {"score_make_2", "score_make_ft"}:
+            return f"{period} PTS {score}{mark}"
+        if ptype == "steal":
+            return f"{period} STL{mark}"
+        if ptype == "block":
+            return f"{period} BLK{mark}"
+        if ptype == "turnover":
+            return f"{period} TO"
+        if ptype in {"def_rebound", "off_rebound_keep"}:
+            return f"{period} REB"
+
+        # 既存の全文を使うと長いため、最低限の短文に落とす
+        base = self._build_commentary_from_presentation(event)
+        if len(base) > 18:
+            return f"{period} PLAY"
+        return f"{period} {base}"
+
+    def _format_period_short(self, quarter: Any, clock_seconds: Any) -> str:
+        q = quarter if isinstance(quarter, int) else 1
+        if isinstance(clock_seconds, int):
+            mm = max(0, int(clock_seconds)) // 60
+            ss = max(0, int(clock_seconds)) % 60
+            return f"Q{q} {mm:02d}:{ss:02d}"
+        return f"Q{q}"
+
+    def _format_score_from_event(self, event: dict) -> str:
+        hs = event.get("home_score")
+        aws = event.get("away_score")
+        if hs is None or aws is None:
+            return self._extract_score_text()
+        return f"{hs}-{aws}"
 
     def _extract_team_name(self, side: str) -> str:
         team_obj = getattr(self.match, "home_team" if side == "home" else "away_team", None)
@@ -4459,6 +4699,7 @@ class SpectateView:
                 "quarter_start": "クォーター開始",
                 "quarter_end": "クォーター終了",
                 "game_end": "試合終了",
+                "synthetic_tipoff": "ティップオフ",
             }
             if ptype in title_map:
                 return title_map[ptype]

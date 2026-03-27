@@ -19,6 +19,8 @@ for path in (PROJECT_ROOT, PACKAGE_ROOT):
 from basketball_sim.tests.test_console_encoding import configure_console_encoding
 
 from basketball_sim.models.match import Match
+from basketball_sim.models.offseason import Offseason
+from basketball_sim.models.season import Season
 from basketball_sim.systems.generator import generate_teams
 from basketball_sim.systems.play_structure import PlayStructureLayer
 from basketball_sim.systems.presentation_layer import PresentationLayer
@@ -40,6 +42,28 @@ HIGHLIGHT_ADD_INTRO_OUTRO = True
 
 # result only mode
 RESULT_ONLY_USE_FALLBACK_FULL = True
+
+# debug helper
+DEBUG_SKIP_TO_OFFSEASON_BEFORE_SPECTATE = False
+
+
+def _prompt_skip_to_offseason(default_enabled: bool = False) -> bool:
+    default = "y" if default_enabled else "n"
+    suffix = "[Y/n]" if default_enabled else "[y/N]"
+    print("[Spectate Test][DEBUG] オフシーズンまで一括進行しますか？")
+    while True:
+        try:
+            raw = input(f"[Spectate Test][DEBUG] skip to offseason {suffix}: ").strip().lower()
+        except EOFError:
+            raw = default
+
+        if raw == "":
+            raw = default
+        if raw in {"y", "yes"}:
+            return True
+        if raw in {"n", "no"}:
+            return False
+        print("y か n を入力してください。")
 
 
 def _pick_two_teams():
@@ -480,6 +504,15 @@ def _select_spectate_events(match: Match, presentation_events: list[dict]) -> li
 def main() -> None:
     configure_console_encoding()
     print("[Spectate Test] 2D観戦テストを開始します。")
+
+    if _prompt_skip_to_offseason(default_enabled=DEBUG_SKIP_TO_OFFSEASON_BEFORE_SPECTATE):
+        print("[Spectate Test][DEBUG] オフシーズンまで一括進行を開始します。")
+        season_teams = generate_teams()
+        season = Season(season_teams, [])
+        season.simulate_to_end()
+        offseason = Offseason(season_teams, [])
+        offseason.run()
+        print("[Spectate Test][DEBUG] オフシーズン進行が完了しました。")
 
     home_team, away_team = _pick_two_teams()
     print(f"[Spectate Test] HOME: {getattr(home_team, 'name', 'HOME')}")
