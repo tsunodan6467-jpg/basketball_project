@@ -1339,10 +1339,10 @@ class MainMenuView:
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
 
-        self.development_hint_var = tk.StringVar(value="")
+        self.development_hint_intro_var = tk.StringVar(value="")
         tk.Label(
             bottom,
-            textvariable=self.development_hint_var,
+            textvariable=self.development_hint_intro_var,
             bg="#1d2129",
             fg="#d6dbe3",
             anchor="w",
@@ -1351,6 +1351,18 @@ class MainMenuView:
             padx=2,
             pady=2,
         ).pack(fill="x", anchor="w")
+        tk.Label(
+            bottom,
+            text="直近変更:",
+            bg="#1d2129",
+            fg="#d6dbe3",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+            padx=2,
+            pady=(8, 2),
+        ).pack(fill="x", anchor="w")
+        self._development_log_frame = tk.Frame(bottom, bg="#1d2129")
+        self._development_log_frame.pack(fill="x", anchor="w")
 
         action_row = ttk.Frame(bottom, style="Panel.TFrame", padding=(0, 8, 0, 0))
         action_row.pack(fill="x")
@@ -1473,10 +1485,10 @@ class MainMenuView:
                     ),
                 )
 
-        self.development_hint_var.set(
-            "読み取り専用の強化画面です。potential / development / 年齢 / 試合数 / 戦術相性を確認できます。\n"
-            f"{self._build_recent_training_change_log_text(self.team, limit=5)}"
+        self.development_hint_intro_var.set(
+            "読み取り専用の強化画面です。potential / development / 年齢 / 試合数 / 戦術相性を確認できます。"
         )
+        self._refresh_development_training_log_widgets()
 
     def _build_development_coach_note(self, coach_key: Any) -> str:
         key = str(coach_key or "")
@@ -2896,6 +2908,51 @@ class MainMenuView:
         if not logs:
             return "なし"
         return str(logs[-1])
+
+    def _training_log_entry_kind(self, entry: str) -> str:
+        s = str(entry or "").strip()
+        if s.startswith("チーム練習:"):
+            return "team"
+        if s.startswith("個別練習:"):
+            return "player"
+        return "other"
+
+    def _refresh_development_training_log_widgets(self) -> None:
+        frame = getattr(self, "_development_log_frame", None)
+        if frame is None:
+            return
+        for child in frame.winfo_children():
+            child.destroy()
+        team = getattr(self, "team", None)
+        logs = list(getattr(team, "training_change_log", []) or []) if team is not None else []
+        if not logs:
+            tk.Label(
+                frame,
+                text="  なし",
+                bg="#1d2129",
+                fg="#9aa3b2",
+                anchor="w",
+                font=("Yu Gothic UI", 10),
+                padx=2,
+                pady=0,
+            ).pack(fill="x", anchor="w")
+            return
+        limit = 5
+        colors = {"team": "#7ec8ff", "player": "#e8c07a", "other": "#9aa3b2"}
+        for entry in logs[-limit:]:
+            kind = self._training_log_entry_kind(entry)
+            fg = colors.get(kind, colors["other"])
+            tk.Label(
+                frame,
+                text=f"- {entry}",
+                bg="#1d2129",
+                fg=fg,
+                anchor="w",
+                justify="left",
+                font=("Yu Gothic UI", 10),
+                padx=2,
+                pady=0,
+            ).pack(fill="x", anchor="w")
 
     def _build_recent_training_change_log_text(self, team: Any, limit: int = 5) -> str:
         logs = list(getattr(team, "training_change_log", []) or [])

@@ -88,3 +88,11 @@ def test_recent_training_change_log_text_shows_latest_five():
     assert "変更3" in text
     assert "変更7" in text
     assert text.count("- ") == 5
+
+
+def test_training_log_entry_kind_detects_team_and_player():
+    team = SimpleNamespace()
+    view = _bare_view_with_team(team)
+    assert MainMenuView._training_log_entry_kind(view, "チーム練習: バランス → 速攻強化") == "team"
+    assert MainMenuView._training_log_entry_kind(view, "個別練習: 山田 balanced → dribble") == "player"
+    assert MainMenuView._training_log_entry_kind(view, "変更7") == "other"
