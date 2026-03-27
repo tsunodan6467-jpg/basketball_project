@@ -40,6 +40,11 @@ class Player:
     potential: str  # e.g., 'S', 'A', 'B', 'C', 'D'
     archetype: str
     usage_base: int
+    # 拡張能力（Phase 1: 定義のみ。試合反映は段階導入）
+    handling: int = 50
+    iq: int = 50
+    speed: int = 50
+    power: int = 50
 
     # 選手人気度 (0〜100)
     popularity: int = 50
@@ -263,7 +268,8 @@ class Player:
     def _clamp_all_core_attributes(self):
         attr_keys = [
             "shoot", "three", "drive", "passing",
-            "rebound", "defense", "ft", "stamina"
+            "rebound", "defense", "ft", "stamina",
+            "handling", "iq", "speed", "power",
         ]
         for key in attr_keys:
             setattr(self, key, self._clamp_attr(getattr(self, key, 50)))
@@ -359,6 +365,12 @@ class Player:
         self.basketball_iq = int(max(1, min(99, self.basketball_iq)))
         self.competitiveness = int(max(1, min(99, self.competitiveness)))
         self.loyalty = int(max(1, min(99, self.loyalty)))
+
+        # Phase 1 互換:
+        # - iq が未調整（既定50）の場合は hidden の basketball_iq を移して整合を取る
+        # - 既存セーブで iq が無い/0 だった場合の極端値を避ける
+        if int(getattr(self, "iq", 50) or 0) <= 0 or int(getattr(self, "iq", 50)) == 50:
+            self.iq = int(max(1, min(99, self.basketball_iq)))
 
     def _roll_hidden_by_potential(self) -> int:
         if self.potential == "S":

@@ -1,0 +1,33 @@
+from basketball_sim.models.player import Player
+
+
+def test_player_extended_attributes_exist_and_clamped():
+    p = Player(
+        player_id=1,
+        name="P1",
+        age=22,
+        nationality="Japan",
+        position="PG",
+        height_cm=180.0,
+        weight_kg=75.0,
+        shoot=60,
+        three=60,
+        drive=60,
+        passing=60,
+        rebound=60,
+        defense=60,
+        ft=60,
+        stamina=60,
+        ovr=70,
+        potential="B",
+        archetype="playmaker",
+        usage_base=20,
+        handling=120,
+        iq=0,
+        speed=-1,
+        power=200,
+    )
+    assert 1 <= p.handling <= 99
+    assert 1 <= p.iq <= 99
+    assert 1 <= p.speed <= 99
+    assert 1 <= p.power <= 99

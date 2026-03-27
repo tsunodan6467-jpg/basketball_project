@@ -33,6 +33,40 @@ def calculate_initial_salary(ovr: int) -> int:
     return int(ovr) * PLAYER_SALARY_BASE_PER_OVR
 
 
+def _assign_extended_attributes(player: Player, pos: str, ovr: int) -> None:
+    """
+    拡張能力（handling/iq/speed/power）の初期値を安全に付与。
+    Phase 1 では試合計算へ強く反映しないため、既存8能力を基準に小さく配る。
+    """
+    base = int(max(40, min(99, ovr)))
+    pos = str(pos or "SF")
+    if pos == "PG":
+        player.handling = min(99, int(base + random.randint(4, 9)))
+        player.iq = min(99, int(base + random.randint(2, 7)))
+        player.speed = min(99, int(base + random.randint(1, 6)))
+        player.power = max(1, int(base + random.randint(-8, -2)))
+    elif pos == "SG":
+        player.handling = min(99, int(base + random.randint(2, 7)))
+        player.iq = min(99, int(base + random.randint(1, 5)))
+        player.speed = min(99, int(base + random.randint(1, 6)))
+        player.power = max(1, int(base + random.randint(-5, 1)))
+    elif pos == "SF":
+        player.handling = min(99, int(base + random.randint(-1, 4)))
+        player.iq = min(99, int(base + random.randint(1, 5)))
+        player.speed = min(99, int(base + random.randint(-1, 4)))
+        player.power = min(99, int(base + random.randint(-1, 5)))
+    elif pos == "PF":
+        player.handling = max(1, int(base + random.randint(-6, 1)))
+        player.iq = min(99, int(base + random.randint(0, 4)))
+        player.speed = max(1, int(base + random.randint(-4, 2)))
+        player.power = min(99, int(base + random.randint(3, 9)))
+    else:  # C
+        player.handling = max(1, int(base + random.randint(-8, -1)))
+        player.iq = min(99, int(base + random.randint(0, 4)))
+        player.speed = max(1, int(base + random.randint(-6, 1)))
+        player.power = min(99, int(base + random.randint(5, 12)))
+
+
 def _get_team_strategy() -> str:
     """
     初期チームに割り当てる戦術を抽選する。
@@ -436,6 +470,7 @@ def generate_single_player(
     )
 
     player.salary = calculate_initial_salary(player.ovr)
+    _assign_extended_attributes(player, pos, final_ovr)
     player.years_pro = max(0, player.age - 18)
     player.contract_years_left = random.randint(2, 4)
 
@@ -565,6 +600,7 @@ def generate_fictional_player(
     )
 
     player.salary = calculate_initial_salary(player.ovr)
+    _assign_extended_attributes(player, pos, final_ovr)
     player.years_pro = max(0, player.age - 18)
     player.contract_years_left = random.randint(1, 3)
 
