@@ -273,7 +273,8 @@
 | `basketball_sim/systems/presentation_layer.py` | プレゼンイベント生成 |
 | `basketball_sim/systems/highlight_selector.py` | 抽出プロトタイプ（本書に合わせて拡張） |
 | `basketball_sim/systems/highlight_camera_system.py` | カメラ |
-| `basketball_sim/systems/spectate_view.py` | 観戦 UI（モード・スキップボタンはここへ接続） |
+| `basketball_sim/systems/spectate_view.py` | 観戦 UI。**結果へ**（`J` キー／ボタン）: `PresentationLayer.skip_to_end()` で残りプレゼンを読み飛ばし、最終スコアを `_result_display_snapshot` で表示。`result_only` モードでは非表示。 |
+| `PresentationLayer.skip_to_end` | 観戦の「結果へ」用。カーソルを末尾へ（読み取り専用）。 |
 
 ---
 
@@ -282,3 +283,4 @@
 | 版 | 日付 | 内容 |
 |----|------|------|
 | v1 | 2026-03-27 | 初版確定。ユーザーたたき台を統合。可変尺・最大約 5 分・「結果へ」ボタン・パイプライン注記を追記 |
+| v1.1 | 2026-03-27 | 観戦 UI に「結果へ」実装、`PresentationLayer.skip_to_end` 追加（§20 参照） |

@@ -137,6 +137,9 @@ class SpectateView:
         self.dribble_step: float = 0.18
         self.dribble_max_phase: float = 1.0
 
+        self._result_display_snapshot: Optional[dict] = None
+        self._btn_skip_result: Optional[ttk.Button] = None
+
         self._reset_match_cursors()
         self._build_ui()
         self._bind_keys()
@@ -148,6 +151,75 @@ class SpectateView:
     # =========================================================
     def _is_result_only_mode(self) -> bool:
         return self.spectate_mode == "result_only"
+
+    def _should_show_skip_to_result_button(self) -> bool:
+        """ハイライト観戦中に「結果へ」を出す（結果のみモードや終了後は不要）。"""
+        if self._is_result_only_mode():
+            return False
+        if self.finished:
+            return False
+        return bool(self.presentation_events)
+
+    def _build_final_result_snapshot_from_match(self) -> Optional[dict]:
+        """スキップ後のスコア表示用。試合オブジェクトまたは最終イベントから最終スコアを推定。"""
+        m = self.match
+        hs: Optional[int] = None
+        aws: Optional[int] = None
+        if m is not None:
+            raw_h = getattr(m, "home_score", None)
+            raw_a = getattr(m, "away_score", None)
+            if raw_h is not None and raw_a is not None:
+                try:
+                    hs = int(raw_h)
+                    aws = int(raw_a)
+                except (TypeError, ValueError):
+                    hs, aws = None, None
+        if hs is None or aws is None:
+            last_ev: Optional[dict] = None
+            if self.presentation_layer is not None:
+                evs = self.presentation_layer.get_events()
+                if evs:
+                    last_ev = evs[-1]
+            elif self.presentation_events:
+                last_ev = self.presentation_events[-1]
+            if isinstance(last_ev, dict):
+                try:
+                    if last_ev.get("home_score") is not None and last_ev.get("away_score") is not None:
+                        hs = int(last_ev.get("home_score", 0))
+                        aws = int(last_ev.get("away_score", 0))
+                except (TypeError, ValueError):
+                    pass
+        if hs is None or aws is None:
+            return None
+        return {
+            "home_score": hs,
+            "away_score": aws,
+            "period_label": "試合終了",
+        }
+
+    def _skip_to_match_result(self) -> None:
+        """ハイライト再生を中断し、最終スコアを表示する（docs/HIGHLIGHT_MODE_SPEC.md §2.2）。"""
+        if self.finished:
+            return
+        if not self._should_show_skip_to_result_button():
+            return
+        self.is_autoplay = False
+        if self.presentation_layer is not None:
+            self.presentation_layer.skip_to_end()
+        else:
+            self.presentation_event_index = len(self.presentation_events)
+
+        self.finished = True
+        self.current_play_index = max(0, self.total_plays - 1)
+        self.current_camera_event = None
+        self.current_presentation_event = None
+        self.current_play = None
+        self._result_display_snapshot = self._build_final_result_snapshot_from_match()
+        self.current_commentary = "試合結果を表示しています。（ハイライトをスキップしました）"
+        self.top_play_overlay_frames_remaining = 0
+        self.top_play_slow_frames_remaining = 0
+        self.top_play_flash_frames_remaining = 0
+        self._refresh_view()
 
     def _is_score_make_presentation(self, event: Optional[dict]) -> bool:
         if not isinstance(event, dict):
@@ -297,17 +369,23 @@ class SpectateView:
 
         controls = ttk.Frame(bottom_frame)
         controls.grid(row=2, column=0, sticky="ew")
-        for i in range(4):
+        for i in range(5):
             controls.columnconfigure(i, weight=1)
 
         ttk.Button(controls, text="次のプレー (N)", command=self._advance_one_play).grid(row=0, column=0, padx=4, sticky="ew")
         ttk.Button(controls, text="自動再生 ON/OFF (A)", command=self._toggle_autoplay).grid(row=0, column=1, padx=4, sticky="ew")
         ttk.Button(controls, text="リセット (R)", command=self._reset_view_state).grid(row=0, column=2, padx=4, sticky="ew")
         ttk.Button(controls, text="閉じる (Esc)", command=self.root.destroy).grid(row=0, column=3, padx=4, sticky="ew")
+        self._btn_skip_result = ttk.Button(
+            controls,
+            text="結果へ (J)",
+            command=self._skip_to_match_result,
+        )
+        self._btn_skip_result.grid(row=0, column=4, padx=4, sticky="ew")
 
         ttk.Label(
             bottom_frame,
-            text="操作: N=次のプレー / A=自動再生ON-OFF / R=リセット / Esc=閉じる",
+            text="操作: N=次のプレー / A=自動再生ON-OFF / R=リセット / J=結果へ / Esc=閉じる",
             font=("Yu Gothic UI", 10),
         ).grid(row=3, column=0, sticky="w", pady=(10, 0))
 
@@ -320,6 +398,8 @@ class SpectateView:
         self.root.bind("<A>", lambda _e: self._toggle_autoplay())
         self.root.bind("<r>", lambda _e: self._reset_view_state())
         self.root.bind("<R>", lambda _e: self._reset_view_state())
+        self.root.bind("<j>", lambda _e: self._skip_to_match_result())
+        self.root.bind("<J>", lambda _e: self._skip_to_match_result())
         self.root.bind("<Escape>", lambda _e: self.root.destroy())
 
     def _on_canvas_click(self, event: tk.Event) -> None:
@@ -786,6 +866,11 @@ class SpectateView:
         self.play_info_var.set(f"Play {max(self.current_play_index, 0)} / {max(self.total_plays - 1, 0)}")
         self.status_var.set("AUTO" if self.is_autoplay else ("END" if self.finished else "MANUAL"))
         self.commentary_var.set(self.current_commentary)
+        if self._btn_skip_result is not None:
+            if self._should_show_skip_to_result_button():
+                self._btn_skip_result.grid()
+            else:
+                self._btn_skip_result.grid_remove()
         self._draw_court()
 
     def _draw_court(self) -> None:
@@ -4218,6 +4303,7 @@ class SpectateView:
         self.current_commentary = "観戦を開始してください。"
         self.current_play_index = -1
         self.rebound_hold_owner_name = None
+        self._result_display_snapshot = None
         self._reset_match_cursors()
         self._refresh_view()
 
@@ -4266,6 +4352,13 @@ class SpectateView:
         return str(team_obj)
 
     def _extract_score_text(self) -> str:
+        snap = getattr(self, "_result_display_snapshot", None)
+        if isinstance(snap, dict):
+            hs = snap.get("home_score")
+            aws = snap.get("away_score")
+            if hs is not None and aws is not None:
+                return f"{hs} - {aws}"
+
         if self.current_presentation_event is None and self.current_play is None:
             return "0 - 0"
 
@@ -4284,6 +4377,12 @@ class SpectateView:
         return "0 - 0"
 
     def _extract_period_text(self) -> str:
+        snap = getattr(self, "_result_display_snapshot", None)
+        if isinstance(snap, dict):
+            pl = snap.get("period_label")
+            if isinstance(pl, str) and pl.strip():
+                return pl
+
         if self.current_presentation_event is None and self.current_play is None:
             return "Q1 10:00"
 
@@ -4322,6 +4421,9 @@ class SpectateView:
         return "low"
 
     def _court_overlay_title(self) -> str:
+        if self.finished and getattr(self, "_result_display_snapshot", None):
+            return "試合終了"
+
         if self.current_presentation_event:
             headline = self.current_presentation_event.get("headline")
             if isinstance(headline, str) and headline.strip():

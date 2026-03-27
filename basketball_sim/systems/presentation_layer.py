@@ -99,6 +99,10 @@ class PresentationLayer:
     def reset_cursor(self) -> None:
         self.presentation_index = 0
 
+    def skip_to_end(self) -> None:
+        """観戦ハイライトの「結果へ」等で、残りプレゼンを読み飛ばす（読み取りのみ）。"""
+        self.presentation_index = len(self.get_events())
+
     def get_event_count(self) -> int:
         return len(self.get_events())
 
