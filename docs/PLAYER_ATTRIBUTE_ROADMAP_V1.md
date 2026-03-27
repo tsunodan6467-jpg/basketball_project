@@ -98,6 +98,18 @@ Phase 1 では、以下のみ実装:
   - `youth_investment`（facility/coaching/scout/community）
 - 変更しない限り設定は維持され、既存の `youth_system` 年次処理に継続適用される
 
+## Phase 6 (Current Scope)
+
+- 個別練習メニューをドリル単位で設定可能に拡張
+  - 例: `dribble`, `rebound`, `stamina_run`, `three_point`, `iq_film` など
+- 内部的には
+  - `training_focus`（カテゴリ）
+  - `training_drill`（具体メニュー）
+  の2層管理
+- 成長は引き続き安全設計
+  - 低確率・`+1`のみ
+  - ログに `drill:<attr>+1` を表示して可視化
+
 ## Risk Controls
 
 - いきなり既存確率式の主変数にしない

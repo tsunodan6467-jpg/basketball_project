@@ -213,7 +213,7 @@ class DevelopmentSystem:
             new_ovr = max(40, min(99, old_ovr + final_delta))
 
         setattr(player, "ovr", int(new_ovr))
-        cls._apply_focus_micro_progression(
+        focus_growth = cls._apply_focus_micro_progression(
             player=player,
             team=team,
             age=age,
@@ -254,15 +254,20 @@ class DevelopmentSystem:
                 f"coach={getattr(team, 'coach_style', 'NA')} strat={getattr(team, 'strategy', 'NA')}"
             )
 
-        if actual_delta == 0:
+        if actual_delta == 0 and focus_growth is None:
             return None
 
         sign = "+" if actual_delta > 0 else ""
         fa_suffix = " [FA]" if is_fa_context else ""
 
+        growth_suffix = ""
+        if focus_growth is not None:
+            attr, delta = focus_growth
+            growth_suffix = f" | drill:{attr}{delta:+d}"
+
         return (
             f"[DEV-D] {player.name} {sign}{actual_delta} -> OVR {player.ovr} "
-            f"(age:{age} gp:{games_played} branch:{branch}){fa_suffix}"
+            f"(age:{age} gp:{games_played} branch:{branch}){growth_suffix}{fa_suffix}"
         )
 
     @classmethod
@@ -274,28 +279,29 @@ class DevelopmentSystem:
         games_played: int,
         total_season_games: int,
         branch: str,
-    ) -> None:
+    ) -> tuple[str, int] | None:
         """
         個別育成方針による微小な能力補正（Phase 3）。
         既存バランスを壊さないよう、年1回の +1 を稀に与えるだけに制限。
         """
         if age >= 32:
-            return
+            return None
         if branch not in {"young", "prime"}:
-            return
+            return None
         gp_ratio = min(1.0, games_played / max(1, total_season_games))
         if gp_ratio < 0.20:
-            return
+            return None
 
         focus = str(getattr(player, "training_focus", "balanced") or "balanced")
-        if focus == "balanced":
-            return
+        drill = str(getattr(player, "training_drill", "balanced") or "balanced")
+        if focus == "balanced" and drill == "balanced":
+            return None
 
         lvl = int(getattr(team, "training_facility_level", 1) or 1)
         # 低頻度・低振れの安全設計（max ~20%）
         proc = min(0.20, 0.05 + lvl * 0.01 + gp_ratio * 0.04)
         if random.random() >= proc:
-            return
+            return None
 
         focus_map = {
             "shooting": ("shoot", "three", "ft"),
@@ -304,12 +310,30 @@ class DevelopmentSystem:
             "physical": ("stamina", "speed", "power"),
             "iq_handling": ("iq", "handling", "passing"),
         }
-        attrs = focus_map.get(focus)
+        drill_map = {
+            "dribble": ("handling", "drive"),
+            "rebound": ("rebound", "power"),
+            "stamina_run": ("stamina", "speed"),
+            "shoot_form": ("shoot", "ft"),
+            "three_point": ("three", "shoot"),
+            "free_throw": ("ft", "iq"),
+            "drive_finish": ("drive", "power"),
+            "passing_read": ("passing", "iq"),
+            "defense_footwork": ("defense", "speed"),
+            "strength": ("power", "rebound"),
+            "speed_agility": ("speed", "handling"),
+            "iq_film": ("iq", "passing"),
+        }
+        attrs = drill_map.get(drill) if drill != "balanced" else focus_map.get(focus)
         if not attrs:
-            return
+            return None
         target = random.choice(attrs)
         old = int(getattr(player, target, 50) or 50)
-        setattr(player, target, int(max(1, min(99, old + 1))))
+        new_val = int(max(1, min(99, old + 1)))
+        if new_val == old:
+            return None
+        setattr(player, target, new_val)
+        return target, 1
 
     @classmethod
     def _resolve_potential_value(cls, player) -> int:

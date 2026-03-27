@@ -55,5 +55,7 @@ def test_player_training_focus_default_and_normalization():
         archetype="scoring_guard",
         usage_base=20,
         training_focus="unknown_focus",
+        training_drill="unknown_drill",
     )
     assert p.training_focus == "balanced"
+    assert p.training_drill == "balanced"

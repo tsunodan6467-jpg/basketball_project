@@ -1557,6 +1557,21 @@ def run_player_training_focus_menu(user_team):
         "physical": "フィジカル",
         "iq_handling": "IQ/ハンドリング",
     }
+    drill_labels = {
+        "balanced": "バランス",
+        "dribble": "ドリブル練習",
+        "rebound": "リバウンド練習",
+        "stamina_run": "走り込み（スタミナ）",
+        "shoot_form": "シュートフォーム",
+        "three_point": "3P特化",
+        "free_throw": "フリースロー",
+        "drive_finish": "ドライブ&フィニッシュ",
+        "passing_read": "パス判断",
+        "defense_footwork": "ディフェンスフットワーク",
+        "strength": "筋力強化",
+        "speed_agility": "スピード&アジリティ",
+        "iq_film": "映像分析（IQ）",
+    }
 
     while True:
         print_separator("個別育成方針")
@@ -1564,7 +1579,8 @@ def run_player_training_focus_menu(user_team):
             f = str(getattr(p, "training_focus", "balanced") or "balanced")
             print(
                 f"{i:>2}. {getattr(p, 'name', '-'):<16} {getattr(p, 'position', 'SF'):<2} "
-                f"OVR:{int(getattr(p, 'ovr', 0)):<2} | 方針:{focus_labels.get(f, f)}"
+                f"OVR:{int(getattr(p, 'ovr', 0)):<2} | 方針:{focus_labels.get(f, f)} | "
+                f"ドリル:{drill_labels.get(str(getattr(p, 'training_drill', 'balanced') or 'balanced'), 'バランス')}"
             )
         print("0. 戻る")
         raw = input("選手番号: ").strip()
@@ -1580,28 +1596,47 @@ def run_player_training_focus_menu(user_team):
             continue
         p = roster_sorted[idx]
 
-        print("\n育成方針を選択:")
+        print("\n個別練習メニューを選択:")
         print("1. バランス")
-        print("2. シュート")
-        print("3. 司令塔")
-        print("4. 守備")
-        print("5. フィジカル")
-        print("6. IQ/ハンドリング")
+        print("2. ドリブル練習")
+        print("3. リバウンド練習")
+        print("4. 走り込み（スタミナ）")
+        print("5. シュートフォーム")
+        print("6. 3P特化")
+        print("7. フリースロー")
+        print("8. ドライブ&フィニッシュ")
+        print("9. パス判断")
+        print("10. ディフェンスフットワーク")
+        print("11. 筋力強化")
+        print("12. スピード&アジリティ")
+        print("13. 映像分析（IQ）")
         choice = input("番号: ").strip()
-        mapping = {
-            "1": "balanced",
-            "2": "shooting",
-            "3": "playmaking",
-            "4": "defense",
-            "5": "physical",
-            "6": "iq_handling",
+        drill_mapping = {
+            "1": ("balanced", "balanced"),
+            "2": ("playmaking", "dribble"),
+            "3": ("defense", "rebound"),
+            "4": ("physical", "stamina_run"),
+            "5": ("shooting", "shoot_form"),
+            "6": ("shooting", "three_point"),
+            "7": ("shooting", "free_throw"),
+            "8": ("playmaking", "drive_finish"),
+            "9": ("playmaking", "passing_read"),
+            "10": ("defense", "defense_footwork"),
+            "11": ("physical", "strength"),
+            "12": ("physical", "speed_agility"),
+            "13": ("iq_handling", "iq_film"),
         }
-        new_focus = mapping.get(choice)
-        if new_focus is None:
+        mapped = drill_mapping.get(choice)
+        if mapped is None:
             print("正しい番号を入力してください。")
             continue
+        new_focus, new_drill = mapped
         setattr(p, "training_focus", new_focus)
-        print(f"{getattr(p, 'name', '-') } の育成方針を {focus_labels[new_focus]} に設定しました。")
+        setattr(p, "training_drill", new_drill)
+        print(
+            f"{getattr(p, 'name', '-') } の個別練習を "
+            f"{drill_labels[new_drill]}（方針:{focus_labels[new_focus]}）に設定しました。"
+        )
 
 
 def run_team_training_menu(user_team):

@@ -123,6 +123,8 @@ class Player:
     fa_personality: str = "balanced"     # balanced / money / winning / role / fit / security / loyal
     # 個別育成方針（Phase 3）
     training_focus: str = "balanced"     # balanced / shooting / playmaking / defense / physical / iq_handling
+    # 個別練習ドリル（Phase 6: UIで選択。成長への反映は微量）
+    training_drill: str = "balanced"
 
     # 物語・称号系の土台
     nickname_title: str = ""
@@ -462,10 +464,30 @@ class Player:
             }
             self.fa_personality = max(scores.items(), key=lambda x: x[1])[0]
         self.training_focus = self._normalize_training_focus(getattr(self, "training_focus", "balanced"))
+        self.training_drill = self._normalize_training_drill(getattr(self, "training_drill", "balanced"))
 
     def _normalize_training_focus(self, raw: str) -> str:
         val = str(raw or "balanced").strip().lower()
         valid = {"balanced", "shooting", "playmaking", "defense", "physical", "iq_handling"}
+        return val if val in valid else "balanced"
+
+    def _normalize_training_drill(self, raw: str) -> str:
+        val = str(raw or "balanced").strip().lower()
+        valid = {
+            "balanced",
+            "dribble",
+            "rebound",
+            "stamina_run",
+            "shoot_form",
+            "three_point",
+            "free_throw",
+            "drive_finish",
+            "passing_read",
+            "defense_footwork",
+            "strength",
+            "speed_agility",
+            "iq_film",
+        }
         return val if val in valid else "balanced"
 
     def get_free_agency_profile(self) -> dict:
