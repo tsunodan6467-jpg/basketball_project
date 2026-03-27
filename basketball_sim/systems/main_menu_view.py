@@ -1474,7 +1474,8 @@ class MainMenuView:
                 )
 
         self.development_hint_var.set(
-            "読み取り専用の強化画面です。potential / development / 年齢 / 試合数 / 戦術相性を確認できます。"
+            "読み取り専用の強化画面です。potential / development / 年齢 / 試合数 / 戦術相性を確認できます。\n"
+            f"直近変更: {self._get_latest_training_change_log(self.team)}"
         )
 
     def _build_development_coach_note(self, coach_key: Any) -> str:
@@ -2885,6 +2886,17 @@ class MainMenuView:
             f"変更後: {new_label}"
         )
 
+    def _append_training_change_log(self, team: Any, message: str) -> None:
+        logs = list(getattr(team, "training_change_log", []) or [])
+        logs.append(str(message or "").strip())
+        setattr(team, "training_change_log", logs[-20:])
+
+    def _get_latest_training_change_log(self, team: Any) -> str:
+        logs = list(getattr(team, "training_change_log", []) or [])
+        if not logs:
+            return "なし"
+        return str(logs[-1])
+
     def _team_training_lock_reason(self, team: Any, focus_key: str) -> str:
         coach = str(getattr(team, "coach_style", "balanced") or "balanced")
         tf = int(getattr(team, "training_facility_level", 1) or 1)
@@ -2978,6 +2990,10 @@ class MainMenuView:
                 if not ok:
                     return
             setattr(self.team, "team_training_focus", key)
+            self._append_training_change_log(
+                self.team,
+                f"チーム練習: {self._get_team_training_label(old_key)} → {self._get_team_training_label(key)}",
+            )
             self._refresh_development_window()
             messagebox.showinfo("完了", f"チーム練習を「{self._get_team_training_label(key)}」に変更しました。", parent=w)
             w.destroy()
@@ -3096,6 +3112,10 @@ class MainMenuView:
                     return
             setattr(p, "training_drill", key)
             setattr(p, "training_focus", focus)
+            self._append_training_change_log(
+                self.team,
+                f"個別練習: {getattr(p, 'name', '-') } {old_drill} → {key}",
+            )
             self._refresh_development_window()
             messagebox.showinfo("完了", f"{getattr(p, 'name', '-') } の個別練習を更新しました。", parent=w)
             w.destroy()

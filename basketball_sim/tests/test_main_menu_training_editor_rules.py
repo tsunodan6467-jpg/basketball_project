@@ -67,3 +67,11 @@ def test_training_change_confirm_texts_are_human_readable():
     assert "テスト選手" in player_msg
     assert "変更前: ドリブル練習" in player_msg
     assert "変更後: 映像分析（IQ）" in player_msg
+
+
+def test_training_change_log_keeps_latest_entries():
+    team = SimpleNamespace()
+    view = _bare_view_with_team(team)
+    MainMenuView._append_training_change_log(view, team, "A")
+    MainMenuView._append_training_change_log(view, team, "B")
+    assert MainMenuView._get_latest_training_change_log(view, team) == "B"
