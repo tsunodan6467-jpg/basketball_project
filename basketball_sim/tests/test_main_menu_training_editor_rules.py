@@ -75,3 +75,16 @@ def test_training_change_log_keeps_latest_entries():
     MainMenuView._append_training_change_log(view, team, "A")
     MainMenuView._append_training_change_log(view, team, "B")
     assert MainMenuView._get_latest_training_change_log(view, team) == "B"
+
+
+def test_recent_training_change_log_text_shows_latest_five():
+    team = SimpleNamespace()
+    view = _bare_view_with_team(team)
+    for i in range(1, 8):
+        MainMenuView._append_training_change_log(view, team, f"変更{i}")
+    text = MainMenuView._build_recent_training_change_log_text(view, team, limit=5)
+    assert "変更1" not in text
+    assert "変更2" not in text
+    assert "変更3" in text
+    assert "変更7" in text
+    assert text.count("- ") == 5

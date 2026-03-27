@@ -1475,7 +1475,7 @@ class MainMenuView:
 
         self.development_hint_var.set(
             "読み取り専用の強化画面です。potential / development / 年齢 / 試合数 / 戦術相性を確認できます。\n"
-            f"直近変更: {self._get_latest_training_change_log(self.team)}"
+            f"{self._build_recent_training_change_log_text(self.team, limit=5)}"
         )
 
     def _build_development_coach_note(self, coach_key: Any) -> str:
@@ -2896,6 +2896,13 @@ class MainMenuView:
         if not logs:
             return "なし"
         return str(logs[-1])
+
+    def _build_recent_training_change_log_text(self, team: Any, limit: int = 5) -> str:
+        logs = list(getattr(team, "training_change_log", []) or [])
+        if not logs:
+            return "直近変更: なし"
+        rows = [f"- {entry}" for entry in logs[-max(1, int(limit)):]]
+        return "直近変更:\n" + "\n".join(rows)
 
     def _team_training_lock_reason(self, team: Any, focus_key: str) -> str:
         coach = str(getattr(team, "coach_style", "balanced") or "balanced")
