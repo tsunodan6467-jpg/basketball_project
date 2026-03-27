@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
-from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP
+from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP, SALARY_SOFT_LIMIT_MULTIPLIER
 from basketball_sim.systems.salary_cap_budget import payroll_exceeds_soft_cap
 
 
@@ -26,7 +26,8 @@ from basketball_sim.systems.salary_cap_budget import payroll_exceeds_soft_cap
 # constants（数値の正本は config.game_constants）
 # -----------------------------
 SALARY_CAP_DEFAULT = LEAGUE_SALARY_CAP
-# ソフト上限の数値は salary_cap_budget.get_soft_cap と同一
+# SALARY_SOFT_LIMIT_MULTIPLIER は game_constants の正本を再エクスポート（trade / free_agency 等の互換）
+# ソフト上限の実数値は salary_cap_budget.get_soft_cap と一致させること
 MIN_SALARY_DEFAULT = 300_000
 MAX_CONTRACT_YEARS_DEFAULT = 5
 
