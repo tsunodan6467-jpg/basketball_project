@@ -1640,6 +1640,75 @@ def run_team_training_menu(user_team):
     print(f"チーム練習方針を {labels[new_focus]} に変更しました。")
 
 
+def run_youth_strengthening_menu(user_team):
+    while True:
+        inv = dict(getattr(user_team, "youth_investment", {}) or {})
+        for k in ("facility", "coaching", "scout", "community"):
+            inv[k] = int(max(0, min(100, inv.get(k, 50))))
+        setattr(user_team, "youth_investment", inv)
+        global_policy = str(getattr(user_team, "youth_policy_global", "balanced") or "balanced")
+        focus_policy = str(getattr(user_team, "youth_policy_focus", "balanced") or "balanced")
+
+        global_labels = {"technical": "テクニカル", "physical": "フィジカル", "balanced": "バランス"}
+        focus_labels = {"pg": "PG", "shooter": "シューター", "big": "ビッグ", "defender": "ディフェンダー", "balanced": "バランス"}
+
+        print_separator("ユース強化（固定方針）")
+        print(f"全体方針 : {global_labels.get(global_policy, global_policy)}")
+        print(f"重点方針 : {focus_labels.get(focus_policy, focus_policy)}")
+        print(
+            "投資配分 : "
+            f"facility={inv['facility']} / coaching={inv['coaching']} / "
+            f"scout={inv['scout']} / community={inv['community']}"
+        )
+        print("1. 全体方針を変更")
+        print("2. 重点方針を変更")
+        print("3. 投資配分を調整（+10 / -10）")
+        print("4. 戻る")
+        choice = input("番号: ").strip()
+
+        if choice == "1":
+            print("1. テクニカル  2. フィジカル  3. バランス")
+            sel = input("番号: ").strip()
+            mapping = {"1": "technical", "2": "physical", "3": "balanced"}
+            v = mapping.get(sel)
+            if v is None:
+                print("正しい番号を入力してください。")
+            else:
+                setattr(user_team, "youth_policy_global", v)
+                print(f"ユース全体方針を {global_labels[v]} に変更しました。")
+        elif choice == "2":
+            print("1. PG  2. シューター  3. ビッグ  4. ディフェンダー  5. バランス")
+            sel = input("番号: ").strip()
+            mapping = {"1": "pg", "2": "shooter", "3": "big", "4": "defender", "5": "balanced"}
+            v = mapping.get(sel)
+            if v is None:
+                print("正しい番号を入力してください。")
+            else:
+                setattr(user_team, "youth_policy_focus", v)
+                print(f"ユース重点方針を {focus_labels[v]} に変更しました。")
+        elif choice == "3":
+            print("対象: 1.facility 2.coaching 3.scout 4.community")
+            target = input("番号: ").strip()
+            key_map = {"1": "facility", "2": "coaching", "3": "scout", "4": "community"}
+            k = key_map.get(target)
+            if k is None:
+                print("正しい番号を入力してください。")
+                continue
+            print("操作: 1.+10  2.-10")
+            op = input("番号: ").strip()
+            delta = 10 if op == "1" else -10 if op == "2" else 0
+            if delta == 0:
+                print("正しい番号を入力してください。")
+                continue
+            inv[k] = int(max(0, min(100, inv[k] + delta)))
+            setattr(user_team, "youth_investment", inv)
+            print(f"{k} を {inv[k]} に更新しました。")
+        elif choice == "4":
+            return
+        else:
+            print("正しい番号を入力してください。")
+
+
 def run_facility_investment_menu(user_team):
     while True:
         print_facility_status(user_team)
@@ -1697,7 +1766,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         print("11. 施設投資")
         print("12. 個別育成方針")
         print("13. チーム練習方針")
-        print("14. 戻る")
+        print("14. ユース強化")
+        print("15. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -1728,6 +1798,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         elif choice == "13":
             run_team_training_menu(user_team)
         elif choice == "14":
+            run_youth_strengthening_menu(user_team)
+        elif choice == "15":
             break
         else:
             print("正しい番号を入力してください。")

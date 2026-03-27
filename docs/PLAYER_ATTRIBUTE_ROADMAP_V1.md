@@ -89,6 +89,15 @@ Phase 1 では、以下のみ実装:
   - `defense`: チーム守備に小ボーナス、ペース微減
   - `transition`: ペース微増、攻撃にごく小ボーナス
 
+## Phase 5 (Current Scope)
+
+- ユース強化を「固定方針」運用に統一
+  - GMメニューから必要時のみ変更
+  - `youth_policy_global`
+  - `youth_policy_focus`
+  - `youth_investment`（facility/coaching/scout/community）
+- 変更しない限り設定は維持され、既存の `youth_system` 年次処理に継続適用される
+
 ## Risk Controls
 
 - いきなり既存確率式の主変数にしない
