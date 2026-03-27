@@ -51,3 +51,11 @@ python -m pytest "basketball_sim/tests/test_special_training_match_effects.py" "
 - 重量バランス監視: `.github/workflows/balance-guard.yml`
   - `workflow_dispatch`（手動実行）と `schedule`（nightly）で実行
 
+## リリース判定ルール（v1）
+
+- 試合係数・育成係数・確率テーブルなど、**バランスへ影響する変更**を含むPRは、
+  `Balance Guard (heavy)` の `success` を必須チェックとする。
+- `failure` の場合は次のどちらかを必ず行う。
+  - 実装を修正して再実行
+  - 閾値と根拠を更新して再実行
+
