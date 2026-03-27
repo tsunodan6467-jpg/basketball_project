@@ -10,11 +10,8 @@ from __future__ import annotations
 
 from typing import Any, List, Tuple
 
-from basketball_sim.systems.contract_logic import (
-    SALARY_CAP_DEFAULT,
-    SALARY_SOFT_LIMIT_MULTIPLIER,
-    get_team_payroll,
-)
+from basketball_sim.systems.contract_logic import SALARY_CAP_DEFAULT, get_team_payroll
+from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap
 
 
 def sort_roster_for_gm_view(players: List[Any]) -> List[Any]:
@@ -299,8 +296,8 @@ def format_team_identity_text(team: Any) -> str:
 
 def format_salary_cap_text(team: Any) -> str:
     payroll = int(get_team_payroll(team))
-    hard_cap = int(SALARY_CAP_DEFAULT)
-    soft_cap = int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER)
+    hard_cap = int(get_hard_cap(SALARY_CAP_DEFAULT))
+    soft_cap = int(get_soft_cap(SALARY_CAP_DEFAULT))
 
     if payroll > soft_cap:
         status = "OVER SOFT CAP"

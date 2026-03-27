@@ -283,7 +283,7 @@ class MainMenuView:
         ).pack(fill="x")
 
         self.next_game_lines = self._make_line_vars(self.next_game_panel, 5)
-        self.club_summary_lines = self._make_line_vars(self.club_summary_panel, 5)
+        self.club_summary_lines = self._make_line_vars(self.club_summary_panel, 6)
         self.task_lines = self._make_bullet_vars(self.tasks_panel, 3, prefix="! ")
         self.news_lines = self._make_bullet_vars(self.news_panel, 4, prefix="・")
 
@@ -619,11 +619,54 @@ class MainMenuView:
 
         return [
             f"順位: {rank} / {wins}勝{losses}敗 / 勝率 {win_pct:.3f}",
+            self._build_payroll_cap_summary_line(),
             recent5_text,
             mission_text,
             team_comment if streak_text == "-" else f"{team_comment}（{streak_text}）",
             supplement,
         ]
+
+    def _build_payroll_cap_summary_line(self) -> str:
+        """クラブサマリー用: ペイロールとリーグキャップ（読み取り専用）。"""
+        team = self.team
+        if team is None:
+            return "給与・キャップ: チーム情報なし"
+        try:
+            from basketball_sim.systems.contract_logic import get_team_payroll
+            from basketball_sim.systems.salary_cap_budget import (
+                cap_status,
+                compute_luxury_tax,
+                get_hard_cap,
+                get_soft_cap,
+            )
+
+            payroll = int(get_team_payroll(team))
+            hard = int(get_hard_cap())
+            soft = int(get_soft_cap())
+            st = cap_status(payroll)
+            status_ja = {
+                "under_cap": "キャップ内",
+                "over_cap": "ハード超過",
+                "over_soft_cap": "ソフト超過",
+            }.get(st, st)
+            room_soft = soft - payroll
+            if room_soft >= 0:
+                room_str = f"ソフト余裕 ${room_soft:,}"
+            else:
+                room_str = f"ソフト超過 ${abs(room_soft):,}"
+            tax = int(compute_luxury_tax(payroll))
+            tax_str = f" / 贅沢税 ${tax:,}" if tax > 0 else ""
+            bud = int(self._safe_get(team, "payroll_budget", 0) or 0)
+            bud_str = ""
+            if bud > 0:
+                mark = " ⚠" if payroll > bud else ""
+                bud_str = f" | クラブ目安 ${bud:,}{mark}"
+            return (
+                f"給与合計 ${payroll:,}（ハード ${hard:,} / ソフト ${soft:,}）"
+                f" | {status_ja} | {room_str}{tax_str}{bud_str}"
+            )
+        except Exception:
+            return "給与・キャップ: 計算不可"
 
 
 
