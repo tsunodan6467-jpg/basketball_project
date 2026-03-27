@@ -1847,6 +1847,34 @@ def print_strengthening_overview(user_team):
     )
 
 
+def print_special_training_catalog(user_team):
+    print_separator("スペシャル練習一覧")
+    coach = str(getattr(user_team, "coach_style", "balanced") or "balanced")
+    tf = int(getattr(user_team, "training_facility_level", 1) or 1)
+    fo = int(getattr(user_team, "front_office_level", 1) or 1)
+    med = int(getattr(user_team, "medical_facility_level", 1) or 1)
+
+    print(f"現在の条件: HC={coach} / TF-Lv{tf} / FO-Lv{fo} / MED-Lv{med}")
+    print("")
+
+    items = [
+        ("個人", "スピード&アジリティ", tf >= 3, "トレーニング施設Lv3以上"),
+        ("個人", "映像分析（IQ）", fo >= 2, "フロントオフィスLv2以上"),
+        ("個人", "ディフェンスフットワーク", coach in {"defense", "development"}, "HCが defense/development"),
+        ("個人", "筋力強化", med >= 2, "メディカル施設Lv2以上"),
+        ("チーム", "精密オフェンス", coach in {"offense", "development"} and tf >= 3, "HCが offense/development かつ トレーニング施設Lv3以上"),
+        ("チーム", "強圧ディフェンス", coach == "defense" and med >= 2, "HCが defense かつ メディカル施設Lv2以上"),
+    ]
+
+    for category, name, unlocked, condition in items:
+        state = "解放済み" if unlocked else "未解放"
+        print(f"[{category}] {name:<22} : {state}")
+        print(f"  条件: {condition}")
+
+    print("")
+    print("※ 将来、HC契約・施設投資の拡張でメニュー追加/効果強化を行う前提の一覧です。")
+
+
 def run_facility_investment_menu(user_team):
     while True:
         print_facility_status(user_team)
@@ -1906,7 +1934,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         print("13. チーム練習方針")
         print("14. ユース強化")
         print("15. 強化トップ（サマリー）")
-        print("16. 戻る")
+        print("16. スペシャル練習一覧")
+        print("17. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -1941,6 +1970,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         elif choice == "15":
             print_strengthening_overview(user_team)
         elif choice == "16":
+            print_special_training_catalog(user_team)
+        elif choice == "17":
             break
         else:
             print("正しい番号を入力してください。")
