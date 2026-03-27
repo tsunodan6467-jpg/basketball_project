@@ -1886,9 +1886,48 @@ def run_main_menu_ui_mode(
         season.simulate_next_round()
         print(f"[MAIN_MENU] round={season.current_round}/{season.total_rounds}")
 
+    def debug_skip_to_offseason():
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk._default_root
+        if season.season_finished:
+            if root is not None:
+                messagebox.showinfo(
+                    "デバッグ",
+                    "すでにレギュラーシーズンは終了しています。\n『オフシーズンを実行』を押してください。",
+                    parent=root,
+                )
+            return
+
+        remaining = max(0, int(season.total_rounds) - int(season.current_round))
+        if root is not None:
+            ok = messagebox.askokcancel(
+                "デバッグ: オフシーズンまで飛ばす",
+                f"残り {remaining} ラウンドを一気にシミュレートします。\n"
+                "処理中はウィンドウが一時的に応答しない場合があります。\n\n"
+                "続けますか？",
+                parent=root,
+            )
+            if not ok:
+                return
+
+        print_separator("デバッグ: レギュラーシーズン一括進行")
+        season.simulate_to_end()
+        print(f"[MAIN_MENU][DEBUG] round={season.current_round}/{season.total_rounds} finished={season.season_finished}")
+
+        if root is not None:
+            messagebox.showinfo(
+                "完了",
+                "レギュラーシーズンを終了状態まで進めました。\n"
+                "『オフシーズンを実行』でオフ処理に進めます。",
+                parent=root,
+            )
+
     # 「日程」: 1ラウンド進行。「GM」は未指定時 main_menu_view 既定（状況表示＋CLI案内）
     menu_callbacks = {
         "日程": advance_one_round,
+        "DEBUG_SKIP_TO_OFFSEASON": debug_skip_to_offseason,
     }
 
     print_separator("主画面UIモード開始")

@@ -262,6 +262,17 @@ class MainMenuView:
         )
         self.advance_button.grid(row=1, column=0, sticky="ew")
 
+        debug_skip_cb = self.menu_callbacks.get("DEBUG_SKIP_TO_OFFSEASON")
+        self.debug_skip_button: Optional[ttk.Button] = None
+        if callable(debug_skip_cb):
+            self.debug_skip_button = ttk.Button(
+                advance_wrap,
+                text="デバッグ: オフシーズンまで飛ばす",
+                style="Menu.TButton",
+                command=debug_skip_cb,
+            )
+            self.debug_skip_button.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+
         # Holders updated by refresh()
         self.top_bar_var = tk.StringVar(value="読み込み中...")
         ttk.Label(
@@ -3163,13 +3174,24 @@ class MainMenuView:
         return user_name == home_name
 
     def _iter_league_teams(self) -> Iterable[Any]:
+        # 1) season.leagues[league_level] があれば最優先（同リーグ順位の母集団）
+        if self.season is not None and self.team is not None:
+            leagues = self._safe_get(self.season, "leagues", None)
+            level = self._safe_get(self.team, "league_level", None)
+            try:
+                if isinstance(leagues, dict) and level in leagues and leagues[level]:
+                    return list(leagues[level])
+            except Exception:
+                pass
+
+        # 2) 互換フィールド
         teams = self._first_non_empty(
             self._safe_get(self.season, "teams", None),
             self._safe_get(self.season, "league_teams", None),
             self._safe_get(self.team, "league_teams", None),
         )
         if teams:
-            return teams
+            return list(teams)
         return [self.team] if self.team is not None else []
 
     def _compute_rank_text(self) -> str:
