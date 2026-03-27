@@ -1651,6 +1651,10 @@ class Match:
             deff += 0.8
         elif training_focus == "transition":
             off += 0.3
+        elif training_focus == "precision_offense":
+            off += 1.2
+        elif training_focus == "intense_defense":
+            deff += 1.2
 
         return off, deff
 
@@ -1685,10 +1689,14 @@ class Match:
             home_adj += 2
         elif home_training == "defense":
             home_adj -= 1
+        elif home_training == "intense_defense":
+            home_adj -= 2
         if away_training == "transition":
             away_adj += 2
         elif away_training == "defense":
             away_adj -= 1
+        elif away_training == "intense_defense":
+            away_adj -= 2
 
         total = base + home_adj + away_adj
         return max(140, min(180, total))

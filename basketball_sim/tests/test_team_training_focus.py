@@ -9,3 +9,8 @@ def test_team_training_focus_default():
 def test_team_training_focus_normalized():
     t = Team(team_id=1, name="T", league_level=1, team_training_focus="invalid")
     assert t.team_training_focus == "balanced"
+
+
+def test_team_training_focus_extended_values_allowed():
+    t = Team(team_id=1, name="T", league_level=1, team_training_focus="precision_offense")
+    assert t.team_training_focus == "precision_offense"

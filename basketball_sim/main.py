@@ -1573,6 +1573,21 @@ def run_player_training_focus_menu(user_team):
         "iq_film": "映像分析（IQ）",
     }
 
+    def _drill_requirement_message(drill_key: str) -> str:
+        coach = str(getattr(user_team, "coach_style", "balanced") or "balanced")
+        tf = int(getattr(user_team, "training_facility_level", 1) or 1)
+        fo = int(getattr(user_team, "front_office_level", 1) or 1)
+        med = int(getattr(user_team, "medical_facility_level", 1) or 1)
+        if drill_key == "speed_agility" and tf < 3:
+            return "トレーニング施設Lv3以上で解放"
+        if drill_key == "iq_film" and fo < 2:
+            return "フロントオフィスLv2以上で解放"
+        if drill_key == "defense_footwork" and coach not in {"defense", "development"}:
+            return "HCスタイルが defense/development で解放"
+        if drill_key == "strength" and med < 2:
+            return "メディカル施設Lv2以上で解放"
+        return ""
+
     while True:
         print_separator("個別育成方針")
         for i, p in enumerate(roster_sorted, 1):
@@ -1610,6 +1625,18 @@ def run_player_training_focus_menu(user_team):
         print("11. 筋力強化")
         print("12. スピード&アジリティ")
         print("13. 映像分析（IQ）")
+        # 解放条件（将来拡張の土台）
+        lock_targets = {
+            "10": "defense_footwork",
+            "11": "strength",
+            "12": "speed_agility",
+            "13": "iq_film",
+        }
+        for num, dk in lock_targets.items():
+            reason = _drill_requirement_message(dk)
+            if reason:
+                print(f"  ※ {num} は未解放: {reason}")
+
         choice = input("番号: ").strip()
         drill_mapping = {
             "1": ("balanced", "balanced"),
@@ -1631,6 +1658,10 @@ def run_player_training_focus_menu(user_team):
             print("正しい番号を入力してください。")
             continue
         new_focus, new_drill = mapped
+        reason = _drill_requirement_message(new_drill)
+        if reason:
+            print(f"未解放のため設定できません: {reason}")
+            continue
         setattr(p, "training_focus", new_focus)
         setattr(p, "training_drill", new_drill)
         print(
@@ -1645,6 +1676,8 @@ def run_team_training_menu(user_team):
         "shooting": "シュート強化",
         "defense": "ディフェンス強化",
         "transition": "速攻強化",
+        "precision_offense": "精密オフェンス（特別）",
+        "intense_defense": "強圧ディフェンス（特別）",
     }
     current = str(getattr(user_team, "team_training_focus", "balanced") or "balanced")
     if current not in labels:
@@ -1657,19 +1690,38 @@ def run_team_training_menu(user_team):
     print("2. シュート強化")
     print("3. ディフェンス強化")
     print("4. 速攻強化")
-    print("5. 戻る")
+    print("5. 精密オフェンス（特別）")
+    print("6. 強圧ディフェンス（特別）")
+    print("7. 戻る")
+    coach = str(getattr(user_team, "coach_style", "balanced") or "balanced")
+    tf = int(getattr(user_team, "training_facility_level", 1) or 1)
+    med = int(getattr(user_team, "medical_facility_level", 1) or 1)
+    precision_locked = not (coach in {"offense", "development"} and tf >= 3)
+    defense_locked = not (coach == "defense" and med >= 2)
+    if precision_locked:
+        print("  ※ 5 は未解放: HC(offense/development) かつ トレーニング施設Lv3以上")
+    if defense_locked:
+        print("  ※ 6 は未解放: HC(defense) かつ メディカル施設Lv2以上")
     choice = input("番号: ").strip()
     mapping = {
         "1": "balanced",
         "2": "shooting",
         "3": "defense",
         "4": "transition",
+        "5": "precision_offense",
+        "6": "intense_defense",
     }
-    if choice == "5":
+    if choice == "7":
         return
     new_focus = mapping.get(choice)
     if new_focus is None:
         print("正しい番号を入力してください。")
+        return
+    if new_focus == "precision_offense" and precision_locked:
+        print("未解放のため設定できません。")
+        return
+    if new_focus == "intense_defense" and defense_locked:
+        print("未解放のため設定できません。")
         return
     setattr(user_team, "team_training_focus", new_focus)
     print(f"チーム練習方針を {labels[new_focus]} に変更しました。")
@@ -1750,6 +1802,8 @@ def print_strengthening_overview(user_team):
         "shooting": "シュート強化",
         "defense": "ディフェンス強化",
         "transition": "速攻強化",
+        "precision_offense": "精密オフェンス（特別）",
+        "intense_defense": "強圧ディフェンス（特別）",
     }
     player_labels = {
         "balanced": "バランス",
