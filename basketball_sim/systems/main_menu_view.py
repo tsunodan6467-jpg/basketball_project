@@ -34,6 +34,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from basketball_sim.systems.gm_dashboard_text import (
     format_gm_roster_text,
+    format_lineup_snapshot_text,
     format_salary_cap_text,
     format_team_identity_text,
 )
@@ -2281,8 +2282,9 @@ class MainMenuView:
         return (
             f"消化ラウンド: {cr}/{tr}\n"
             f"{lock_line}\n\n"
+            "「スタメン・ベンチ」タブで起用の確認ができます（読み取り専用）。"
             "「戦術・HC・起用」タブで戦術・HCスタイル・起用方針を変更できます。"
-            "トレード・スタメン・施設投資などは、ターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
+            "トレード・スタメン編集・施設投資などは、ターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
         )
 
     @staticmethod
@@ -2304,6 +2306,7 @@ class MainMenuView:
         self._gm_set_readonly_text(self._gm_text_team, format_team_identity_text(self.team))
         self._gm_set_readonly_text(self._gm_text_cap, format_salary_cap_text(self.team))
         self._gm_set_readonly_text(self._gm_text_roster, format_gm_roster_text(self.team))
+        self._gm_set_readonly_text(self._gm_text_lineup, format_lineup_snapshot_text(self.team))
         self._sync_gm_strategy_combos()
 
     def _sync_gm_strategy_combos(self) -> None:
@@ -2429,6 +2432,7 @@ class MainMenuView:
         self._gm_text_team = _make_tab("チーム情報")
         self._gm_text_cap = _make_tab("サラリーキャップ")
         self._gm_text_roster = _make_tab("ロスター")
+        self._gm_text_lineup = _make_tab("スタメン・ベンチ")
 
         tab_st = ttk.Frame(nb, style="Root.TFrame", padding=14)
         nb.add(tab_st, text="戦術・HC・起用")

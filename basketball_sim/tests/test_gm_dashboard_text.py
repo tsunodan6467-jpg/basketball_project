@@ -4,6 +4,7 @@ from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.gm_dashboard_text import (
     format_gm_roster_text,
+    format_lineup_snapshot_text,
     format_salary_cap_text,
     format_team_identity_text,
 )
@@ -59,3 +60,13 @@ def test_format_gm_roster_lists_player():
     text = format_gm_roster_text(t)
     assert "P2" in text
     assert "スタメン" in text or "★" in text
+
+
+def test_format_lineup_snapshot_contains_sections():
+    t = Team(team_id=1, name="T", league_level=1)
+    for i in range(8):
+        t.add_player(_player(100 + i))
+    snap = format_lineup_snapshot_text(t)
+    assert "【スタメン】" in snap
+    assert "【ベンチ序列】" in snap
+    assert "変更はターミナル" in snap

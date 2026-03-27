@@ -29,9 +29,17 @@ from basketball_sim.systems.contract_logic import (
     get_team_payroll,
 )
 from basketball_sim.systems.gm_dashboard_text import (
+    format_bench_order_text,
     format_gm_roster_text,
     format_salary_cap_text,
+    format_sixth_man_line_text,
+    format_starting_lineup_text,
     format_team_identity_text,
+    get_current_bench_order,
+    get_current_sixth_man,
+    get_current_starting_five,
+    get_starting_player_ids,
+    sort_roster_for_gm_view,
 )
 from basketball_sim.systems.gm_ui_constants import (
     COACH_STYLE_OPTIONS,
@@ -884,74 +892,9 @@ def set_team_usage_policy(user_team):
     print(f"{old_label} -> {new_label}")
 
 
-def sort_roster_for_gm_view(players):
-    position_order = {"PG": 1, "SG": 2, "SF": 3, "PF": 4, "C": 5}
-    return sorted(
-        players,
-        key=lambda p: (
-            position_order.get(getattr(p, "position", "SF"), 99),
-            -getattr(p, "ovr", 0),
-            getattr(p, "name", ""),
-        )
-    )
-
-
-def get_current_starting_five(user_team):
-    if hasattr(user_team, "get_starting_five"):
-        return user_team.get_starting_five()
-    roster = sort_roster_for_gm_view(getattr(user_team, "players", []))
-    return roster[:5]
-
-
-def get_starting_player_ids(user_team):
-    return {
-        getattr(p, "player_id", None)
-        for p in get_current_starting_five(user_team)
-    }
-
-
-def get_current_sixth_man(user_team):
-    if hasattr(user_team, "get_sixth_man"):
-        return user_team.get_sixth_man()
-    return None
-
-
-def get_current_bench_order(user_team):
-    if hasattr(user_team, "get_bench_order_players"):
-        return user_team.get_bench_order_players()
-    starter_ids = {
-        getattr(p, "player_id", None)
-        for p in get_current_starting_five(user_team)
-    }
-    roster = sort_roster_for_gm_view(getattr(user_team, "players", []))
-    return [
-        p for p in roster
-        if not p.is_injured() and not p.is_retired and getattr(p, "player_id", None) not in starter_ids
-    ]
-
-
 def print_current_bench_order(user_team):
     print_separator("現在のベンチ序列")
-    bench_players = get_current_bench_order(user_team)
-
-    if not bench_players:
-        print("ベンチ候補が存在しません。")
-        return
-
-    current_sixth = get_current_sixth_man(user_team)
-    current_sixth_id = getattr(current_sixth, "player_id", None) if current_sixth is not None else None
-
-    for i, p in enumerate(bench_players, 1):
-        role_mark = "6" if getattr(p, "player_id", None) == current_sixth_id else " "
-        print(
-            f"{i}. {role_mark} {p.name:<15} "
-            f"{p.position:<2} "
-            f"OVR:{getattr(p, 'ovr', 0):<2} "
-            f"Age:{getattr(p, 'age', 0):<2} "
-            f"{getattr(p, 'nationality', 'Japan')}"
-        )
-
-    print("\n6 = current sixth man")
+    print(format_bench_order_text(user_team))
 
 
 def print_gm_roster_view(user_team):
@@ -961,37 +904,12 @@ def print_gm_roster_view(user_team):
 
 def print_current_starting_five(user_team):
     print_separator("現在のスタメン")
-    starters = get_current_starting_five(user_team)
-
-    if not starters:
-        print("スタメン候補が存在しません。")
-        return
-
-    for i, p in enumerate(starters, 1):
-        print(
-            f"{i}. {p.name:<15} "
-            f"{p.position:<2} "
-            f"OVR:{getattr(p, 'ovr', 0):<2} "
-            f"Age:{getattr(p, 'age', 0):<2} "
-            f"{getattr(p, 'nationality', 'Japan')}"
-        )
+    print(format_starting_lineup_text(user_team))
 
 
 def print_current_sixth_man(user_team):
     print_separator("現在の6thマン")
-    sixth_man = get_current_sixth_man(user_team)
-
-    if sixth_man is None:
-        print("6thマン候補が存在しません。")
-        return
-
-    print(
-        f"{getattr(sixth_man, 'name', 'Unknown'):<15} "
-        f"{getattr(sixth_man, 'position', 'SF'):<2} "
-        f"OVR:{getattr(sixth_man, 'ovr', 0):<2} "
-        f"Age:{getattr(sixth_man, 'age', 0):<2} "
-        f"{getattr(sixth_man, 'nationality', 'Japan')}"
-    )
+    print(format_sixth_man_line_text(user_team))
 
 
 def get_available_starting_candidates(user_team, current_starters, slot_index):

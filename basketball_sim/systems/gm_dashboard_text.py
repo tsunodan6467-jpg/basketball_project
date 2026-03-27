@@ -53,6 +53,98 @@ def get_current_sixth_man(user_team: Any):
     return None
 
 
+def _player_active_for_bench_order(p: Any) -> bool:
+    """負傷・引退を除く（main.get_current_bench_order と同義の安全版）。"""
+    m = getattr(p, "is_injured", None)
+    if callable(m):
+        try:
+            if m():
+                return False
+        except Exception:
+            pass
+    else:
+        if getattr(p, "injured", False):
+            return False
+    if bool(getattr(p, "is_retired", False)):
+        return False
+    return True
+
+
+def get_current_bench_order(user_team: Any) -> List[Any]:
+    if hasattr(user_team, "get_bench_order_players"):
+        try:
+            return list(user_team.get_bench_order_players() or [])
+        except Exception:
+            pass
+    starter_ids = get_starting_player_ids(user_team)
+    roster = sort_roster_for_gm_view(list(getattr(user_team, "players", []) or []))
+    return [
+        p
+        for p in roster
+        if _player_active_for_bench_order(p) and getattr(p, "player_id", None) not in starter_ids
+    ]
+
+
+def _brief_player_line(p: Any) -> str:
+    return (
+        f"{str(getattr(p, 'name', '-')):<15} "
+        f"{str(getattr(p, 'position', '-')):<2} "
+        f"OVR:{int(getattr(p, 'ovr', 0)):<2} "
+        f"Age:{int(getattr(p, 'age', 0)):<2} "
+        f"{getattr(p, 'nationality', 'Japan')}"
+    )
+
+
+def format_starting_lineup_text(team: Any) -> str:
+    starters = get_current_starting_five(team)
+    if not starters:
+        return "スタメン候補が不足しているか、まだ設定されていません。"
+    lines: List[str] = ["【スタメン】", ""]
+    for i, p in enumerate(starters, 1):
+        lines.append(f"{i}. {_brief_player_line(p)}")
+    return "\n".join(lines)
+
+
+def format_sixth_man_line_text(team: Any) -> str:
+    sm = get_current_sixth_man(team)
+    if sm is None:
+        return "6thマンが未設定です。"
+    return "【6thマン】\n\n" + _brief_player_line(sm)
+
+
+def format_bench_order_text(team: Any) -> str:
+    bench = get_current_bench_order(team)
+    if not bench:
+        return "ベンチ候補が存在しません。"
+    sixth = get_current_sixth_man(team)
+    sid = getattr(sixth, "player_id", None) if sixth is not None else None
+    lines: List[str] = ["【ベンチ序列】（先頭が7番手）", ""]
+    for i, p in enumerate(bench, 1):
+        mark = "6" if getattr(p, "player_id", None) == sid else " "
+        lines.append(f"{i}. {mark} {_brief_player_line(p)}")
+    lines.append("")
+    lines.append("6 = 現在のシックスマン")
+    return "\n".join(lines)
+
+
+def format_lineup_snapshot_text(team: Any) -> str:
+    """スタメン・6th・ベンチを1画面用にまとめる（読み取り専用）。"""
+    parts = [
+        format_starting_lineup_text(team),
+        "",
+        "─" * 40,
+        "",
+        format_sixth_man_line_text(team),
+        "",
+        "─" * 40,
+        "",
+        format_bench_order_text(team),
+        "",
+        "※ 変更はターミナルのシーズンメニュー「8. GMメニュー」から行ってください。",
+    ]
+    return "\n".join(parts)
+
+
 def format_team_identity_text(team: Any) -> str:
     getter = getattr(team, "get_usage_policy_label", None)
     if callable(getter):
