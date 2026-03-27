@@ -30,7 +30,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime, date
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from basketball_sim.systems.gm_dashboard_text import (
     apply_bench_order_swap,
@@ -1351,6 +1351,21 @@ class MainMenuView:
             padx=2,
             pady=2,
         ).pack(fill="x", anchor="w")
+
+        action_row = ttk.Frame(bottom, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        action_row.pack(fill="x")
+        ttk.Button(
+            action_row,
+            text="チーム練習を変更",
+            style="Menu.TButton",
+            command=self._open_team_training_editor_window,
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            action_row,
+            text="個別練習を変更",
+            style="Menu.TButton",
+            command=self._open_player_training_editor_window,
+        ).pack(side="left")
 
         ttk.Button(
             bottom,
@@ -2827,6 +2842,219 @@ class MainMenuView:
             count = len([1 for _, _, ok, _ in items if ok])
             rows.append(f"{style_label}: {count}/{len(items)}")
         return rows
+
+    def _get_team_training_label(self, key: str) -> str:
+        labels = {
+            "balanced": "バランス",
+            "shooting": "シュート強化",
+            "defense": "ディフェンス強化",
+            "transition": "速攻強化",
+            "precision_offense": "精密オフェンス（特別）",
+            "intense_defense": "強圧ディフェンス（特別）",
+        }
+        return labels.get(str(key or "balanced"), str(key or "balanced"))
+
+    def _team_training_lock_reason(self, team: Any, focus_key: str) -> str:
+        coach = str(getattr(team, "coach_style", "balanced") or "balanced")
+        tf = int(getattr(team, "training_facility_level", 1) or 1)
+        med = int(getattr(team, "medical_facility_level", 1) or 1)
+        if focus_key == "precision_offense" and not (coach in {"offense", "development"} and tf >= 3):
+            return "HCが「攻撃重視」または「育成」かつ トレーニング施設Lv3以上で解放"
+        if focus_key == "intense_defense" and not (coach == "defense" and med >= 2):
+            return "HCが「守備重視」かつ メディカル施設Lv2以上で解放"
+        return ""
+
+    def _player_drill_lock_reason(self, team: Any, drill_key: str) -> str:
+        coach = str(getattr(team, "coach_style", "balanced") or "balanced")
+        tf = int(getattr(team, "training_facility_level", 1) or 1)
+        fo = int(getattr(team, "front_office_level", 1) or 1)
+        med = int(getattr(team, "medical_facility_level", 1) or 1)
+        if drill_key == "speed_agility" and tf < 3:
+            return "トレーニング施設Lv3以上で解放"
+        if drill_key == "iq_film" and fo < 2:
+            return "フロントオフィスLv2以上で解放"
+        if drill_key == "defense_footwork" and coach not in {"defense", "development"}:
+            return "HCが「守備重視」または「育成」で解放"
+        if drill_key == "strength" and med < 2:
+            return "メディカル施設Lv2以上で解放"
+        return ""
+
+    def _open_team_training_editor_window(self) -> None:
+        if self.team is None:
+            return
+        parent = getattr(self, "_development_window", None) or self.root
+        w = tk.Toplevel(parent)
+        w.title("チーム練習方針を変更")
+        w.geometry("560x320")
+        w.configure(bg="#15171c")
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+        options: List[Tuple[str, str]] = [
+            ("balanced", "バランス"),
+            ("shooting", "シュート強化"),
+            ("defense", "ディフェンス強化"),
+            ("transition", "速攻強化"),
+            ("precision_offense", "精密オフェンス（特別）"),
+            ("intense_defense", "強圧ディフェンス（特別）"),
+        ]
+        label_to_key = {lab: key for key, lab in options}
+        ttk.Label(wrap, text="方針", font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
+        combo = ttk.Combobox(wrap, state="readonly", values=[lab for _, lab in options], width=36)
+        current = str(getattr(self.team, "team_training_focus", "balanced") or "balanced")
+        combo.set(self._get_team_training_label(current))
+        combo.pack(anchor="w", pady=(4, 10))
+        note_var = tk.StringVar(value="")
+        tk.Label(
+            wrap,
+            textvariable=note_var,
+            bg="#1d2129",
+            fg="#d6dbe3",
+            justify="left",
+            anchor="w",
+            font=("Yu Gothic UI", 10),
+            padx=8,
+            pady=6,
+            wraplength=520,
+        ).pack(fill="x", pady=(0, 12))
+
+        def _refresh_note(_event: Any = None) -> None:
+            key = label_to_key.get(combo.get(), current)
+            reason = self._team_training_lock_reason(self.team, key)
+            if reason:
+                note_var.set(f"未解放（条件）: {reason}")
+            else:
+                note_var.set("選択可能です。")
+
+        combo.bind("<<ComboboxSelected>>", _refresh_note)
+        _refresh_note()
+
+        def _apply() -> None:
+            key = label_to_key.get(combo.get())
+            if not key:
+                messagebox.showerror("エラー", "方針を選択してください。", parent=w)
+                return
+            reason = self._team_training_lock_reason(self.team, key)
+            if reason:
+                messagebox.showwarning("未解放", f"この方針は未解放です。\n{reason}", parent=w)
+                return
+            setattr(self.team, "team_training_focus", key)
+            self._refresh_development_window()
+            messagebox.showinfo("完了", f"チーム練習を「{self._get_team_training_label(key)}」に変更しました。", parent=w)
+            w.destroy()
+
+        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn.pack(fill="x")
+        ttk.Button(btn, text="反映", style="Primary.TButton", command=_apply).pack(side="left")
+        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
+
+    def _open_player_training_editor_window(self) -> None:
+        if self.team is None:
+            return
+        parent = getattr(self, "_development_window", None) or self.root
+        w = tk.Toplevel(parent)
+        w.title("個別練習を変更")
+        w.geometry("780x420")
+        w.configure(bg="#15171c")
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+
+        roster = list(getattr(self.team, "players", []) or [])
+        roster = sorted(
+            roster,
+            key=lambda p: (str(getattr(p, "position", "SF")), -int(getattr(p, "ovr", 0)), str(getattr(p, "name", ""))),
+        )
+        if not roster:
+            messagebox.showinfo("個別練習", "ロスターがありません。", parent=w)
+            w.destroy()
+            return
+
+        drills: List[Tuple[str, str, str]] = [
+            ("balanced", "バランス", "balanced"),
+            ("dribble", "ドリブル練習", "playmaking"),
+            ("rebound", "リバウンド練習", "defense"),
+            ("stamina_run", "走り込み（スタミナ）", "physical"),
+            ("shoot_form", "シュートフォーム", "shooting"),
+            ("three_point", "3P特化", "shooting"),
+            ("free_throw", "フリースロー", "shooting"),
+            ("drive_finish", "ドライブ&フィニッシュ", "playmaking"),
+            ("passing_read", "パス判断", "playmaking"),
+            ("defense_footwork", "ディフェンスフットワーク", "defense"),
+            ("strength", "筋力強化", "physical"),
+            ("speed_agility", "スピード&アジリティ", "physical"),
+            ("iq_film", "映像分析（IQ）", "iq_handling"),
+        ]
+        player_labels = [
+            f"{getattr(p, 'name', '-'):<16} {getattr(p, 'position', 'SF')} OVR:{int(getattr(p, 'ovr', 0))}"
+            for p in roster
+        ]
+        drill_label_to_key = {label: (key, focus) for key, label, focus in drills}
+
+        ttk.Label(wrap, text="選手", font=("Yu Gothic UI", 10, "bold")).grid(row=0, column=0, sticky="w")
+        player_combo = ttk.Combobox(wrap, state="readonly", values=player_labels, width=42)
+        player_combo.grid(row=1, column=0, sticky="ew", pady=(4, 10), padx=(0, 12))
+        player_combo.set(player_labels[0])
+
+        ttk.Label(wrap, text="練習", font=("Yu Gothic UI", 10, "bold")).grid(row=0, column=1, sticky="w")
+        drill_combo = ttk.Combobox(wrap, state="readonly", values=[label for _, label, _ in drills], width=32)
+        drill_combo.grid(row=1, column=1, sticky="ew", pady=(4, 10))
+        drill_combo.set(drills[0][1])
+
+        wrap.columnconfigure(0, weight=1)
+        wrap.columnconfigure(1, weight=1)
+
+        note_var = tk.StringVar(value="")
+        tk.Label(
+            wrap,
+            textvariable=note_var,
+            bg="#1d2129",
+            fg="#d6dbe3",
+            justify="left",
+            anchor="w",
+            font=("Yu Gothic UI", 10),
+            padx=8,
+            pady=6,
+            wraplength=740,
+        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+
+        def _selected_player() -> Any:
+            idx = max(0, player_combo.current())
+            return roster[idx]
+
+        def _refresh_note(_event: Any = None) -> None:
+            key_focus = drill_label_to_key.get(drill_combo.get(), ("balanced", "balanced"))
+            key = key_focus[0]
+            reason = self._player_drill_lock_reason(self.team, key)
+            p = _selected_player()
+            current_drill = str(getattr(p, "training_drill", "balanced") or "balanced")
+            if reason:
+                note_var.set(f"現在ドリル: {current_drill} / 未解放（条件）: {reason}")
+            else:
+                note_var.set(f"現在ドリル: {current_drill} / 選択可能です。")
+
+        player_combo.bind("<<ComboboxSelected>>", _refresh_note)
+        drill_combo.bind("<<ComboboxSelected>>", _refresh_note)
+        _refresh_note()
+
+        def _apply() -> None:
+            p = _selected_player()
+            key, focus = drill_label_to_key.get(drill_combo.get(), ("", ""))
+            if not key:
+                messagebox.showerror("エラー", "練習を選択してください。", parent=w)
+                return
+            reason = self._player_drill_lock_reason(self.team, key)
+            if reason:
+                messagebox.showwarning("未解放", f"この練習は未解放です。\n{reason}", parent=w)
+                return
+            setattr(p, "training_drill", key)
+            setattr(p, "training_focus", focus)
+            self._refresh_development_window()
+            messagebox.showinfo("完了", f"{getattr(p, 'name', '-') } の個別練習を更新しました。", parent=w)
+            w.destroy()
+
+        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn.grid(row=3, column=0, columnspan=2, sticky="ew")
+        ttk.Button(btn, text="反映", style="Primary.TButton", command=_apply).pack(side="left")
+        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
 
     def _on_reset_starting_lineup_gui(self) -> None:
         """カスタムスタメン解除（Team.clear_starting_lineup）。確認ダイアログ付き。"""
