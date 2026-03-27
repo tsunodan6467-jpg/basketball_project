@@ -1,0 +1,27 @@
+name: Balance Guard (heavy)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily at 18:00 UTC (03:00 JST)
+    - cron: "0 18 * * *"
+
+jobs:
+  simulation_balance_guard:
+    name: 3-seed simulation balance guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package (editable) + dev deps
+        run: pip install -e ".[dev]"
+
+      - name: Run simulation balance guard test
+        run: python -m pytest basketball_sim/tests/test_simulation_balance_guard.py -q
+

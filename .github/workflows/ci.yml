@@ -26,8 +26,8 @@ jobs:
       - name: Install package (editable) + dev deps
         run: pip install -e ".[dev]"
 
-      - name: Pytest
-        run: python -m pytest basketball_sim/tests -q
+      - name: Pytest (default suite)
+        run: python -m pytest basketball_sim/tests -q --ignore=basketball_sim/tests/test_simulation_balance_guard.py
 
       - name: CLI smoke (non-interactive)
         run: python -m basketball_sim.main --smoke

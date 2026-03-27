@@ -1652,9 +1652,11 @@ class Match:
         elif training_focus == "transition":
             off += 0.3
         elif training_focus == "precision_offense":
-            off += 1.2
+            # Safety rollout: special training effect is intentionally small.
+            off += 0.9
         elif training_focus == "intense_defense":
-            deff += 1.2
+            # Safety rollout: special training effect is intentionally small.
+            deff += 0.9
 
         return off, deff
 
