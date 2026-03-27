@@ -37,6 +37,12 @@ from basketball_sim.systems.gm_dashboard_text import (
     format_salary_cap_text,
     format_team_identity_text,
 )
+from basketball_sim.systems.gm_ui_constants import (
+    COACH_STYLE_OPTIONS,
+    STRATEGY_OPTIONS,
+    USAGE_POLICY_OPTIONS,
+    apply_team_gm_settings,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -2275,8 +2281,8 @@ class MainMenuView:
         return (
             f"消化ラウンド: {cr}/{tr}\n"
             f"{lock_line}\n\n"
-            "下記タブは読み取り専用です。トレード・スタメン・施設投資などの操作は、"
-            "ターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
+            "「戦術・HC・起用」タブで戦術・HCスタイル・起用方針を変更できます。"
+            "トレード・スタメン・施設投資などは、ターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
         )
 
     @staticmethod
@@ -2298,6 +2304,45 @@ class MainMenuView:
         self._gm_set_readonly_text(self._gm_text_team, format_team_identity_text(self.team))
         self._gm_set_readonly_text(self._gm_text_cap, format_salary_cap_text(self.team))
         self._gm_set_readonly_text(self._gm_text_roster, format_gm_roster_text(self.team))
+        self._sync_gm_strategy_combos()
+
+    def _sync_gm_strategy_combos(self) -> None:
+        if self.team is None or not hasattr(self, "_combo_strategy"):
+            return
+
+        def _set(combo: ttk.Combobox, options, current_key: str) -> None:
+            cur = str(current_key)
+            for k, lab in options:
+                if k == cur:
+                    combo.set(lab)
+                    return
+            combo.set(options[0][1])
+
+        _set(self._combo_strategy, STRATEGY_OPTIONS, getattr(self.team, "strategy", "balanced"))
+        _set(self._combo_coach, COACH_STYLE_OPTIONS, getattr(self.team, "coach_style", "balanced"))
+        _set(self._combo_usage, USAGE_POLICY_OPTIONS, getattr(self.team, "usage_policy", "balanced"))
+
+    def _on_apply_gm_strategy(self) -> None:
+        if self.team is None:
+            return
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        try:
+            sk = self._gm_label_to_key_strategy[self._combo_strategy.get()]
+            ck = self._gm_label_to_key_coach[self._combo_coach.get()]
+            uk = self._gm_label_to_key_usage[self._combo_usage.get()]
+        except (KeyError, tk.TclError):
+            messagebox.showerror("エラー", "選択値を取得できませんでした。", parent=parent)
+            return
+        ok, msg = apply_team_gm_settings(self.team, sk, ck, uk)
+        if not ok:
+            messagebox.showerror("反映できません", msg, parent=parent)
+            return
+        self._refresh_gm_dashboard_window()
+        messagebox.showinfo("保存", "戦術・HC・起用方針を反映しました。", parent=parent)
 
     def _on_close_gm_window(self) -> None:
         w = getattr(self, "_gm_window", None)
@@ -2309,7 +2354,7 @@ class MainMenuView:
         self._gm_window = None
 
     def _open_gm_dashboard_window(self) -> None:
-        """読み取り専用 GM（チーム情報・キャップ・ロスター）。操作系は CLI。"""
+        """GM: チーム情報／キャップ／ロスターは閲覧、戦術・HC・起用はタブ内で反映。トレード等は CLI。"""
         if self.team is None:
             messagebox.showwarning("GM", "チームが未接続です。", parent=self.root)
             return
@@ -2384,6 +2429,49 @@ class MainMenuView:
         self._gm_text_team = _make_tab("チーム情報")
         self._gm_text_cap = _make_tab("サラリーキャップ")
         self._gm_text_roster = _make_tab("ロスター")
+
+        tab_st = ttk.Frame(nb, style="Root.TFrame", padding=14)
+        nb.add(tab_st, text="戦術・HC・起用")
+        tab_st.columnconfigure(1, weight=1)
+
+        self._gm_label_to_key_strategy = {lab: k for k, lab in STRATEGY_OPTIONS}
+        self._gm_label_to_key_coach = {lab: k for k, lab in COACH_STYLE_OPTIONS}
+        self._gm_label_to_key_usage = {lab: k for k, lab in USAGE_POLICY_OPTIONS}
+
+        def _strategy_row(row: int, label: str, combo: ttk.Combobox) -> None:
+            ttk.Label(tab_st, text=label).grid(row=row, column=0, sticky="w", pady=6)
+            combo.grid(row=row, column=1, sticky="ew", pady=6, padx=(12, 0))
+
+        self._combo_strategy = ttk.Combobox(
+            tab_st,
+            state="readonly",
+            width=34,
+            values=[lab for _, lab in STRATEGY_OPTIONS],
+        )
+        _strategy_row(0, "戦術", self._combo_strategy)
+
+        self._combo_coach = ttk.Combobox(
+            tab_st,
+            state="readonly",
+            width=34,
+            values=[lab for _, lab in COACH_STYLE_OPTIONS],
+        )
+        _strategy_row(1, "HCスタイル", self._combo_coach)
+
+        self._combo_usage = ttk.Combobox(
+            tab_st,
+            state="readonly",
+            width=34,
+            values=[lab for _, lab in USAGE_POLICY_OPTIONS],
+        )
+        _strategy_row(2, "起用方針", self._combo_usage)
+
+        ttk.Button(
+            tab_st,
+            text="設定を反映",
+            style="Primary.TButton",
+            command=self._on_apply_gm_strategy,
+        ).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(18, 0))
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=10)
         bottom.pack(fill="x", pady=(10, 0))

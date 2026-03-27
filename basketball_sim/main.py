@@ -33,6 +33,11 @@ from basketball_sim.systems.gm_dashboard_text import (
     format_salary_cap_text,
     format_team_identity_text,
 )
+from basketball_sim.systems.gm_ui_constants import (
+    COACH_STYLE_OPTIONS,
+    STRATEGY_OPTIONS,
+    USAGE_POLICY_OPTIONS,
+)
 
 try:
     from basketball_sim.systems.main_menu_view import launch_main_menu
@@ -86,29 +91,6 @@ ROSTER_TEMPLATE = {
     "PF": 3,
     "C": 2,
 }
-
-STRATEGY_OPTIONS = [
-    ("balanced", "バランス"),
-    ("run_and_gun", "ラン＆ガン"),
-    ("three_point", "スリーポイント偏重"),
-    ("defense", "守備重視"),
-    ("inside", "インサイド"),
-]
-
-COACH_STYLE_OPTIONS = [
-    ("balanced", "バランス"),
-    ("offense", "攻撃重視"),
-    ("defense", "守備重視"),
-    ("development", "育成"),
-]
-
-
-USAGE_POLICY_OPTIONS = [
-    ("balanced", "バランス"),
-    ("win_now", "勝利優先（今を勝つ）"),
-    ("development", "育成・若手優先"),
-]
-
 
 def create_user_team_info():
     print_separator("クラブ作成")
