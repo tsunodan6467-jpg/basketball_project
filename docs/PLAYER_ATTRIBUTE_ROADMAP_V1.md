@@ -79,6 +79,16 @@ Phase 1 では、以下のみ実装:
 このフェーズでは「UIで方針を決められる」ことと「小さく反映される」ことを優先し、
 試合内確率式の大幅変更は行わない。
 
+## Phase 4 (Current Scope)
+
+- チーム練習方針（毎週固定）を追加
+  - `balanced / shooting / defense / transition`
+  - 変更したい時だけ GMメニューで切替
+- 反映は薄く限定
+  - `shooting`: チーム攻撃に小ボーナス
+  - `defense`: チーム守備に小ボーナス、ペース微減
+  - `transition`: ペース微増、攻撃にごく小ボーナス
+
 ## Risk Controls
 
 - いきなり既存確率式の主変数にしない

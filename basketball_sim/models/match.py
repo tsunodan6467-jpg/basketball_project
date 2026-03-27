@@ -1643,6 +1643,15 @@ class Match:
             off += 0.5
             deff += 0.5
 
+        # Phase 4 (safe): チーム練習は毎週固定で薄く反映
+        training_focus = str(getattr(team, "team_training_focus", "balanced") or "balanced")
+        if training_focus == "shooting":
+            off += 0.8
+        elif training_focus == "defense":
+            deff += 0.8
+        elif training_focus == "transition":
+            off += 0.3
+
         return off, deff
 
     def _get_total_possessions(self) -> int:
@@ -1667,9 +1676,19 @@ class Match:
         away_strategy = getattr(self.away_team, "strategy", "balanced")
         home_coach = getattr(self.home_team, "coach_style", "balanced")
         away_coach = getattr(self.away_team, "coach_style", "balanced")
+        home_training = str(getattr(self.home_team, "team_training_focus", "balanced") or "balanced")
+        away_training = str(getattr(self.away_team, "team_training_focus", "balanced") or "balanced")
 
         home_adj = strategy_pace_map.get(home_strategy, 0) + coach_pace_map.get(home_coach, 0)
         away_adj = strategy_pace_map.get(away_strategy, 0) + coach_pace_map.get(away_coach, 0)
+        if home_training == "transition":
+            home_adj += 2
+        elif home_training == "defense":
+            home_adj -= 1
+        if away_training == "transition":
+            away_adj += 2
+        elif away_training == "defense":
+            away_adj -= 1
 
         total = base + home_adj + away_adj
         return max(140, min(180, total))

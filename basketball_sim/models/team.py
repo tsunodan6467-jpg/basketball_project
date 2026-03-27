@@ -17,6 +17,8 @@ class Team:
 
     coach_style: str = "balanced"
     usage_policy: str = "balanced"
+    # チーム練習方針（毎週固定。変更時のみGMメニューから更新）
+    team_training_focus: str = "balanced"  # balanced / shooting / defense / transition
 
     home_city: str = ""
     is_user_team: bool = False
@@ -126,6 +128,9 @@ class Team:
         valid_usage_policies = {"balanced", "win_now", "development"}
         if self.usage_policy not in valid_usage_policies:
             self.usage_policy = "balanced"
+        valid_team_training_focus = {"balanced", "shooting", "defense", "transition"}
+        if getattr(self, "team_training_focus", "balanced") not in valid_team_training_focus:
+            self.team_training_focus = "balanced"
 
         self.scout_level = int(max(1, min(100, getattr(self, "scout_level", 50))))
         valid_scout_focuses = {"balanced", "shooting", "defense", "athletic", "playmaking", "inside"}
@@ -237,6 +242,10 @@ class Team:
 
         if not hasattr(self, "usage_policy") or self.usage_policy is None:
             self.usage_policy = "balanced"
+        if not hasattr(self, "team_training_focus") or self.team_training_focus is None:
+            self.team_training_focus = "balanced"
+        if self.team_training_focus not in {"balanced", "shooting", "defense", "transition"}:
+            self.team_training_focus = "balanced"
 
         if not hasattr(self, "scout_level") or self.scout_level is None:
             self.scout_level = 50

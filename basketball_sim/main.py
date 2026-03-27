@@ -1604,6 +1604,42 @@ def run_player_training_focus_menu(user_team):
         print(f"{getattr(p, 'name', '-') } の育成方針を {focus_labels[new_focus]} に設定しました。")
 
 
+def run_team_training_menu(user_team):
+    labels = {
+        "balanced": "バランス",
+        "shooting": "シュート強化",
+        "defense": "ディフェンス強化",
+        "transition": "速攻強化",
+    }
+    current = str(getattr(user_team, "team_training_focus", "balanced") or "balanced")
+    if current not in labels:
+        current = "balanced"
+        setattr(user_team, "team_training_focus", current)
+
+    print_separator("チーム練習方針")
+    print(f"現在設定: {labels[current]}（毎週固定。変更時のみ更新）")
+    print("1. バランス")
+    print("2. シュート強化")
+    print("3. ディフェンス強化")
+    print("4. 速攻強化")
+    print("5. 戻る")
+    choice = input("番号: ").strip()
+    mapping = {
+        "1": "balanced",
+        "2": "shooting",
+        "3": "defense",
+        "4": "transition",
+    }
+    if choice == "5":
+        return
+    new_focus = mapping.get(choice)
+    if new_focus is None:
+        print("正しい番号を入力してください。")
+        return
+    setattr(user_team, "team_training_focus", new_focus)
+    print(f"チーム練習方針を {labels[new_focus]} に変更しました。")
+
+
 def run_facility_investment_menu(user_team):
     while True:
         print_facility_status(user_team)
@@ -1660,7 +1696,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         print(trade_label)
         print("11. 施設投資")
         print("12. 個別育成方針")
-        print("13. 戻る")
+        print("13. チーム練習方針")
+        print("14. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -1689,6 +1726,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         elif choice == "12":
             run_player_training_focus_menu(user_team)
         elif choice == "13":
+            run_team_training_menu(user_team)
+        elif choice == "14":
             break
         else:
             print("正しい番号を入力してください。")
