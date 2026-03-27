@@ -4,11 +4,8 @@ import random
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.season_transaction_rules import cpu_inseason_fa_allowed_for_simulated_round
-from basketball_sim.systems.contract_logic import (
-    SALARY_CAP_DEFAULT,
-    SALARY_SOFT_LIMIT_MULTIPLIER,
-    get_team_payroll,
-)
+from basketball_sim.systems.contract_logic import SALARY_CAP_DEFAULT, get_team_payroll
+from basketball_sim.systems.salary_cap_budget import get_soft_cap
 
 
 FA_SOFT_CAP_SIGNING_BUFFER_RATIO = 0.08
@@ -172,7 +169,6 @@ def evaluate_team_need_for_player(team: Team, player: Player) -> float:
 def get_team_fa_signing_limit(
     team: Team,
     salary_cap: int = SALARY_CAP_DEFAULT,
-    soft_multiplier: float = SALARY_SOFT_LIMIT_MULTIPLIER,
 ) -> int:
     """
     FA契約に使える簡易上限。
@@ -180,11 +176,13 @@ def get_team_fa_signing_limit(
     - cap未満: soft cap まで契約可能
     - cap以上〜soft cap未満: 低額契約のみ許可
     - soft cap以上: FA契約不可
+
+    ソフト上限の数値は salary_cap_budget.get_soft_cap と同一。
     """
     ensure_team_fa_market_fields(team)
 
     payroll = get_team_payroll(team)
-    soft_cap_limit = int(salary_cap * soft_multiplier)
+    soft_cap_limit = int(get_soft_cap(salary_cap))
 
     if payroll >= soft_cap_limit:
         return 0
@@ -201,7 +199,6 @@ def can_team_afford_free_agent(
     team: Team,
     player: Player,
     salary_cap: int = SALARY_CAP_DEFAULT,
-    soft_multiplier: float = SALARY_SOFT_LIMIT_MULTIPLIER,
 ) -> bool:
     """
     所持金 + サラリーキャップの両方で判定する。
@@ -212,11 +209,7 @@ def can_team_afford_free_agent(
     if int(getattr(team, "money", 0)) < ask:
         return False
 
-    signing_limit = get_team_fa_signing_limit(
-        team,
-        salary_cap=salary_cap,
-        soft_multiplier=soft_multiplier,
-    )
+    signing_limit = get_team_fa_signing_limit(team, salary_cap=salary_cap)
     return ask <= signing_limit
 
 
@@ -502,7 +495,7 @@ def run_cpu_fa_market_cycle(
                 f"(OVR:{getattr(target, 'ovr', 0)}) | "
                 f"Salary:{estimate_fa_market_value(target)} | "
                 f"Years:{estimate_fa_contract_years(target)} | "
-                f"Payroll:{get_team_payroll(team)} / SoftCap:{int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER)}"
+                f"Payroll:{get_team_payroll(team)} / SoftCap:{int(get_soft_cap(SALARY_CAP_DEFAULT))}"
             )
             sign_count += 1
 

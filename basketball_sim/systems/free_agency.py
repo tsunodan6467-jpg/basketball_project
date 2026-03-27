@@ -12,6 +12,11 @@ from basketball_sim.systems.contract_logic import (
     fa_roll_accept_offer,
     get_team_payroll,
 )
+from basketball_sim.systems.salary_cap_budget import (
+    cap_status as shared_cap_status,
+    compute_luxury_tax,
+    get_soft_cap as shared_get_soft_cap,
+)
 
 
 MAX_FA_SIGNINGS = 3
@@ -28,15 +33,12 @@ def _team_wins(team: Team) -> int:
 
 
 def _soft_cap() -> int:
-    return int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER)
+    # サラリー判定は salary_cap_budget の単一入口に寄せる（判定ズレ防止）
+    return int(shared_get_soft_cap(SALARY_CAP_DEFAULT))
 
 
 def _cap_status(payroll: int) -> str:
-    if payroll > _soft_cap():
-        return "over_soft_cap"
-    if payroll > SALARY_CAP_DEFAULT:
-        return "over_cap"
-    return "under_cap"
+    return str(shared_cap_status(int(payroll), salary_cap=SALARY_CAP_DEFAULT))
 
 
 def _get_fa_profile(player: Player) -> dict:
@@ -199,6 +201,20 @@ def _calculate_offer(team: Team, player: Player) -> int:
     payroll_after = payroll_before + offer
     if payroll_after > soft_cap:
         offer = max(0, soft_cap - payroll_before)
+
+    # クラブ予算（ある場合）を超えるオファーは圧縮する。
+    # payroll_budget が未設定なら従来どおり soft cap 基準で扱う。
+    payroll_budget = int(getattr(team, "payroll_budget", soft_cap) or soft_cap)
+    if payroll_budget > 0:
+        room_to_budget = max(0, payroll_budget - payroll_before)
+        offer = min(offer, room_to_budget if room_to_budget > 0 else 0)
+
+    # 贅沢税の増分が大きすぎる契約は一段圧縮（過剰な赤字契約を抑制）。
+    tax_before = int(compute_luxury_tax(payroll_before, salary_cap=SALARY_CAP_DEFAULT))
+    tax_after = int(compute_luxury_tax(payroll_before + offer, salary_cap=SALARY_CAP_DEFAULT))
+    tax_delta = max(0, tax_after - tax_before)
+    if tax_delta >= 8_000_000:
+        offer = int(offer * 0.85)
 
     return max(0, int(offer))
 

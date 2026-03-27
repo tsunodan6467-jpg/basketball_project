@@ -8,6 +8,7 @@ from basketball_sim.systems.salary_cap_budget import (
     get_hard_cap,
     get_soft_cap,
     is_payroll_over_club_budget,
+    payroll_exceeds_soft_cap,
 )
 
 
@@ -22,6 +23,21 @@ def test_cap_status_tiers():
     assert cap_status(h - 1) == "under_cap"
     assert cap_status(h + 1) == "over_cap"
     assert cap_status(s + 1) == "over_soft_cap"
+
+
+def test_payroll_exceeds_soft_cap_matches_cap_status():
+    s = get_soft_cap()
+    assert payroll_exceeds_soft_cap(s) is False
+    assert payroll_exceeds_soft_cap(s + 1) is True
+
+
+def test_fa_signing_limit_uses_same_soft_cap():
+    from basketball_sim.models.team import Team
+    from basketball_sim.systems.free_agent_market import get_team_fa_signing_limit
+
+    t = Team(team_id=1, name="T", league_level=1)
+    t.players = []
+    assert get_team_fa_signing_limit(t) == get_soft_cap(LEAGUE_SALARY_CAP)
 
 
 def test_luxury_tax_only_above_soft():

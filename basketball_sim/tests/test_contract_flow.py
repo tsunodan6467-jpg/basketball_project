@@ -8,7 +8,9 @@ from basketball_sim.systems.contract_logic import (
     apply_resign,
     calculate_resign_score,
     evaluate_resign_offer,
+    would_offer_break_soft_limit,
 )
+from basketball_sim.systems.salary_cap_budget import payroll_exceeds_soft_cap
 
 
 def _p(pid: int, years: int, nat: str = "Japan") -> Player:
@@ -89,6 +91,22 @@ def test_apply_resign_sets_action():
     apply_resign(t, p, 6_000_000, 2)
     assert p.contract_years_left == 2
     assert p.contract_last_action == "resign"
+
+
+def test_would_offer_break_soft_limit_matches_payroll_exceeds():
+    """再契約のソフト上限判定が salary_cap_budget と一致する。"""
+    from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP
+
+    team = Team(team_id=1, name="T", league_level=1)
+    p = _p(12, 1)
+    p.salary = 5_000_000
+    team.add_player(p)
+    offer = 50_000_000
+    team_payroll = sum(getattr(x, "salary", 0) for x in team.players)
+    projected = team_payroll - p.salary + offer
+    assert would_offer_break_soft_limit(team, p, offer, salary_cap=LEAGUE_SALARY_CAP) == payroll_exceeds_soft_cap(
+        projected, LEAGUE_SALARY_CAP
+    )
 
 
 def test_resign_score_higher_with_longer_tenure():

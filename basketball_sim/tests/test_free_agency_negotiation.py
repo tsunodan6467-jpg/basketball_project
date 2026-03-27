@@ -79,3 +79,21 @@ def test_retention_bonus_other_team():
 
 def test_fa_roll_rejects_low_score():
     assert fa_roll_accept_offer(20) is False
+
+
+def test_calculate_offer_respects_payroll_budget_room():
+    team = _team()
+    # 既存年俸 7.6M + 予算 8.0M -> 新規は最大 0.4M まで
+    team.players = [_player(101, 4_000_000, salary=7_600_000)]
+    team.payroll_budget = 8_000_000
+    cand = _player(102, 9_000_000, salary=4_000_000, ovr=76)
+    offer = fa._calculate_offer(team, cand)
+    assert offer <= 400_000
+
+
+def test_cap_status_is_aligned_with_shared_budget_module():
+    hard = fa.SALARY_CAP_DEFAULT
+    soft = fa._soft_cap()
+    assert fa._cap_status(hard - 1) == "under_cap"
+    assert fa._cap_status(hard + 1) == "over_cap"
+    assert fa._cap_status(soft + 1) == "over_soft_cap"

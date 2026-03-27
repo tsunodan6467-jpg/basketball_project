@@ -2,6 +2,7 @@ import random
 from typing import List, Optional, Dict
 
 from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP
+from basketball_sim.systems.salary_cap_budget import get_soft_cap, payroll_exceeds_soft_cap
 
 from .team import Team
 from .player import Player
@@ -488,9 +489,8 @@ class Offseason:
         self._resign_players()
         self._off_phase(6)
         self._assign_scout_dispatches()
-        # 来年のドラフト候補プールを先行生成し、特別指定の招待を行う
+        # 来年のドラフト候補プールは先行生成して保持（特別指定招待は9月プレシーズンで実施）
         self._ensure_future_draft_pool_for_next_year()
-        self._run_special_designation_invitations()
         self._off_phase(7)
         self._reset_team_stats()
         self._reset_player_stats()
@@ -525,6 +525,8 @@ class Offseason:
         self._review_team_coaches()
         assign_team_strategies(self.teams)
         print_team_strategies(self.teams)
+        # UI/CLI 体験上は「開幕前（9月プレシーズン）」に表示されるよう末尾へ移動
+        self._run_special_designation_invitations()
 
         self._off_phase(17)
         self._log_contract_roster_integrity()
@@ -1760,15 +1762,16 @@ class Offseason:
             f"Re-sign Score: {resign_score:.1f} | "
             f"Base Threshold: {threshold:.1f}"
         )
+        soft_limit = int(get_soft_cap(salary_cap))
         print(
             f"Team Payroll After Sign: ${current_team_salary:,} | "
-            f"Cap Limit(120%): ${int(salary_cap * 1.2):,}"
+            f"Soft Cap: ${soft_limit:,}"
         )
 
-        if current_team_salary > salary_cap * 1.2:
+        if payroll_exceeds_soft_cap(current_team_salary, salary_cap):
             print(
                 f"[USER-RE-SIGN] {team.name} cannot offer to {player.name} "
-                f"because payroll would exceed 120% cap."
+                f"because payroll would exceed the soft cap."
             )
             return False
 
@@ -2047,10 +2050,10 @@ class Offseason:
                         continue
 
                 if accepted:
-                    if current_team_salary > salary_cap * 1.2:
+                    if payroll_exceeds_soft_cap(current_team_salary, salary_cap):
                         print(
                             f"[RE-SIGN] {team.name} could not re-sign {player.name} "
-                            f"(OVR:{player.ovr}) due to salary cap (over 120%)"
+                            f"(OVR:{player.ovr}) due to salary cap (over soft cap)"
                         )
                         accepted = False
                         if player.ovr >= 70:

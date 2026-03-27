@@ -34,6 +34,14 @@ def cap_status(payroll: int, salary_cap: Optional[int] = None) -> str:
     return "under_cap"
 
 
+def payroll_exceeds_soft_cap(payroll: int, salary_cap: Optional[int] = None) -> bool:
+    """
+    プロジェクト後ペイロールがソフト上限を超えるか。
+    再契約（evaluate_resign）・オフシーズン再契約UI・FA の上限感の共通判定に使う。
+    """
+    return cap_status(int(payroll), salary_cap=salary_cap) == "over_soft_cap"
+
+
 def compute_luxury_tax(payroll: int, salary_cap: Optional[int] = None) -> int:
     """
     ソフトキャップ超過分に対する贅沢税（整数・v1 簡易）。

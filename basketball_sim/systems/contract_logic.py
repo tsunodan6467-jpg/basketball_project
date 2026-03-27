@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
-from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP, SALARY_SOFT_LIMIT_MULTIPLIER
+from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP
+from basketball_sim.systems.salary_cap_budget import payroll_exceeds_soft_cap
 
 
 # =========================================================
@@ -25,7 +26,7 @@ from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP, SALARY_SOFT_
 # constants（数値の正本は config.game_constants）
 # -----------------------------
 SALARY_CAP_DEFAULT = LEAGUE_SALARY_CAP
-# SALARY_SOFT_LIMIT_MULTIPLIER は game_constants と同一オブジェクトを参照
+# ソフト上限の数値は salary_cap_budget.get_soft_cap と同一
 MIN_SALARY_DEFAULT = 300_000
 MAX_CONTRACT_YEARS_DEFAULT = 5
 
@@ -503,12 +504,11 @@ def would_offer_break_soft_limit(
     player: object,
     offer_salary: int,
     salary_cap: int = SALARY_CAP_DEFAULT,
-    soft_multiplier: float = SALARY_SOFT_LIMIT_MULTIPLIER,
 ) -> bool:
     team_payroll = get_team_payroll(team)
     current_salary = safe_getattr_int(player, "salary", 0)
     projected_payroll = team_payroll - current_salary + offer_salary
-    return projected_payroll > int(salary_cap * soft_multiplier)
+    return payroll_exceeds_soft_cap(projected_payroll, salary_cap)
 
 
 
