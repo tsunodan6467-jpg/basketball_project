@@ -262,8 +262,8 @@ class DevelopmentSystem:
 
         growth_suffix = ""
         if focus_growth is not None:
-            attr, delta = focus_growth
-            growth_suffix = f" | drill:{attr}{delta:+d}"
+            attr, delta, proc_snapshot = focus_growth
+            growth_suffix = f" | drill:{attr}{delta:+d} ({proc_snapshot:.1f}%)"
 
         return (
             f"[DEV-D] {player.name} {sign}{actual_delta} -> OVR {player.ovr} "
@@ -279,7 +279,7 @@ class DevelopmentSystem:
         games_played: int,
         total_season_games: int,
         branch: str,
-    ) -> tuple[str, int] | None:
+    ) -> tuple[str, int, float] | None:
         """
         個別育成方針による微小な能力補正（Phase 3）。
         既存バランスを壊さないよう、年1回の +1 を稀に与えるだけに制限。
@@ -298,8 +298,11 @@ class DevelopmentSystem:
             return None
 
         lvl = int(getattr(team, "training_facility_level", 1) or 1)
-        # 低頻度・低振れの安全設計（max ~20%）
-        proc = min(0.20, 0.05 + lvl * 0.01 + gp_ratio * 0.04)
+        age_mul = cls._get_focus_age_multiplier(age)
+        gp_mul = cls._get_focus_gp_multiplier(gp_ratio)
+        # 低頻度・低振れの安全設計（年齢/出場時間で調整。max 24%）
+        base_proc = 0.05 + lvl * 0.01
+        proc = min(0.24, base_proc * age_mul * gp_mul)
         if random.random() >= proc:
             return None
 
@@ -333,7 +336,31 @@ class DevelopmentSystem:
         if new_val == old:
             return None
         setattr(player, target, new_val)
-        return target, 1
+        return target, 1, proc * 100.0
+
+    @classmethod
+    def _get_focus_age_multiplier(cls, age: int) -> float:
+        """若手ほど練習の発動率が高い（安全な小差）。"""
+        if age <= 20:
+            return 1.25
+        if age <= 23:
+            return 1.15
+        if age <= 27:
+            return 1.00
+        if age <= 31:
+            return 0.85
+        return 0.70
+
+    @classmethod
+    def _get_focus_gp_multiplier(cls, gp_ratio: float) -> float:
+        """出場率が高いほど練習効果が出やすい。"""
+        if gp_ratio >= 0.85:
+            return 1.20
+        if gp_ratio >= 0.65:
+            return 1.08
+        if gp_ratio >= 0.45:
+            return 1.00
+        return 0.90
 
     @classmethod
     def _resolve_potential_value(cls, player) -> int:
