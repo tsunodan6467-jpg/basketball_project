@@ -2719,12 +2719,65 @@ class MainMenuView:
         except (KeyError, tk.TclError):
             messagebox.showerror("エラー", "選択値を取得できませんでした。", parent=parent)
             return
+        old_coach = str(getattr(self.team, "coach_style", "balanced") or "balanced")
         ok, msg = apply_team_gm_settings(self.team, sk, ck, uk)
         if not ok:
             messagebox.showerror("反映できません", msg, parent=parent)
             return
         self._refresh_gm_dashboard_window()
-        messagebox.showinfo("保存", "戦術・HC・起用方針を反映しました。", parent=parent)
+        lines = ["戦術・HC・起用方針を反映しました。"]
+        if old_coach != ck:
+            lines.append("")
+            lines.extend(self._build_coach_unlock_diff_lines(old_coach, ck))
+        messagebox.showinfo("保存", "\n".join(lines), parent=parent)
+
+    def _coach_style_label(self, style_key: str) -> str:
+        labels = {k: v for k, v in COACH_STYLE_OPTIONS}
+        return labels.get(str(style_key or "balanced"), str(style_key or "balanced"))
+
+    def _build_special_training_catalog_items(self, team: Any, coach_override: Optional[str] = None) -> List[tuple]:
+        coach = str(getattr(team, "coach_style", "balanced") or "balanced")
+        if coach_override is not None:
+            coach = str(coach_override or "balanced")
+        tf = int(getattr(team, "training_facility_level", 1) or 1)
+        fo = int(getattr(team, "front_office_level", 1) or 1)
+        med = int(getattr(team, "medical_facility_level", 1) or 1)
+        return [
+            ("個人", "スピード&アジリティ", tf >= 3, "トレーニング施設Lv3以上"),
+            ("個人", "映像分析（IQ）", fo >= 2, "フロントオフィスLv2以上"),
+            ("個人", "ディフェンスフットワーク", coach in {"defense", "development"}, "HCが「守備重視」または「育成」"),
+            ("個人", "筋力強化", med >= 2, "メディカル施設Lv2以上"),
+            ("チーム", "精密オフェンス", coach in {"offense", "development"} and tf >= 3, "HCが「攻撃重視」または「育成」かつ トレーニング施設Lv3以上"),
+            ("チーム", "強圧ディフェンス", coach == "defense" and med >= 2, "HCが「守備重視」かつ メディカル施設Lv2以上"),
+        ]
+
+    def _build_coach_unlock_diff_lines(self, old_coach: str, new_coach: str) -> List[str]:
+        old_items = self._build_special_training_catalog_items(self.team, coach_override=old_coach)
+        new_items = self._build_special_training_catalog_items(self.team, coach_override=new_coach)
+        old_unlocked = {f"{c}:{n}" for c, n, ok, _ in old_items if ok}
+        new_unlocked = {f"{c}:{n}" for c, n, ok, _ in new_items if ok}
+        reason_map = {f"{c}:{n}": cond for c, n, _, cond in new_items}
+
+        lines = [
+            f"HCスタイル: {self._coach_style_label(old_coach)} → {self._coach_style_label(new_coach)}",
+            f"解放数: {len(new_unlocked)}/{len(new_items)}",
+        ]
+
+        newly_unlocked = sorted(new_unlocked - old_unlocked)
+        if newly_unlocked:
+            lines.append("新規解放:")
+            for row in newly_unlocked:
+                lines.append(f"- {row}（理由: {reason_map.get(row, '条件達成')}）")
+        else:
+            lines.append("新規解放: なし")
+
+        newly_locked = sorted(old_unlocked - new_unlocked)
+        if newly_locked:
+            lines.append("今回ロック:")
+            for row in newly_locked:
+                lines.append(f"- {row}（理由: {reason_map.get(row, '条件未達')}）")
+
+        return lines
 
     def _on_reset_starting_lineup_gui(self) -> None:
         """カスタムスタメン解除（Team.clear_starting_lineup）。確認ダイアログ付き。"""
