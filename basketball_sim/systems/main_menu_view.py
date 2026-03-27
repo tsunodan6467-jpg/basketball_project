@@ -1277,14 +1277,18 @@ class MainMenuView:
         top.pack(fill="x", pady=(0, 12))
         top.columnconfigure(0, weight=1)
         top.columnconfigure(1, weight=1)
+        top.columnconfigure(2, weight=1)
 
         self.development_summary_panel = self._create_panel(top, "育成サマリー")
         self.development_summary_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         self.development_effect_panel = self._create_panel(top, "育成影響要因")
-        self.development_effect_panel.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+        self.development_effect_panel.grid(row=0, column=1, sticky="nsew", padx=8)
+        self.development_special_panel = self._create_panel(top, "スペシャル練習解放状況")
+        self.development_special_panel.grid(row=0, column=2, sticky="nsew", padx=(8, 0))
 
         self.development_summary_lines = self._make_line_vars(self.development_summary_panel, 6)
         self.development_effect_lines = self._make_line_vars(self.development_effect_panel, 6)
+        self.development_special_lines = self._make_line_vars(self.development_special_panel, 7)
 
         table_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=10)
         table_wrap.pack(fill="both", expand=True)
@@ -1422,6 +1426,12 @@ class MainMenuView:
             "試合出場数も育成量に影響します",
         ]
         for var, line in zip(self.development_effect_lines, effect_lines):
+            var.set(line)
+
+        special_lines = self._build_current_special_training_lines(self.team)
+        while len(special_lines) < len(self.development_special_lines):
+            special_lines.append("")
+        for var, line in zip(self.development_special_lines, special_lines[: len(self.development_special_lines)]):
             var.set(line)
 
         tree = getattr(self, "development_tree", None)
@@ -2414,6 +2424,26 @@ class MainMenuView:
         _set(self._combo_strategy, STRATEGY_OPTIONS, getattr(self.team, "strategy", "balanced"))
         _set(self._combo_coach, COACH_STYLE_OPTIONS, getattr(self.team, "coach_style", "balanced"))
         _set(self._combo_usage, USAGE_POLICY_OPTIONS, getattr(self.team, "usage_policy", "balanced"))
+        self._refresh_gm_coach_preview()
+
+    def _refresh_gm_coach_preview(self) -> None:
+        text_widget = getattr(self, "_gm_coach_preview_text", None)
+        if text_widget is None or self.team is None:
+            return
+        try:
+            selected_label = self._combo_coach.get()
+            selected_key = self._gm_label_to_key_coach.get(
+                selected_label,
+                getattr(self.team, "coach_style", "balanced"),
+            )
+        except Exception:
+            selected_key = getattr(self.team, "coach_style", "balanced")
+        old_key = str(getattr(self.team, "coach_style", "balanced") or "balanced")
+        lines = self._build_coach_unlock_diff_lines(old_key, str(selected_key))
+        self._gm_set_readonly_text(text_widget, "\n".join(lines))
+
+    def _on_gm_coach_selection_changed(self, _event: Any = None) -> None:
+        self._refresh_gm_coach_preview()
 
     def _gm_slot_label_to_index(self, label: str) -> int:
         try:
@@ -2779,6 +2809,25 @@ class MainMenuView:
 
         return lines
 
+    def _build_current_special_training_lines(self, team: Any) -> List[str]:
+        coach = str(getattr(team, "coach_style", "balanced") or "balanced")
+        items = self._build_special_training_catalog_items(team, coach_override=coach)
+        unlocked = [f"{c}:{n}" for c, n, ok, _ in items if ok]
+        lines = [
+            f"現在HC: {self._coach_style_label(coach)}",
+            f"解放数: {len(unlocked)}/{len(items)}",
+            "解放中: " + (" / ".join(unlocked) if unlocked else "なし"),
+        ]
+        return lines + self._build_coach_unlock_count_rows(team)
+
+    def _build_coach_unlock_count_rows(self, team: Any) -> List[str]:
+        rows: List[str] = []
+        for style_key, style_label in COACH_STYLE_OPTIONS:
+            items = self._build_special_training_catalog_items(team, coach_override=style_key)
+            count = len([1 for _, _, ok, _ in items if ok])
+            rows.append(f"{style_label}: {count}/{len(items)}")
+        return rows
+
     def _on_reset_starting_lineup_gui(self) -> None:
         """カスタムスタメン解除（Team.clear_starting_lineup）。確認ダイアログ付き。"""
         if self.team is None:
@@ -3063,6 +3112,7 @@ class MainMenuView:
             values=[lab for _, lab in COACH_STYLE_OPTIONS],
         )
         _strategy_row(1, "HCスタイル", self._combo_coach)
+        self._combo_coach.bind("<<ComboboxSelected>>", self._on_gm_coach_selection_changed)
 
         self._combo_usage = ttk.Combobox(
             tab_st,
@@ -3072,12 +3122,27 @@ class MainMenuView:
         )
         _strategy_row(2, "起用方針", self._combo_usage)
 
+        self._gm_coach_preview_text = tk.Text(
+            tab_st,
+            wrap="word",
+            bg="#222834",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+            font=("Consolas", 10),
+            relief="flat",
+            height=9,
+            padx=10,
+            pady=10,
+        )
+        self._gm_coach_preview_text.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        tab_st.rowconfigure(3, weight=1)
+
         ttk.Button(
             tab_st,
             text="設定を反映",
             style="Primary.TButton",
             command=self._on_apply_gm_strategy,
-        ).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(18, 0))
+        ).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(18, 0))
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=10)
         bottom.pack(fill="x", pady=(10, 0))

@@ -28,3 +28,21 @@ def test_coach_unlock_diff_lines_include_unlock_and_lock_changes():
     assert "個人:ディフェンスフットワーク" in joined
     assert "今回ロック:" in joined
     assert "チーム:精密オフェンス" in joined
+
+
+def test_current_special_training_lines_include_current_and_matrix_counts():
+    team = SimpleNamespace(
+        coach_style="development",
+        training_facility_level=3,
+        front_office_level=2,
+        medical_facility_level=2,
+    )
+    view = _bare_view_with_team(team)
+    lines = MainMenuView._build_current_special_training_lines(view, team)
+    joined = "\n".join(lines)
+
+    assert "現在HC: 育成" in joined
+    assert "解放数:" in joined
+    assert "解放中:" in joined
+    assert "攻撃重視:" in joined
+    assert "守備重視:" in joined
