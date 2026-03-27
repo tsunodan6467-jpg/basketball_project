@@ -187,11 +187,11 @@ def _build_icon_candidate_rows(teams):
                 {
                     "player": player,
                     "team": team,
-                    "name": getattr(player, "name", "Unknown"),
+                    "name": getattr(player, "name", "不明"),
                     "position": getattr(player, "position", "SF"),
                     "ovr": int(getattr(player, "ovr", 0)),
                     "nationality": getattr(player, "nationality", "Japan"),
-                    "team_name": getattr(team, "name", "Unknown Team"),
+                    "team_name": getattr(team, "name", "不明チーム"),
                     "seed_data": None,
                 }
             )
@@ -355,7 +355,7 @@ def choose_best_auto_candidate(candidates, counts, required_position=None):
 
 def print_roster_rule_summary(players):
     counts = {"Foreign": 0, "AsiaNat": 0}
-    pos_counter = Counter(getattr(p, "position", "Unknown") for p in players)
+    pos_counter = Counter(getattr(p, "position", "不明") for p in players)
 
     for p in players:
         update_counts(p, counts)
@@ -363,8 +363,8 @@ def print_roster_rule_summary(players):
     print("\n[ロスター内訳]")
     for pos in ["PG", "SG", "SF", "PF", "C"]:
         print(f"{pos}: {pos_counter.get(pos, 0)}")
-    print(f"Foreign: {counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP}")
-    print(f"Asia/Naturalized: {counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}")
+    print(f"外国籍: {counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP}")
+    print(f"アジア/帰化: {counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}")
 
 
 def auto_draft_players(pool, user_team, icon_player):
@@ -465,8 +465,8 @@ def draft_players(pool, user_team, icon_player):
     while len(selected) < 12:
         print(f"\n現在 {len(selected)}/12人")
         print(
-            f"国籍枠: Foreign {counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP} | "
-            f"Asia/Naturalized {counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}"
+            f"国籍枠: 外国籍 {counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP} | "
+            f"アジア/帰化 {counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}"
         )
 
         print("\nポジション選択")
@@ -627,8 +627,8 @@ def choose_cpu_roster_candidate(candidates, counts, stronger=False, required_pos
 def summarize_roster_nationality_counts(players):
     counts = build_japan_rule_counts(players)
     return (
-        f"Foreign:{counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP} | "
-        f"Asia/Naturalized:{counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}"
+        f"外国籍:{counts['Foreign']}/{LEAGUE_ROSTER_FOREIGN_CAP} | "
+        f"アジア/帰化:{counts['AsiaNat']}/{LEAGUE_ROSTER_ASIA_NATURALIZED_CAP}"
     )
 
 
@@ -822,11 +822,11 @@ def print_player_career_tracking(user_team, tracked_player_name=None):
             hof_score = getattr(p, "hall_of_fame_score", 0.0)
 
         print(
-            f"{p.name:<15} | Age:{p.age:<2} | OVR:{p.ovr:<2} | "
-            f"Peak:{getattr(p, 'peak_ovr', p.ovr):<2} | "
-            f"Career PTS:{getattr(p, 'career_points', 0):<5} | "
-            f"Career GP:{getattr(p, 'career_games_played', 0):<4} | "
-            f"HOF Score:{hof_score:.2f}"
+            f"{p.name:<15} | 年齢:{p.age:<2} | OVR:{p.ovr:<2} | "
+            f"ピーク:{getattr(p, 'peak_ovr', p.ovr):<2} | "
+            f"通算得点:{getattr(p, 'career_points', 0):<5} | "
+            f"通算試合:{getattr(p, 'career_games_played', 0):<4} | "
+            f"HOF評価:{hof_score:.2f}"
         )
 
 
@@ -842,7 +842,7 @@ def print_team_identity(user_team):
 
 
 def print_salary_cap_status(user_team):
-    print_separator("Salary Cap Status")
+    print_separator("サラリーキャップ状況")
     print(format_salary_cap_text(user_team))
 
 
@@ -862,22 +862,80 @@ def choose_option_from_list(title, items):
         print("正しい番号を入力してください。")
 
 
+def _coach_style_label(style_key: str) -> str:
+    labels = {k: v for k, v in COACH_STYLE_OPTIONS}
+    return labels.get(str(style_key or "balanced"), str(style_key or "balanced"))
+
+
+def _strategy_label(strategy_key: str) -> str:
+    labels = {k: v for k, v in STRATEGY_OPTIONS}
+    return labels.get(str(strategy_key or "balanced"), str(strategy_key or "balanced"))
+
+
+def _youth_investment_label(invest_key: str) -> str:
+    labels = {
+        "facility": "施設",
+        "coaching": "指導",
+        "scout": "スカウト",
+        "community": "地域連携",
+    }
+    return labels.get(str(invest_key or ""), str(invest_key or ""))
+
+
 def set_team_strategy(user_team):
     selected = choose_option_from_list("戦術変更", STRATEGY_OPTIONS)
     old_value = getattr(user_team, "strategy", "balanced")
     user_team.strategy = selected
 
     print_separator("戦術変更完了")
-    print(f"{old_value} -> {user_team.strategy}")
+    print(f"{_strategy_label(old_value)} → {_strategy_label(user_team.strategy)}")
 
 
 def set_team_coach_style(user_team):
-    selected = choose_option_from_list("HCスタイル変更", COACH_STYLE_OPTIONS)
+    print_separator("HC変更時の解放プレビュー")
+    current_style = str(getattr(user_team, "coach_style", "balanced") or "balanced")
+    coach_options_with_unlock_count = []
+    for style_key, style_label in COACH_STYLE_OPTIONS:
+        items = _build_special_training_catalog_items(user_team, coach_override=style_key)
+        unlocked = [f"{c}:{n}" for c, n, ok, _ in items if ok]
+        unlock_count = len(unlocked)
+        total_count = len(items)
+        unlocked_text = " / ".join(unlocked) if unlocked else "（解放なし）"
+        marker = "（現在）" if style_key == current_style else ""
+        print(f"- {style_label}{marker} [{unlock_count}/{total_count}] 解放候補: {unlocked_text}")
+        coach_options_with_unlock_count.append((style_key, f"{style_label} [{unlock_count}/{total_count}]"))
+
+    print("")
+    selected = choose_option_from_list("HCスタイル変更", coach_options_with_unlock_count)
     old_value = getattr(user_team, "coach_style", "balanced")
+    old_unlocked = {
+        f"{c}:{n}"
+        for c, n, ok, _ in _build_special_training_catalog_items(user_team, coach_override=old_value)
+        if ok
+    }
     user_team.coach_style = selected
+    new_items = _build_special_training_catalog_items(user_team, coach_override=selected)
+    new_unlocked = {
+        f"{c}:{n}" for c, n, ok, _ in new_items if ok
+    }
+    lock_reason_by_key = {f"{c}:{n}": cond for c, n, _, cond in new_items}
 
     print_separator("HCスタイル変更完了")
-    print(f"{old_value} -> {user_team.coach_style}")
+    print(f"{_coach_style_label(old_value)} → {_coach_style_label(user_team.coach_style)}")
+    newly_unlocked = sorted(new_unlocked - old_unlocked)
+    newly_locked = sorted(old_unlocked - new_unlocked)
+    if newly_unlocked:
+        print("新規解放されたスペシャル練習:")
+        for row in newly_unlocked:
+            reason = lock_reason_by_key.get(row, "条件達成")
+            print(f"- {row}（理由: {reason}）")
+    else:
+        print("新規解放はありません。")
+    if newly_locked:
+        print("今回ロックされたスペシャル練習:")
+        for row in newly_locked:
+            reason = lock_reason_by_key.get(row, "条件未達")
+            print(f"- {row}（理由: {reason}）")
 
 
 def set_team_usage_policy(user_team):
@@ -891,7 +949,7 @@ def set_team_usage_policy(user_team):
     new_label = getattr(user_team, "get_usage_policy_label", lambda: getattr(user_team, "usage_policy", "balanced"))()
 
     print_separator("起用方針変更完了")
-    print(f"{old_label} -> {new_label}")
+    print(f"{old_label} → {new_label}")
 
 
 def print_current_bench_order(user_team):
@@ -985,8 +1043,8 @@ def change_starting_lineup(user_team):
 
         print_separator("スタメン変更完了")
         print(
-            f"{getattr(current_starters[slot_index], 'name', 'Unknown')} -> "
-            f"{getattr(new_player, 'name', 'Unknown')}"
+            f"{getattr(current_starters[slot_index], 'name', '不明')} → "
+            f"{getattr(new_player, 'name', '不明')}"
         )
 
 
@@ -1032,7 +1090,7 @@ def change_sixth_man(user_team):
                 f"{getattr(p, 'nationality', 'Japan')}"
             )
 
-        print("\n6 = current sixth man")
+        print("\n※ 先頭の「6」は現在の6thマン")
 
         while True:
             pick = input("選択番号: ").strip()
@@ -1050,7 +1108,7 @@ def change_sixth_man(user_team):
             user_team.set_sixth_man(new_player)
 
         print_separator("6thマン変更完了")
-        print(f"{getattr(new_player, 'name', 'Unknown')} を 6thマンに設定しました。")
+        print(f"{getattr(new_player, 'name', '不明')} を 6thマンに設定しました。")
 
 
 def change_bench_order(user_team):
@@ -1105,8 +1163,8 @@ def change_bench_order(user_team):
 
         print_separator("ベンチ序列変更完了")
         print(
-            f"{getattr(bench_players[first - 1], 'name', 'Unknown')} と "
-            f"{getattr(bench_players[second - 1], 'name', 'Unknown')} を入れ替えました。"
+            f"{getattr(bench_players[first - 1], 'name', '不明')} と "
+            f"{getattr(bench_players[second - 1], 'name', '不明')} を入れ替えました。"
         )
 
 
@@ -1237,8 +1295,8 @@ def choose_players_from_list(players, prompt, count):
 
 def print_trade_evaluation_summary(user_eval, ai_eval):
     print_separator("トレード評価")
-    print(f"あなた側評価  : {'ACCEPT' if user_eval.accepts else 'REJECT'} | Score {user_eval.score}")
-    print(f"AI側評価      : {'ACCEPT' if ai_eval.accepts else 'REJECT'} | Score {ai_eval.score}")
+    print(f"あなた側評価  : {'承認' if user_eval.accepts else '拒否'} | スコア {user_eval.score}")
+    print(f"AI側評価      : {'承認' if ai_eval.accepts else '拒否'} | スコア {ai_eval.score}")
     print(f"あなた側理由   : {', '.join(user_eval.reasons)}")
     print(f"AI側理由       : {', '.join(ai_eval.reasons)}")
 
@@ -1303,7 +1361,7 @@ def propose_trade(all_teams, user_team, season=None):
 
     print_separator("トレード結果")
     if success:
-        print(f"成立: {user_player.name} <-> {ai_player.name}")
+        print(f"成立: {user_player.name} ⇄ {ai_player.name}")
     else:
         print("トレード実行に失敗しました。")
 
@@ -1421,8 +1479,10 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
     )
     print_separator("トレード結果")
     if success:
-        print(f"成立: {', '.join(p.name for p in user_gives)} -> {ai_team.name} / "
-              f"{', '.join(p.name for p in ai_receives)} 来た")
+        print(
+            f"成立: {', '.join(p.name for p in user_gives)} を {ai_team.name} へ放出 / "
+            f"{', '.join(p.name for p in ai_receives)} を獲得"
+        )
     else:
         print("トレード実行に失敗しました（ロスター/上限/安全確認NG）。")
 
@@ -1487,7 +1547,7 @@ def print_facility_status(user_team):
         label = FACILITY_LABELS.get(facility_key, facility_key)
         level = int(getattr(user_team, facility_key, 1))
         upgrade_cost = get_facility_upgrade_cost(user_team, facility_key)
-        print(f"{label:<18} Lv.{level:<2} -> 次回投資額 {upgrade_cost:,}円")
+        print(f"{label:<18} Lv.{level:<2} → 次回投資額 {upgrade_cost:,}円")
 
     print()
     print(f"人気          : {int(getattr(user_team, 'popularity', 0))}")
@@ -1535,7 +1595,7 @@ def apply_facility_upgrade(user_team, facility_key):
         )
 
     print_separator("投資完了")
-    print(f"{label} を Lv.{current_level} -> Lv.{current_level + 1} に強化しました。")
+    print(f"{label} を Lv.{current_level} → Lv.{current_level + 1} に強化しました。")
     print(f"残り資金: {int(getattr(user_team, 'money', 0)):,}円")
 
 
@@ -1583,7 +1643,7 @@ def run_player_training_focus_menu(user_team):
         if drill_key == "iq_film" and fo < 2:
             return "フロントオフィスLv2以上で解放"
         if drill_key == "defense_footwork" and coach not in {"defense", "development"}:
-            return "HCスタイルが defense/development で解放"
+            return "HCスタイルが「守備重視」または「育成」で解放"
         if drill_key == "strength" and med < 2:
             return "メディカル施設Lv2以上で解放"
         return ""
@@ -1635,7 +1695,7 @@ def run_player_training_focus_menu(user_team):
         for num, dk in lock_targets.items():
             reason = _drill_requirement_message(dk)
             if reason:
-                print(f"  ※ {num} は未解放: {reason}")
+                print(f"  ※ {num} は未解放（解放条件: {reason}）")
 
         choice = input("番号: ").strip()
         drill_mapping = {
@@ -1660,7 +1720,7 @@ def run_player_training_focus_menu(user_team):
         new_focus, new_drill = mapped
         reason = _drill_requirement_message(new_drill)
         if reason:
-            print(f"未解放のため設定できません: {reason}")
+            print(f"この練習は未解放です（解放条件: {reason}）")
             continue
         setattr(p, "training_focus", new_focus)
         setattr(p, "training_drill", new_drill)
@@ -1699,9 +1759,9 @@ def run_team_training_menu(user_team):
     precision_locked = not (coach in {"offense", "development"} and tf >= 3)
     defense_locked = not (coach == "defense" and med >= 2)
     if precision_locked:
-        print("  ※ 5 は未解放: HC(offense/development) かつ トレーニング施設Lv3以上")
+        print("  ※ 5 は未解放（解放条件: HCが「攻撃重視」または「育成」かつ トレーニング施設Lv3以上）")
     if defense_locked:
-        print("  ※ 6 は未解放: HC(defense) かつ メディカル施設Lv2以上")
+        print("  ※ 6 は未解放（解放条件: HCが「守備重視」かつ メディカル施設Lv2以上）")
     choice = input("番号: ").strip()
     mapping = {
         "1": "balanced",
@@ -1718,10 +1778,10 @@ def run_team_training_menu(user_team):
         print("正しい番号を入力してください。")
         return
     if new_focus == "precision_offense" and precision_locked:
-        print("未解放のため設定できません。")
+        print("この練習は未解放です（解放条件を満たしていません）。")
         return
     if new_focus == "intense_defense" and defense_locked:
-        print("未解放のため設定できません。")
+        print("この練習は未解放です（解放条件を満たしていません）。")
         return
     setattr(user_team, "team_training_focus", new_focus)
     print(f"チーム練習方針を {labels[new_focus]} に変更しました。")
@@ -1744,8 +1804,8 @@ def run_youth_strengthening_menu(user_team):
         print(f"重点方針 : {focus_labels.get(focus_policy, focus_policy)}")
         print(
             "投資配分 : "
-            f"facility={inv['facility']} / coaching={inv['coaching']} / "
-            f"scout={inv['scout']} / community={inv['community']}"
+            f"施設={inv['facility']} / 指導={inv['coaching']} / "
+            f"スカウト={inv['scout']} / 地域連携={inv['community']}"
         )
         print("1. 全体方針を変更")
         print("2. 重点方針を変更")
@@ -1774,7 +1834,7 @@ def run_youth_strengthening_menu(user_team):
                 setattr(user_team, "youth_policy_focus", v)
                 print(f"ユース重点方針を {focus_labels[v]} に変更しました。")
         elif choice == "3":
-            print("対象: 1.facility 2.coaching 3.scout 4.community")
+            print("対象: 1.施設 2.指導 3.スカウト 4.地域連携")
             target = input("番号: ").strip()
             key_map = {"1": "facility", "2": "coaching", "3": "scout", "4": "community"}
             k = key_map.get(target)
@@ -1789,7 +1849,7 @@ def run_youth_strengthening_menu(user_team):
                 continue
             inv[k] = int(max(0, min(100, inv[k] + delta)))
             setattr(user_team, "youth_investment", inv)
-            print(f"{k} を {inv[k]} に更新しました。")
+            print(f"{_youth_investment_label(k)} を {inv[k]} に更新しました。")
         elif choice == "4":
             return
         else:
@@ -1843,8 +1903,26 @@ def print_strengthening_overview(user_team):
         "[ユース] "
         f"全体={global_labels.get(y_global, y_global)} / "
         f"重点={focus_labels.get(y_focus, y_focus)} / "
-        f"投資(f/c/s/com)={inv['facility']}/{inv['coaching']}/{inv['scout']}/{inv['community']}"
+        f"投資(施設/指導/スカウト/地域連携)="
+        f"{inv['facility']}/{inv['coaching']}/{inv['scout']}/{inv['community']}"
     )
+
+
+def _build_special_training_catalog_items(user_team, coach_override=None):
+    coach = str(getattr(user_team, "coach_style", "balanced") or "balanced")
+    if coach_override is not None:
+        coach = str(coach_override or "balanced")
+    tf = int(getattr(user_team, "training_facility_level", 1) or 1)
+    fo = int(getattr(user_team, "front_office_level", 1) or 1)
+    med = int(getattr(user_team, "medical_facility_level", 1) or 1)
+    return [
+        ("個人", "スピード&アジリティ", tf >= 3, "トレーニング施設Lv3以上"),
+        ("個人", "映像分析（IQ）", fo >= 2, "フロントオフィスLv2以上"),
+        ("個人", "ディフェンスフットワーク", coach in {"defense", "development"}, "HCが「守備重視」または「育成」"),
+        ("個人", "筋力強化", med >= 2, "メディカル施設Lv2以上"),
+        ("チーム", "精密オフェンス", coach in {"offense", "development"} and tf >= 3, "HCが「攻撃重視」または「育成」かつ トレーニング施設Lv3以上"),
+        ("チーム", "強圧ディフェンス", coach == "defense" and med >= 2, "HCが「守備重視」かつ メディカル施設Lv2以上"),
+    ]
 
 
 def print_special_training_catalog(user_team):
@@ -1854,18 +1932,13 @@ def print_special_training_catalog(user_team):
     fo = int(getattr(user_team, "front_office_level", 1) or 1)
     med = int(getattr(user_team, "medical_facility_level", 1) or 1)
 
-    print(f"現在の条件: HC={coach} / TF-Lv{tf} / FO-Lv{fo} / MED-Lv{med}")
+    print(
+        f"現在の条件: HC={_coach_style_label(coach)} / "
+        f"トレーニング施設Lv{tf} / フロントオフィスLv{fo} / メディカル施設Lv{med}"
+    )
     print("")
 
-    items = [
-        ("個人", "スピード&アジリティ", tf >= 3, "トレーニング施設Lv3以上"),
-        ("個人", "映像分析（IQ）", fo >= 2, "フロントオフィスLv2以上"),
-        ("個人", "ディフェンスフットワーク", coach in {"defense", "development"}, "HCが defense/development"),
-        ("個人", "筋力強化", med >= 2, "メディカル施設Lv2以上"),
-        ("チーム", "精密オフェンス", coach in {"offense", "development"} and tf >= 3, "HCが offense/development かつ トレーニング施設Lv3以上"),
-        ("チーム", "強圧ディフェンス", coach == "defense" and med >= 2, "HCが defense かつ メディカル施設Lv2以上"),
-    ]
-
+    items = _build_special_training_catalog_items(user_team)
     for category, name, unlocked, condition in items:
         state = "解放済み" if unlocked else "未解放"
         print(f"[{category}] {name:<22} : {state}")
@@ -1979,14 +2052,14 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
 
 def _prompt_save_path() -> Path:
     default_p = default_save_path("quicksave")
-    print(f"保存先パス（Enter だけで {default_p}）:")
+    print(f"保存先パス（未入力で {default_p}）:")
     raw = input().strip()
     return Path(raw) if raw else default_p
 
 
 def _prompt_load_resume() -> Dict[str, Any]:
     default_p = default_save_path("quicksave")
-    print(f"読み込むファイルパス（Enter だけで {default_p}）:")
+    print(f"読み込むファイルパス（未入力で {default_p}）:")
     raw = input().strip()
     path = Path(raw) if raw else default_p
     payload = load_world(path)
