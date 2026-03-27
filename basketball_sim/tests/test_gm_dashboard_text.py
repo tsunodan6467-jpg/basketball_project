@@ -3,6 +3,7 @@
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.gm_dashboard_text import (
+    apply_starting_slot_change,
     format_gm_roster_text,
     format_lineup_snapshot_text,
     format_salary_cap_text,
@@ -10,13 +11,13 @@ from basketball_sim.systems.gm_dashboard_text import (
 )
 
 
-def _player(pid: int) -> Player:
+def _player(pid: int, position: str = "PG") -> Player:
     return Player(
         player_id=pid,
         name=f"P{pid}",
         age=24,
         nationality="Japan",
-        position="PG",
+        position=position,
         height_cm=190.0,
         weight_kg=85.0,
         shoot=60,
@@ -69,5 +70,38 @@ def test_format_lineup_snapshot_contains_sections():
     snap = format_lineup_snapshot_text(t)
     assert "【スタメン】" in snap
     assert "【ベンチ序列】" in snap
-    assert "GMメニュー" in snap
+    assert "GMメニュー" in snap or "スタメン・ベンチ" in snap
     assert "自動スタメン" in snap
+
+
+def test_apply_starting_slot_change_swaps_pg():
+    t = Team(team_id=1, name="T", league_level=1)
+    pg_a = _player(1, "PG")
+    pg_b = _player(2, "PG")
+    sg = _player(3, "SG")
+    sf = _player(4, "SF")
+    pf = _player(5, "PF")
+    c = _player(6, "C")
+    for p in (pg_a, pg_b, sg, sf, pf, c):
+        t.add_player(p)
+    t.set_starting_lineup_by_players([pg_a, sg, sf, pf, c])
+    ok, msg = apply_starting_slot_change(t, 0, pg_b)
+    assert ok and msg == ""
+    starters = [getattr(p, "player_id", None) for p in t.get_starting_five()]
+    assert starters[0] == 2
+
+
+def test_apply_starting_slot_change_rejects_invalid_candidate():
+    t = Team(team_id=1, name="T", league_level=1)
+    pg = _player(1, "PG")
+    sg = _player(2, "SG")
+    sf = _player(3, "SF")
+    pf = _player(4, "PF")
+    c = _player(5, "C")
+    orphan = _player(99, "PG")
+    for p in (pg, sg, sf, pf, c):
+        t.add_player(p)
+    t.set_starting_lineup_by_players([pg, sg, sf, pf, c])
+    ok, msg = apply_starting_slot_change(t, 0, orphan)
+    assert not ok
+    assert "選べません" in msg

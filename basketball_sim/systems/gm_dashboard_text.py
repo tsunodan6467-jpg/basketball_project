@@ -8,7 +8,7 @@ input() を使わない確認系の単一ソースにする。
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any, List, Tuple
 
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
@@ -70,6 +70,85 @@ def _player_active_for_bench_order(p: Any) -> bool:
     if bool(getattr(p, "is_retired", False)):
         return False
     return True
+
+
+def get_available_starting_candidates(
+    user_team: Any, current_starters: List[Any], slot_index: int
+) -> List[Any]:
+    """
+    CLI change_starting_lineup と同一の候補ロジック。
+    slot_index: 0=PG … 4=C（現在のスタメン5人の並びに対応）。
+    """
+    if slot_index < 0 or slot_index >= len(current_starters):
+        return []
+    slot_player = current_starters[slot_index]
+    slot_position = getattr(slot_player, "position", "SF")
+
+    candidates: List[Any] = []
+    for p in sort_roster_for_gm_view(list(getattr(user_team, "players", []) or [])):
+        if not _player_active_for_bench_order(p):
+            continue
+
+        same_position = getattr(p, "position", "SF") == slot_position
+        current_ids_except_slot = {
+            getattr(sp, "player_id", None)
+            for i, sp in enumerate(current_starters)
+            if i != slot_index
+        }
+
+        if getattr(p, "player_id", None) in current_ids_except_slot:
+            continue
+
+        if same_position or p == slot_player:
+            candidates.append(p)
+
+    if candidates:
+        return candidates
+
+    fallback: List[Any] = []
+    for p in sort_roster_for_gm_view(list(getattr(user_team, "players", []) or [])):
+        if not _player_active_for_bench_order(p):
+            continue
+
+        current_ids_except_slot = {
+            getattr(sp, "player_id", None)
+            for i, sp in enumerate(current_starters)
+            if i != slot_index
+        }
+
+        if getattr(p, "player_id", None) in current_ids_except_slot:
+            continue
+
+        fallback.append(p)
+
+    return fallback
+
+
+def apply_starting_slot_change(team: Any, slot_index: int, new_player: Any) -> Tuple[bool, str]:
+    """
+    1枠だけスタメン差し替え。Team.set_starting_lineup_by_players を使用（CLI と同じ）。
+    """
+    starters = get_current_starting_five(team)
+    if len(starters) < 5:
+        return False, "スタメンが5人未満のため変更できません。"
+    if slot_index < 0 or slot_index >= len(starters):
+        return False, "枠の指定が不正です（PG〜C の5枠）。"
+    cands = get_available_starting_candidates(team, starters, slot_index)
+    npid = getattr(new_player, "player_id", None)
+    if npid is None:
+        return False, "選手IDが無効です。"
+    if not any(getattr(p, "player_id", None) == npid for p in cands):
+        return False, "その選手はこの枠には選べません。"
+    updated = list(starters)
+    updated[slot_index] = new_player
+    setter = getattr(team, "set_starting_lineup_by_players", None)
+    if not callable(setter):
+        return False, "チームがスタメン設定に対応していません。"
+    try:
+        setter(updated)
+    except Exception as exc:
+        return False, str(exc)
+    return True, ""
 
 
 def get_current_bench_order(user_team: Any) -> List[Any]:
@@ -142,8 +221,8 @@ def format_lineup_snapshot_text(team: Any) -> str:
         "",
         format_bench_order_text(team),
         "",
-        "※ 個別の入れ替えはターミナルのシーズンメニュー「8. GMメニュー」。"
-        "カスタムスタメン解除のみ GUI の「自動スタメンに戻す」からも可能。",
+        "※ 1枠の差し替えは GUI の「スタメン・ベンチ」タブ（反映（確認））か、"
+        "ターミナル「8. GMメニュー」のスタメン変更。カスタム解除は「自動スタメンに戻す」。",
     ]
     return "\n".join(parts)
 

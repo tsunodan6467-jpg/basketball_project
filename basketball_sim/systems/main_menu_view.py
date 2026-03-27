@@ -33,10 +33,12 @@ from datetime import datetime, date
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from basketball_sim.systems.gm_dashboard_text import (
+    apply_starting_slot_change,
     format_gm_roster_text,
     format_lineup_snapshot_text,
     format_salary_cap_text,
     format_team_identity_text,
+    get_available_starting_candidates,
     get_current_bench_order,
     get_current_sixth_man,
     get_current_starting_five,
@@ -2305,6 +2307,7 @@ class MainMenuView:
         self._gm_set_readonly_text(self._gm_text_cap, format_salary_cap_text(self.team))
         self._gm_set_readonly_text(self._gm_text_roster, format_gm_roster_text(self.team))
         self._gm_set_readonly_text(self._gm_text_lineup, format_lineup_snapshot_text(self.team))
+        self._sync_gm_lineup_edit()
         self._sync_gm_strategy_combos()
 
     def _sync_gm_strategy_combos(self) -> None:
@@ -2322,6 +2325,112 @@ class MainMenuView:
         _set(self._combo_strategy, STRATEGY_OPTIONS, getattr(self.team, "strategy", "balanced"))
         _set(self._combo_coach, COACH_STYLE_OPTIONS, getattr(self.team, "coach_style", "balanced"))
         _set(self._combo_usage, USAGE_POLICY_OPTIONS, getattr(self.team, "usage_policy", "balanced"))
+
+    def _gm_slot_label_to_index(self, label: str) -> int:
+        try:
+            return self._gm_slot_labels.index(label)
+        except (ValueError, AttributeError):
+            return 0
+
+    def _gm_candidate_label_for_player(self, p: Any) -> str:
+        return (
+            f"{getattr(p, 'name', '-')} ({getattr(p, 'position', '-')}) "
+            f"OVR{int(getattr(p, 'ovr', 0))} id={getattr(p, 'player_id', '')}"
+        )
+
+    def _sync_gm_lineup_candidates(self) -> None:
+        if self.team is None or not hasattr(self, "_gm_combo_lineup_slot"):
+            return
+        starters = get_current_starting_five(self.team)
+        if len(starters) < 5:
+            self._gm_candidate_players = []
+            self._gm_combo_lineup_candidate.configure(values=[])
+            self._gm_combo_lineup_candidate.set("")
+            return
+        try:
+            lab = self._gm_combo_lineup_slot.get()
+        except tk.TclError:
+            lab = self._gm_slot_labels[0]
+        slot_index = self._gm_slot_label_to_index(lab)
+        cands = get_available_starting_candidates(self.team, starters, slot_index)
+        self._gm_candidate_players = list(cands)
+        values = [self._gm_candidate_label_for_player(p) for p in cands]
+        self._gm_combo_lineup_candidate.configure(values=values)
+        if values:
+            self._gm_combo_lineup_candidate.set(values[0])
+        else:
+            self._gm_combo_lineup_candidate.set("")
+
+    def _sync_gm_lineup_edit(self) -> None:
+        if self.team is None or not hasattr(self, "_gm_combo_lineup_slot"):
+            return
+        starters = get_current_starting_five(self.team)
+        ok = len(starters) >= 5
+        state = "readonly" if ok else "disabled"
+        self._gm_combo_lineup_slot.configure(state=state)
+        self._gm_combo_lineup_candidate.configure(state=state)
+        self._gm_btn_apply_lineup_slot.configure(state="normal" if ok else "disabled")
+        if not ok:
+            self._gm_candidate_players = []
+            self._gm_combo_lineup_candidate.configure(values=[])
+            self._gm_combo_lineup_candidate.set("")
+            return
+        try:
+            cur = self._gm_combo_lineup_slot.get()
+        except tk.TclError:
+            cur = ""
+        if not cur or cur not in getattr(self, "_gm_slot_labels", ()):
+            self._gm_combo_lineup_slot.set(self._gm_slot_labels[0])
+        self._sync_gm_lineup_candidates()
+
+    def _on_gm_slot_lineup_changed(self) -> None:
+        self._sync_gm_lineup_candidates()
+
+    def _on_apply_gm_starting_slot(self) -> None:
+        if self.team is None:
+            return
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        starters = get_current_starting_five(self.team)
+        if len(starters) < 5:
+            messagebox.showwarning("スタメン", "スタメンが5人未満のため変更できません。", parent=parent)
+            return
+        try:
+            lab = self._gm_combo_lineup_slot.get()
+        except tk.TclError:
+            lab = self._gm_slot_labels[0]
+        slot_index = self._gm_slot_label_to_index(lab)
+        try:
+            sel = self._gm_combo_lineup_candidate.get()
+        except tk.TclError:
+            sel = ""
+        values = [self._gm_candidate_label_for_player(p) for p in self._gm_candidate_players]
+        try:
+            idx = values.index(sel)
+        except ValueError:
+            messagebox.showwarning("スタメン", "候補を選択してください。", parent=parent)
+            return
+        player = self._gm_candidate_players[idx]
+        try:
+            ok = messagebox.askokcancel(
+                "スタメン差し替え",
+                f"{lab} の選手を {getattr(player, 'name', '')} に変更しますか？\n\n"
+                "（CLIのGM「スタメン変更」と同じ候補ルールです。）",
+                parent=parent,
+            )
+        except Exception:
+            return
+        if not ok:
+            return
+        success, msg = apply_starting_slot_change(self.team, slot_index, player)
+        if not success:
+            messagebox.showerror("反映できません", msg, parent=parent)
+            return
+        self.refresh()
+        messagebox.showinfo("完了", "スタメンを更新しました。", parent=parent)
 
     def _on_apply_gm_strategy(self) -> None:
         if self.team is None:
@@ -2462,8 +2571,43 @@ class MainMenuView:
         def _make_lineup_tab() -> None:
             tab = ttk.Frame(nb, style="Root.TFrame", padding=6)
             nb.add(tab, text="スタメン・ベンチ")
-            tab.rowconfigure(0, weight=1)
+            tab.rowconfigure(1, weight=1)
             tab.columnconfigure(0, weight=1)
+
+            self._gm_slot_labels = ("PG枠", "SG枠", "SF枠", "PF枠", "C枠")
+            edit_row = ttk.Frame(tab, style="Panel.TFrame", padding=(4, 6))
+            edit_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+            ttk.Label(edit_row, text="差し替え枠", font=("Yu Gothic UI", 9)).pack(
+                side="left", padx=(0, 6)
+            )
+            self._gm_combo_lineup_slot = ttk.Combobox(
+                edit_row,
+                state="readonly",
+                width=10,
+                values=list(self._gm_slot_labels),
+            )
+            self._gm_combo_lineup_slot.pack(side="left", padx=(0, 12))
+            self._gm_combo_lineup_slot.bind(
+                "<<ComboboxSelected>>",
+                lambda _e: self._on_gm_slot_lineup_changed(),
+            )
+            ttk.Label(edit_row, text="候補", font=("Yu Gothic UI", 9)).pack(
+                side="left", padx=(0, 6)
+            )
+            self._gm_combo_lineup_candidate = ttk.Combobox(
+                edit_row,
+                state="readonly",
+                width=42,
+            )
+            self._gm_combo_lineup_candidate.pack(side="left", padx=(0, 12))
+            self._gm_candidate_players: List[Any] = []
+            self._gm_btn_apply_lineup_slot = ttk.Button(
+                edit_row,
+                text="反映（確認）",
+                style="Primary.TButton",
+                command=self._on_apply_gm_starting_slot,
+            )
+            self._gm_btn_apply_lineup_slot.pack(side="left")
 
             txt = tk.Text(
                 tab,
@@ -2479,12 +2623,12 @@ class MainMenuView:
             vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
             hsb = ttk.Scrollbar(tab, orient="horizontal", command=txt.xview)
             txt.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-            txt.grid(row=0, column=0, sticky="nsew")
-            vsb.grid(row=0, column=1, sticky="ns")
-            hsb.grid(row=1, column=0, columnspan=2, sticky="ew")
+            txt.grid(row=1, column=0, sticky="nsew")
+            vsb.grid(row=1, column=1, sticky="ns")
+            hsb.grid(row=2, column=0, columnspan=2, sticky="ew")
 
             btn_row = ttk.Frame(tab, style="Panel.TFrame", padding=(8, 4))
-            btn_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+            btn_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
             ttk.Button(
                 btn_row,
                 text="自動スタメンに戻す（確認）",
@@ -2493,7 +2637,7 @@ class MainMenuView:
             ).pack(side="left", padx=(0, 8))
             ttk.Label(
                 btn_row,
-                text="カスタムスタメン解除。個別の入れ替えはCLIのGMメニュー。",
+                text="カスタム解除は上。1枠だけの差し替えは「反映（確認）」（CLIのスタメン変更と同じ候補ルール）。",
                 font=("Yu Gothic UI", 9),
             ).pack(side="left")
 

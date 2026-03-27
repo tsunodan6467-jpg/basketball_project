@@ -35,6 +35,7 @@ from basketball_sim.systems.gm_dashboard_text import (
     format_sixth_man_line_text,
     format_starting_lineup_text,
     format_team_identity_text,
+    get_available_starting_candidates,
     get_current_bench_order,
     get_current_sixth_man,
     get_current_starting_five,
@@ -910,47 +911,6 @@ def print_current_starting_five(user_team):
 def print_current_sixth_man(user_team):
     print_separator("現在の6thマン")
     print(format_sixth_man_line_text(user_team))
-
-
-def get_available_starting_candidates(user_team, current_starters, slot_index):
-    slot_player = current_starters[slot_index]
-    slot_position = getattr(slot_player, "position", "SF")
-
-    candidates = []
-    for p in sort_roster_for_gm_view(getattr(user_team, "players", [])):
-        if p.is_injured() or p.is_retired:
-            continue
-
-        same_position = getattr(p, "position", "SF") == slot_position
-        current_ids_except_slot = {
-            getattr(sp, "player_id", None)
-            for i, sp in enumerate(current_starters)
-            if i != slot_index
-        }
-
-        if getattr(p, "player_id", None) in current_ids_except_slot:
-            continue
-
-        if same_position or p == slot_player:
-            candidates.append(p)
-
-    if not candidates:
-        for p in sort_roster_for_gm_view(getattr(user_team, "players", [])):
-            if p.is_injured() or p.is_retired:
-                continue
-
-            current_ids_except_slot = {
-                getattr(sp, "player_id", None)
-                for i, sp in enumerate(current_starters)
-                if i != slot_index
-            }
-
-            if getattr(p, "player_id", None) in current_ids_except_slot:
-                continue
-
-            candidates.append(p)
-
-    return candidates
 
 
 def change_starting_lineup(user_team):
