@@ -23,6 +23,21 @@
 - `basketball_sim/integrations/STEAMWORKS_DESIGN.md`
 - `installer/README.md`
 
+## 実測ログ: `--steam-diag`（DLL 未同梱・本人確認待ち時の期待値）
+
+実施日: 2026-03-27  
+コマンド: `dist\BasketballGM.exe --steam-diag`（PyInstaller ビルド直後）
+
+```
+steam_diag:
+  try_init_steam: False
+  steam_native_loaded: False
+  steam_loaded_dll_path: None
+  steam_is_subscribed: None
+```
+
+`STEAMWORKS_DESIGN.md` の「本人確認待ち・DLL 未同梱の期待値（正常）」と一致。App ID 発行後・`steam_api64.dll` を exe と同階層に置いたうえで再実行し、`try_init_steam: True` や `steam_loaded_dll_path` が埋まるかを確認する。
+
 ## 返答が来たら最初にやること（再開手順）
 
 1. Steamworks パートナー側のステータス確認（本人確認完了を確認）
