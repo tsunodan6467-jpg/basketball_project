@@ -1709,6 +1709,55 @@ def run_youth_strengthening_menu(user_team):
             print("正しい番号を入力してください。")
 
 
+def print_strengthening_overview(user_team):
+    team_labels = {
+        "balanced": "バランス",
+        "shooting": "シュート強化",
+        "defense": "ディフェンス強化",
+        "transition": "速攻強化",
+    }
+    player_labels = {
+        "balanced": "バランス",
+        "shooting": "シュート",
+        "playmaking": "司令塔",
+        "defense": "守備",
+        "physical": "フィジカル",
+        "iq_handling": "IQ/ハンドリング",
+    }
+    global_labels = {"technical": "テクニカル", "physical": "フィジカル", "balanced": "バランス"}
+    focus_labels = {"pg": "PG", "shooter": "シューター", "big": "ビッグ", "defender": "ディフェンダー", "balanced": "バランス"}
+
+    print_separator("強化トップ（固定方針サマリー）")
+    team_focus = str(getattr(user_team, "team_training_focus", "balanced") or "balanced")
+    print(f"[チーム練習] {team_labels.get(team_focus, team_focus)}")
+
+    roster = list(getattr(user_team, "players", []) or [])
+    if roster:
+        focus_count = {}
+        for p in roster:
+            f = str(getattr(p, "training_focus", "balanced") or "balanced")
+            focus_count[f] = int(focus_count.get(f, 0)) + 1
+        summary = " / ".join(
+            f"{player_labels.get(k, k)}:{v}人"
+            for k, v in sorted(focus_count.items(), key=lambda row: row[1], reverse=True)
+        )
+        print(f"[個別育成] {summary}")
+    else:
+        print("[個別育成] ロスターなし")
+
+    inv = dict(getattr(user_team, "youth_investment", {}) or {})
+    for k in ("facility", "coaching", "scout", "community"):
+        inv[k] = int(max(0, min(100, inv.get(k, 50))))
+    y_global = str(getattr(user_team, "youth_policy_global", "balanced") or "balanced")
+    y_focus = str(getattr(user_team, "youth_policy_focus", "balanced") or "balanced")
+    print(
+        "[ユース] "
+        f"全体={global_labels.get(y_global, y_global)} / "
+        f"重点={focus_labels.get(y_focus, y_focus)} / "
+        f"投資(f/c/s/com)={inv['facility']}/{inv['coaching']}/{inv['scout']}/{inv['community']}"
+    )
+
+
 def run_facility_investment_menu(user_team):
     while True:
         print_facility_status(user_team)
@@ -1767,7 +1816,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         print("12. 個別育成方針")
         print("13. チーム練習方針")
         print("14. ユース強化")
-        print("15. 戻る")
+        print("15. 強化トップ（サマリー）")
+        print("16. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -1800,6 +1850,8 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         elif choice == "14":
             run_youth_strengthening_menu(user_team)
         elif choice == "15":
+            print_strengthening_overview(user_team)
+        elif choice == "16":
             break
         else:
             print("正しい番号を入力してください。")
