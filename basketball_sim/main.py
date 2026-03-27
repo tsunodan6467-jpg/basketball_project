@@ -1163,7 +1163,7 @@ def print_tradeable_players(team, title):
             f"OVR:{getattr(p, 'ovr', 0):<2} "
             f"Age:{getattr(p, 'age', 0):<2} "
             f"{getattr(p, 'nationality', 'Japan'):<12} "
-            f"Salary:${getattr(p, 'salary', 0):,}"
+            f"Salary:{getattr(p, 'salary', 0):,}円"
         )
 
     return players
@@ -1475,7 +1475,7 @@ def get_facility_upgrade_cost(user_team, facility_key):
 
 def print_facility_status(user_team):
     print_separator("施設投資状況")
-    print(f"現在資金: ${int(getattr(user_team, 'money', 0)):,}")
+    print(f"現在資金: {int(getattr(user_team, 'money', 0)):,}円")
     print()
 
     for facility_key in [
@@ -1487,7 +1487,7 @@ def print_facility_status(user_team):
         label = FACILITY_LABELS.get(facility_key, facility_key)
         level = int(getattr(user_team, facility_key, 1))
         upgrade_cost = get_facility_upgrade_cost(user_team, facility_key)
-        print(f"{label:<18} Lv.{level:<2} -> 次回投資額 ${upgrade_cost:,}")
+        print(f"{label:<18} Lv.{level:<2} -> 次回投資額 {upgrade_cost:,}円")
 
     print()
     print(f"人気          : {int(getattr(user_team, 'popularity', 0))}")
@@ -1503,8 +1503,8 @@ def apply_facility_upgrade(user_team, facility_key):
 
     print_separator(f"{label} 投資")
     print(f"現在レベル : Lv.{current_level}")
-    print(f"必要資金   : ${cost:,}")
-    print(f"現在資金   : ${money:,}")
+    print(f"必要資金   : {cost:,}円")
+    print(f"現在資金   : {money:,}円")
 
     if money < cost:
         print("資金不足のため投資できません。")
@@ -1536,7 +1536,7 @@ def apply_facility_upgrade(user_team, facility_key):
 
     print_separator("投資完了")
     print(f"{label} を Lv.{current_level} -> Lv.{current_level + 1} に強化しました。")
-    print(f"残り資金: ${int(getattr(user_team, 'money', 0)):,}")
+    print(f"残り資金: {int(getattr(user_team, 'money', 0)):,}円")
 
 
 def run_facility_investment_menu(user_team):

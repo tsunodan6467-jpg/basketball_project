@@ -576,7 +576,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
             if offer > signing_room:
                 print(
                     f"[FA-CAP] {team.name} skipped {candidate.name} "
-                    f"(offer ${offer:,} > room ${signing_room:,})"
+                    f"(offer {offer:,}円 > room {signing_room:,}円)"
                 )
                 continue
 
@@ -594,7 +594,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
             team_offers[team.team_id] += 1
 
             print(
-                f"[FA-OFFER] {team.name} offered ${offer:,} / {contract_years}y to {candidate.name} "
+                f"[FA-OFFER] {team.name} offered {offer:,}円 / {contract_years}y to {candidate.name} "
                 f"| ovr={candidate.ovr} | personality={profile.get('fa_personality', 'balanced')} "
                 f"| role={role_value:.1f} | win={winning_value:.1f} "
                 f"| fit={fit_value:.1f} | coach_fit={coach_fit_value:.1f} "
@@ -635,7 +635,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
                 signed_players.add(candidate.player_id)
 
                 print(
-                    f"[FA] {team.name} signed {candidate.name} for ${offer:,} / {contract_years}y "
+                    f"[FA] {team.name} signed {candidate.name} for {offer:,}円 / {contract_years}y "
                     f"| Payroll:{payroll_after:,} / SoftCap:{_soft_cap(team):,} "
                     f"| status_after={status_after}"
                 )

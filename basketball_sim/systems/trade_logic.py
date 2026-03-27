@@ -728,9 +728,9 @@ class TradeSystem:
             for p in gives_a:
                 team_a.add_history_transaction("trade", p, note=f"Traded to {team_b.name}")
             if cash > 0:
-                team_a.add_history_transaction("trade", None, note=f"Cash+${cash:,} to {team_b.name}")
+                team_a.add_history_transaction("trade", None, note=f"Cash+{cash:,}円 to {team_b.name}")
             if rb > 0:
-                team_a.add_history_transaction("trade", None, note=f"RB+${rb:,} to {team_b.name}")
+                team_a.add_history_transaction("trade", None, note=f"RB+{rb:,}円 to {team_b.name}")
 
         if hasattr(team_b, "add_history_transaction"):
             for p in receives_b:
@@ -738,9 +738,9 @@ class TradeSystem:
             for p in gives_b:
                 team_b.add_history_transaction("trade", p, note=f"Traded to {team_a.name}")
             if cash > 0:
-                team_b.add_history_transaction("trade", None, note=f"Cash-${cash:,} received from {team_a.name}")
+                team_b.add_history_transaction("trade", None, note=f"Cash-{cash:,}円 received from {team_a.name}")
             if rb > 0:
-                team_b.add_history_transaction("trade", None, note=f"RB-${rb:,} received from {team_a.name}")
+                team_b.add_history_transaction("trade", None, note=f"RB-{rb:,}円 received from {team_a.name}")
 
         return True
 

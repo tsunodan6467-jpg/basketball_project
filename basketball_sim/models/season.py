@@ -3299,9 +3299,9 @@ class Season:
         for i, data in enumerate(top_teams_finances, 1):
             t = data["team"]
             avg_att = int(data["attendance"])
-            print(f"{i}. {t.name:<25} - ${t.money:12,} | (Att: {avg_att:5d})")
-            print(f"      Ticket: ${data['ticket_rev']:,} | Sponsor: ${data['sponsor_rev']:,}")
-            print(f"      Exp:    ${data['expenses']:,} | Profit:  ${data['profit']:,}")
+            print(f"{i}. {t.name:<25} - {t.money:12,}円 | (Att: {avg_att:5d})")
+            print(f"      Ticket: {data['ticket_rev']:,}円 | Sponsor: {data['sponsor_rev']:,}円")
+            print(f"      Exp:    {data['expenses']:,}円 | Profit:  {data['profit']:,}円")
 
         print("\n[Poorest Clubs]")
         bottom_teams_finances = sorted(finances_log, key=lambda x: x["team"].money)[:5]
@@ -3309,9 +3309,9 @@ class Season:
         for i, data in enumerate(bottom_teams_finances, 1):
             t = data["team"]
             avg_att = int(data["attendance"])
-            print(f"{i}. {t.name:<25} - ${t.money:12,} | (Att: {avg_att:5d})")
-            print(f"      Ticket: ${data['ticket_rev']:,} | Sponsor: ${data['sponsor_rev']:,}")
-            print(f"      Exp:    ${data['expenses']:,} | Profit:  ${data['profit']:,}")
+            print(f"{i}. {t.name:<25} - {t.money:12,}円 | (Att: {avg_att:5d})")
+            print(f"      Ticket: {data['ticket_rev']:,}円 | Sponsor: {data['sponsor_rev']:,}円")
+            print(f"      Exp:    {data['expenses']:,}円 | Profit:  {data['profit']:,}円")
 
     def _print_scoring_distribution_summary(self):
         if not self.game_results:

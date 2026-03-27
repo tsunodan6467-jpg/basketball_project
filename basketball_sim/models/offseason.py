@@ -425,7 +425,7 @@ class Offseason:
                 picked.draft_profile_label = f"{picked.draft_profile_label} / 特別指定"
 
             team.special_designation_players.append(picked)
-            print(f"[SPECIAL-DESIGNATION] {team.name} signed {picked.name} (1y/0$) from next draft pool")
+            print(f"[SPECIAL-DESIGNATION] {team.name} signed {picked.name} (1y/0円) from next draft pool")
 
         holder.league_future_draft_pool = list(pool_sorted)
 
@@ -1760,8 +1760,8 @@ class Offseason:
             f"OVR:{player.ovr} | GP:{player.games_played}"
         )
         print(
-            f"Current Salary: ${getattr(player, 'salary', 0):,} | "
-            f"Proposed: ${new_salary:,} / {desired_years} years"
+            f"Current Salary: {getattr(player, 'salary', 0):,}円 | "
+            f"Proposed: {new_salary:,}円 / {desired_years} years"
         )
         print(
             f"Re-sign Score: {resign_score:.1f} | "
@@ -1769,8 +1769,8 @@ class Offseason:
         )
         soft_limit = int(get_soft_cap(salary_cap))
         print(
-            f"Team Payroll After Sign: ${current_team_salary:,} | "
-            f"Soft Cap: ${soft_limit:,}"
+            f"Team Payroll After Sign: {current_team_salary:,}円 | "
+            f"Soft Cap: {soft_limit:,}円"
         )
 
         if payroll_exceeds_soft_cap(current_team_salary, salary_cap):
@@ -1955,8 +1955,8 @@ class Offseason:
                         print(
                             f"{i}. {p.name:<15} {p.position} "
                             f"OVR:{p.ovr} Age:{p.age} GP:{getattr(p, 'games_played', 0)} "
-                            f"Current:${getattr(p, 'salary', 0):,} "
-                            f"Ask:${desired_salary:,}/{desired_years}y"
+                            f"Current:{getattr(p, 'salary', 0):,}円 "
+                            f"Ask:{desired_salary:,}円/{desired_years}y"
                         )
 
         for team in self.teams:
@@ -2080,7 +2080,7 @@ class Offseason:
                         self.re_signed_player_ids.add(player.player_id)
                         print(
                             f"[RE-SIGN] {team.name} re-signed {player.name} "
-                            f"(OVR:{player.ovr}) for ${int(player.desired_salary):,} / "
+                            f"(OVR:{player.ovr}) for {int(player.desired_salary):,}円 / "
                             f"{int(player.desired_years)} years | score={resign_score:.1f}"
                         )
 
@@ -3369,8 +3369,8 @@ class Offseason:
                 payroll, int(getattr(team, "payroll_budget", 0))
             ):
                 print(
-                    f"[PAYROLL-BUDGET] {team.name} roster payroll ${payroll:,} exceeds "
-                    f"guideline ${int(getattr(team, 'payroll_budget', 0)):,}"
+                    f"[PAYROLL-BUDGET] {team.name} roster payroll {payroll:,}円 exceeds "
+                    f"guideline {int(getattr(team, 'payroll_budget', 0)):,}円"
                 )
 
             if hasattr(team, "record_financial_result"):
@@ -3415,23 +3415,23 @@ class Offseason:
                 })
 
             fin_extra = f" | Cap:{cap_label}" if cap_label else ""
-            tax_extra = f" | LuxuryTax:${luxury_tax:,}" if luxury_tax else ""
+            tax_extra = f" | LuxuryTax:{luxury_tax:,}円" if luxury_tax else ""
             print(
                 f"[FINANCE] D{getattr(team, 'league_level', 3)} | {team.name} | "
-                f"Revenue:${revenue:,} | Expense:${expense:,} | Payroll:${payroll:,} | "
-                f"Facility:${facility_maintenance:,} | Cashflow:${cashflow:,} | Money:${int(getattr(team, 'money', 0)):,}"
+                f"Revenue:{revenue:,}円 | Expense:{expense:,}円 | Payroll:{payroll:,}円 | "
+                f"Facility:{facility_maintenance:,}円 | Cashflow:{cashflow:,}円 | Money:{int(getattr(team, 'money', 0)):,}円"
                 f"{fin_extra}{tax_extra}"
             )
 
             if self._is_user_team(team):
                 print(f"\n=== USER TEAM FINANCE REPORT: {team.name} ===")
                 print(
-                    f"売上: ${revenue:,} / 支出: ${expense:,} / 人件費: ${payroll:,} / "
-                    f"施設維持費: ${facility_maintenance:,}"
+                    f"売上: {revenue:,}円 / 支出: {expense:,}円 / 人件費: {payroll:,}円 / "
+                    f"施設維持費: {facility_maintenance:,}円"
                 )
                 print(
-                    f"最終収支: ${cashflow:,} / 現在資金: ${int(getattr(team, 'money', 0)):,} / "
-                    f"来季人件費目安: ${int(getattr(team, 'payroll_budget', 0)):,}"
+                    f"最終収支: {cashflow:,}円 / 現在資金: {int(getattr(team, 'money', 0)):,}円 / "
+                    f"来季人件費目安: {int(getattr(team, 'payroll_budget', 0)):,}円"
                 )
                 print(f"オーナー期待: {getattr(team, 'owner_expectation', 'stay_competitive')}")
                 if hasattr(team, "get_finance_report_text"):

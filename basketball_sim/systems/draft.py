@@ -683,7 +683,7 @@ def conduct_draft(teams: List[Team], draft_pool: List[Player], free_agents: List
             print(
                 f"{prefix} Pick {pick_num}: {team.name} selected {selected_player.name} "
                 f"(OVR:{selected_player.ovr}) | {label} | "
-                f"Salary: ${selected_player.salary:,} | Years: {selected_player.contract_years_left}"
+                f"Salary: {selected_player.salary:,}円 | Years: {selected_player.contract_years_left}"
             )
         else:
             print(
