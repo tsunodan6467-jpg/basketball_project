@@ -53,6 +53,10 @@ from basketball_sim.systems.gm_ui_constants import (
     USAGE_POLICY_OPTIONS,
     apply_team_gm_settings,
 )
+from basketball_sim.systems.season_transaction_rules import (
+    INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
+    inseason_roster_moves_unlocked,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -402,6 +406,41 @@ class MainMenuView:
             pass
 
     # ------------------------------------------------------------------
+    # In-season trade / FA (same guard as CLI: season_transaction_rules)
+    # ------------------------------------------------------------------
+    def inseason_roster_moves_allowed(self) -> bool:
+        """
+        CLI の inseason_roster_moves_unlocked(season) と同じ可否。
+        シーズン未接続・レギュラー終了後は期限ロックの対象外（True）。
+        """
+        if self.season is None:
+            return True
+        if bool(self._safe_get(self.season, "season_finished", False)):
+            return True
+        try:
+            return inseason_roster_moves_unlocked(self.season)
+        except Exception:
+            return True
+
+    def ensure_inseason_roster_moves_allowed(self, parent: Optional[Any] = None) -> bool:
+        """
+        トレード／インシーズンFA に相当する操作の直前に呼ぶ。
+        不可なら CLI と同じロック文言を表示し False。
+        """
+        if self.inseason_roster_moves_allowed():
+            return True
+        p = parent if parent is not None else self.root
+        try:
+            messagebox.showwarning(
+                "トレード・インシーズンFAは不可",
+                INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
+                parent=p,
+            )
+        except Exception:
+            pass
+        return False
+
+    # ------------------------------------------------------------------
     # Refresh helpers
     # ------------------------------------------------------------------
     def _refresh_top_bar(self) -> None:
@@ -443,12 +482,7 @@ class MainMenuView:
             return
         cr = int(self._safe_get(self.season, "current_round", 0) or 0)
         tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
-        try:
-            from basketball_sim.systems.season_transaction_rules import inseason_roster_moves_unlocked
-
-            unlocked = inseason_roster_moves_unlocked(self.season)
-        except Exception:
-            unlocked = True
+        unlocked = self.inseason_roster_moves_allowed()
         tx = "可（ラウンド22消化後まで）" if unlocked else "期限切れ（シーズン終了まで不可）"
         self.season_status_var.set(f"消化ラウンド: {cr}/{tr}  |  トレード／インシーズンFA: {tx}")
 
@@ -458,14 +492,9 @@ class MainMenuView:
             return "—"
         if bool(self._safe_get(self.season, "season_finished", False)):
             return "オフシーズン（制限なし）"
-        try:
-            from basketball_sim.systems.season_transaction_rules import inseason_roster_moves_unlocked
-
-            if inseason_roster_moves_unlocked(self.season):
-                return "可（ラウンド22消化後まで）"
-            return "期限切れ（シーズン終了まで不可）"
-        except Exception:
-            return "判定不可"
+        if self.inseason_roster_moves_allowed():
+            return "可（ラウンド22消化後まで）"
+        return "期限切れ（シーズン終了まで不可）"
 
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
@@ -2260,14 +2289,7 @@ class MainMenuView:
         cr = int(self._safe_get(self.season, "current_round", 0) or 0)
         tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
         fin = self.season is not None and bool(self._safe_get(self.season, "season_finished", False))
-        unlocked = True
-        if self.season is not None and not fin:
-            try:
-                from basketball_sim.systems.season_transaction_rules import inseason_roster_moves_unlocked
-
-                unlocked = inseason_roster_moves_unlocked(self.season)
-            except Exception:
-                unlocked = True
+        unlocked = self.inseason_roster_moves_allowed()
         if self.season is None:
             lock_line = "シーズンが未接続です。"
         elif fin:
@@ -2287,7 +2309,8 @@ class MainMenuView:
             f"{lock_line}\n\n"
             "「スタメン・ベンチ」タブでスタメン1枠・6th・ベンチ入替を反映できます（確認ダイアログ付き）。"
             "「戦術・HC・起用」タブで戦術・HCスタイル・起用方針を変更できます。"
-            "トレード・施設投資などはターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
+            "トレード・インシーズンFAはウィンドウ下の「トレード・FA（ターミナル案内）」で可否を確認できます。"
+            "施設投資もターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
         )
 
     @staticmethod
@@ -2674,6 +2697,22 @@ class MainMenuView:
         self.refresh()
         messagebox.showinfo("完了", "スタメンを自動選出に戻しました。", parent=parent)
 
+    def _on_gm_cli_trade_fa_hint(self) -> None:
+        """トレード／インシーズンFA 相当の可否を CLI と同じガードで確認し、ターミナル操作を案内する。"""
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        if not self.ensure_inseason_roster_moves_allowed(parent):
+            return
+        messagebox.showinfo(
+            "ターミナルでトレード・FA",
+            "シーズンメニューで「8. GMメニュー」→「10. トレード」から操作します。\n"
+            "（レギュラー中のトレード・インシーズンFAは期限後は同じくメニュー側でブロックされます。）",
+            parent=parent,
+        )
+
     def _on_close_gm_window(self) -> None:
         w = getattr(self, "_gm_window", None)
         try:
@@ -2928,8 +2967,14 @@ class MainMenuView:
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=10)
         bottom.pack(fill="x", pady=(10, 0))
+        ttk.Button(
+            bottom,
+            text="トレード・FA（ターミナル案内）",
+            style="Menu.TButton",
+            command=self._on_gm_cli_trade_fa_hint,
+        ).pack(side="left")
         ttk.Button(bottom, text="閉じる", style="Menu.TButton", command=self._on_close_gm_window).pack(
-            anchor="e"
+            side="right"
         )
 
         self._gm_window = window
@@ -3302,6 +3347,22 @@ class MainMenuView:
         return bool(self._safe_get(player, "injured", False))
 
 
+def wrap_menu_callback_with_inseason_transaction_guard(
+    view: MainMenuView,
+    callback: MenuCallback,
+    parent: Optional[Any] = None,
+) -> MenuCallback:
+    """
+    メニューからトレード／インシーズンFA 相当の処理を呼ぶとき用。
+    CLI の season_transaction_rules と同じガードを通してから callback を実行する。
+    """
+    def _wrapped() -> None:
+        if not view.ensure_inseason_roster_moves_allowed(parent):
+            return
+        callback()
+    return _wrapped
+
+
 def launch_main_menu(
     team: Any = None,
     season: Any = None,
@@ -3311,7 +3372,11 @@ def launch_main_menu(
     tasks: Optional[List[str]] = None,
     user_settings: Optional[Dict[str, Any]] = None,
 ) -> MainMenuView:
-    """Convenience launcher used by future main.py wiring."""
+    """
+    Convenience launcher used by future main.py wiring.
+    トレード／インシーズンFA 相当の menu_callbacks は
+    wrap_menu_callback_with_inseason_transaction_guard で包むこと。
+    """
     view = MainMenuView(
         team=team,
         season=season,
