@@ -3,11 +3,16 @@
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.gm_dashboard_text import (
+    apply_bench_order_swap,
+    apply_sixth_man_selection,
     apply_starting_slot_change,
     format_gm_roster_text,
     format_lineup_snapshot_text,
     format_salary_cap_text,
     format_team_identity_text,
+    get_current_bench_order,
+    get_current_sixth_man,
+    get_sixth_man_candidates,
 )
 
 
@@ -89,6 +94,49 @@ def test_apply_starting_slot_change_swaps_pg():
     assert ok and msg == ""
     starters = [getattr(p, "player_id", None) for p in t.get_starting_five()]
     assert starters[0] == 2
+
+
+def test_get_sixth_man_candidates_excludes_starters():
+    t = Team(team_id=1, name="T", league_level=1)
+    starters = [_player(i, pos) for i, pos in zip(range(1, 6), ("PG", "SG", "SF", "PF", "C"))]
+    bench_pg = _player(6, "PG")
+    for p in starters + [bench_pg]:
+        t.add_player(p)
+    t.set_starting_lineup_by_players(starters)
+    cands = get_sixth_man_candidates(t)
+    assert len(cands) == 1
+    assert getattr(cands[0], "player_id", None) == 6
+
+
+def test_apply_sixth_man_selection_and_rejects_orphan():
+    t = Team(team_id=1, name="T", league_level=1)
+    starters = [_player(i, pos) for i, pos in zip(range(1, 6), ("PG", "SG", "SF", "PF", "C"))]
+    bench_pg = _player(6, "PG")
+    orphan = _player(99, "PG")
+    for p in starters + [bench_pg]:
+        t.add_player(p)
+    t.set_starting_lineup_by_players(starters)
+    ok, msg = apply_sixth_man_selection(t, orphan)
+    assert not ok
+    assert "選べません" in msg
+    ok2, msg2 = apply_sixth_man_selection(t, bench_pg)
+    assert ok2 and msg2 == ""
+    sm = get_current_sixth_man(t)
+    assert sm is not None and getattr(sm, "player_id", None) == 6
+
+
+def test_apply_bench_order_swap_swaps_two():
+    t = Team(team_id=1, name="T", league_level=1)
+    players = [_player(i, pos) for i, pos in zip(range(1, 9), ("PG", "SG", "SF", "PF", "C", "PG", "SG", "SF"))]
+    for p in players:
+        t.add_player(p)
+    t.set_starting_lineup_by_players(players[:5])
+    before = [getattr(p, "player_id", None) for p in get_current_bench_order(t)]
+    assert len(before) >= 3
+    ok, msg = apply_bench_order_swap(t, 0, 2)
+    assert ok and msg == ""
+    after = [getattr(p, "player_id", None) for p in get_current_bench_order(t)]
+    assert after[0] == before[2] and after[2] == before[0]
 
 
 def test_apply_starting_slot_change_rejects_invalid_candidate():

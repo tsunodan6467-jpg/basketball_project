@@ -38,6 +38,7 @@ from basketball_sim.systems.gm_dashboard_text import (
     get_available_starting_candidates,
     get_current_bench_order,
     get_current_sixth_man,
+    get_sixth_man_candidates,
     get_current_starting_five,
     get_starting_player_ids,
     sort_roster_for_gm_view,
@@ -987,20 +988,6 @@ def change_starting_lineup(user_team):
             f"{getattr(current_starters[slot_index], 'name', 'Unknown')} -> "
             f"{getattr(new_player, 'name', 'Unknown')}"
         )
-
-
-def get_sixth_man_candidates(user_team):
-    starter_ids = get_starting_player_ids(user_team)
-    candidates = []
-
-    for p in sort_roster_for_gm_view(getattr(user_team, "players", [])):
-        if p.is_injured() or p.is_retired:
-            continue
-        if getattr(p, "player_id", None) in starter_ids:
-            continue
-        candidates.append(p)
-
-    return candidates
 
 
 def change_sixth_man(user_team):

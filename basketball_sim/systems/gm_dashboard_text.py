@@ -151,6 +151,54 @@ def apply_starting_slot_change(team: Any, slot_index: int, new_player: Any) -> T
     return True, ""
 
 
+def get_sixth_man_candidates(user_team: Any) -> List[Any]:
+    """CLI change_sixth_man と同一の候補（先発以外の有効なロスター選手）。"""
+    starter_ids = get_starting_player_ids(user_team)
+    candidates: List[Any] = []
+    for p in sort_roster_for_gm_view(list(getattr(user_team, "players", []) or [])):
+        if not _player_active_for_bench_order(p):
+            continue
+        if getattr(p, "player_id", None) in starter_ids:
+            continue
+        candidates.append(p)
+    return candidates
+
+
+def apply_sixth_man_selection(team: Any, player: Any) -> Tuple[bool, str]:
+    cands = get_sixth_man_candidates(team)
+    npid = getattr(player, "player_id", None)
+    if npid is None:
+        return False, "選手IDが無効です。"
+    if not any(getattr(p, "player_id", None) == npid for p in cands):
+        return False, "その選手は6thに選べません。"
+    setter = getattr(team, "set_sixth_man", None)
+    if not callable(setter):
+        return False, "チームが6th設定に対応していません。"
+    setter(player)
+    return True, ""
+
+
+def apply_bench_order_swap(team: Any, index_a: int, index_b: int) -> Tuple[bool, str]:
+    bench = get_current_bench_order(team)
+    n = len(bench)
+    if n < 2:
+        return False, "ベンチが2人未満のため入れ替えできません。"
+    if index_a < 0 or index_a >= n or index_b < 0 or index_b >= n:
+        return False, "番号が不正です。"
+    if index_a == index_b:
+        return False, "同じ番号は入れ替えできません。"
+    updated = bench[:]
+    updated[index_a], updated[index_b] = updated[index_b], updated[index_a]
+    setter = getattr(team, "set_bench_order_by_players", None)
+    if not callable(setter):
+        return False, "チームがベンチ序列設定に対応していません。"
+    try:
+        setter(updated)
+    except Exception as exc:
+        return False, str(exc)
+    return True, ""
+
+
 def get_current_bench_order(user_team: Any) -> List[Any]:
     if hasattr(user_team, "get_bench_order_players"):
         try:

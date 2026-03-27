@@ -33,6 +33,8 @@ from datetime import datetime, date
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from basketball_sim.systems.gm_dashboard_text import (
+    apply_bench_order_swap,
+    apply_sixth_man_selection,
     apply_starting_slot_change,
     format_gm_roster_text,
     format_lineup_snapshot_text,
@@ -42,6 +44,7 @@ from basketball_sim.systems.gm_dashboard_text import (
     get_current_bench_order,
     get_current_sixth_man,
     get_current_starting_five,
+    get_sixth_man_candidates,
     sort_roster_for_gm_view,
 )
 from basketball_sim.systems.gm_ui_constants import (
@@ -2282,9 +2285,9 @@ class MainMenuView:
         return (
             f"消化ラウンド: {cr}/{tr}\n"
             f"{lock_line}\n\n"
-            "「スタメン・ベンチ」タブで起用の確認ができます（読み取り専用）。"
+            "「スタメン・ベンチ」タブでスタメン1枠・6th・ベンチ入替を反映できます（確認ダイアログ付き）。"
             "「戦術・HC・起用」タブで戦術・HCスタイル・起用方針を変更できます。"
-            "トレード・スタメン編集・施設投資などは、ターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
+            "トレード・施設投資などはターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
         )
 
     @staticmethod
@@ -2308,6 +2311,8 @@ class MainMenuView:
         self._gm_set_readonly_text(self._gm_text_roster, format_gm_roster_text(self.team))
         self._gm_set_readonly_text(self._gm_text_lineup, format_lineup_snapshot_text(self.team))
         self._sync_gm_lineup_edit()
+        self._sync_gm_sixth_edit()
+        self._sync_gm_bench_edit()
         self._sync_gm_strategy_combos()
 
     def _sync_gm_strategy_combos(self) -> None:
@@ -2432,6 +2437,189 @@ class MainMenuView:
         self.refresh()
         messagebox.showinfo("完了", "スタメンを更新しました。", parent=parent)
 
+    def _bench_slot_labels(self) -> List[str]:
+        return [
+            f"{i + 1}. {self._gm_candidate_label_for_player(p)}"
+            for i, p in enumerate(self._gm_bench_players)
+        ]
+
+    def _sync_gm_sixth_edit(self) -> None:
+        if self.team is None or not hasattr(self, "_gm_combo_sixth"):
+            return
+        cands = get_sixth_man_candidates(self.team)
+        self._gm_sixth_candidate_players = list(cands)
+        values = [self._gm_candidate_label_for_player(p) for p in cands]
+        self._gm_combo_sixth.configure(values=values)
+        if values:
+            self._gm_combo_sixth.set(values[0])
+        else:
+            self._gm_combo_sixth.set("")
+        self._gm_btn_apply_sixth.configure(state="normal" if values else "disabled")
+
+    def _sync_gm_bench_edit(self) -> None:
+        if self.team is None or not hasattr(self, "_gm_combo_bench_a"):
+            return
+        bench = get_current_bench_order(self.team)
+        self._gm_bench_players = list(bench)
+        labels = self._bench_slot_labels()
+        if len(bench) < 2:
+            self._gm_combo_bench_a.configure(values=[], state="disabled")
+            self._gm_combo_bench_b.configure(values=[], state="disabled")
+            self._gm_combo_bench_a.set("")
+            self._gm_combo_bench_b.set("")
+            self._gm_btn_bench_swap.configure(state="disabled")
+            return
+        for combo in (self._gm_combo_bench_a, self._gm_combo_bench_b):
+            combo.configure(values=labels, state="readonly")
+        self._gm_combo_bench_a.set(labels[0])
+        self._gm_combo_bench_b.set(labels[1])
+        self._gm_btn_bench_swap.configure(state="normal")
+
+    def _on_apply_gm_sixth_man(self) -> None:
+        if self.team is None:
+            return
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        values = [self._gm_candidate_label_for_player(p) for p in self._gm_sixth_candidate_players]
+        try:
+            sel = self._gm_combo_sixth.get()
+        except tk.TclError:
+            sel = ""
+        try:
+            idx = values.index(sel)
+        except ValueError:
+            messagebox.showwarning("6thマン", "候補を選択してください。", parent=parent)
+            return
+        player = self._gm_sixth_candidate_players[idx]
+        try:
+            ok = messagebox.askokcancel(
+                "6thマン",
+                f"6thマンを {getattr(player, 'name', '')} に設定しますか？\n\n"
+                "（CLIのGM「6thマン変更」と同じ候補です。）",
+                parent=parent,
+            )
+        except Exception:
+            return
+        if not ok:
+            return
+        success, msg = apply_sixth_man_selection(self.team, player)
+        if not success:
+            messagebox.showerror("反映できません", msg, parent=parent)
+            return
+        self.refresh()
+        messagebox.showinfo("完了", "6thマンを更新しました。", parent=parent)
+
+    def _on_reset_sixth_man_gui(self) -> None:
+        if self.team is None:
+            return
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        try:
+            ok = messagebox.askokcancel(
+                "自動6thに戻す",
+                "手動の6thマン設定を解除し、自動選出に戻しますか？",
+                parent=parent,
+            )
+        except Exception:
+            return
+        if not ok:
+            return
+        clr = getattr(self.team, "clear_sixth_man", None)
+        if not callable(clr):
+            messagebox.showinfo("未対応", "このチームでは6th解除を実行できません。", parent=parent)
+            return
+        try:
+            clr()
+        except Exception as exc:
+            messagebox.showerror("エラー", str(exc), parent=parent)
+            return
+        self.refresh()
+        messagebox.showinfo("完了", "6thマンを自動選出に戻しました。", parent=parent)
+
+    def _on_apply_gm_bench_swap(self) -> None:
+        if self.team is None:
+            return
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        self._gm_bench_players = list(get_current_bench_order(self.team))
+        labels = self._bench_slot_labels()
+        if len(self._gm_bench_players) < 2:
+            messagebox.showwarning("ベンチ", "ベンチが2人未満のため入れ替えできません。", parent=parent)
+            return
+        try:
+            sa = self._gm_combo_bench_a.get()
+            sb = self._gm_combo_bench_b.get()
+        except tk.TclError:
+            return
+        try:
+            idx_a = labels.index(sa)
+            idx_b = labels.index(sb)
+        except ValueError:
+            messagebox.showwarning("ベンチ", "控えを選択してください。", parent=parent)
+            return
+        if idx_a == idx_b:
+            messagebox.showwarning("ベンチ", "異なる2つの番号を選んでください。", parent=parent)
+            return
+        pa = self._gm_bench_players[idx_a]
+        pb = self._gm_bench_players[idx_b]
+        try:
+            ok = messagebox.askokcancel(
+                "ベンチ入替",
+                f"控え{idx_a + 1}（{getattr(pa, 'name', '')}）と "
+                f"控え{idx_b + 1}（{getattr(pb, 'name', '')}）を入れ替えますか？\n\n"
+                "（CLIのGM「ベンチ序列変更」と同じく、2人の順序のみ入れ替えます。）",
+                parent=parent,
+            )
+        except Exception:
+            return
+        if not ok:
+            return
+        success, msg = apply_bench_order_swap(self.team, idx_a, idx_b)
+        if not success:
+            messagebox.showerror("反映できません", msg, parent=parent)
+            return
+        self.refresh()
+        messagebox.showinfo("完了", "ベンチ序列を更新しました。", parent=parent)
+
+    def _on_reset_bench_order_gui(self) -> None:
+        if self.team is None:
+            return
+        w = getattr(self, "_gm_window", None)
+        try:
+            parent = w if w is not None and w.winfo_exists() else self.root
+        except Exception:
+            parent = self.root
+        try:
+            ok = messagebox.askokcancel(
+                "自動ベンチに戻す",
+                "手動のベンチ序列を解除し、自動並び（OVR順）に戻しますか？",
+                parent=parent,
+            )
+        except Exception:
+            return
+        if not ok:
+            return
+        clr = getattr(self.team, "clear_bench_order", None)
+        if not callable(clr):
+            messagebox.showinfo("未対応", "このチームではベンチ解除を実行できません。", parent=parent)
+            return
+        try:
+            clr()
+        except Exception as exc:
+            messagebox.showerror("エラー", str(exc), parent=parent)
+            return
+        self.refresh()
+        messagebox.showinfo("完了", "ベンチ序列を自動に戻しました。", parent=parent)
+
     def _on_apply_gm_strategy(self) -> None:
         if self.team is None:
             return
@@ -2496,7 +2684,7 @@ class MainMenuView:
         self._gm_window = None
 
     def _open_gm_dashboard_window(self) -> None:
-        """GM: チーム情報／キャップ／ロスターは閲覧、戦術・HC・起用はタブ内で反映。トレード等は CLI。"""
+        """GM: チーム情報／キャップ／ロスターは閲覧。戦術・HC・起用とスタメン／6th／ベンチはタブ内で反映。トレード等は CLI。"""
         if self.team is None:
             messagebox.showwarning("GM", "チームが未接続です。", parent=self.root)
             return
@@ -2571,12 +2759,12 @@ class MainMenuView:
         def _make_lineup_tab() -> None:
             tab = ttk.Frame(nb, style="Root.TFrame", padding=6)
             nb.add(tab, text="スタメン・ベンチ")
-            tab.rowconfigure(1, weight=1)
+            tab.rowconfigure(3, weight=1)
             tab.columnconfigure(0, weight=1)
 
             self._gm_slot_labels = ("PG枠", "SG枠", "SF枠", "PF枠", "C枠")
             edit_row = ttk.Frame(tab, style="Panel.TFrame", padding=(4, 6))
-            edit_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+            edit_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
             ttk.Label(edit_row, text="差し替え枠", font=("Yu Gothic UI", 9)).pack(
                 side="left", padx=(0, 6)
             )
@@ -2609,6 +2797,53 @@ class MainMenuView:
             )
             self._gm_btn_apply_lineup_slot.pack(side="left")
 
+            sixth_row = ttk.Frame(tab, style="Panel.TFrame", padding=(4, 6))
+            sixth_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+            ttk.Label(sixth_row, text="6thマン", font=("Yu Gothic UI", 9)).pack(
+                side="left", padx=(0, 6)
+            )
+            self._gm_combo_sixth = ttk.Combobox(sixth_row, state="readonly", width=44)
+            self._gm_combo_sixth.pack(side="left", padx=(0, 10))
+            self._gm_sixth_candidate_players: List[Any] = []
+            self._gm_btn_apply_sixth = ttk.Button(
+                sixth_row,
+                text="6thを反映（確認）",
+                style="Primary.TButton",
+                command=self._on_apply_gm_sixth_man,
+            )
+            self._gm_btn_apply_sixth.pack(side="left", padx=(0, 8))
+            ttk.Button(
+                sixth_row,
+                text="自動6thに戻す（確認）",
+                style="Menu.TButton",
+                command=self._on_reset_sixth_man_gui,
+            ).pack(side="left")
+
+            bench_row = ttk.Frame(tab, style="Panel.TFrame", padding=(4, 6))
+            bench_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+            ttk.Label(bench_row, text="ベンチ入替", font=("Yu Gothic UI", 9)).pack(
+                side="left", padx=(0, 6)
+            )
+            self._gm_combo_bench_a = ttk.Combobox(bench_row, state="readonly", width=28)
+            self._gm_combo_bench_a.pack(side="left", padx=(0, 6))
+            ttk.Label(bench_row, text="⇔", font=("Yu Gothic UI", 9)).pack(side="left", padx=4)
+            self._gm_combo_bench_b = ttk.Combobox(bench_row, state="readonly", width=28)
+            self._gm_combo_bench_b.pack(side="left", padx=(0, 10))
+            self._gm_bench_players: List[Any] = []
+            self._gm_btn_bench_swap = ttk.Button(
+                bench_row,
+                text="入替（確認）",
+                style="Primary.TButton",
+                command=self._on_apply_gm_bench_swap,
+            )
+            self._gm_btn_bench_swap.pack(side="left", padx=(0, 8))
+            ttk.Button(
+                bench_row,
+                text="自動ベンチに戻す（確認）",
+                style="Menu.TButton",
+                command=self._on_reset_bench_order_gui,
+            ).pack(side="left")
+
             txt = tk.Text(
                 tab,
                 wrap="none",
@@ -2623,12 +2858,12 @@ class MainMenuView:
             vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
             hsb = ttk.Scrollbar(tab, orient="horizontal", command=txt.xview)
             txt.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-            txt.grid(row=1, column=0, sticky="nsew")
-            vsb.grid(row=1, column=1, sticky="ns")
-            hsb.grid(row=2, column=0, columnspan=2, sticky="ew")
+            txt.grid(row=3, column=0, sticky="nsew")
+            vsb.grid(row=3, column=1, sticky="ns")
+            hsb.grid(row=4, column=0, columnspan=2, sticky="ew")
 
             btn_row = ttk.Frame(tab, style="Panel.TFrame", padding=(8, 4))
-            btn_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+            btn_row.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 0))
             ttk.Button(
                 btn_row,
                 text="自動スタメンに戻す（確認）",
@@ -2637,7 +2872,7 @@ class MainMenuView:
             ).pack(side="left", padx=(0, 8))
             ttk.Label(
                 btn_row,
-                text="カスタム解除は上。1枠だけの差し替えは「反映（確認）」（CLIのスタメン変更と同じ候補ルール）。",
+                text="スタメン／6th／ベンチは上段。解除ボタンはカスタム設定のリセット。トレード等はCLI。",
                 font=("Yu Gothic UI", 9),
             ).pack(side="left")
 

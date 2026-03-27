@@ -26,5 +26,7 @@
 
 ## 変更操作
 
-- **スタメン1枠の差し替え**は **CLI** の GM メニュー（スタメン変更）と **GUI**（主画面 → GM →「スタメン・ベンチ」タブの **枠／候補／反映（確認）**）のどちらでも可。候補の出し方は `get_available_starting_candidates`（`gm_dashboard_text`）で CLI と一致。
-- **カスタムスタメン全体の解除**は同タブの **「自動スタメンに戻す（確認）」**。`Team.clear_starting_lineup()` を実行し、自動選出に戻す（`askokcancel`）。6th はそのまま。
+- **スタメン1枠の差し替え**は **CLI** の GM メニュー（スタメン変更）と **GUI**（主画面 → GM →「スタメン・ベンチ」タブの **枠／候補／反映（確認）**）のどちらでも可。候補は `get_available_starting_candidates`（`gm_dashboard_text`）で CLI と一致。
+- **6thマン**は同タブの候補＋**6thを反映**、または CLI。候補は `get_sixth_man_candidates`。解除は **自動6thに戻す**（`Team.clear_sixth_man`）。
+- **ベンチ序列の2人入替**は同タブの **入替（確認）** または CLI。解除は **自動ベンチに戻す**（`Team.clear_bench_order`）。入替の適用は `apply_bench_order_swap` が CLI の2番指定入替と同じ結果になる。
+- **カスタムスタメン全体の解除**は **「自動スタメンに戻す（確認）」**。`Team.clear_starting_lineup()` を実行し、自動選出に戻す（`askokcancel`）。6th はそのまま。
