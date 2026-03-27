@@ -42,9 +42,9 @@ class SeasonEvent:
 
 ROUND_CONFIG = {
     1:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ開幕週"},
-    2:  {"month": 10, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
+    2:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
     3:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md1", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD1"},
-    4:  {"month": 10, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
+    4:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
     5:  {"month": 11, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "通常週"},
     6:  {"month": 11, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md2", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD2"},
@@ -256,6 +256,13 @@ class Season:
 
     def _is_break_week(self, round_number: int) -> bool:
         return bool(self._get_round_config(round_number).get("is_break_week"))
+
+    def _regular_season_games_per_team_target(self) -> int:
+        total = 0
+        for round_no in range(1, self.total_rounds + 1):
+            cfg = self._get_round_config(round_no)
+            total += int(cfg.get("league_games_per_team", 0) or 0)
+        return max(1, total)
 
 
     def _get_cycle_year(self) -> int:
@@ -1136,20 +1143,35 @@ class Season:
         return all_rounds
 
     def _prepare_regular_season_schedule(self) -> List[List[Tuple[Team, Team]]]:
-        league_rounds = {}
-        max_rounds = 0
+        total_rounds = max(ROUND_CONFIG.keys()) if ROUND_CONFIG else 0
+        if total_rounds <= 0:
+            return []
+
+        # ROUND_CONFIG の league_games_per_team を実際の日程へ反映する。
+        # 1ラウンド内で複数試合を実施することで、想定試合数（60試合/年）を満たす。
+        per_level_cycle_rounds: Dict[int, List[List[Tuple[Team, Team]]]] = {}
+        per_level_cycle_cursor: Dict[int, int] = {}
 
         for level in [1, 2, 3]:
-            rounds = self._build_double_round_robin_rounds(self.leagues[level])
-            league_rounds[level] = rounds
-            max_rounds = max(max_rounds, len(rounds))
+            cycle_rounds = self._build_double_round_robin_rounds(self.leagues[level])
+            per_level_cycle_rounds[level] = cycle_rounds
+            per_level_cycle_cursor[level] = 0
 
-        schedule_by_round = []
-        for round_idx in range(max_rounds):
-            combined_round = []
+        schedule_by_round: List[List[Tuple[Team, Team]]] = []
+        for round_no in range(1, total_rounds + 1):
+            cfg = ROUND_CONFIG.get(round_no, {})
+            games_per_team = int(cfg.get("league_games_per_team", 0) or 0)
+            combined_round: List[Tuple[Team, Team]] = []
+
             for level in [1, 2, 3]:
-                if round_idx < len(league_rounds[level]):
-                    combined_round.extend(league_rounds[level][round_idx])
+                cycle_rounds = per_level_cycle_rounds[level]
+                if not cycle_rounds or games_per_team <= 0:
+                    continue
+
+                for _ in range(games_per_team):
+                    idx = per_level_cycle_cursor[level] % len(cycle_rounds)
+                    combined_round.extend(cycle_rounds[idx])
+                    per_level_cycle_cursor[level] += 1
 
             random.shuffle(combined_round)
             schedule_by_round.append(combined_round)
@@ -2854,7 +2876,8 @@ class Season:
             )
 
     def _calculate_and_print_awards_by_division(self):
-        mvp_min_games = math.ceil(self.total_rounds * 0.8)
+        target_games = self._regular_season_games_per_team_target()
+        mvp_min_games = math.ceil(target_games * 0.8)
 
         for level in [1, 2, 3]:
             qualified_players = self._get_qualified_players_in_level(level, min_games=15)
@@ -2912,7 +2935,7 @@ class Season:
                     apg * 0.18 +
                     bpg * 0.08 +
                     spg * 0.06 +
-                    (team_wins / max(1, self.total_rounds)) * 10 +
+                    (team_wins / max(1, target_games)) * 10 +
                     p.ovr * 0.05
                 )
                 mvp_candidates.append((mvp_score, p))

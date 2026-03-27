@@ -819,8 +819,15 @@ def generate_teams() -> list[Team]:
                 market_size=market_size
             )
 
-            for _ in range(13):
-                p = generate_single_player()
+            # 本契約13枠の国籍スロットを先に決めてから生成する。
+            # 日本ルール: Foreign 3 / Asia-or-Naturalized 1 / Domestic 9
+            nationality_slots = ["Foreign", "Foreign", "Foreign"]
+            nationality_slots.append(random.choice(["Asia", "Naturalized"]))
+            nationality_slots.extend(["Japan"] * 9)
+            random.shuffle(nationality_slots)
+
+            for nat in nationality_slots:
+                p = generate_single_player(nationality_override=nat)
                 p.years_pro = max(0, p.age - 18)
                 p.contract_years_left = random.randint(2, 4)
                 p.league_years = p.years_pro
