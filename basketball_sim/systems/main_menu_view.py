@@ -637,13 +637,16 @@ class MainMenuView:
                 cap_status,
                 compute_luxury_tax,
                 get_hard_cap,
+                get_payroll_floor,
                 get_soft_cap,
+                league_level_for_team,
             )
 
             payroll = int(get_team_payroll(team))
-            hard = int(get_hard_cap())
-            soft = int(get_soft_cap())
-            st = cap_status(payroll)
+            lv = league_level_for_team(team)
+            hard = int(get_hard_cap(league_level=lv))
+            soft = int(get_soft_cap(league_level=lv))
+            st = cap_status(payroll, league_level=lv)
             status_ja = {
                 "under_cap": "キャップ内",
                 "over_cap": "ハード超過",
@@ -651,19 +654,23 @@ class MainMenuView:
             }.get(st, st)
             room_soft = soft - payroll
             if room_soft >= 0:
-                room_str = f"ソフト余裕 ${room_soft:,}"
+                room_str = f"ソフト余裕 {room_soft:,}円"
             else:
-                room_str = f"ソフト超過 ${abs(room_soft):,}"
-            tax = int(compute_luxury_tax(payroll))
-            tax_str = f" / 贅沢税 ${tax:,}" if tax > 0 else ""
+                room_str = f"ソフト超過 {abs(room_soft):,}円"
+            tax = int(compute_luxury_tax(payroll, league_level=lv))
+            tax_str = f" / 贅沢税 {tax:,}円" if tax > 0 else ""
             bud = int(self._safe_get(team, "payroll_budget", 0) or 0)
             bud_str = ""
             if bud > 0:
                 mark = " ⚠" if payroll > bud else ""
-                bud_str = f" | クラブ目安 ${bud:,}{mark}"
+                bud_str = f" | クラブ目安 {bud:,}円{mark}"
+            floor = int(get_payroll_floor(lv))
+            floor_str = ""
+            if floor > 0 and payroll < floor:
+                floor_str = f" | ⚠ ペイロール下限未満（要 {floor:,}円以上・シーズン終了時は降格の対象）"
             return (
-                f"給与合計 ${payroll:,}（ハード ${hard:,} / ソフト ${soft:,}）"
-                f" | {status_ja} | {room_str}{tax_str}{bud_str}"
+                f"給与合計 {payroll:,}円（ハード {hard:,}円 / ソフト {soft:,}円）"
+                f" | {status_ja} | {room_str}{tax_str}{bud_str}{floor_str}"
             )
         except Exception:
             return "給与・キャップ: 計算不可"

@@ -2747,6 +2747,44 @@ class Season:
             results[level] = self._simulate_playoffs_for_division(level)
         return results
 
+    def _teams_below_payroll_floor(self, leagues: dict, level: int) -> List[Team]:
+        from basketball_sim.systems.contract_logic import get_team_payroll
+        from basketball_sim.systems.salary_cap_budget import get_payroll_floor
+
+        floor = get_payroll_floor(level)
+        if floor <= 0:
+            return []
+        out: List[Team] = []
+        for t in leagues[level]:
+            if int(get_team_payroll(t)) < floor:
+                out.append(t)
+        return out
+
+    def _promotion_candidates_from_division(
+        self,
+        playoff_results: dict,
+        standings: List[Team],
+        division_level: int,
+        needed: int,
+    ) -> List[Team]:
+        if needed <= 0:
+            return []
+        div_result = playoff_results.get(division_level, {})
+        promoted: List[Team] = []
+        eligible = set(standings)
+        champ = div_result.get("champion")
+        ru = div_result.get("runner_up")
+        if champ is not None and champ in eligible:
+            promoted.append(champ)
+        if ru is not None and ru not in promoted and ru in eligible:
+            promoted.append(ru)
+        for t in standings:
+            if t not in promoted:
+                promoted.append(t)
+            if len(promoted) >= needed:
+                break
+        return promoted[:needed]
+
     def _process_promotion_relegation(self, leagues: dict, playoff_results: dict):
         print("\n--- Final Standings & Promotion/Relegation ---")
 
@@ -2766,35 +2804,41 @@ class Season:
         for i, t in enumerate(d3_standings, 1):
             print(f" {i}. {t.name:<25} ({t.regular_wins}-{t.regular_losses})")
 
-        d1_relegated = d1_standings[-2:] if len(d1_standings) >= 2 else []
-        d2_relegated = d2_standings[-2:] if len(d2_standings) >= 2 else []
+        d1_floor_violators = self._teams_below_payroll_floor(leagues, 1)
+        d2_floor_violators = self._teams_below_payroll_floor(leagues, 2)
 
-        d2_promoted = []
-        d3_promoted = []
+        d1_must_down = set(d1_standings[-2:] if len(d1_standings) >= 2 else []) | set(d1_floor_violators)
+        d1_relegated = [t for t in d1_standings if t in d1_must_down]
 
-        d2_result = playoff_results.get(2, {})
-        d3_result = playoff_results.get(3, {})
+        d2_must_down = set(d2_standings[-2:] if len(d2_standings) >= 2 else []) | set(d2_floor_violators)
+        d2_relegated = [t for t in d2_standings if t in d2_must_down]
 
-        if d2_result.get("champion") is not None:
-            d2_promoted.append(d2_result["champion"])
-        if d2_result.get("runner_up") is not None and d2_result["runner_up"] not in d2_promoted:
-            d2_promoted.append(d2_result["runner_up"])
+        n_d1_down = len(d1_relegated)
+        n_d2_down = len(d2_relegated)
 
-        if d3_result.get("champion") is not None:
-            d3_promoted.append(d3_result["champion"])
-        if d3_result.get("runner_up") is not None and d3_result["runner_up"] not in d3_promoted:
-            d3_promoted.append(d3_result["runner_up"])
+        d2_relegated_set = set(d2_relegated)
+        eligible_d2 = [t for t in d2_standings if t not in d2_relegated_set]
+        d2_promoted = self._promotion_candidates_from_division(
+            playoff_results, eligible_d2, 2, n_d1_down
+        )
+        d3_promoted = self._promotion_candidates_from_division(
+            playoff_results, d3_standings, 3, n_d2_down
+        )
 
         print("\n[League Changes for Next Season]")
 
         for t in d1_relegated:
             t.league_level = 2
-            print(f"  v Relegated: {t.name} (D1 -> D2)")
+            tag = " [ペイロール下限未達]" if t in d1_floor_violators else ""
+            print(f"  v Relegated: {t.name} (D1 -> D2){tag}")
+            extra = {"from_division": 1, "to_division": 2}
+            if t in d1_floor_violators:
+                extra["reason"] = "payroll_floor"
             self._record_competition_team_result(
                 competition_id="regular_season",
                 team=t,
                 result_type="relegated",
-                extra={"from_division": 1, "to_division": 2}
+                extra=extra,
             )
 
         for t in d2_promoted:
@@ -2809,12 +2853,18 @@ class Season:
 
         for t in d2_relegated:
             t.league_level = 3
-            print(f"  v Relegated: {t.name} (D2 -> D3)")
+            if t in d2_floor_violators:
+                print(f"  v Relegated: {t.name} (D2 -> D3) [ペイロール下限未達]")
+            else:
+                print(f"  v Relegated: {t.name} (D2 -> D3)")
+            extra = {"from_division": 2, "to_division": 3}
+            if t in d2_floor_violators:
+                extra["reason"] = "payroll_floor"
             self._record_competition_team_result(
                 competition_id="regular_season",
                 team=t,
                 result_type="relegated",
-                extra={"from_division": 2, "to_division": 3}
+                extra=extra,
             )
 
         for t in d3_promoted:

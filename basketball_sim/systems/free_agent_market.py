@@ -1,11 +1,12 @@
 from typing import List, Optional, Tuple
 import random
 
+from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.season_transaction_rules import cpu_inseason_fa_allowed_for_simulated_round
-from basketball_sim.systems.contract_logic import SALARY_CAP_DEFAULT, get_team_payroll
-from basketball_sim.systems.salary_cap_budget import get_soft_cap
+from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap, league_level_for_team
 
 
 FA_SOFT_CAP_SIGNING_BUFFER_RATIO = 0.08
@@ -24,7 +25,7 @@ def ensure_fa_market_fields(player: Player) -> None:
         player.is_retired = False
 
     if not hasattr(player, "salary") or player.salary is None:
-        player.salary = max(getattr(player, "ovr", 0) * 10000, 300000)
+        player.salary = max(getattr(player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
 
     if not hasattr(player, "contract_years_left") or player.contract_years_left is None:
         player.contract_years_left = 0
@@ -168,7 +169,7 @@ def evaluate_team_need_for_player(team: Team, player: Player) -> float:
 
 def get_team_fa_signing_limit(
     team: Team,
-    salary_cap: int = SALARY_CAP_DEFAULT,
+    salary_cap: Optional[int] = None,
 ) -> int:
     """
     FA契約に使える簡易上限。
@@ -178,10 +179,13 @@ def get_team_fa_signing_limit(
     - soft cap以上: FA契約不可
 
     ソフト上限の数値は salary_cap_budget.get_soft_cap と同一。
+    salary_cap を省略時はチーム所属ディビジョンのハードキャップを使用。
     """
     ensure_team_fa_market_fields(team)
 
     payroll = get_team_payroll(team)
+    if salary_cap is None:
+        salary_cap = int(get_hard_cap(league_level=league_level_for_team(team)))
     soft_cap_limit = int(get_soft_cap(salary_cap))
 
     if payroll >= soft_cap_limit:
@@ -198,7 +202,7 @@ def get_team_fa_signing_limit(
 def can_team_afford_free_agent(
     team: Team,
     player: Player,
-    salary_cap: int = SALARY_CAP_DEFAULT,
+    salary_cap: Optional[int] = None,
 ) -> bool:
     """
     所持金 + サラリーキャップの両方で判定する。
@@ -495,7 +499,7 @@ def run_cpu_fa_market_cycle(
                 f"(OVR:{getattr(target, 'ovr', 0)}) | "
                 f"Salary:{estimate_fa_market_value(target)} | "
                 f"Years:{estimate_fa_contract_years(target)} | "
-                f"Payroll:{get_team_payroll(team)} / SoftCap:{int(get_soft_cap(SALARY_CAP_DEFAULT))}"
+                f"Payroll:{get_team_payroll(team)} / SoftCap:{int(get_soft_cap(league_level=league_level_for_team(team)))}"
             )
             sign_count += 1
 

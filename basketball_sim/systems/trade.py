@@ -3,11 +3,8 @@ from typing import List
 
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
-from basketball_sim.systems.contract_logic import (
-    SALARY_CAP_DEFAULT,
-    SALARY_SOFT_LIMIT_MULTIPLIER,
-    get_team_payroll,
-)
+from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.salary_cap_budget import get_soft_cap, league_level_for_team
 
 
 MIN_TRADE_OVR = 58
@@ -293,13 +290,10 @@ def _get_trade_payroll_after(team: Team, outgoing: Player, incoming: Player) -> 
     )
 
 
-def _get_cap_status(payroll_after: int) -> str:
-    soft_cap = int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER)
-    if payroll_after > soft_cap:
-        return "over_soft_cap"
-    if payroll_after > SALARY_CAP_DEFAULT:
-        return "over_cap"
-    return "under_cap"
+def _get_cap_status(payroll_after: int, team: Team) -> str:
+    from basketball_sim.systems.salary_cap_budget import cap_status
+
+    return cap_status(int(payroll_after), league_level=league_level_for_team(team))
 
 
 def _can_absorb_salary(team: Team, outgoing: Player, incoming: Player) -> bool:
@@ -309,7 +303,7 @@ def _can_absorb_salary(team: Team, outgoing: Player, incoming: Player) -> bool:
     """
     team_salary_after = _get_trade_payroll_after(team, outgoing, incoming)
 
-    if team_salary_after > SALARY_CAP_DEFAULT:
+    if team_salary_after > int(get_soft_cap(league_level=league_level_for_team(team))):
         return False
 
     salary_diff = getattr(incoming, "salary", 0) - getattr(outgoing, "salary", 0)
@@ -606,8 +600,8 @@ def conduct_trades(teams: List[Team]):
                         f"[TRADE] {team_a.name} traded {p_a.name} (OVR:{p_a.ovr}) "
                         f"to {team_b.name} for {p_b.name} (OVR:{p_b.ovr}) | "
                         f"gain_a={gain_a:.1f} gain_b={gain_b:.1f} | "
-                        f"{team_a.name}:{payroll_a_after:,}({_get_cap_status(payroll_a_after)}) | "
-                        f"{team_b.name}:{payroll_b_after:,}({_get_cap_status(payroll_b_after)})"
+                        f"{team_a.name}:{payroll_a_after:,}({_get_cap_status(payroll_a_after, team_a)}) | "
+                        f"{team_b.name}:{payroll_b_after:,}({_get_cap_status(payroll_b_after, team_b)})"
                     )
 
                     trade_executed = True

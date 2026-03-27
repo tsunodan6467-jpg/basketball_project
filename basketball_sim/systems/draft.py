@@ -1,6 +1,7 @@
 from typing import List, Optional, Tuple
 import random
 
+from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
 
@@ -612,7 +613,7 @@ def _handle_roster_limit_after_draft(team: Team, drafted_player: Player, free_ag
         team.remove_player(release_player)
         release_player.contract_years_left = 0
         if getattr(release_player, "salary", 0) <= 0:
-            release_player.salary = max(getattr(release_player, "ovr", 0) * 10000, 300000)
+            release_player.salary = max(getattr(release_player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
         free_agents.append(release_player)
         print(
             f"[DRAFT-RELEASE] {team.name} released {release_player.name} "
@@ -624,7 +625,7 @@ def _handle_roster_limit_after_draft(team: Team, drafted_player: Player, free_ag
     team.remove_player(drafted_player)
     drafted_player.contract_years_left = 0
     if getattr(drafted_player, "salary", 0) <= 0:
-        drafted_player.salary = max(getattr(drafted_player, "ovr", 0) * 10000, 300000)
+        drafted_player.salary = max(getattr(drafted_player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
     free_agents.append(drafted_player)
     print(
         f"[DRAFT-KEEP] {team.name} kept current roster and sent {drafted_player.name} "
@@ -693,7 +694,7 @@ def conduct_draft(teams: List[Team], draft_pool: List[Player], free_agents: List
     for p in draft_pool:
         p.contract_years_left = 0
         if getattr(p, "salary", 0) <= 0:
-            p.salary = max(getattr(p, "ovr", 0) * 10000, 300000)
+            p.salary = max(getattr(p, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
         free_agents.append(p)
 
     draft_pool.clear()

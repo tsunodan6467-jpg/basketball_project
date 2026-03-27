@@ -38,9 +38,36 @@ LEAGUE_ONCOURT_FOREIGN_CAP = 2
 LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP = 1
 
 # サラリー（Step 3: リーグキャップ・ソフト上限・贅沢税の単一ソース）
-LEAGUE_SALARY_CAP = 15_000_000
+# 金額はすべて円。D1 ソフトキャップ = ハード × SALARY_SOFT_LIMIT_MULTIPLIER（既定 1.2）→ 12億円。
 SALARY_SOFT_LIMIT_MULTIPLIER = 1.20
-# ソフトキャップ超過分に掛ける率（v1: 超過ペイロール全体に対する簡易税）
+# ディビジョン別「ハードキャップ」（年俸合計の目安上限。ソフトはこれ×乗数）
+LEAGUE_SALARY_CAP_BY_DIVISION = {
+    1: 1_000_000_000,   # 10億 → ソフト 12億（D1）
+    2: 500_000_000,     # 5億 → ソフト 6億（D2）
+    3: 250_000_000,     # 2.5億 → ソフト 3億（D3・バランス調整用）
+}
+# 後方互換・省略時は D1 のハードキャップ
+LEAGUE_SALARY_CAP = LEAGUE_SALARY_CAP_BY_DIVISION[1]
+
+# 選手年俸の OVR ベース（contract_logic.calculate_desired_salary の一次項と一致）
+PLAYER_SALARY_BASE_PER_OVR = 1_800_000
+
+# ペイロール下限（円）。0 は「下限なし」（違反・降格ペナルティなし）
+PAYROLL_FLOOR_BY_DIVISION = {
+    1: 600_000_000,   # 6億（D1）
+    2: 400_000_000,   # 4億（D2）
+    3: 0,
+}
+
+# ソフトキャップ超過分に対する段階式ぜいたく税（ドラフト RB の _tax_extra と同型）
+# 超過額 over に対し: 最初の幅 w1 に倍率 m1、次の w2 に m2、残りに m3
+PAYROLL_LUXURY_TAX_BRACKET_WIDTH_1 = 200_000_000   # 2億円分
+PAYROLL_LUXURY_TAX_BRACKET_WIDTH_2 = 500_000_000   # 5億円分
+PAYROLL_LUXURY_TAX_BRACKET_MULT_1 = 1
+PAYROLL_LUXURY_TAX_BRACKET_MULT_2 = 2
+PAYROLL_LUXURY_TAX_BRACKET_MULT_3 = 3
+
+# 旧単一レート（互換用・非推奨）。compute_luxury_tax は段階式を使用。
 LUXURY_TAX_RATE = 0.50
 
 # レギュラーシーズン中のトレード/インシーズンFA 期限（ROUND_CONFIG 準拠）

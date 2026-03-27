@@ -5,11 +5,8 @@ from typing import List, Tuple, Dict, Optional, Set
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
-from basketball_sim.systems.contract_logic import (
-    SALARY_CAP_DEFAULT,
-    SALARY_SOFT_LIMIT_MULTIPLIER,
-    get_team_payroll,
-)
+from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.salary_cap_budget import get_soft_cap, league_level_for_team
 
 
 @dataclass
@@ -482,7 +479,8 @@ class TradeSystem:
         outgoing_salary = sum(int(getattr(p, "salary", 0) or 0) for p in gives_players)
         incoming_salary = sum(int(getattr(p, "salary", 0) or 0) for p in kept_incoming)
         payroll_after = payroll_current - outgoing_salary + incoming_salary
-        if payroll_after > int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER):
+        soft_limit = int(get_soft_cap(league_level=league_level_for_team(team)))
+        if payroll_after > soft_limit:
             reasons.append("soft_cap_block")
             return TradeEvaluation(False, -999.0, reasons)
 
@@ -683,9 +681,9 @@ class TradeSystem:
 
         payroll_after_a = payroll_current_a - outgoing_salary_a + sum(int(getattr(p, "salary", 0) or 0) for p in kept_incoming_a)
         payroll_after_b = payroll_current_b - outgoing_salary_b + sum(int(getattr(p, "salary", 0) or 0) for p in kept_incoming_b)
-        if payroll_after_a > int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER):
+        if payroll_after_a > int(get_soft_cap(league_level=league_level_for_team(team_a))):
             return False
-        if payroll_after_b > int(SALARY_CAP_DEFAULT * SALARY_SOFT_LIMIT_MULTIPLIER):
+        if payroll_after_b > int(get_soft_cap(league_level=league_level_for_team(team_b))):
             return False
 
         # 実行（まず選手入替）

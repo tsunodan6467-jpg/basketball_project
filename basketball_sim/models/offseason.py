@@ -1,8 +1,13 @@
 import random
 from typing import List, Optional, Dict
 
-from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP
-from basketball_sim.systems.salary_cap_budget import get_soft_cap, payroll_exceeds_soft_cap
+from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
+from basketball_sim.systems.salary_cap_budget import (
+    get_hard_cap,
+    get_soft_cap,
+    league_level_for_team,
+    payroll_exceeds_soft_cap,
+)
 
 from .team import Team
 from .player import Player
@@ -1299,7 +1304,7 @@ class Offseason:
         player.contract_years_left = 0
         player.team_id = None
         player.fa_years_waiting = 0
-        player.salary = max(getattr(player, "ovr", 0) * 10000, 350000)
+        player.salary = max(getattr(player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 350000)
         return player
 
     def _all_players(self) -> List[Player]:
@@ -1925,7 +1930,6 @@ class Offseason:
 
     def _resign_players(self):
         print("Conducting Re-signing...")
-        salary_cap = int(LEAGUE_SALARY_CAP)
 
         user_teams = [team for team in self.teams if self._is_user_team(team)]
         if not user_teams:
@@ -1956,6 +1960,7 @@ class Offseason:
                         )
 
         for team in self.teams:
+            salary_cap = int(get_hard_cap(league_level=league_level_for_team(team)))
             expiring_players = [
                 p for p in team.players
                 if getattr(p, "contract_years_left", 0) == 1
@@ -1977,8 +1982,8 @@ class Offseason:
                 if calculate_desired_contract_terms is not None:
                     desired_salary, desired_years = calculate_desired_contract_terms(player)
                 else:
-                    current_salary = max(getattr(player, "salary", 0), player.ovr * 10000)
-                    desired_salary = max(current_salary, player.ovr * 10000)
+                    current_salary = max(getattr(player, "salary", 0), player.ovr * PLAYER_SALARY_BASE_PER_OVR)
+                    desired_salary = max(current_salary, player.ovr * PLAYER_SALARY_BASE_PER_OVR)
                     if player.age <= 24:
                         desired_years = 4
                     elif player.age <= 29:
@@ -3350,10 +3355,10 @@ class Offseason:
 
             luxury_tax = 0
             if compute_luxury_tax is not None:
-                luxury_tax = int(compute_luxury_tax(payroll))
+                luxury_tax = int(compute_luxury_tax(payroll, league_level=league_level))
             cap_label = ""
             if cap_status is not None:
-                cap_label = cap_status(int(payroll))
+                cap_label = cap_status(int(payroll), league_level=league_level)
             team.owner_expectation = self._normalize_owner_expectation_for_missions(
                 self._get_owner_expectation_label(team, wins)
             )

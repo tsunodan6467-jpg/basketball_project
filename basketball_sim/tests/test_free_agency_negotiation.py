@@ -92,8 +92,9 @@ def test_calculate_offer_respects_payroll_budget_room():
 
 
 def test_cap_status_is_aligned_with_shared_budget_module():
-    hard = fa.SALARY_CAP_DEFAULT
-    soft = fa._soft_cap()
-    assert fa._cap_status(hard - 1) == "under_cap"
-    assert fa._cap_status(hard + 1) == "over_cap"
-    assert fa._cap_status(soft + 1) == "over_soft_cap"
+    team = Team(team_id=1, name="T", league_level=1)
+    hard = fa._hard_cap(team)
+    soft = fa._soft_cap(team)
+    assert fa._cap_status(hard - 1, team) == "under_cap"
+    assert fa._cap_status(hard + 1, team) == "over_cap"
+    assert fa._cap_status(soft + 1, team) == "over_soft_cap"

@@ -6,8 +6,6 @@ from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
 from basketball_sim.systems.contract_logic import (
-    SALARY_CAP_DEFAULT,
-    SALARY_SOFT_LIMIT_MULTIPLIER,
     calculate_fa_retention_bonus,
     fa_roll_accept_offer,
     get_team_payroll,
@@ -15,7 +13,9 @@ from basketball_sim.systems.contract_logic import (
 from basketball_sim.systems.salary_cap_budget import (
     cap_status as shared_cap_status,
     compute_luxury_tax,
+    get_hard_cap,
     get_soft_cap as shared_get_soft_cap,
+    league_level_for_team,
 )
 
 
@@ -32,13 +32,17 @@ def _team_wins(team: Team) -> int:
     return getattr(team, "last_season_wins", getattr(team, "regular_wins", 15))
 
 
-def _soft_cap() -> int:
+def _hard_cap(team: Team) -> int:
+    return int(get_hard_cap(league_level=league_level_for_team(team)))
+
+
+def _soft_cap(team: Team) -> int:
     # サラリー判定は salary_cap_budget の単一入口に寄せる（判定ズレ防止）
-    return int(shared_get_soft_cap(SALARY_CAP_DEFAULT))
+    return int(shared_get_soft_cap(league_level=league_level_for_team(team)))
 
 
-def _cap_status(payroll: int) -> str:
-    return str(shared_cap_status(int(payroll), salary_cap=SALARY_CAP_DEFAULT))
+def _cap_status(payroll: int, team: Team) -> str:
+    return str(shared_cap_status(int(payroll), league_level=league_level_for_team(team)))
 
 
 def _get_fa_profile(player: Player) -> dict:
@@ -161,7 +165,7 @@ def _determine_contract_years(player: Player, team: Team, offer: int) -> int:
             years = min(years, max(1, min(3, desired_years)))
 
     payroll_before = _team_salary(team)
-    if payroll_before > SALARY_CAP_DEFAULT and years >= 3:
+    if payroll_before > _hard_cap(team) and years >= 3:
         years -= 1
 
     return max(1, min(4, years))
@@ -169,7 +173,9 @@ def _determine_contract_years(player: Player, team: Team, offer: int) -> int:
 
 def _calculate_offer(team: Team, player: Player) -> int:
     payroll_before = _team_salary(team)
-    soft_cap = _soft_cap()
+    soft_cap = _soft_cap(team)
+    cap_base = _hard_cap(team)
+    lv = league_level_for_team(team)
 
     if payroll_before >= soft_cap:
         return 0
@@ -187,12 +193,12 @@ def _calculate_offer(team: Team, player: Player) -> int:
 
     payroll_after = payroll_before + offer
 
-    if payroll_before <= SALARY_CAP_DEFAULT < payroll_after:
+    if payroll_before <= cap_base < payroll_after:
         # cap超えは許容。ただし超えた瞬間の契約は少し控えめにする
         room_to_soft = max(0, soft_cap - payroll_before)
         offer = min(offer, room_to_soft)
 
-    if payroll_before > SALARY_CAP_DEFAULT:
+    if payroll_before > cap_base:
         # すでにcap超えなら、soft capまでの低額契約のみ許可
         room_to_soft = max(0, soft_cap - payroll_before)
         low_cost_limit = min(max(base, 0), 900_000)
@@ -210,10 +216,11 @@ def _calculate_offer(team: Team, player: Player) -> int:
         offer = min(offer, room_to_budget if room_to_budget > 0 else 0)
 
     # 贅沢税の増分が大きすぎる契約は一段圧縮（過剰な赤字契約を抑制）。
-    tax_before = int(compute_luxury_tax(payroll_before, salary_cap=SALARY_CAP_DEFAULT))
-    tax_after = int(compute_luxury_tax(payroll_before + offer, salary_cap=SALARY_CAP_DEFAULT))
+    tax_before = int(compute_luxury_tax(payroll_before, league_level=lv))
+    tax_after = int(compute_luxury_tax(payroll_before + offer, league_level=lv))
     tax_delta = max(0, tax_after - tax_before)
-    if tax_delta >= 8_000_000:
+    tax_warn = max(8_000_000, soft_cap // 200)
+    if tax_delta >= tax_warn:
         offer = int(offer * 0.85)
 
     return max(0, int(offer))
@@ -552,7 +559,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
                 break
 
             payroll_before = _team_salary(team)
-            status_before = _cap_status(payroll_before)
+            status_before = _cap_status(payroll_before, team)
 
             offer = _calculate_offer(team, candidate)
 
@@ -564,7 +571,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
 
                 signing_room = int(get_team_fa_signing_limit(team))
             except Exception:
-                signing_room = max(0, _soft_cap() - payroll_before)
+                signing_room = max(0, _soft_cap(team) - payroll_before)
 
             if offer > signing_room:
                 print(
@@ -574,7 +581,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
                 continue
 
             payroll_after = payroll_before + offer
-            status_after = _cap_status(payroll_after)
+            status_after = _cap_status(payroll_after, team)
 
             fit_value = _get_strategy_fit(team, candidate)
             coach_fit_value = _get_coach_fit(team, candidate)
@@ -592,7 +599,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
                 f"| role={role_value:.1f} | win={winning_value:.1f} "
                 f"| fit={fit_value:.1f} | coach_fit={coach_fit_value:.1f} "
                 f"| score={score:.1f} | payroll={payroll_before:,}->{payroll_after:,} "
-                f"| cap={SALARY_CAP_DEFAULT:,} | soft_cap={_soft_cap():,} "
+                f"| cap={_hard_cap(team):,} | soft_cap={_soft_cap(team):,} "
                 f"| status_before={status_before} | status_after={status_after}"
             )
 
@@ -629,7 +636,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
 
                 print(
                     f"[FA] {team.name} signed {candidate.name} for ${offer:,} / {contract_years}y "
-                    f"| Payroll:{payroll_after:,} / SoftCap:{_soft_cap():,} "
+                    f"| Payroll:{payroll_after:,} / SoftCap:{_soft_cap(team):,} "
                     f"| status_after={status_after}"
                 )
 

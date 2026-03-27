@@ -3,8 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
-from basketball_sim.config.game_constants import LEAGUE_SALARY_CAP, SALARY_SOFT_LIMIT_MULTIPLIER
-from basketball_sim.systems.salary_cap_budget import payroll_exceeds_soft_cap
+from basketball_sim.config.game_constants import (
+    LEAGUE_SALARY_CAP,
+    PLAYER_SALARY_BASE_PER_OVR,
+    SALARY_SOFT_LIMIT_MULTIPLIER,
+)
+from basketball_sim.systems.salary_cap_budget import get_hard_cap, league_level_for_team, payroll_exceeds_soft_cap
 
 
 # =========================================================
@@ -235,7 +239,7 @@ def calculate_desired_salary(player: object) -> int:
     potential = normalize_potential(getattr(player, "potential", "C"))
 
     # OVR主軸
-    base_salary = ovr * 1_800_000
+    base_salary = ovr * PLAYER_SALARY_BASE_PER_OVR
 
     # potential補正
     potential_bonus = POTENTIAL_BONUS[potential]
@@ -504,12 +508,13 @@ def would_offer_break_soft_limit(
     team: object,
     player: object,
     offer_salary: int,
-    salary_cap: int = SALARY_CAP_DEFAULT,
+    salary_cap: Optional[int] = None,
 ) -> bool:
     team_payroll = get_team_payroll(team)
     current_salary = safe_getattr_int(player, "salary", 0)
     projected_payroll = team_payroll - current_salary + offer_salary
-    return payroll_exceeds_soft_cap(projected_payroll, salary_cap)
+    cap = int(get_hard_cap(league_level=league_level_for_team(team))) if salary_cap is None else int(salary_cap)
+    return payroll_exceeds_soft_cap(projected_payroll, cap)
 
 
 
@@ -518,7 +523,7 @@ def evaluate_resign(
     player: object,
     offer_salary: Optional[int] = None,
     offer_years: Optional[int] = None,
-    salary_cap: int = SALARY_CAP_DEFAULT,
+    salary_cap: Optional[int] = None,
 ) -> ReSignDecision:
     if offer_salary is None or offer_years is None:
         default_salary, default_years = build_default_offer(player)
@@ -657,7 +662,7 @@ def evaluate_resign_offer(
     team: object,
     offered_salary: int,
     offered_years: int,
-    salary_cap: int = SALARY_CAP_DEFAULT,
+    salary_cap: Optional[int] = None,
 ) -> dict:
     decision = evaluate_resign(team, player, offer_salary=offered_salary, offer_years=offered_years, salary_cap=salary_cap)
     return {

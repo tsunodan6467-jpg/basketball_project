@@ -1,4 +1,5 @@
 import random
+from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 
@@ -28,8 +29,8 @@ def sync_player_id_counter_from_world(teams, free_agents) -> int:
 
 
 def calculate_initial_salary(ovr: int) -> int:
-    """OVRをもとに初期年俸を計算します"""
-    return ovr * 10000
+    """OVRをもとに初期年俸を計算します（希望年俸のベーススケールと整合）。"""
+    return int(ovr) * PLAYER_SALARY_BASE_PER_OVR
 
 
 def _get_team_strategy() -> str:
@@ -760,7 +761,7 @@ def generate_international_free_agent(nationality: str, reborn_profile: dict | N
         _set_acquisition(player, "international", "international_market")
 
     player.contract_years_left = random.randint(1, 2)
-    player.salary = int(player.ovr * random.randint(11000, 14000))
+    player.salary = calculate_initial_salary(player.ovr)
     player.league_years = 0
 
     if nationality == "Asia":

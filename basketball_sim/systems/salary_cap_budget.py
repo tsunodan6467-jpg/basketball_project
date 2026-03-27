@@ -10,23 +10,49 @@ from typing import Optional, Tuple
 
 from basketball_sim.config.game_constants import (
     LEAGUE_SALARY_CAP,
-    LUXURY_TAX_RATE,
+    LEAGUE_SALARY_CAP_BY_DIVISION,
+    PAYROLL_FLOOR_BY_DIVISION,
+    PAYROLL_LUXURY_TAX_BRACKET_MULT_1,
+    PAYROLL_LUXURY_TAX_BRACKET_MULT_2,
+    PAYROLL_LUXURY_TAX_BRACKET_MULT_3,
+    PAYROLL_LUXURY_TAX_BRACKET_WIDTH_1,
+    PAYROLL_LUXURY_TAX_BRACKET_WIDTH_2,
     SALARY_SOFT_LIMIT_MULTIPLIER,
 )
 
 
-def get_hard_cap(salary_cap: Optional[int] = None) -> int:
-    return int(salary_cap if salary_cap is not None else LEAGUE_SALARY_CAP)
+def league_level_for_team(team: Optional[object]) -> int:
+    if team is None:
+        return 1
+    lv = getattr(team, "league_level", None)
+    if lv is None:
+        return 1
+    try:
+        lv = int(lv)
+    except (TypeError, ValueError):
+        return 1
+    return max(1, min(3, lv))
 
 
-def get_soft_cap(salary_cap: Optional[int] = None) -> int:
-    return int(round(get_hard_cap(salary_cap) * SALARY_SOFT_LIMIT_MULTIPLIER))
+def get_hard_cap(salary_cap: Optional[int] = None, *, league_level: Optional[int] = None) -> int:
+    """
+    明示 salary_cap があればそれをハードキャップとして用いる（テスト・上書き用）。
+    なければ league_level（省略時 D1）のリーグ既定を使う。
+    """
+    if salary_cap is not None:
+        return int(salary_cap)
+    lv = 1 if league_level is None else max(1, min(3, int(league_level)))
+    return int(LEAGUE_SALARY_CAP_BY_DIVISION.get(lv, LEAGUE_SALARY_CAP))
 
 
-def cap_status(payroll: int, salary_cap: Optional[int] = None) -> str:
+def get_soft_cap(salary_cap: Optional[int] = None, *, league_level: Optional[int] = None) -> int:
+    return int(round(get_hard_cap(salary_cap, league_level=league_level) * SALARY_SOFT_LIMIT_MULTIPLIER))
+
+
+def cap_status(payroll: int, salary_cap: Optional[int] = None, *, league_level: Optional[int] = None) -> str:
     """under_cap | over_cap | over_soft_cap"""
-    h = get_hard_cap(salary_cap)
-    s = get_soft_cap(salary_cap)
+    h = get_hard_cap(salary_cap, league_level=league_level)
+    s = get_soft_cap(salary_cap, league_level=league_level)
     if payroll > s:
         return "over_soft_cap"
     if payroll > h:
@@ -34,22 +60,54 @@ def cap_status(payroll: int, salary_cap: Optional[int] = None) -> str:
     return "under_cap"
 
 
-def payroll_exceeds_soft_cap(payroll: int, salary_cap: Optional[int] = None) -> bool:
+def payroll_exceeds_soft_cap(
+    payroll: int, salary_cap: Optional[int] = None, *, league_level: Optional[int] = None
+) -> bool:
     """
     プロジェクト後ペイロールがソフト上限を超えるか。
     再契約（evaluate_resign）・オフシーズン再契約UI・FA の上限感の共通判定に使う。
     """
-    return cap_status(int(payroll), salary_cap=salary_cap) == "over_soft_cap"
+    return cap_status(int(payroll), salary_cap=salary_cap, league_level=league_level) == "over_soft_cap"
 
 
-def compute_luxury_tax(payroll: int, salary_cap: Optional[int] = None) -> int:
+def compute_luxury_tax(
+    payroll: int,
+    salary_cap: Optional[int] = None,
+    *,
+    league_level: Optional[int] = None,
+) -> int:
     """
-    ソフトキャップ超過分に対する贅沢税（整数・v1 簡易）。
-    ペイロールがソフト以下なら 0。
+    ソフトキャップ超過分に対する段階式贅沢税（整数）。
+    ドラフト RB の _tax_extra_for_total_spend と同型。
     """
-    soft = get_soft_cap(salary_cap)
+    soft = get_soft_cap(salary_cap, league_level=league_level)
     over = max(0, int(payroll) - soft)
-    return int(round(over * float(LUXURY_TAX_RATE)))
+    if over <= 0:
+        return 0
+
+    w1 = int(PAYROLL_LUXURY_TAX_BRACKET_WIDTH_1)
+    w2 = int(PAYROLL_LUXURY_TAX_BRACKET_WIDTH_2)
+    m1 = int(PAYROLL_LUXURY_TAX_BRACKET_MULT_1)
+    m2 = int(PAYROLL_LUXURY_TAX_BRACKET_MULT_2)
+    m3 = int(PAYROLL_LUXURY_TAX_BRACKET_MULT_3)
+
+    tier1 = min(over, w1)
+    tier2 = min(max(over - w1, 0), w2)
+    tier3 = max(over - w1 - w2, 0)
+    return int(tier1 * m1 + tier2 * m2 + tier3 * m3)
+
+
+def get_payroll_floor(league_level: int) -> int:
+    """0 なら下限なし。"""
+    lv = max(1, min(3, int(league_level)))
+    return int(PAYROLL_FLOOR_BY_DIVISION.get(lv, 0))
+
+
+def is_payroll_below_floor(payroll: int, league_level: int) -> bool:
+    fl = get_payroll_floor(league_level)
+    if fl <= 0:
+        return False
+    return int(payroll) < fl
 
 
 def projected_payroll_after_swap(
@@ -65,13 +123,15 @@ def can_absorb_salary_under_soft_cap(
     outgoing_salary: int,
     incoming_salary: int,
     salary_cap: Optional[int] = None,
+    *,
+    league_level: Optional[int] = None,
 ) -> Tuple[bool, int, str]:
     """
     トレード/FA の「ソフト上限を超えるか」判定のみ（ブロックはしない）。
     return: (ok_under_soft, projected, cap_status_str)
     """
     proj = projected_payroll_after_swap(current_payroll, outgoing_salary, incoming_salary)
-    st = cap_status(proj, salary_cap=salary_cap)
+    st = cap_status(proj, salary_cap=salary_cap, league_level=league_level)
     ok = st != "over_soft_cap"
     return ok, proj, st
 
