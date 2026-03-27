@@ -47,3 +47,35 @@ LUXURY_TAX_RATE = 0.50
 # ラウンド22＝3月第2週相当。消化済み current_round がこの値以上ならロック（ラウンド23〜シーズン終了まで）。
 # シミュレーション対象ラウンド番号（1始まり）がこの値以下なら CPU インシーズンFA を実行する。
 REGULAR_SEASON_TRANSACTION_CUTOFF_ROUND = 22
+
+# =========================================================
+# Highlight mode tuning presets (logic-first)
+# =========================================================
+# 文脈ごとの既定値。highlight_selector が参照し、明示引数があればそちらを優先する。
+HIGHLIGHT_CONTEXT_PRESET_TABLE = {
+    "regular": {
+        "max_events": 10,
+        "min_score": 18,
+        "max_total_seconds": 180,
+    },
+    "playoff": {
+        "max_events": 12,
+        "min_score": 16,
+        "max_total_seconds": 240,
+    },
+    "big_stage": {
+        "max_events": 14,
+        "min_score": 14,
+        "max_total_seconds": 300,
+    },
+}
+
+# 大舞台扱いの competition_type。Match.competition_type と照合する。
+HIGHLIGHT_BIG_STAGE_COMPETITIONS = {
+    "final_boss",
+    "emperor_cup",
+    "asia_cup",
+    "asia_cl",
+    "intercontinental",
+    "easl",
+}

@@ -271,17 +271,48 @@
 | モジュール | 役割 |
 |------------|------|
 | `basketball_sim/systems/presentation_layer.py` | プレゼンイベント生成 |
-| `basketball_sim/systems/highlight_selector.py` | `build_highlight_playlist_events` / `build_highlight_override_events_from_match` で既存 `highlight_score` から短い列を生成（第一段階）。 |
+| `basketball_sim/systems/highlight_selector.py` | `build_highlight_playlist_events` / `build_highlight_override_events_from_match` で既存 `highlight_score` から短い列を生成（段階実装）。Q1 `quarter_start` が無いとき先頭に `synthetic_tipoff`、max_events≥3 で Q1–Q2 を最低 2 本、隣接同種の緩和、同一ポゼッション重複の抑制、同一 `focus_player_name` 偏りの緩和。採用段では `highlight_score` に加えて S/A/B tier と強制S（終盤逆転/同点系など）を優先。さらに各クリップに `clip_order` / `estimated_clip_seconds` / `emphasis_level` / `clip_role` / `recommended_camera_style` を付与し、後段の演出差し替えを容易化。`build_highlight_override_events_from_match` は `game_context`（`is_playoff` / `competition_type`）から既定 `max_events` / `min_score` / `max_total_seconds` を自動調整。 |
 | `basketball_sim/systems/highlight_camera_system.py` | カメラ |
 | `basketball_sim/systems/spectate_view.py` | 観戦 UI。**結果へ**（`J` キー／ボタン）: `PresentationLayer.skip_to_end()` で残りプレゼンを読み飛ばし、最終スコアを `_result_display_snapshot` で表示。`result_only` モードでは非表示。 |
 | `PresentationLayer.skip_to_end` | 観戦の「結果へ」用。カーソルを末尾へ（読み取り専用）。 |
 
 ---
 
-## 21. 変更履歴
+## 21. 推奨実装順（次段）
+
+製品の見え方に効く順で進めることを推奨する（前段が無くても後段だけ入れられるものもある）。
+
+1. **プレイリスト品質（軽量ルール）** — 隣接同種の緩和、のち選手偏り・同ゾーン連打の抑制。  
+2. **総尺・本数上限** — `game_context` と `max_total_seconds` / `max_clips` を観戦パスに接続。  
+3. **S/A/B・強制 S** — 採用ルールを `highlight_score` と併用できる形で整理。  
+4. **`synthetic_tipoff` の短尺アニメ** — 静止＋UI だけでなく、ジャンプボール相当のミニ演出。  
+5. **小さい `max_events`（例: 2）** — ティップオフ枠と前半 2 本が両立しないため、実装では前半最低をスキップする。**仕様上も「短い列」のときの優先（ティップオフ）を明記済みとする。**
+
+---
+
+## 22. 変更履歴
 
 | 版 | 日付 | 内容 |
 |----|------|------|
 | v1 | 2026-03-27 | 初版確定。ユーザーたたき台を統合。可変尺・最大約 5 分・「結果へ」ボタン・パイプライン注記を追記 |
 | v1.1 | 2026-03-27 | 観戦 UI に「結果へ」実装、`PresentationLayer.skip_to_end` 追加（§20 参照） |
 | v1.2 | 2026-03-27 | `spectate_mode="highlight"` と `highlight_selector` のプレイリスト生成（スコア上位→時系列） |
+| v1.3 | 2026-03-27 | `synthetic_tipoff` 先頭挿入・前半（Q1–Q2）最低 2 本、`highlight_camera_system` / `spectate_view` で `quarter_start` 相当扱い |
+| v1.4 | 2026-03-27 | 隣接同種の緩和（番号の間に未採用プレーがあれば差し替え）、§21 推奨実装順を追記 |
+| v1.5 | 2026-03-27 | `game_context` 連動の既定本数/閾値（通常・playoff・大舞台）を `build_highlight_override_events_from_match` に追加 |
+| v1.6 | 2026-03-27 | 推定クリップ秒での総尺上限（`max_total_seconds`）を追加。文脈別既定は通常180秒・playoff240秒・大舞台300秒。 |
+| v1.7 | 2026-03-27 | 同一ポゼッション重複の抑制（高スコア側採用）と同一 `focus_player_name` 偏りの緩和を追加。 |
+| v1.8 | 2026-03-27 | S/A/B tier と強制S（終盤の逆転/同点・クラッチ守備等）を選定優先に追加。 |
+| v1.9 | 2026-03-27 | `spectate_view` に `synthetic_tipoff` の簡易ジャンプボール演出（既存Canvas描画ベース）を追加。 |
+| v1.10 | 2026-03-27 | HighlightPlan メタデータ（順序/推定尺/演出強度/役割/推奨カメラ）を出力へ付与し、後段のグラフィック差し替えを容易化。 |
+| v1.11 | 2026-03-27 | `highlight_camera_system` が HighlightPlan メタデータ（`recommended_camera_style` / `emphasis_level` / `clip_role` 等）を参照してカメラ決定をオーバーライド可能に。 |
+| v1.12 | 2026-03-27 | 採用セットを維持したまま、ラスト1〜2本をクライマックス寄せ（終盤S/強制S優先）に並び替える最終整形を追加。 |
+| v1.13 | 2026-03-27 | 各ハイライトに `selection_reason` / `selection_reasons` を付与し、選定根拠（tier選抜・前半補完・重複解消・終盤寄せ等）を追跡可能に。 |
+| v1.14 | 2026-03-27 | 軽量デバッグ要約（`build_highlight_debug_summary`）と `debug_print_plan` を追加し、選定理由・演出メタの確認を高速化。 |
+| v1.15 | 2026-03-27 | 文脈別チューニング値（通常/Playoff/大舞台）を `HighlightContextPreset` として集約し、上限・閾値の管理点を一本化。 |
+| v1.16 | 2026-03-27 | 文脈別チューニング値を `config/game_constants.py` の `HIGHLIGHT_CONTEXT_PRESET_TABLE` へ外出しし、コード変更なしで調整可能化。 |
+| v1.17 | 2026-03-27 | プリセット値の妥当性チェック（`validate_highlight_context_presets`）と安全フォールバック生成を追加し、設定ミス時の耐性を強化。 |
+| v1.18 | 2026-03-27 | `result_only` の自動再生をイベント数連動で約10秒目標に調整。終了時は `highlight_outro` を自動付与し、結果画面（スコア/次へ進む）へ統一遷移。 |
+| v1.19 | 2026-03-27 | `result_only` 専用の実況短文化（プレー種別ベース要約）を追加し、超高速再生時の可読性を向上。 |
+| v1.20 | 2026-03-27 | `result_only` 実況を視認性重視ラベル（`3P!`, `PTS`, `STL`, `BLK`, `TO`, `REB`, `END`）へ最適化。S/強制Sは `!`/`!!` で強調。 |
+| v1.21 | 2026-03-27 | `result_only` 実況ラベルをイベント種別で色分け（得点/守備/終了/区切り）し、超高速再生時の判読性を強化。 |

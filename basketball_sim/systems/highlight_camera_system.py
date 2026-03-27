@@ -165,6 +165,11 @@ class HighlightCameraSystem:
         quarter = self._to_optional_int(presentation_event.get("quarter"))
         clock_seconds = self._to_optional_int(presentation_event.get("clock_seconds"))
         highlight_tags = self._safe_str_list(presentation_event.get("highlight_tags"))
+        highlight_tier = self._to_optional_str(presentation_event.get("highlight_tier"))
+        force_tier = self._to_optional_str(presentation_event.get("force_tier"))
+        emphasis_level_hint = self._to_optional_str(presentation_event.get("emphasis_level"))
+        camera_style_hint = self._to_optional_str(presentation_event.get("recommended_camera_style"))
+        clip_role = self._to_optional_str(presentation_event.get("clip_role"))
 
         camera_level, camera_level_rank = self._determine_camera_level(
             highlight_score=highlight_score,
@@ -173,11 +178,27 @@ class HighlightCameraSystem:
             highlight_tags=highlight_tags,
             structure_type=structure_type,
         )
+        camera_level, camera_level_rank = self._apply_camera_level_hint(
+            camera_level=camera_level,
+            camera_level_rank=camera_level_rank,
+            presentation_type=presentation_type,
+            camera_style_hint=camera_style_hint,
+            emphasis_level_hint=emphasis_level_hint,
+            highlight_tier=highlight_tier,
+            force_tier=force_tier,
+            clip_role=clip_role,
+        )
         zoom_level = self._determine_zoom_level(
             camera_level=camera_level,
             presentation_type=presentation_type,
             structure_type=structure_type,
             highlight_tags=highlight_tags,
+        )
+        zoom_level = self._apply_zoom_hint(
+            zoom_level=zoom_level,
+            presentation_type=presentation_type,
+            camera_style_hint=camera_style_hint,
+            emphasis_level_hint=emphasis_level_hint,
         )
         focus_target, focus_targets = self._determine_focus_targets(
             presentation_event=presentation_event,
@@ -194,6 +215,12 @@ class HighlightCameraSystem:
             presentation_type=presentation_type,
             structure_type=structure_type,
             highlight_tags=highlight_tags,
+        )
+        cut_type = self._apply_cut_type_hint(
+            cut_type=cut_type,
+            presentation_type=presentation_type,
+            camera_style_hint=camera_style_hint,
+            emphasis_level_hint=emphasis_level_hint,
         )
         cut_count = self._determine_cut_count(
             camera_level=camera_level,
@@ -249,6 +276,11 @@ class HighlightCameraSystem:
             presentation_type=presentation_type,
             structure_type=structure_type,
         )
+        transition_profile = self._apply_transition_hint(
+            transition_profile=transition_profile,
+            presentation_type=presentation_type,
+            camera_style_hint=camera_style_hint,
+        )
         ui_emphasis = self._determine_ui_emphasis(
             camera_level=camera_level,
             presentation_type=presentation_type,
@@ -269,6 +301,11 @@ class HighlightCameraSystem:
             "importance": importance,
             "highlight_score": highlight_score,
             "highlight_tags": highlight_tags,
+            "highlight_tier": highlight_tier,
+            "force_tier": force_tier,
+            "emphasis_level_hint": emphasis_level_hint,
+            "camera_style_hint": camera_style_hint,
+            "clip_role": clip_role,
             "structure_type": structure_type,
             "team_side": team_side,
             "focus_player_name": focus_player_name,
@@ -303,6 +340,118 @@ class HighlightCameraSystem:
             "presentation_event": presentation_event,
         }
 
+    def _apply_camera_level_hint(
+        self,
+        camera_level: str,
+        camera_level_rank: int,
+        presentation_type: str,
+        camera_style_hint: Optional[str],
+        emphasis_level_hint: Optional[str],
+        highlight_tier: Optional[str],
+        force_tier: Optional[str],
+        clip_role: Optional[str],
+    ) -> tuple[str, int]:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
+            return "normal", 0
+
+        if force_tier == "S" or clip_role == "climax":
+            return "top_play", 4
+
+        if camera_style_hint == "cinematic":
+            return "top_play", 4
+        if camera_style_hint == "replay_focus":
+            return "replay", 3
+        if camera_style_hint == "highlight_follow":
+            return "highlight", 2
+        if camera_style_hint == "broadcast":
+            return "normal", 0
+
+        if emphasis_level_hint == "max":
+            return "top_play", 4
+        if emphasis_level_hint == "high":
+            if camera_level_rank < 3:
+                return "replay", 3
+            return camera_level, camera_level_rank
+        if emphasis_level_hint == "medium":
+            if camera_level_rank < 2:
+                return "highlight", 2
+            return camera_level, camera_level_rank
+        if emphasis_level_hint == "low":
+            if camera_level_rank < 1:
+                return "light", 1
+            return camera_level, camera_level_rank
+        if emphasis_level_hint == "none":
+            return "normal", 0
+
+        if highlight_tier == "S" and camera_level_rank < 3:
+            return "replay", 3
+        if highlight_tier == "A" and camera_level_rank < 2:
+            return "highlight", 2
+        if highlight_tier == "B" and camera_level_rank < 1:
+            return "light", 1
+
+        return camera_level, camera_level_rank
+
+    def _apply_zoom_hint(
+        self,
+        zoom_level: str,
+        presentation_type: str,
+        camera_style_hint: Optional[str],
+        emphasis_level_hint: Optional[str],
+    ) -> str:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
+            return "scoreboard"
+        if camera_style_hint == "cinematic":
+            return "dramatic_close"
+        if camera_style_hint == "replay_focus":
+            return "close"
+        if camera_style_hint == "highlight_follow":
+            return "medium"
+        if camera_style_hint == "broadcast":
+            return "wide"
+        if emphasis_level_hint == "max":
+            return "dramatic_close"
+        if emphasis_level_hint == "high":
+            return "close"
+        return zoom_level
+
+    def _apply_cut_type_hint(
+        self,
+        cut_type: str,
+        presentation_type: str,
+        camera_style_hint: Optional[str],
+        emphasis_level_hint: Optional[str],
+    ) -> str:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
+            return "hard_cut"
+        if camera_style_hint == "cinematic":
+            return "hero_cut"
+        if camera_style_hint == "replay_focus":
+            return "replay_cut"
+        if camera_style_hint == "highlight_follow":
+            return "impact_cut"
+        if emphasis_level_hint == "max":
+            return "hero_cut"
+        return cut_type
+
+    def _apply_transition_hint(
+        self,
+        transition_profile: str,
+        presentation_type: str,
+        camera_style_hint: Optional[str],
+    ) -> str:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
+            return "ui_hold"
+        if camera_style_hint == "cinematic":
+            return "focus_shift"
+        if camera_style_hint == "replay_focus":
+            return "replay_snap"
+        if camera_style_hint == "highlight_follow":
+            return "focus_shift"
+        if camera_style_hint == "broadcast":
+            return "none"
+        return transition_profile
+
     # =========================================================
     # Core rules
     # =========================================================
@@ -314,7 +463,7 @@ class HighlightCameraSystem:
         highlight_tags: list[str],
         structure_type: Optional[str],
     ) -> tuple[str, int]:
-        forced_normal_types = {"quarter_start", "quarter_end", "game_end"}
+        forced_normal_types = {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}
         if presentation_type in forced_normal_types:
             return "normal", 0
 
@@ -369,7 +518,7 @@ class HighlightCameraSystem:
         structure_type: Optional[str],
         highlight_tags: list[str],
     ) -> str:
-        if presentation_type in {"quarter_start", "quarter_end", "game_end"}:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
             return "scoreboard"
 
         base_zoom_by_level = {
@@ -431,7 +580,7 @@ class HighlightCameraSystem:
         presentation_type: str,
         structure_type: Optional[str],
     ) -> str:
-        if presentation_type in {"quarter_start", "quarter_end", "game_end"}:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
             return "locked"
 
         if structure_type == "fast_break":
@@ -458,7 +607,7 @@ class HighlightCameraSystem:
         structure_type: Optional[str],
         highlight_tags: list[str],
     ) -> str:
-        if presentation_type in {"quarter_start", "quarter_end", "game_end"}:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
             return "hard_cut"
 
         if camera_level == "top_play":
@@ -483,7 +632,7 @@ class HighlightCameraSystem:
         presentation_type: str,
         highlight_tags: list[str],
     ) -> int:
-        if presentation_type in {"quarter_start", "quarter_end", "game_end"}:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
             return 1
         if camera_level == "top_play":
             return 1 if "clutch" not in highlight_tags else 2
@@ -494,7 +643,7 @@ class HighlightCameraSystem:
         return 0
 
     def _determine_replay_flag(self, camera_level: str, presentation_type: str) -> bool:
-        if presentation_type in {"quarter_start", "quarter_end"}:
+        if presentation_type in {"quarter_start", "quarter_end", "synthetic_tipoff"}:
             return False
         return camera_level in {"replay", "top_play"}
 
@@ -600,7 +749,7 @@ class HighlightCameraSystem:
         focus_target: str,
         team_side: Optional[str],
     ) -> str:
-        if presentation_type in {"quarter_start", "quarter_end", "game_end"}:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
             return "center_court"
         if structure_type == "fast_break":
             return "rim_lane"
@@ -634,7 +783,7 @@ class HighlightCameraSystem:
         presentation_type: str,
         structure_type: Optional[str],
     ) -> str:
-        if presentation_type in {"quarter_start", "quarter_end", "game_end"}:
+        if presentation_type in {"quarter_start", "quarter_end", "game_end", "synthetic_tipoff"}:
             return "ui_hold"
         if structure_type == "fast_break":
             return "speed_pan"
