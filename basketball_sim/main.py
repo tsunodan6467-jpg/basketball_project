@@ -22,6 +22,13 @@ from basketball_sim.systems.season_transaction_rules import (
     INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
 )
+from basketball_sim.systems.facility_investment import (
+    FACILITY_LABELS,
+    can_commit_facility_upgrade,
+    commit_facility_upgrade,
+    format_facility_status_lines,
+    get_facility_upgrade_cost,
+)
 from basketball_sim.systems.training_unlocks import player_drill_lock_reason
 from basketball_sim.systems.trade_logic import TradeSystem, MultiTradeOffer
 from basketball_sim.systems.contract_logic import (
@@ -1513,47 +1520,10 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
             print("正しい番号を入力してください。")
 
 
-FACILITY_LABELS = {
-    "arena_level": "アリーナ",
-    "training_facility_level": "トレーニング施設",
-    "medical_facility_level": "メディカル施設",
-    "front_office_level": "フロントオフィス",
-}
-
-FACILITY_BASE_COSTS = {
-    "arena_level": 2_000_000,
-    "training_facility_level": 1_200_000,
-    "medical_facility_level": 1_000_000,
-    "front_office_level": 900_000,
-}
-
-
-def get_facility_upgrade_cost(user_team, facility_key):
-    current_level = int(getattr(user_team, facility_key, 1))
-    base_cost = FACILITY_BASE_COSTS.get(facility_key, 1_000_000)
-    return int(base_cost * max(1, current_level))
-
-
 def print_facility_status(user_team):
     print_separator("施設投資状況")
-    print(f"現在資金: {int(getattr(user_team, 'money', 0)):,}円")
-    print()
-
-    for facility_key in [
-        "arena_level",
-        "training_facility_level",
-        "medical_facility_level",
-        "front_office_level",
-    ]:
-        label = FACILITY_LABELS.get(facility_key, facility_key)
-        level = int(getattr(user_team, facility_key, 1))
-        upgrade_cost = get_facility_upgrade_cost(user_team, facility_key)
-        print(f"{label:<18} Lv.{level:<2} → 次回投資額 {upgrade_cost:,}円")
-
-    print()
-    print(f"人気          : {int(getattr(user_team, 'popularity', 0))}")
-    print(f"ファン基盤      : {int(getattr(user_team, 'fan_base', 0))}")
-    print(f"スカウト水準    : {int(getattr(user_team, 'scout_level', 0))}")
+    for line in format_facility_status_lines(user_team):
+        print(line)
 
 
 def apply_facility_upgrade(user_team, facility_key):
@@ -1567,8 +1537,9 @@ def apply_facility_upgrade(user_team, facility_key):
     print(f"必要資金   : {cost:,}円")
     print(f"現在資金   : {money:,}円")
 
-    if money < cost:
-        print("資金不足のため投資できません。")
+    ok_pre, msg_pre = can_commit_facility_upgrade(user_team, facility_key)
+    if not ok_pre:
+        print(msg_pre if msg_pre else "投資できません。")
         return
 
     confirm = input("投資を実行しますか？ (y/n): ").strip().lower()
@@ -1576,28 +1547,13 @@ def apply_facility_upgrade(user_team, facility_key):
         print("投資を中止しました。")
         return
 
-    setattr(user_team, facility_key, current_level + 1)
-
-    if facility_key == "arena_level":
-        user_team.popularity = int(getattr(user_team, "popularity", 0)) + 1
-        user_team.fan_base = int(getattr(user_team, "fan_base", 0)) + 2
-    elif facility_key == "training_facility_level":
-        user_team.popularity = int(getattr(user_team, "popularity", 0)) + 1
-    elif facility_key == "medical_facility_level":
-        user_team.popularity = int(getattr(user_team, "popularity", 0)) + 1
-    elif facility_key == "front_office_level":
-        user_team.scout_level = int(getattr(user_team, "scout_level", 0)) + 3
-
-    if hasattr(user_team, "record_financial_result"):
-        user_team.record_financial_result(
-            revenue=0,
-            expense=cost,
-            note=f"facility_upgrade:{facility_key}:Lv{current_level + 1}"
-        )
-
-    print_separator("投資完了")
-    print(f"{label} を Lv.{current_level} → Lv.{current_level + 1} に強化しました。")
-    print(f"残り資金: {int(getattr(user_team, 'money', 0)):,}円")
+    ok, msg = commit_facility_upgrade(user_team, facility_key)
+    if ok:
+        print_separator("投資完了")
+        print(msg)
+        print(f"残り資金: {int(getattr(user_team, 'money', 0)):,}円")
+    else:
+        print(msg)
 
 
 def run_player_training_focus_menu(user_team):

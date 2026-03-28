@@ -47,7 +47,7 @@
 | # | 大分類 | 既存コードとの対応 |
 |---|--------|-------------------|
 | 1 | 財務レポート | `money`・前季収支・`get_finance_report_text`・`finance_history` |
-| 2 | 施設投資 | `arena_level` 等・`main.apply_facility_upgrade` 相当 |
+| 2 | 施設投資 | `arena_level` 等・`systems/facility_investment.py`（`commit_facility_upgrade`／CLI は `main.apply_facility_upgrade` 経由で同一ロジック） |
 | 3 | オーナーミッション | `owner_missions`・`evaluate_owner_missions` |
 | 4 | スポンサー | `sponsor_power` 拡張・契約データは新規 |
 | 5 | 広報・ファン施策 | `popularity`・`fan_base`・`market_size`＋行動ログ新規 |

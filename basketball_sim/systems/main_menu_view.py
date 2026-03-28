@@ -65,6 +65,14 @@ from basketball_sim.systems.team_tactics import (
     get_safe_team_tactics,
     normalize_team_tactics,
 )
+from basketball_sim.systems.facility_investment import (
+    FACILITY_LABELS,
+    FACILITY_MAX_LEVEL,
+    FACILITY_ORDER,
+    can_commit_facility_upgrade,
+    commit_facility_upgrade,
+    get_facility_upgrade_cost,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -930,6 +938,22 @@ class MainMenuView:
 
         self.finance_summary_lines = self._make_line_vars(self.finance_summary_panel, 6)
         self.facility_lines = self._make_line_vars(self.facility_panel, 6)
+        fac_content = self._resolve_content_parent(self.facility_panel)
+        btn_row = ttk.Frame(fac_content, style="Card.TFrame")
+        btn_row.pack(fill="x", pady=(12, 0))
+        self._facility_upgrade_buttons: Dict[str, ttk.Button] = {}
+        for i, fk in enumerate(FACILITY_ORDER):
+            label = FACILITY_LABELS.get(fk, fk)
+            b = ttk.Button(
+                btn_row,
+                text=f"{label}を強化",
+                style="Menu.TButton",
+                command=lambda k=fk: self._on_facility_upgrade_click(k),
+            )
+            b.grid(row=i // 2, column=i % 2, sticky="ew", padx=4, pady=4)
+            self._facility_upgrade_buttons[fk] = b
+        btn_row.columnconfigure(0, weight=1)
+        btn_row.columnconfigure(1, weight=1)
         self.owner_lines = self._make_line_vars(self.owner_panel, 6)
         self.finance_report_lines = self._make_line_vars(self.finance_report_panel, 8)
 
@@ -967,6 +991,33 @@ class MainMenuView:
                 window.destroy()
         finally:
             self._finance_window = None
+            self._facility_upgrade_buttons = {}
+
+    def _on_facility_upgrade_click(self, facility_key: str) -> None:
+        team = self.team
+        if team is None:
+            return
+        if not bool(getattr(team, "is_user_team", False)):
+            messagebox.showinfo("施設投資", "自チームのみ施設投資できます。")
+            return
+        ok, msg = can_commit_facility_upgrade(team, facility_key)
+        if not ok:
+            messagebox.showwarning("施設投資", msg or "投資できません。")
+            return
+        label = FACILITY_LABELS.get(facility_key, facility_key)
+        cost = get_facility_upgrade_cost(team, facility_key)
+        if not messagebox.askyesno(
+            "施設投資の確認",
+            f"{label} を 1 段階強化しますか？\n必要資金: {self._format_money(cost)}",
+        ):
+            return
+        ok2, msg2 = commit_facility_upgrade(team, facility_key)
+        if ok2:
+            messagebox.showinfo("施設投資", msg2)
+            self._refresh_finance_window()
+            self.refresh()
+        else:
+            messagebox.showwarning("施設投資", msg2)
 
     def _refresh_finance_window(self) -> None:
         if getattr(self, "finance_header_var", None) is None:
@@ -1003,25 +1054,39 @@ class MainMenuView:
         for var, line in zip(self.finance_summary_lines, summary_lines):
             var.set(line)
 
-        arena = self._safe_get(self.team, "arena_level", profile.get("arena_level", 1))
-        training = self._safe_get(self.team, "training_facility_level", profile.get("training_facility_level", 1))
-        medical = self._safe_get(self.team, "medical_facility_level", profile.get("medical_facility_level", 1))
-        front = self._safe_get(self.team, "front_office_level", profile.get("front_office_level", 1))
         market_size = self._safe_get(self.team, "market_size", profile.get("market_size", 1.0))
         fan_base = self._safe_get(self.team, "fan_base", profile.get("fan_base", 0))
         season_tickets = self._safe_get(self.team, "season_ticket_base", profile.get("season_ticket_base", 0))
         sponsor_power = self._safe_get(self.team, "sponsor_power", profile.get("sponsor_power", 0))
 
-        facility_lines = [
-            f"アリーナ: Lv{self._safe_int_text(arena)}",
-            f"育成施設: Lv{self._safe_int_text(training)}",
-            f"メディカル: Lv{self._safe_int_text(medical)}",
-            f"フロント: Lv{self._safe_int_text(front)}",
-            f"市場規模: {market_size}",
-            f"ファン基盤: {self._safe_int_text(fan_base)} / シーズン券: {self._safe_int_text(season_tickets)} / スポンサー力: {self._safe_int_text(sponsor_power)}",
-        ]
+        facility_lines: List[str] = []
+        for fk in FACILITY_ORDER:
+            lv = int(self._safe_get(self.team, fk, profile.get(fk, 1)))
+            flabel = FACILITY_LABELS.get(fk, fk)
+            if lv >= FACILITY_MAX_LEVEL:
+                facility_lines.append(f"{flabel}: Lv{lv}（最大）")
+            else:
+                nxt = get_facility_upgrade_cost(self.team, fk)
+                facility_lines.append(f"{flabel}: Lv{lv} → 次回 {self._format_money(nxt)}")
+        facility_lines.append(f"市場規模: {market_size}")
+        facility_lines.append(
+            f"ファン基盤: {self._safe_int_text(fan_base)} / シーズン券: {self._safe_int_text(season_tickets)} / スポンサー力: {self._safe_int_text(sponsor_power)}"
+        )
         for var, line in zip(self.facility_lines, facility_lines):
             var.set(line)
+
+        btns = getattr(self, "_facility_upgrade_buttons", None)
+        if isinstance(btns, dict) and btns:
+            is_user = self.team is not None and bool(getattr(self.team, "is_user_team", False))
+            for fk, b in btns.items():
+                try:
+                    if not is_user:
+                        b.state(["disabled"])
+                    else:
+                        can_do, _ = can_commit_facility_upgrade(self.team, fk)
+                        b.state(["!disabled"] if can_do else ["disabled"])
+                except tk.TclError:
+                    pass
 
         owner_expectation = self._safe_get(self.team, "owner_expectation", profile.get("owner_expectation", "-"))
         owner_trust = self._safe_get(self.team, "owner_trust", profile.get("owner_trust", "-"))
@@ -1067,7 +1132,8 @@ class MainMenuView:
             var.set(line)
 
         self.finance_hint_var.set(
-            "読み取り専用の経営画面です。施設投資や予算操作は後続フェーズで安全に接続します。"
+            "自チームでは「施設を強化」から投資できます（確認ダイアログあり・CLI と同一ロジック）。"
+            "他チーム閲覧時はボタンは無効です。予算操作などその他は後続フェーズです。"
         )
 
     def open_strategy_window(self) -> None:
