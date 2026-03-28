@@ -11,7 +11,7 @@
 | ユーザー設定（セーブとは別） | `basketball_sim/utils/user_settings.py`（JSON・`settings_path()`・`_normalize`・`save_user_settings` 原子的保存） |
 | CLI セーブ | `main.py`：`build_save_payload` 経由（年度メニュー `6`・シーズンメニュー `10`） |
 | 主画面 | `main_menu_view.py`：`MENU_ITEMS` に「システム」あり。**`on_system_menu` 注入時**は `main._open_main_menu_system_window` が Toplevel を開く（未注入時は従来どおり未実装メッセージ可） |
-| UI モード | `main.run_main_menu_ui_mode`：`game_state` 辞書＋`on_system_menu`＋`on_main_window_close`（未保存の弱い確認） |
+| UI モード | `main.run_main_menu_ui_mode`：`game_state` 辞書＋`on_system_menu`＋`on_main_window_close`（未保存の弱い確認）。**タイトル「続きから」**でセーブ読込後は `choose_resume_launch_mode` により **CLI 再開 / 主画面 UI 再開**を選択可（UI 未ロード時は従来どおり CLI にフォールバック）。**オフ完了後**はダイアログで **主画面のまま次シーズン**（`_apply_next_season_from_annual_gate`＝CLI 年度「次のシーズンへ進む」と同義）か **閉じて CLI 年度メニュー**を選択可。`ui_flow["offseason_completed"]` の間は主ボタンで **再オフに入らず** 同じ次年度確認（`_gui_prompt_next_season_after_offseason_gate`）へ。 |
 | Steam・ライセンス | `integrations/steamworks_bridge.py` / `user_settings.steam_require_license` |
 
 **位置づけ**: 確定仕様ではない。**セーブ互換と設定ファイルの保全**を最優先し、GUI は **既存 API の薄い皮**に留める。
@@ -297,6 +297,7 @@
 ### 5.3 主画面 UI（`run_main_menu_ui_mode`）
 
 - **`game_state`**: `teams`, `free_agents`, `user_team`, `season`, `season_count`, `tracked_player_name`。  
+  - UI オフ完了後の CLI 接続では `run_interactive_season(..., start_at_annual_menu=True, initial_season_count=game_state["season_count"])` とし、高年次の `season_count` が 1 に戻らないようにする。  
 - **`ui_flow`**: `offseason_completed`, `dirty`。  
 - **`MainMenuView`**: `on_system_menu`（システム）, `on_main_window_close`（未保存の弱い確認）。  
 - **`close_all_subwindows`**: ロード適用直前に実行（人事・GM・情報・歴史・日程・システム窓など）。  
@@ -324,3 +325,4 @@
 | 2026-03-28 | 第1稿: 6分類と既存 save_load / user_settings / main の対応、セーブタイミング・payload 単一化・ロード再入・未保存・タイトル戻りの論点、優先順位、スモーク項目。 |
 | 2026-03-28 | 追記: `save_payload`・途中セーブ・UI システム窓・`game_state`／`dirty`／メイン閉じる確認・`close_all_subwindows`・クイックセーブ上書き確認・**アプリを終了**・`run_smoke` を `build_save_payload` 経由に統一・pytest を文書化。§5 実装反映メモ・§6 変更履歴に再編。 |
 | 2026-03-28 | システム窓に **設定タブ**（`user_settings` 保存・`apply_runtime_user_settings`・ログ即時反映・フルスクリーン解除修正）。`fresh_default_settings` / `normalize_user_settings` / `is_valid_tk_binding_sequence` 公開。 |
+| 2026-03-28 | `run_interactive_season(initial_season_count=…)` と `_starting_season_count_for_interactive_loop`：GUI→CLI 年度メニューで `season_count` を維持。増分は「次のシーズンへ」のみ。 |

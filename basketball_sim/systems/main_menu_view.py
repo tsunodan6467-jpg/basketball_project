@@ -19,7 +19,7 @@ What this file provides
 Notes
 -----
 - This file is intentionally read-mostly. The only mutating action is an optional
-  callback such as on_advance, which is injected from outside.
+  callback such as on_advance(view), which is injected from outside.
 - The UI tolerates partial data. Missing values fall back to safe placeholders.
 - Detailed screen transitions are not implemented yet; each left menu item is a
   safe callback hook point.
@@ -136,7 +136,7 @@ from basketball_sim.utils.user_settings import (
 
 
 MenuCallback = Callable[[], None]
-AdvanceCallback = Callable[[], None]
+AdvanceCallback = Callable[["MainMenuView"], None]
 SystemMenuCallback = Callable[["MainMenuView"], None]
 
 
@@ -189,6 +189,7 @@ class MainMenuView:
         user_settings: Optional[Dict[str, Any]] = None,
         on_system_menu: Optional[SystemMenuCallback] = None,
         on_main_window_close: Optional[Callable[[], bool]] = None,
+        advance_primary_ui_fn: Optional[Callable[[], Tuple[str, str]]] = None,
     ) -> None:
         self.team = team
         self.season = season
@@ -196,6 +197,7 @@ class MainMenuView:
         self.menu_callbacks = menu_callbacks or {}
         self.on_system_menu = on_system_menu
         self.on_main_window_close = on_main_window_close
+        self.advance_primary_ui_fn = advance_primary_ui_fn
         self.external_news_items = news_items
         self.external_tasks = tasks
 
@@ -666,15 +668,34 @@ class MainMenuView:
 
         season_finished = bool(self._safe_get(self.season, "season_finished", False))
         if season_finished:
-            self.advance_hint_var.set(
-                "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
-            )
+            if self.advance_primary_ui_fn is not None:
+                try:
+                    _, hint = self.advance_primary_ui_fn()
+                    self.advance_hint_var.set(
+                        hint
+                        or "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
+                    )
+                except Exception:
+                    self.advance_hint_var.set(
+                        "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
+                    )
+            else:
+                self.advance_hint_var.set(
+                    "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
+                )
         elif count > 0:
             self.advance_hint_var.set(f"未処理案件が {count} 件あります。必要なら先に確認してください。")
         else:
             self.advance_hint_var.set("")
 
     def _refresh_advance_button(self) -> None:
+        if self.advance_primary_ui_fn is not None:
+            try:
+                label, _ = self.advance_primary_ui_fn()
+                self.advance_button.configure(text=label)
+                return
+            except Exception:
+                pass
         fin = bool(self._safe_get(self.season, "season_finished", False))
         self.advance_button.configure(text="オフシーズンを実行" if fin else "次へ進む")
 
@@ -5926,7 +5947,7 @@ class MainMenuView:
 
     def _on_advance(self) -> None:
         if self.on_advance is not None:
-            self.on_advance()
+            self.on_advance(self)
             self.refresh()
             return
         messagebox.showinfo("未接続", "次へ進む処理は main.py 接続時に追加します。")
@@ -6333,9 +6354,12 @@ def launch_main_menu(
     user_settings: Optional[Dict[str, Any]] = None,
     on_system_menu: Optional[SystemMenuCallback] = None,
     on_main_window_close: Optional[Callable[[], bool]] = None,
+    advance_primary_ui_fn: Optional[Callable[[], Tuple[str, str]]] = None,
 ) -> MainMenuView:
     """
     Convenience launcher used by future main.py wiring.
+    on_advance は MainMenuView インスタンスを引数に取る（1 ラウンド進行・オフ開始など）。
+    advance_primary_ui_fn があれば (主ボタン文言, 終了時ヒント) を返し、オフ済みなどの分岐に使う。
     トレード／インシーズンFA 相当の menu_callbacks は
     wrap_menu_callback_with_inseason_transaction_guard で包むこと。
     """
@@ -6349,6 +6373,7 @@ def launch_main_menu(
         user_settings=user_settings,
         on_system_menu=on_system_menu,
         on_main_window_close=on_main_window_close,
+        advance_primary_ui_fn=advance_primary_ui_fn,
     )
     view.run()
     return view

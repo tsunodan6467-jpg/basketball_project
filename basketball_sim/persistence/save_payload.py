@@ -25,6 +25,11 @@ def build_save_payload(
     """
     CLI / GUI 共通のセーブ用ペイロード。
 
+    season_count（進行用・payload 正本）:
+      run_interactive_season のループ変数と同じ意味。レギュラー中・年度メニュー直後（オフ済み）
+      もそのシーズン番号。増えるのは年度メニュー「次のシーズンへ進む」相当の処理のみ。
+      呼び出し側が一貫した値を渡すこと。
+
     at_annual_menu が True のときは resume_season を保存しない（年度進行メニュー相当で
     Season インスタンスが世界と不整合になり得るため。チーム／FA のみで再開する）。
     """

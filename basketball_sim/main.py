@@ -3,7 +3,7 @@ from copy import deepcopy
 import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from basketball_sim.config.game_constants import (
     LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
@@ -2024,6 +2024,125 @@ def _prompt_load_resume() -> Dict[str, Any]:
     return payload
 
 
+def _starting_season_count_for_interactive_loop(
+    resume: Optional[Dict[str, Any]],
+    initial_season_count: Optional[int],
+) -> int:
+    """
+    run_interactive_season 用の進行正本（payload season_count と同じ意味）。
+    resume があるときは resume['season_count'] のみ採用（initial_season_count は無視）。
+    """
+    if resume is not None:
+        return int(resume["season_count"])
+    if initial_season_count is not None:
+        return max(1, int(initial_season_count))
+    return 1
+
+
+def _hydrate_resume_for_main_menu_ui(resume: Dict[str, Any]) -> Tuple[Any, Any, Any, Any, int, Any, bool]:
+    """
+    検証済み payload 想定だが、run_interactive_season と同様に validate / rebind / ID 同期を行い、
+    主画面 UI 用の teams / season / season_count / at_annual_menu 対応フラグを組み立てる。
+    """
+    validate_payload(resume)
+    rebind_resume_season_to_world(resume)
+    sync_player_id_counter_from_world(resume["teams"], resume["free_agents"])
+    teams = resume["teams"]
+    free_agents = resume["free_agents"]
+    user_team = find_user_team(teams, resume["user_team_id"])
+    tracked_player_name = resume.get("tracked_player_name")
+    season_count = int(resume["season_count"])
+    offseason_completed = bool(resume.get("at_annual_menu"))
+    rs = resume.get("resume_season")
+    if rs is not None:
+        try:
+            rs.all_teams = teams
+            rs.free_agents = free_agents if free_agents is not None else []
+            season = rs
+        except Exception:
+            season = Season(teams, free_agents)
+    else:
+        season = Season(teams, free_agents)
+    return teams, free_agents, user_team, season, season_count, tracked_player_name, offseason_completed
+
+
+def _apply_next_season_from_annual_gate(game_state: Dict[str, Any], ui_flow: Dict[str, Any]) -> None:
+    """
+    CLI 年度進行メニュー「1. 次のシーズンへ進む」と同じ意味。
+    season_count の増分はユーザーが明示的に次年度へ進めたときのみ（オフ完了直後には呼ばない）。
+    """
+    game_state["season_count"] = int(game_state["season_count"]) + 1
+    game_state["season"] = Season(game_state["teams"], game_state["free_agents"])
+    ui_flow["offseason_completed"] = False
+    ui_flow["dirty"] = True
+
+
+def _main_menu_advance_button_and_hint(season_finished: bool, offseason_completed: bool) -> Tuple[str, str]:
+    """主画面の進行ボタン文言とヒント（テスト可能な純粋分岐）。"""
+    if not season_finished:
+        return ("次へ進む", "")
+    if offseason_completed:
+        return (
+            "次のシーズンへ…",
+            "オフシーズンは完了しています。『次のシーズンへ…』で次年度開始の確認が開きます。"
+            "メインを閉じるとターミナルの年度進行メニューにも移れます。",
+        )
+    return (
+        "オフシーズンを実行",
+        "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。",
+    )
+
+
+def _gui_apply_next_season_in_main_menu(view: Any, game_state: Dict[str, Any], ui_flow: Dict[str, Any]) -> None:
+    _apply_next_season_from_annual_gate(game_state, ui_flow)
+    try:
+        view.close_all_subwindows()
+    except Exception:
+        pass
+    view.team = game_state["user_team"]
+    view.season = game_state["season"]
+    view.refresh()
+    print_separator(f"シーズン {int(game_state['season_count'])} 開始（主画面UI）")
+
+
+def _gui_prompt_next_season_after_offseason_gate(
+    view: Any,
+    game_state: Dict[str, Any],
+    ui_flow: Dict[str, Any],
+    *,
+    repeat_prompt: bool = False,
+) -> None:
+    """オフ完了後（または再クリック時）の次年度 GUI / CLI 案内。repeat_prompt=True は再オフ禁止後の再確認用。"""
+    import tkinter as tk
+    from tkinter import messagebox
+
+    root = tk._default_root
+    tail = (
+        "次のシーズンを主画面から始めますか？\n"
+        "（「いいえ」の場合はメインウィンドウを閉じると、従来どおりターミナルの年度進行メニューから続けられます。）"
+    )
+    title = "年度進行" if repeat_prompt else "完了"
+    body = tail if repeat_prompt else ("オフシーズンが終わりました。\n\n" + tail)
+
+    if root is not None:
+        go_gui = messagebox.askyesno(title, body, parent=root)
+        if go_gui:
+            _gui_apply_next_season_in_main_menu(view, game_state, ui_flow)
+        else:
+            messagebox.showinfo(
+                "年度進行",
+                "メインウィンドウを閉じると、ターミナルに年度進行メニューが続きます。\n"
+                "次シーズン・セーブはそこから操作できます。",
+                parent=root,
+            )
+    else:
+        print_separator(title)
+        print(body)
+        print(
+            "（GUI の root が無いため自動では次年度を開始しません。メインを閉じてターミナルから続行してください。）"
+        )
+
+
 def run_interactive_season(
     teams=None,
     free_agents=None,
@@ -2031,10 +2150,13 @@ def run_interactive_season(
     tracked_player_name=None,
     resume: Optional[Dict[str, Any]] = None,
     start_at_annual_menu: bool = False,
+    initial_season_count: Optional[int] = None,
 ):
     """
     CLI シーズンループ。resume を渡すとセーブから続行（年度進行メニュー直後から再開可）。
     start_at_annual_menu: UI でオフシーズンまで済ませた直後など、年度進行メニューから開始する。
+    initial_season_count: resume が無いときだけ有効。GUI から年度メニューへ渡す進行用 season_count。
+        未指定は 1。resume 指定時は無視され、resume['season_count'] が正本。
     """
     skip_to_annual_menu = False
     resume_season_once = None
@@ -2046,15 +2168,15 @@ def run_interactive_season(
         free_agents = resume["free_agents"]
         user_team = find_user_team(teams, resume["user_team_id"])
         tracked_player_name = resume.get("tracked_player_name")
-        season_count = resume["season_count"]
         skip_to_annual_menu = bool(resume.get("at_annual_menu"))
         resume_season_once = resume.get("resume_season")
     else:
         if teams is None or free_agents is None or user_team is None:
             raise ValueError("run_interactive_season: teams / free_agents / user_team が必要です（resume 未指定時）")
-        season_count = 1
         if start_at_annual_menu:
             skip_to_annual_menu = True
+
+    season_count = _starting_season_count_for_interactive_loop(resume, initial_season_count)
 
     while True:
         if not skip_to_annual_menu:
@@ -2150,6 +2272,7 @@ def run_interactive_season(
         next_choice = input("番号: ").strip()
 
         if next_choice == "1":
+            # 進行用 season_count を増やす唯一の地点（オフ終了時では増えない）
             season_count += 1
             continue
         elif next_choice == "2":
@@ -2225,6 +2348,19 @@ def choose_game_launch_mode():
     print_separator("起動モード選択")
     print("1. 従来CLIモード")
     print("2. 主画面UIモード（試験実装）")
+
+    while True:
+        choice = input("番号: ").strip()
+        if choice in {"1", "2"}:
+            return choice
+        print("1 か 2 を入力してください。")
+
+
+def choose_resume_launch_mode():
+    """セーブ読込直後のみ。1=CLI再開、2=主画面UI再開（UI 利用不可時は run_main_menu_ui_mode 側で CLI にフォールバック）。"""
+    print_separator("続きの進め方")
+    print("1. 従来CLIモードで再開")
+    print("2. 主画面UIモードで再開（試験実装）")
 
     while True:
         choice = input("番号: ").strip()
@@ -2545,34 +2681,50 @@ def _open_main_menu_system_window(view: Any, game_state: Dict[str, Any], ui_flow
 
 
 def run_main_menu_ui_mode(
-    teams,
-    free_agents,
-    user_team,
+    teams=None,
+    free_agents=None,
+    user_team=None,
     tracked_player_name=None,
     user_settings: Optional[Dict[str, Any]] = None,
+    resume: Optional[Dict[str, Any]] = None,
 ):
     if launch_main_menu is None:
         print("main_menu_view.py の読み込みに失敗しました。CLIモードで続行します。")
-        run_interactive_season(
-            teams=teams,
-            free_agents=free_agents,
-            user_team=user_team,
-            tracked_player_name=tracked_player_name,
-        )
+        if resume is not None:
+            run_interactive_season(resume=resume)
+        else:
+            run_interactive_season(
+                teams=teams,
+                free_agents=free_agents,
+                user_team=user_team,
+                tracked_player_name=tracked_player_name,
+            )
         return
 
-    season = Season(teams, free_agents)
-    ui_flow: Dict[str, Any] = {"offseason_completed": False, "dirty": False}
+    if resume is not None:
+        teams, free_agents, user_team, season, sc, tracked_player_name, off_done = _hydrate_resume_for_main_menu_ui(
+            resume
+        )
+    else:
+        if teams is None or free_agents is None or user_team is None:
+            raise ValueError(
+                "run_main_menu_ui_mode: teams / free_agents / user_team が必要です（resume 未指定時）"
+            )
+        season = Season(teams, free_agents)
+        sc = 1
+        off_done = False
+
+    ui_flow: Dict[str, Any] = {"offseason_completed": off_done, "dirty": False}
     game_state: Dict[str, Any] = {
         "teams": teams,
         "free_agents": free_agents,
         "user_team": user_team,
         "season": season,
-        "season_count": 1,
+        "season_count": sc,
         "tracked_player_name": tracked_player_name,
     }
 
-    def advance_one_round():
+    def advance_one_round(view: Any) -> None:
         season = game_state["season"]
         teams = game_state["teams"]
         free_agents = game_state["free_agents"]
@@ -2583,6 +2735,12 @@ def run_main_menu_ui_mode(
             from tkinter import messagebox
 
             root = tk._default_root
+            if ui_flow.get("offseason_completed"):
+                _gui_prompt_next_season_after_offseason_gate(
+                    view, game_state, ui_flow, repeat_prompt=True
+                )
+                return
+
             if root is not None:
                 ok = messagebox.askokcancel(
                     "オフシーズン",
@@ -2611,14 +2769,9 @@ def run_main_menu_ui_mode(
             print_user_team_history(user_team)
             ui_flow["offseason_completed"] = True
             ui_flow["dirty"] = True
-            if root is not None:
-                messagebox.showinfo(
-                    "完了",
-                    "オフシーズンが終わりました。\n"
-                    "メインウィンドウを閉じると、ターミナルに年度進行メニューが続きます。\n"
-                    "次シーズン・セーブはそこから操作できます。",
-                    parent=root,
-                )
+            _gui_prompt_next_season_after_offseason_gate(
+                view, game_state, ui_flow, repeat_prompt=False
+            )
             return
         season.simulate_next_round()
         ui_flow["dirty"] = True
@@ -2690,8 +2843,16 @@ def run_main_menu_ui_mode(
 
     print_separator("主画面UIモード開始")
     print("『日程』で日程ウィンドウ、『次へ進む』で1ラウンド進行します。")
-    print("シーズン終了後は『オフシーズンを実行』→ 完了後、ウィンドウを閉じるとターミナルで年度進行メニューが続きます。")
+    print(
+        "シーズン終了後は『オフシーズンを実行』→ 完了後、主画面から次シーズンを開始するか、"
+        "ウィンドウを閉じてターミナルの年度進行メニューに移れます。"
+    )
     print("他メニューは段階的に接続します。")
+
+    def advance_primary_ui() -> Tuple[str, str]:
+        s = game_state["season"]
+        fin = bool(getattr(s, "season_finished", False))
+        return _main_menu_advance_button_and_hint(fin, bool(ui_flow.get("offseason_completed")))
 
     launch_main_menu(
         team=user_team,
@@ -2701,6 +2862,7 @@ def run_main_menu_ui_mode(
         user_settings=user_settings,
         on_system_menu=on_system_menu,
         on_main_window_close=on_main_window_close_confirm,
+        advance_primary_ui_fn=advance_primary_ui,
     )
 
     if ui_flow["offseason_completed"]:
@@ -2711,6 +2873,7 @@ def run_main_menu_ui_mode(
             user_team=game_state["user_team"],
             tracked_player_name=game_state["tracked_player_name"],
             start_at_annual_menu=True,
+            initial_season_count=int(game_state["season_count"]),
         )
 
 
@@ -2742,9 +2905,15 @@ def simulate():
 
     if resume_payload is not None:
         print_separator("セーブを読み込みました")
-        print("続きは従来の CLI モードで進行します（シーズン途中は resume_season 付きセーブから再開）。")
         init_simulation_random(resume_payload.get("simulation_seed"))
-        run_interactive_season(resume=resume_payload)
+        resume_launch = choose_resume_launch_mode()
+        if resume_launch == "2":
+            run_main_menu_ui_mode(user_settings=_settings, resume=resume_payload)
+        else:
+            print(
+                "続きは従来の CLI モードで進行します（シーズン途中は resume_season 付きセーブから再開）。"
+            )
+            run_interactive_season(resume=resume_payload)
         return
 
     init_simulation_random()
