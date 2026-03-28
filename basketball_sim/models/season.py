@@ -2509,6 +2509,13 @@ class Season:
         self.game_count += round_game_count
         self.current_round += 1
 
+        try:
+            from basketball_sim.systems.cpu_management import run_cpu_management_after_round
+
+            run_cpu_management_after_round(self)
+        except Exception:
+            pass
+
         avg_total = round_points / round_game_count if round_game_count > 0 else 0.0
         print(f"ラウンド消化試合数: {round_game_count}")
         print(f"ラウンド平均総得点: {avg_total:.1f}")
