@@ -2,6 +2,8 @@
 
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
+    fresh_default_settings,
+    is_valid_tk_binding_sequence,
     load_user_settings,
     resolve_window_geometry,
     tk_binding_for,
@@ -59,3 +61,16 @@ def test_tk_binding_for_custom_and_fallback() -> None:
         )
         == default
     )
+
+
+def test_is_valid_tk_binding_sequence() -> None:
+    assert is_valid_tk_binding_sequence("<Escape>") is True
+    assert is_valid_tk_binding_sequence("<F1>") is True
+    assert is_valid_tk_binding_sequence("Escape") is False
+    assert is_valid_tk_binding_sequence("") is False
+
+
+def test_fresh_default_settings_has_schema() -> None:
+    d = fresh_default_settings()
+    assert d["schema_version"] >= 1
+    assert "window" in d and "width" in d["window"]

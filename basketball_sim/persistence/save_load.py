@@ -6,8 +6,11 @@
   あとから続きから再開できるようにする。
 - 形式にバージョン番号を付け、将来データ構造が変わっても判別できるようにする。
 
-制約（現段階）:
-- シーズン途中の途中ラウンドは保存しない。年度進行メニュー（オフシーズン処理の直後）から保存。
+制約・方針:
+- 年度進行メニュー相当（オフシーズン直後）のセーブでは payload に resume_season を載せない
+  （`build_save_payload(..., at_annual_menu=True)`）。チーム／FA のみで再開する。
+- シーズン途中のセーブでは `resume_season` に Season インスタンスを含める（pickle 同一グラフ）。
+  ロード後は `rebind_resume_season_to_world` で teams / free_agents と参照を一致させる。
 - 実装は pickle（Python 同士の復元向け）。将来 JSON 等に差し替え可能。
 """
 
@@ -106,6 +109,8 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         payload["payload_schema_version"] = PAYLOAD_SCHEMA_VERSION
     if "simulation_seed" not in payload:
         payload["simulation_seed"] = None
+    if "resume_season" not in payload:
+        payload["resume_season"] = None
 
     teams = payload.get("teams")
     if isinstance(teams, list):

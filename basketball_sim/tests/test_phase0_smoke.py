@@ -20,6 +20,7 @@ from basketball_sim.persistence.save_load import (
     save_world,
     validate_payload,
 )
+from basketball_sim.persistence.save_payload import build_save_payload, rebind_resume_season_to_world
 from basketball_sim.systems import generator as generator_mod
 from basketball_sim.utils import sim_rng as sim_rng_mod
 
@@ -31,6 +32,7 @@ def test_normalize_payload_fills_missing_keys() -> None:
     assert p["at_annual_menu"] is False
     assert p["payload_schema_version"] == PAYLOAD_SCHEMA_VERSION
     assert p["simulation_seed"] is None
+    assert p.get("resume_season") is None
 
 
 def test_validate_payload_requires_core_keys() -> None:
@@ -68,6 +70,39 @@ def test_save_load_roundtrip_minimal_team(tmp_path: Path) -> None:
     assert isinstance(loaded, Team)
     assert loaded.team_id == 7
     assert loaded.name == "Roundtrip FC"
+
+
+def test_save_load_midseason_season_roundtrip(tmp_path: Path) -> None:
+    from basketball_sim.main import generate_teams
+    from basketball_sim.models.season import Season
+    from basketball_sim.utils import sim_rng as sim_rng_mod
+
+    sim_rng_mod.init_simulation_random(11_223_344)
+    teams = generate_teams()
+    fa: list = []
+    season = Season(teams, fa)
+    season.simulate_next_round()
+    mid_round = int(season.current_round)
+
+    path = tmp_path / "mid.sav"
+    payload_in = build_save_payload(
+        teams=teams,
+        free_agents=fa,
+        user_team_id=int(teams[0].team_id),
+        season_count=1,
+        tracked_player_name=None,
+        at_annual_menu=False,
+        simulation_seed=sim_rng_mod.get_last_simulation_seed(),
+        resume_season=season,
+    )
+    save_world(path, payload_in)
+    out = load_world(path)
+    validate_payload(out)
+    rebind_resume_season_to_world(out)
+    rs = out.get("resume_season")
+    assert rs is not None
+    assert int(rs.current_round) == mid_round
+    assert rs.all_teams is out["teams"]
 
 
 def test_load_rejects_future_format_version(tmp_path: Path) -> None:

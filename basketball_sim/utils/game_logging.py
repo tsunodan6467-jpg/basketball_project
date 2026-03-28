@@ -124,6 +124,22 @@ def setup_application_logging(user_settings: Optional[Dict[str, Any]] = None) ->
     root.info("logging ready path=%s level=%s", log_path, level_name)
 
 
+def apply_runtime_log_level_from_settings(user_settings: Optional[Dict[str, Any]]) -> None:
+    """
+    設定変更直後にログレベルを反映する。
+    BASKETBALL_SIM_LOG_LEVEL が環境に設定されている場合は変更しない（起動時方針どおり）。
+    """
+    if os.environ.get("BASKETBALL_SIM_LOG_LEVEL", "").strip():
+        return
+    if not _setup_done:
+        return
+    level = _resolve_log_level(user_settings)
+    root = logging.getLogger(_LOGGER_NAME)
+    root.setLevel(level)
+    for h in root.handlers:
+        h.setLevel(level)
+
+
 def _reset_application_logging_for_tests() -> None:
     """pytest 用: ハンドラとフックを戻し、再度 setup できるようにする。"""
     global _setup_done

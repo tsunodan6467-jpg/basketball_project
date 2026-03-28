@@ -27,6 +27,8 @@ Notes
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import tkinter as tk
 from tkinter import scrolledtext, ttk, messagebox
 from datetime import datetime, date
@@ -128,12 +130,14 @@ from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
     load_user_settings,
+    normalize_user_settings,
     tk_binding_for,
 )
 
 
 MenuCallback = Callable[[], None]
 AdvanceCallback = Callable[[], None]
+SystemMenuCallback = Callable[["MainMenuView"], None]
 
 
 class MainMenuView:
@@ -183,18 +187,23 @@ class MainMenuView:
         tasks: Optional[List[str]] = None,
         title: str = "国内バスケGM - 主画面",
         user_settings: Optional[Dict[str, Any]] = None,
+        on_system_menu: Optional[SystemMenuCallback] = None,
+        on_main_window_close: Optional[Callable[[], bool]] = None,
     ) -> None:
         self.team = team
         self.season = season
         self.on_advance = on_advance
         self.menu_callbacks = menu_callbacks or {}
+        self.on_system_menu = on_system_menu
+        self.on_main_window_close = on_main_window_close
         self.external_news_items = news_items
         self.external_tasks = tasks
 
         self.root = root or tk.Tk()
         self.root.title(title)
         cfg = user_settings if user_settings is not None else load_user_settings()
-        apply_tk_window_settings(self.root, cfg)
+        self.user_settings = deepcopy(normalize_user_settings(cfg))
+        apply_tk_window_settings(self.root, self.user_settings)
         self.root.configure(bg="#15171c")
 
         self.style = ttk.Style(self.root)
@@ -206,8 +215,12 @@ class MainMenuView:
         self._configure_styles()
         self._build_ui()
         self.refresh()
-        _close_seq = tk_binding_for(cfg, KEY_ACTION_CLOSE_SUBWINDOW, "<Escape>")
-        self.root.bind(_close_seq, self._on_close_subwindow_hotkey)
+        self._close_subwindow_bind_seq = tk_binding_for(
+            self.user_settings, KEY_ACTION_CLOSE_SUBWINDOW, "<Escape>"
+        )
+        self.root.bind(self._close_subwindow_bind_seq, self._on_close_subwindow_hotkey)
+        if self.on_main_window_close is not None:
+            self.root.protocol("WM_DELETE_WINDOW", self._on_user_request_close_root)
 
     # ------------------------------------------------------------------
     # UI build
@@ -417,6 +430,45 @@ class MainMenuView:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+    def apply_runtime_user_settings(self, settings: Dict[str, Any]) -> None:
+        """settings.json 保存後など、幾何・フルスクリーン・サブウィンドウ閉じるキーを即時反映する。"""
+        merged = normalize_user_settings(settings)
+        try:
+            self.root.unbind(self._close_subwindow_bind_seq)
+        except tk.TclError:
+            pass
+        self.user_settings = deepcopy(merged)
+        apply_tk_window_settings(self.root, self.user_settings)
+        self._close_subwindow_bind_seq = tk_binding_for(
+            self.user_settings, KEY_ACTION_CLOSE_SUBWINDOW, "<Escape>"
+        )
+        self.root.bind(self._close_subwindow_bind_seq, self._on_close_subwindow_hotkey)
+
+    def close_all_subwindows(self) -> None:
+        """ロード等で世界を差し替える前に、開いている Toplevel をまとめて閉じる。"""
+        for closer in (
+            self._on_close_roster_window,
+            self._on_close_finance_window,
+            self._on_close_strategy_window,
+            self._on_close_development_window,
+            self._on_close_information_window,
+            self._on_close_schedule_window,
+            self._close_history_window,
+            self._on_close_gm_window,
+        ):
+            try:
+                closer()
+            except Exception:
+                pass
+        sysw = getattr(self, "_system_menu_window", None)
+        if sysw is not None:
+            try:
+                if sysw.winfo_exists():
+                    sysw.destroy()
+            except Exception:
+                pass
+            self._system_menu_window = None
+
     def refresh(self) -> None:
         self._refresh_top_bar()
         self._refresh_season_status()
@@ -465,6 +517,18 @@ class MainMenuView:
         except Exception:
             pass
         self._refresh_advance_button()
+
+    def _on_user_request_close_root(self) -> None:
+        if self.on_main_window_close is not None:
+            try:
+                if not self.on_main_window_close():
+                    return
+            except Exception:
+                pass
+        try:
+            self.root.destroy()
+        except Exception:
+            pass
 
     def run(self) -> None:
         self._schedule_steam_callback_pump()
@@ -5854,6 +5918,10 @@ class MainMenuView:
         if key == "歴史":
             self.open_history_window()
             return
+        if key == "システム":
+            if self.on_system_menu is not None:
+                self.on_system_menu(self)
+                return
         messagebox.showinfo("未実装", f"{key} 画面はこれから接続します。")
 
     def _on_advance(self) -> None:
@@ -6263,6 +6331,8 @@ def launch_main_menu(
     news_items: Optional[List[str]] = None,
     tasks: Optional[List[str]] = None,
     user_settings: Optional[Dict[str, Any]] = None,
+    on_system_menu: Optional[SystemMenuCallback] = None,
+    on_main_window_close: Optional[Callable[[], bool]] = None,
 ) -> MainMenuView:
     """
     Convenience launcher used by future main.py wiring.
@@ -6277,6 +6347,8 @@ def launch_main_menu(
         news_items=news_items,
         tasks=tasks,
         user_settings=user_settings,
+        on_system_menu=on_system_menu,
+        on_main_window_close=on_main_window_close,
     )
     view.run()
     return view

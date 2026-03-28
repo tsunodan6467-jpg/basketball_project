@@ -1,4 +1,5 @@
 from collections import Counter
+from copy import deepcopy
 import random
 import sys
 from pathlib import Path
@@ -7,7 +8,6 @@ from typing import Any, Dict, Optional
 from basketball_sim.config.game_constants import (
     LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
     LEAGUE_ROSTER_FOREIGN_CAP,
-    PAYLOAD_SCHEMA_VERSION,
 )
 from basketball_sim.models.season import Season
 from basketball_sim.models.offseason import Offseason
@@ -75,10 +75,21 @@ from basketball_sim.persistence.save_load import (
     save_world,
     validate_payload,
 )
+from basketball_sim.persistence.save_payload import build_save_payload, rebind_resume_season_to_world
 from basketball_sim.integrations.steamworks_bridge import enforce_steam_license, try_init_steam
-from basketball_sim.utils.game_logging import setup_application_logging
+from basketball_sim.utils.game_logging import apply_runtime_log_level_from_settings, setup_application_logging
 from basketball_sim.utils.sim_rng import get_last_simulation_seed, init_simulation_random
-from basketball_sim.utils.user_settings import apply_settings_to_environment, ensure_settings_file_exists
+from basketball_sim.utils.paths import settings_path
+from basketball_sim.utils.user_settings import (
+    KEY_ACTION_CLOSE_SUBWINDOW,
+    apply_settings_to_environment,
+    ensure_settings_file_exists,
+    fresh_default_settings,
+    is_valid_tk_binding_sequence,
+    load_user_settings,
+    save_user_settings,
+    tk_binding_for,
+)
 
 
 CITY_MARKET_SIZE = {
@@ -2009,6 +2020,7 @@ def _prompt_load_resume() -> Dict[str, Any]:
     path = Path(raw) if raw else default_p
     payload = load_world(path)
     validate_payload(payload)
+    rebind_resume_season_to_world(payload)
     return payload
 
 
@@ -2025,8 +2037,10 @@ def run_interactive_season(
     start_at_annual_menu: UI でオフシーズンまで済ませた直後など、年度進行メニューから開始する。
     """
     skip_to_annual_menu = False
+    resume_season_once = None
     if resume is not None:
         validate_payload(resume)
+        rebind_resume_season_to_world(resume)
         sync_player_id_counter_from_world(resume["teams"], resume["free_agents"])
         teams = resume["teams"]
         free_agents = resume["free_agents"]
@@ -2034,6 +2048,7 @@ def run_interactive_season(
         tracked_player_name = resume.get("tracked_player_name")
         season_count = resume["season_count"]
         skip_to_annual_menu = bool(resume.get("at_annual_menu"))
+        resume_season_once = resume.get("resume_season")
     else:
         if teams is None or free_agents is None or user_team is None:
             raise ValueError("run_interactive_season: teams / free_agents / user_team が必要です（resume 未指定時）")
@@ -2044,7 +2059,16 @@ def run_interactive_season(
     while True:
         if not skip_to_annual_menu:
             print_separator(f"シーズン {season_count} 開始")
-            season = Season(teams, free_agents)
+            if resume_season_once is not None:
+                season = resume_season_once
+                resume_season_once = None
+                try:
+                    season.all_teams = teams
+                    season.free_agents = free_agents if free_agents is not None else []
+                except Exception:
+                    season = Season(teams, free_agents)
+            else:
+                season = Season(teams, free_agents)
 
             while not season.season_finished:
                 print_separator("シーズンメニュー")
@@ -2063,6 +2087,7 @@ def run_interactive_season(
                 print("7. キャリア追跡ログを見る")
                 print("8. GMメニュー")
                 print("9. シーズンを最後まで進める")
+                print("10. セーブする（このラウンドの続きから再開できます）")
 
                 choice = input("番号: ").strip()
 
@@ -2084,6 +2109,24 @@ def run_interactive_season(
                     run_gm_menu(teams, user_team, free_agents, season=season)
                 elif choice == "9":
                     season.simulate_to_end()
+                elif choice == "10":
+                    save_path = _prompt_save_path()
+                    payload = build_save_payload(
+                        teams=teams,
+                        free_agents=free_agents,
+                        user_team_id=user_team.team_id,
+                        season_count=season_count,
+                        tracked_player_name=tracked_player_name,
+                        at_annual_menu=False,
+                        simulation_seed=get_last_simulation_seed(),
+                        resume_season=season,
+                    )
+                    try:
+                        save_world(save_path, payload)
+                        print(f"セーブしました: {save_path}")
+                    except Exception as exc:
+                        print(f"セーブに失敗しました: {exc}")
+                    continue
                 else:
                     print("正しい番号を入力してください。")
 
@@ -2120,16 +2163,16 @@ def run_interactive_season(
             continue
         elif next_choice == "6":
             save_path = _prompt_save_path()
-            payload = {
-                "teams": teams,
-                "free_agents": free_agents,
-                "user_team_id": user_team.team_id,
-                "tracked_player_name": tracked_player_name,
-                "season_count": season_count,
-                "at_annual_menu": True,
-                "payload_schema_version": PAYLOAD_SCHEMA_VERSION,
-                "simulation_seed": get_last_simulation_seed(),
-            }
+            payload = build_save_payload(
+                teams=teams,
+                free_agents=free_agents,
+                user_team_id=user_team.team_id,
+                season_count=season_count,
+                tracked_player_name=tracked_player_name,
+                at_annual_menu=True,
+                simulation_seed=get_last_simulation_seed(),
+                resume_season=None,
+            )
             try:
                 save_world(save_path, payload)
                 print(f"セーブしました: {save_path}")
@@ -2190,6 +2233,317 @@ def choose_game_launch_mode():
         print("1 か 2 を入力してください。")
 
 
+def _open_main_menu_system_window(view: Any, game_state: Dict[str, Any], ui_flow: Dict[str, Any]) -> None:
+    """主画面からのシステム（セーブ／ロード）。実処理は save_load + game_state 更新。"""
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, ttk
+
+    old = getattr(view, "_system_menu_window", None)
+    if old is not None:
+        try:
+            if old.winfo_exists():
+                old.focus_force()
+                return
+        except tk.TclError:
+            pass
+
+    win = tk.Toplevel(view.root)
+    win.title("システム")
+    view._system_menu_window = win
+    win.configure(bg="#15171c")
+    win.minsize(460, 420)
+
+    outer = ttk.Frame(win, padding=12)
+    outer.pack(fill="both", expand=True)
+
+    nb = ttk.Notebook(outer)
+    nb.pack(fill="both", expand=True, pady=(0, 8))
+
+    tab_data = ttk.Frame(nb, padding=10)
+    tab_settings = ttk.Frame(nb, padding=10)
+    nb.add(tab_data, text="データ")
+    nb.add(tab_settings, text="設定")
+
+    hint = (
+        "クイックセーブは ~/.basketball_sim/saves/quicksave.sav です。\n"
+        "ロードは現在のメモリ上の進行を置き換えます（確認あり）。"
+    )
+    ttk.Label(tab_data, text=hint, wraplength=400).pack(anchor="w", pady=(0, 10))
+
+    def _clear_ref() -> None:
+        view._system_menu_window = None
+
+    def _close() -> None:
+        _clear_ref()
+        win.destroy()
+
+    win.protocol("WM_DELETE_WINDOW", _close)
+
+    def do_save() -> None:
+        at_annual = bool(ui_flow.get("offseason_completed"))
+        path = default_save_path("quicksave")
+        if path.is_file():
+            if not messagebox.askokcancel(
+                "クイックセーブ",
+                f"既存ファイルを上書きします。よろしいですか？\n{path}",
+                parent=win,
+            ):
+                return
+        payload = build_save_payload(
+            teams=game_state["teams"],
+            free_agents=game_state["free_agents"],
+            user_team_id=game_state["user_team"].team_id,
+            season_count=game_state["season_count"],
+            tracked_player_name=game_state["tracked_player_name"],
+            at_annual_menu=at_annual,
+            simulation_seed=get_last_simulation_seed(),
+            resume_season=None if at_annual else game_state["season"],
+        )
+        try:
+            save_world(path, payload)
+            ui_flow["dirty"] = False
+            messagebox.showinfo("セーブ", f"保存しました。\n{path}", parent=win)
+        except Exception as exc:
+            messagebox.showerror("セーブ", f"失敗しました:\n{exc}", parent=win)
+
+    def do_save_as() -> None:
+        at_annual = bool(ui_flow.get("offseason_completed"))
+        path_str = filedialog.asksaveasfilename(
+            parent=win,
+            title="名前を付けて保存",
+            initialdir=str(default_save_path("quicksave").parent),
+            defaultextension=".sav",
+            filetypes=[("セーブ", "*.sav"), ("すべて", "*.*")],
+        )
+        if not path_str:
+            return
+        path = Path(path_str)
+        payload = build_save_payload(
+            teams=game_state["teams"],
+            free_agents=game_state["free_agents"],
+            user_team_id=game_state["user_team"].team_id,
+            season_count=game_state["season_count"],
+            tracked_player_name=game_state["tracked_player_name"],
+            at_annual_menu=at_annual,
+            simulation_seed=get_last_simulation_seed(),
+            resume_season=None if at_annual else game_state["season"],
+        )
+        try:
+            save_world(path, payload)
+            ui_flow["dirty"] = False
+            messagebox.showinfo("セーブ", f"保存しました。\n{path}", parent=win)
+        except Exception as exc:
+            messagebox.showerror("セーブ", f"失敗しました:\n{exc}", parent=win)
+
+    def do_load() -> None:
+        if not messagebox.askokcancel(
+            "ロード",
+            "現在の進行は失われます。ロードしてよいですか？",
+            parent=win,
+        ):
+            return
+        path_str = filedialog.askopenfilename(
+            parent=win,
+            title="セーブを開く",
+            initialdir=str(default_save_path("quicksave").parent),
+            filetypes=[("セーブ", "*.sav"), ("すべて", "*.*")],
+        )
+        if not path_str:
+            return
+        try:
+            p = load_world(Path(path_str))
+            validate_payload(p)
+            rebind_resume_season_to_world(p)
+            sync_player_id_counter_from_world(p["teams"], p["free_agents"])
+        except Exception as exc:
+            messagebox.showerror("ロード", f"読み込みに失敗しました:\n{exc}", parent=win)
+            return
+
+        view.close_all_subwindows()
+        game_state["teams"] = p["teams"]
+        game_state["free_agents"] = p["free_agents"]
+        game_state["user_team"] = find_user_team(p["teams"], p["user_team_id"])
+        game_state["season_count"] = p["season_count"]
+        game_state["tracked_player_name"] = p.get("tracked_player_name")
+        if p.get("resume_season") is not None:
+            game_state["season"] = p["resume_season"]
+        else:
+            game_state["season"] = Season(p["teams"], p["free_agents"])
+        ui_flow["offseason_completed"] = bool(p.get("at_annual_menu"))
+        view.team = game_state["user_team"]
+        view.season = game_state["season"]
+        seed = p.get("simulation_seed")
+        if seed is not None:
+            init_simulation_random(seed)
+        ui_flow["dirty"] = False
+        view.refresh()
+        messagebox.showinfo("ロード", "読み込みました。", parent=win)
+
+    def do_quit_app() -> None:
+        extra = ""
+        if ui_flow.get("dirty"):
+            extra = "未保存の変更がある可能性があります。\n\n"
+        if not messagebox.askokcancel(
+            "アプリを終了",
+            f"{extra}アプリケーションを終了しますか？",
+            parent=win,
+        ):
+            return
+        _close()
+        try:
+            view.root.destroy()
+        except Exception:
+            pass
+
+    ttk.Button(tab_data, text="クイックセーブ", command=do_save).pack(fill="x", pady=4)
+    ttk.Button(tab_data, text="名前を付けて保存…", command=do_save_as).pack(fill="x", pady=4)
+    ttk.Button(tab_data, text="ロード…", command=do_load).pack(fill="x", pady=4)
+    ttk.Button(tab_data, text="アプリを終了", command=do_quit_app).pack(fill="x", pady=(8, 0))
+
+    # ----- 設定タブ（user_settings.json 正本） -----
+    cfg0 = view.user_settings
+    width_var = tk.StringVar(value=str(int(cfg0["window"]["width"])))
+    height_var = tk.StringVar(value=str(int(cfg0["window"]["height"])))
+    fullscreen_var = tk.BooleanVar(value=bool(cfg0.get("fullscreen")))
+    log_var = tk.StringVar(value=str(cfg0.get("log_level", "INFO")))
+    close_key_var = tk.StringVar(
+        value=tk_binding_for(cfg0, KEY_ACTION_CLOSE_SUBWINDOW, "<Escape>")
+    )
+    steam_var = tk.BooleanVar(value=bool(cfg0.get("steam_require_license")))
+
+    LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+    set_hint = (
+        f"保存先: {settings_path()}\n"
+        "環境変数 BASKETBALL_SIM_LOG_LEVEL が設定されている場合、ログレベル変更は反映されません。\n"
+        "Steam ライセンス必須は主に次回起動から有効です。"
+    )
+    ttk.Label(tab_settings, text=set_hint, wraplength=400).grid(
+        row=0, column=0, columnspan=3, sticky="w", pady=(0, 10)
+    )
+
+    r = 1
+    ttk.Label(tab_settings, text="ウィンドウ幅（640〜7680）").grid(row=r, column=0, sticky="w", pady=4)
+    tk.Spinbox(
+        tab_settings,
+        textvariable=width_var,
+        from_=640,
+        to=7680,
+        increment=10,
+        width=8,
+    ).grid(row=r, column=1, sticky="w", padx=(8, 0))
+    r += 1
+    ttk.Label(tab_settings, text="ウィンドウ高さ（480〜4320）").grid(row=r, column=0, sticky="w", pady=4)
+    tk.Spinbox(
+        tab_settings,
+        textvariable=height_var,
+        from_=480,
+        to=4320,
+        increment=10,
+        width=8,
+    ).grid(row=r, column=1, sticky="w", padx=(8, 0))
+    r += 1
+    ttk.Checkbutton(tab_settings, text="フルスクリーン", variable=fullscreen_var).grid(
+        row=r, column=0, columnspan=2, sticky="w", pady=4
+    )
+    r += 1
+    ttk.Label(tab_settings, text="ログレベル").grid(row=r, column=0, sticky="w", pady=4)
+    log_combo = ttk.Combobox(
+        tab_settings,
+        textvariable=log_var,
+        values=LOG_LEVELS,
+        state="readonly",
+        width=12,
+    )
+    log_combo.grid(row=r, column=1, sticky="w", padx=(8, 0))
+    r += 1
+    ttk.Label(tab_settings, text="サブウィンドウを閉じるキー").grid(row=r, column=0, sticky="w", pady=4)
+    ttk.Entry(tab_settings, textvariable=close_key_var, width=16).grid(
+        row=r, column=1, sticky="w", padx=(8, 0)
+    )
+    ttk.Label(tab_settings, text="例: <Escape>  <F1>", font=("Yu Gothic UI", 8)).grid(
+        row=r, column=2, sticky="w", padx=(6, 0)
+    )
+    r += 1
+    ttk.Checkbutton(
+        tab_settings,
+        text="Steam ライセンス必須（未購入時は終了）",
+        variable=steam_var,
+    ).grid(row=r, column=0, columnspan=3, sticky="w", pady=4)
+    r += 1
+
+    tab_settings.columnconfigure(2, weight=1)
+
+    def _reset_settings_widgets() -> None:
+        d = fresh_default_settings()
+        width_var.set(str(int(d["window"]["width"])))
+        height_var.set(str(int(d["window"]["height"])))
+        fullscreen_var.set(bool(d.get("fullscreen")))
+        log_var.set(str(d.get("log_level", "INFO")))
+        close_key_var.set(tk_binding_for(d, KEY_ACTION_CLOSE_SUBWINDOW, "<Escape>"))
+        steam_var.set(bool(d.get("steam_require_license")))
+
+    def do_save_user_settings() -> None:
+        try:
+            w = int(str(width_var.get()).strip())
+            h = int(str(height_var.get()).strip())
+        except ValueError:
+            messagebox.showerror("設定", "幅・高さは整数で入力してください。", parent=win)
+            return
+        raw_close = close_key_var.get().strip()
+        if raw_close and not is_valid_tk_binding_sequence(raw_close):
+            messagebox.showerror(
+                "設定",
+                "サブウィンドウを閉じるキーの形式が不正です。\n例: <Escape>  <F1>",
+                parent=win,
+            )
+            return
+        data = deepcopy(view.user_settings)
+        data["window"] = {"width": w, "height": h}
+        data["fullscreen"] = bool(fullscreen_var.get())
+        lvl = str(log_var.get()).upper().strip()
+        if lvl not in LOG_LEVELS:
+            messagebox.showerror("設定", "ログレベルを選び直してください。", parent=win)
+            return
+        data["log_level"] = lvl
+        kb = dict(data.get("key_bindings") or {})
+        if raw_close:
+            kb[KEY_ACTION_CLOSE_SUBWINDOW] = raw_close
+        else:
+            kb.pop(KEY_ACTION_CLOSE_SUBWINDOW, None)
+        data["key_bindings"] = kb
+        data["steam_require_license"] = bool(steam_var.get())
+        try:
+            save_user_settings(data)
+        except Exception as exc:
+            messagebox.showerror("設定", f"保存に失敗しました:\n{exc}", parent=win)
+            return
+        merged = load_user_settings()
+        apply_settings_to_environment(merged)
+        apply_runtime_log_level_from_settings(merged)
+        view.apply_runtime_user_settings(merged)
+        messagebox.showinfo("設定", f"保存しました。\n{settings_path()}", parent=win)
+
+    def do_reset_settings_to_defaults() -> None:
+        if not messagebox.askokcancel(
+            "設定を標準に戻す",
+            "画面上の値を既定に戻します（まだファイルには書き込みません）。\n"
+            "反映するには「設定を保存」を押してください。",
+            parent=win,
+        ):
+            return
+        _reset_settings_widgets()
+
+    ttk.Button(tab_settings, text="設定を保存", command=do_save_user_settings).grid(
+        row=r, column=0, columnspan=2, sticky="ew", pady=(12, 4)
+    )
+    ttk.Button(tab_settings, text="画面上の値を標準に戻す", command=do_reset_settings_to_defaults).grid(
+        row=r + 1, column=0, columnspan=2, sticky="ew", pady=4
+    )
+
+    ttk.Button(outer, text="閉じる", command=_close).pack(fill="x")
+
+
 def run_main_menu_ui_mode(
     teams,
     free_agents,
@@ -2208,9 +2562,22 @@ def run_main_menu_ui_mode(
         return
 
     season = Season(teams, free_agents)
-    ui_flow = {"offseason_completed": False}
+    ui_flow: Dict[str, Any] = {"offseason_completed": False, "dirty": False}
+    game_state: Dict[str, Any] = {
+        "teams": teams,
+        "free_agents": free_agents,
+        "user_team": user_team,
+        "season": season,
+        "season_count": 1,
+        "tracked_player_name": tracked_player_name,
+    }
 
     def advance_one_round():
+        season = game_state["season"]
+        teams = game_state["teams"]
+        free_agents = game_state["free_agents"]
+        user_team = game_state["user_team"]
+        tp = game_state["tracked_player_name"]
         if season.season_finished:
             import tkinter as tk
             from tkinter import messagebox
@@ -2240,9 +2607,10 @@ def run_main_menu_ui_mode(
                     )
                 return
             print_separator("オフシーズン完了")
-            print_player_career_tracking(user_team, tracked_player_name=tracked_player_name)
+            print_player_career_tracking(user_team, tracked_player_name=tp)
             print_user_team_history(user_team)
             ui_flow["offseason_completed"] = True
+            ui_flow["dirty"] = True
             if root is not None:
                 messagebox.showinfo(
                     "完了",
@@ -2253,12 +2621,14 @@ def run_main_menu_ui_mode(
                 )
             return
         season.simulate_next_round()
+        ui_flow["dirty"] = True
         print(f"[MAIN_MENU] round={season.current_round}/{season.total_rounds}")
 
     def debug_skip_to_offseason():
         import tkinter as tk
         from tkinter import messagebox
 
+        season = game_state["season"]
         root = tk._default_root
         if season.season_finished:
             if root is not None:
@@ -2283,6 +2653,7 @@ def run_main_menu_ui_mode(
 
         print_separator("デバッグ: レギュラーシーズン一括進行")
         season.simulate_to_end()
+        ui_flow["dirty"] = True
         print(f"[MAIN_MENU][DEBUG] round={season.current_round}/{season.total_rounds} finished={season.season_finished}")
 
         if root is not None:
@@ -2292,6 +2663,25 @@ def run_main_menu_ui_mode(
                 "『オフシーズンを実行』でオフ処理に進めます。",
                 parent=root,
             )
+
+    def on_main_window_close_confirm() -> bool:
+        import tkinter as tk
+        from tkinter import messagebox
+
+        if not ui_flow.get("dirty"):
+            return True
+        root = tk._default_root
+        return bool(
+            messagebox.askokcancel(
+                "メインウィンドウを閉じる",
+                "未保存の変更がある可能性があります（最後のセーブ以降に進行しました）。\n"
+                "閉じてよいですか？",
+                parent=root,
+            )
+        )
+
+    def on_system_menu(view: Any) -> None:
+        _open_main_menu_system_window(view, game_state, ui_flow)
 
     # 「日程」: 日程ウィンドウ（読み取り専用）。1ラウンド進行は「次へ進む」。
     menu_callbacks = {
@@ -2309,15 +2699,17 @@ def run_main_menu_ui_mode(
         on_advance=advance_one_round,
         menu_callbacks=menu_callbacks,
         user_settings=user_settings,
+        on_system_menu=on_system_menu,
+        on_main_window_close=on_main_window_close_confirm,
     )
 
     if ui_flow["offseason_completed"]:
         print_separator("UIでのオフシーズン完了 → CLI 年度進行メニュー")
         run_interactive_season(
-            teams=teams,
-            free_agents=free_agents,
-            user_team=user_team,
-            tracked_player_name=tracked_player_name,
+            teams=game_state["teams"],
+            free_agents=game_state["free_agents"],
+            user_team=game_state["user_team"],
+            tracked_player_name=game_state["tracked_player_name"],
             start_at_annual_menu=True,
         )
 
@@ -2350,7 +2742,7 @@ def simulate():
 
     if resume_payload is not None:
         print_separator("セーブを読み込みました")
-        print("続きは従来の CLI モードで進行します（シーズン途中の途中ラウンドは未対応。年度進行メニュー付近から再開）。")
+        print("続きは従来の CLI モードで進行します（シーズン途中は resume_season 付きセーブから再開）。")
         init_simulation_random(resume_payload.get("simulation_seed"))
         run_interactive_season(resume=resume_payload)
         return
@@ -2398,12 +2790,16 @@ def run_smoke() -> int:
     try:
         init_simulation_random(42_424_242)
         team = Team(team_id=1, name="Smoke FC", league_level=1)
-        payload_in = {
-            "teams": [team],
-            "free_agents": [],
-            "user_team_id": 1,
-            "season_count": 1,
-        }
+        payload_in = build_save_payload(
+            teams=[team],
+            free_agents=[],
+            user_team_id=1,
+            season_count=1,
+            tracked_player_name=None,
+            at_annual_menu=True,
+            simulation_seed=get_last_simulation_seed(),
+            resume_season=None,
+        )
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "smoke.sav"
             save_world(path, payload_in)

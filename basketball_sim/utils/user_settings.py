@@ -86,6 +86,16 @@ def _normalize(data: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def fresh_default_settings() -> Dict[str, Any]:
+    """編集 UI・「標準に戻す」用の既定設定（正規化済みコピー）。"""
+    return deepcopy(_DEFAULTS)
+
+
+def normalize_user_settings(data: Dict[str, Any]) -> Dict[str, Any]:
+    """外部から渡した dict を既定値とマージして検証済みコピーを返す。"""
+    return _normalize(data)
+
+
 def load_user_settings(path: Path | None = None) -> Dict[str, Any]:
     """設定ファイルがなければ既定値。壊れていれば既定値にフォールバック。"""
     p = path or settings_path()
@@ -146,6 +156,16 @@ def resolve_window_geometry(settings: Dict[str, Any]) -> Tuple[int, int, int, in
 _TK_BIND_RE = re.compile(r"^<[^>]{1,48}>$")
 
 
+def is_valid_tk_binding_sequence(seq: str) -> bool:
+    """Tk bind 用の1トークン（例 `<Escape>`）として安全な形式か。"""
+    if not isinstance(seq, str):
+        return False
+    s = seq.strip()
+    if not s or len(s) > 64:
+        return False
+    return bool(_TK_BIND_RE.fullmatch(s))
+
+
 def tk_binding_for(settings: Dict[str, Any], action: str, default: str) -> str:
     """
     key_bindings[action] から Tkinter の bind 用シーケンスを返す。
@@ -174,11 +194,13 @@ def apply_tk_window_settings(root: Any, settings: Dict[str, Any]) -> None:
     w, h, min_w, min_h = resolve_window_geometry(settings)
     root.geometry(f"{w}x{h}")
     root.minsize(min_w, min_h)
-    if bool(settings.get("fullscreen", False)):
-        try:
+    try:
+        if bool(settings.get("fullscreen", False)):
             root.attributes("-fullscreen", True)
-        except Exception:
-            LOG.debug("fullscreen 非対応の環境のためスキップ", exc_info=True)
+        else:
+            root.attributes("-fullscreen", False)
+    except Exception:
+        LOG.debug("fullscreen 属性の適用をスキップ", exc_info=True)
 
 
 def apply_settings_to_environment(settings: Dict[str, Any]) -> None:
