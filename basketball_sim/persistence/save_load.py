@@ -106,6 +106,16 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         payload["payload_schema_version"] = PAYLOAD_SCHEMA_VERSION
     if "simulation_seed" not in payload:
         payload["simulation_seed"] = None
+
+    teams = payload.get("teams")
+    if isinstance(teams, list):
+        from basketball_sim.systems.team_tactics import ensure_team_tactics_on_team
+
+        for t in teams:
+            try:
+                ensure_team_tactics_on_team(t)
+            except Exception:
+                continue
     return payload
 
 

@@ -58,6 +58,13 @@ from basketball_sim.systems.season_transaction_rules import (
     inseason_roster_moves_unlocked,
 )
 from basketball_sim.systems.training_unlocks import player_drill_lock_reason
+from basketball_sim.systems.team_tactics import (
+    STARTER_POSITIONS,
+    ensure_team_tactics_on_team,
+    get_default_team_tactics,
+    get_safe_team_tactics,
+    normalize_team_tactics,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -1076,8 +1083,8 @@ class MainMenuView:
             pass
 
         window = tk.Toplevel(self.root)
-        window.title(f"戦術・起用 - {self._team_name()}")
-        window.geometry("980x680")
+        window.title(f"戦術メニュー - {self._team_name()}")
+        window.geometry("980x720")
         window.minsize(860, 580)
         window.configure(bg="#15171c")
         try:
@@ -1098,6 +1105,52 @@ class MainMenuView:
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x")
+
+        if self.team is not None:
+            try:
+                ensure_team_tactics_on_team(self.team)
+            except Exception:
+                pass
+
+        nav = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 0, 0, 8))
+        nav.pack(fill="x")
+        ttk.Label(nav, text="戦術設定（各画面で保存）", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 6))
+        row_a = ttk.Frame(nav, style="Panel.TFrame")
+        row_a.pack(fill="x")
+        row_b = ttk.Frame(nav, style="Panel.TFrame")
+        row_b.pack(fill="x", pady=(4, 0))
+        hub_ref = window
+
+        def _nav_btn(fr: ttk.Frame, label: str, opener: Any) -> None:
+            ttk.Button(fr, text=label, style="Menu.TButton", command=opener, width=20).pack(
+                side="left", padx=4, pady=2
+            )
+
+        _nav_btn(
+            row_a,
+            "チーム戦術",
+            lambda: self._open_tactics_team_strategy_window(hub_ref),
+        )
+        _nav_btn(
+            row_a,
+            "ローテーション管理",
+            lambda: self._open_tactics_rotation_window(hub_ref),
+        )
+        _nav_btn(
+            row_a,
+            "起用方針",
+            lambda: self._open_tactics_usage_policy_window(hub_ref),
+        )
+        _nav_btn(
+            row_b,
+            "役割設定",
+            lambda: self._open_tactics_roles_window(hub_ref),
+        )
+        _nav_btn(
+            row_b,
+            "セットプレー方針",
+            lambda: self._open_tactics_playbook_window(hub_ref),
+        )
 
         content = ttk.Frame(outer, style="Root.TFrame")
         content.pack(fill="both", expand=True)
@@ -1197,15 +1250,15 @@ class MainMenuView:
         sixth_man = self._get_sixth_man_player()
         bench_order = self._get_bench_order_players()
 
-        self.strategy_header_var.set(f"{self._team_name()} 戦術・起用状況")
+        self.strategy_header_var.set(f"{self._team_name()} 戦術メニュー（概要）")
 
         strategy_lines = [
-            f"チーム戦術: {strategy_text}",
+            f"試合反映中の戦術 (Team.strategy): {strategy_text}",
             f"HCスタイル: {coach_text}",
-            f"起用方針: {usage_text}",
+            f"起用方針 (Team.usage_policy): {usage_text}",
             f"ロスター人数: {len(list(self._safe_get(self.team, 'players', []) or []))}",
             f"先発人数: {len(starters)} / ベンチ序列人数: {len(bench_order)}",
-            f"補足: 現在は読み取り専用です",
+            "詳細戦術 (team_tactics): 上のボタンから編集・保存（Phase A は試合未連携）",
         ]
         for var, line in zip(self.strategy_lines, strategy_lines):
             var.set(line)
@@ -1235,8 +1288,638 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "strategy / coach_style / usage_policy / get_starting_five() / get_sixth_man() / get_bench_order_players() を表示しています。"
+            "概要は読み取り専用です。GMタブの「戦術・HC・起用」で試合に効く strategy / usage_policy を変更できます。"
+            " team_tactics の細かい設定は Phase B 以降でシミュへ接続予定です。"
         )
+
+    def _tactics_roster_player_ids(self) -> set:
+        ids: set = set()
+        for p in self._safe_get(self.team, "players", []) or []:
+            pid = getattr(p, "player_id", None)
+            if pid is None:
+                continue
+            try:
+                ids.add(int(pid))
+            except (TypeError, ValueError):
+                continue
+        return ids
+
+    def _tactics_commit_payload(self, payload: Dict[str, Any]) -> None:
+        if self.team is None:
+            return
+        pids = self._tactics_roster_player_ids()
+        self.team.team_tactics = normalize_team_tactics(payload, valid_player_ids=pids if pids else None)
+
+    def _open_tactics_team_strategy_window(self, parent: tk.Toplevel) -> None:
+        if self.team is None:
+            return
+        ensure_team_tactics_on_team(self.team)
+        data = get_safe_team_tactics(self.team)["team_strategy"]
+        pairs_map = {
+            "offense_tempo": [("slow", "遅め"), ("standard", "標準"), ("fast", "速め")],
+            "offense_style": [
+                ("balanced", "バランス"),
+                ("inside", "インサイド重視"),
+                ("three_point", "3P重視"),
+                ("drive", "ドライブ重視"),
+            ],
+            "offense_creation": [
+                ("ball_move", "ボールムーブ重視"),
+                ("pick_and_roll", "Pick & Roll重視"),
+                ("iso", "アイソ重視"),
+                ("post", "ポスト活用"),
+            ],
+            "defense_style": [
+                ("balanced", "バランス"),
+                ("protect_paint", "ペイント保護"),
+                ("protect_three", "3P警戒"),
+                ("pressure", "プレッシャー強め"),
+            ],
+            "rebound_style": [
+                ("get_back", "戻り優先"),
+                ("balanced", "バランス"),
+                ("crash_offense", "攻撃リバウンド重視"),
+            ],
+            "transition_style": [
+                ("push", "速攻を狙う"),
+                ("situational", "状況次第"),
+                ("half_court", "ハーフコート優先"),
+            ],
+        }
+        labels = {
+            "offense_tempo": "オフェンステンポ",
+            "offense_style": "攻撃スタイル",
+            "offense_creation": "攻撃組み立て",
+            "defense_style": "ディフェンス方針",
+            "rebound_style": "リバウンド方針",
+            "transition_style": "トランジション方針",
+        }
+        w = tk.Toplevel(parent)
+        w.title("チーム戦術")
+        w.geometry("520x420")
+        w.configure(bg="#15171c")
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+        combos: Dict[str, ttk.Combobox] = {}
+
+        def _set_combo(combo: ttk.Combobox, pairs: List[Tuple[str, str]], cur: str) -> None:
+            vals = [b for _, b in pairs]
+            combo["values"] = vals
+            internals = [a for a, _ in pairs]
+            combo.set(vals[internals.index(cur)] if cur in internals else vals[0])
+
+        for key in (
+            "offense_tempo",
+            "offense_style",
+            "offense_creation",
+            "defense_style",
+            "rebound_style",
+            "transition_style",
+        ):
+            row = ttk.Frame(wrap, style="Panel.TFrame")
+            row.pack(fill="x", pady=3)
+            ttk.Label(row, text=labels[key], width=18).pack(side="left")
+            cb = ttk.Combobox(row, state="readonly", width=28)
+            cb.pack(side="left", padx=6)
+            _set_combo(cb, pairs_map[key], str(data.get(key, "")))
+            combos[key] = cb
+
+        def _collect() -> Dict[str, str]:
+            out: Dict[str, str] = {}
+            for key, cb in combos.items():
+                pairs = pairs_map[key]
+                disp = cb.get()
+                for a, b in pairs:
+                    if b == disp:
+                        out[key] = a
+                        break
+                else:
+                    out[key] = pairs[0][0]
+            return out
+
+        def _save() -> None:
+            raw = dict(get_safe_team_tactics(self.team))
+            raw["team_strategy"] = _collect()
+            self._tactics_commit_payload(raw)
+            messagebox.showinfo("保存", "チーム戦術を保存しました。", parent=w)
+            self._refresh_strategy_window()
+
+        def _reset() -> None:
+            d = get_default_team_tactics()["team_strategy"]
+            for k, cb in combos.items():
+                _set_combo(cb, pairs_map[k], str(d.get(k, "")))
+
+        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn.pack(fill="x", pady=(12, 0))
+        ttk.Button(btn, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
+        ttk.Button(btn, text="標準に戻す", style="Menu.TButton", command=_reset).pack(side="left", padx=4)
+        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
+
+    def _open_tactics_rotation_window(self, parent: tk.Toplevel) -> None:
+        if self.team is None:
+            return
+        ensure_team_tactics_on_team(self.team)
+        rot = get_safe_team_tactics(self.team)["rotation"]
+        roster = list(self._safe_get(self.team, "players", []) or [])
+        roster_sorted = sorted(
+            roster,
+            key=lambda p: (-int(getattr(p, "ovr", 0)), str(getattr(p, "name", ""))),
+        )
+        slot_labels = [("未設定", None)] + [
+            (f"{getattr(p, 'name', '-')} ({getattr(p, 'position', '?')})", int(getattr(p, "player_id", 0)))
+            for p in roster_sorted
+            if getattr(p, "player_id", None) is not None
+        ]
+
+        sub_pairs = [
+            ("standard", "標準"),
+            ("starters_long", "主力長め"),
+            ("bench_deep", "ベンチ厚め"),
+            ("youth_dev", "若手育成"),
+        ]
+        fat_pairs = [("strict", "疲労に厳格"), ("standard", "標準"), ("push", "多少無理をさせる")]
+        foul_pairs = [("early_pull", "早めに下げる"), ("standard", "標準"), ("ride", "我慢する")]
+        clutch_pairs = [
+            ("stars", "主力固定"),
+            ("hot_hand", "好調優先"),
+            ("defense", "守備重視"),
+            ("offense", "攻撃重視"),
+        ]
+
+        w = tk.Toplevel(parent)
+        w.title("ローテーション管理")
+        w.geometry("640x620")
+        w.configure(bg="#15171c")
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+
+        ttk.Label(wrap, text="先発（ポジション別・Phase A は team_tactics のみ保存）", font=("Yu Gothic UI", 10, "bold")).pack(
+            anchor="w"
+        )
+        starter_combos: Dict[str, ttk.Combobox] = {}
+        starters_state = rot.get("starters") or {}
+        for pos in STARTER_POSITIONS:
+            row = ttk.Frame(wrap, style="Panel.TFrame")
+            row.pack(fill="x", pady=2)
+            ttk.Label(row, text=pos, width=4).pack(side="left")
+            cb = ttk.Combobox(row, state="readonly", width=42)
+            displays = [t[0] for t in slot_labels]
+            cb["values"] = displays
+            cur_id = starters_state.get(pos) if isinstance(starters_state, dict) else None
+            sel = 0
+            for i, (_, pid) in enumerate(slot_labels):
+                if pid == cur_id:
+                    sel = i
+                    break
+            cb.current(sel)
+            cb.pack(side="left", padx=6)
+            starter_combos[pos] = cb
+
+        ttk.Label(
+            wrap,
+            text="控え順: Phase A では一覧編集は未実装（保存時は既存の team_tactics の値を維持）",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+        ).pack(anchor="w", pady=(6, 0))
+        ttk.Label(wrap, text="交代・終盤方針", font=("Yu Gothic UI", 10, "bold")).pack(anchor="w", pady=(10, 4))
+
+        def _policy_combo(
+            row_parent: ttk.Frame, label: str, pairs: List[Tuple[str, str]], cur: str
+        ) -> ttk.Combobox:
+            r = ttk.Frame(row_parent, style="Panel.TFrame")
+            r.pack(fill="x", pady=2)
+            ttk.Label(r, text=label, width=18).pack(side="left")
+            cb = ttk.Combobox(r, state="readonly", width=28)
+            vals = [b for _, b in pairs]
+            cb["values"] = vals
+            ints = [a for a, _ in pairs]
+            cb.set(vals[ints.index(cur)] if cur in ints else vals[0])
+            cb.pack(side="left", padx=6)
+            return cb
+
+        pol_frame = ttk.Frame(wrap, style="Panel.TFrame")
+        pol_frame.pack(fill="x")
+        cb_sub = _policy_combo(pol_frame, "交代方針", sub_pairs, str(rot.get("sub_policy", "standard")))
+        cb_fat = _policy_combo(pol_frame, "疲労対応", fat_pairs, str(rot.get("fatigue_policy", "standard")))
+        cb_foul = _policy_combo(pol_frame, "ファウル対応", foul_pairs, str(rot.get("foul_policy", "standard")))
+        cb_clutch = _policy_combo(pol_frame, "終盤起用", clutch_pairs, str(rot.get("clutch_policy", "stars")))
+
+        ttk.Label(wrap, text="目標出場時間（分・0〜40）", font=("Yu Gothic UI", 10, "bold")).pack(anchor="w", pady=(10, 4))
+        minutes_frame = ttk.Frame(wrap, style="Panel.TFrame")
+        minutes_frame.pack(fill="both", expand=True)
+        canvas = tk.Canvas(minutes_frame, bg="#1d2129", highlightthickness=0, height=220)
+        vsb = ttk.Scrollbar(minutes_frame, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas, style="Panel.TFrame")
+        inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=vsb.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+
+        scales: Dict[int, tk.Scale] = {}
+        tm = rot.get("target_minutes") if isinstance(rot.get("target_minutes"), dict) else {}
+        for p in roster_sorted:
+            pid = getattr(p, "player_id", None)
+            if pid is None:
+                continue
+            pid = int(pid)
+            row = ttk.Frame(inner, style="Panel.TFrame")
+            row.pack(fill="x", pady=2)
+            nm = str(getattr(p, "name", "-"))[:14]
+            ttk.Label(row, text=f"{nm}", width=16).pack(side="left")
+            try:
+                init_v = float(tm.get(str(pid), tm.get(pid, 20.0)))
+            except (TypeError, ValueError):
+                init_v = 20.0
+            init_v = max(0.0, min(40.0, init_v))
+            sc = tk.Scale(
+                row,
+                from_=0,
+                to=40,
+                orient="horizontal",
+                length=180,
+                showvalue=True,
+                resolution=1,
+            )
+            sc.set(init_v)
+            sc.pack(side="left", padx=8)
+            scales[pid] = sc
+
+        def _collect_rotation() -> Dict[str, Any]:
+            starters: Dict[str, Any] = {}
+            for pos, cb in starter_combos.items():
+                idx = cb.current()
+                if idx is None or idx < 0:
+                    idx = 0
+                _label, pid = slot_labels[idx]
+                starters[pos] = pid
+
+            def _read_pol(cb: ttk.Combobox, pairs: List[Tuple[str, str]]) -> str:
+                d = cb.get()
+                for a, b in pairs:
+                    if b == d:
+                        return a
+                return pairs[0][0]
+
+            target_minutes: Dict[str, float] = {}
+            for pid, sc in scales.items():
+                target_minutes[str(pid)] = float(sc.get())
+
+            return {
+                "starters": starters,
+                "bench_order": list(rot.get("bench_order") or []),
+                "target_minutes": target_minutes,
+                "sub_policy": _read_pol(cb_sub, sub_pairs),
+                "fatigue_policy": _read_pol(cb_fat, fat_pairs),
+                "foul_policy": _read_pol(cb_foul, foul_pairs),
+                "clutch_policy": _read_pol(cb_clutch, clutch_pairs),
+            }
+
+        def _save() -> None:
+            raw = dict(get_safe_team_tactics(self.team))
+            raw["rotation"] = _collect_rotation()
+            self._tactics_commit_payload(raw)
+            messagebox.showinfo("保存", "ローテーション設定を保存しました。", parent=w)
+            self._refresh_strategy_window()
+
+        def _reset() -> None:
+            d = get_default_team_tactics()["rotation"]
+            for pos, cb in starter_combos.items():
+                cb.current(0)
+            cb_sub.set(sub_pairs[0][1])
+            cb_fat.set(fat_pairs[1][1])
+            cb_foul.set(foul_pairs[1][1])
+            cb_clutch.set(clutch_pairs[0][1])
+            for pid, sc in scales.items():
+                sc.set(20.0)
+
+        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn.pack(fill="x", pady=(8, 0))
+        ttk.Button(btn, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
+        ttk.Button(btn, text="標準に戻す", style="Menu.TButton", command=_reset).pack(side="left", padx=4)
+        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
+
+    def _open_tactics_usage_policy_window(self, parent: tk.Toplevel) -> None:
+        if self.team is None:
+            return
+        ensure_team_tactics_on_team(self.team)
+        u = get_safe_team_tactics(self.team)["usage_policy"]
+        pairs_map = {
+            "priority": [("win", "勝利優先"), ("balanced", "バランス"), ("development", "育成優先")],
+            "evaluation_focus": [
+                ("overall", "総合力重視"),
+                ("offense", "攻撃力重視"),
+                ("defense", "守備力重視"),
+                ("potential", "将来性重視"),
+            ],
+            "form_weight": [("high", "調子を強く反映"), ("standard", "標準"), ("skill", "実力を優先")],
+            "age_balance": [("veteran", "ベテラン優先"), ("balanced", "バランス"), ("youth", "若手優先")],
+            "injury_care": [("high", "ケガ配慮・強め"), ("standard", "標準"), ("low", "多少は無視")],
+            "schedule_care": [("rest", "休養重視"), ("standard", "標準"), ("win", "勝利優先")],
+            "foreign_player_usage": [
+                ("stars", "主力として最大活用"),
+                ("balanced", "バランス運用"),
+                ("japan_core", "日本人中心"),
+            ],
+        }
+        labels_j = {
+            "priority": "起用の基本方針",
+            "evaluation_focus": "評価基準",
+            "form_weight": "調子の反映度",
+            "age_balance": "年齢バランス",
+            "injury_care": "ケガリスク配慮",
+            "schedule_care": "連戦時運用",
+            "foreign_player_usage": "外国籍起用方針",
+        }
+        w = tk.Toplevel(parent)
+        w.title("起用方針（詳細・保存のみ）")
+        w.geometry("560x400")
+        w.configure(bg="#15171c")
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+        combos: Dict[str, ttk.Combobox] = {}
+
+        def _set_combo(cb: ttk.Combobox, pairs: List[Tuple[str, str]], cur: str) -> None:
+            vals = [b for _, b in pairs]
+            cb["values"] = vals
+            ints = [a for a, _ in pairs]
+            cb.set(vals[ints.index(cur)] if cur in ints else vals[0])
+
+        for key in pairs_map:
+            row = ttk.Frame(wrap, style="Panel.TFrame")
+            row.pack(fill="x", pady=3)
+            ttk.Label(row, text=labels_j[key], width=20).pack(side="left")
+            cb = ttk.Combobox(row, state="readonly", width=26)
+            _set_combo(cb, pairs_map[key], str(u.get(key, "")))
+            cb.pack(side="left", padx=6)
+            combos[key] = cb
+
+        def _collect() -> Dict[str, str]:
+            out: Dict[str, str] = {}
+            for key, cb in combos.items():
+                d = cb.get()
+                for a, b in pairs_map[key]:
+                    if b == d:
+                        out[key] = a
+                        break
+                else:
+                    out[key] = pairs_map[key][0][0]
+            return out
+
+        def _save() -> None:
+            raw = dict(get_safe_team_tactics(self.team))
+            raw["usage_policy"] = _collect()
+            self._tactics_commit_payload(raw)
+            messagebox.showinfo("保存", "起用方針（詳細）を保存しました。", parent=w)
+
+        def _reset() -> None:
+            d = get_default_team_tactics()["usage_policy"]
+            for k, cb in combos.items():
+                _set_combo(cb, pairs_map[k], str(d.get(k, "")))
+
+        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn.pack(fill="x", pady=(12, 0))
+        ttk.Button(btn, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
+        ttk.Button(btn, text="標準に戻す", style="Menu.TButton", command=_reset).pack(side="left", padx=4)
+        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
+
+    def _open_tactics_playbook_window(self, parent: tk.Toplevel) -> None:
+        if self.team is None:
+            return
+        ensure_team_tactics_on_team(self.team)
+        pb = get_safe_team_tactics(self.team)["playbook"]
+        keys = [
+            ("pick_and_roll", "Pick & Roll 頻度"),
+            ("spain_pick_and_roll", "Spain P&R 頻度"),
+            ("handoff", "ハンドオフ頻度"),
+            ("off_ball_screen", "オフボールスクリーン頻度"),
+            ("post_up", "ポストアップ頻度"),
+            ("transition", "速攻頻度"),
+        ]
+        level_pairs = [("low", "少ない"), ("standard", "標準"), ("high", "多い")]
+        w = tk.Toplevel(parent)
+        w.title("セットプレー方針")
+        w.geometry("480x360")
+        w.configure(bg="#15171c")
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+        combos: Dict[str, ttk.Combobox] = {}
+        for key, jlabel in keys:
+            row = ttk.Frame(wrap, style="Panel.TFrame")
+            row.pack(fill="x", pady=3)
+            ttk.Label(row, text=jlabel, width=22).pack(side="left")
+            cb = ttk.Combobox(row, state="readonly", width=12)
+            vals = [b for _, b in level_pairs]
+            cb["values"] = vals
+            ints = [a for a, _ in level_pairs]
+            cur = str(pb.get(key, "standard"))
+            cb.set(vals[ints.index(cur)] if cur in ints else vals[1])
+            cb.pack(side="left", padx=6)
+            combos[key] = cb
+
+        def _collect() -> Dict[str, str]:
+            out: Dict[str, str] = {}
+            for key, cb in combos.items():
+                d = cb.get()
+                for a, b in level_pairs:
+                    if b == d:
+                        out[key] = a
+                        break
+                else:
+                    out[key] = "standard"
+            return out
+
+        def _save() -> None:
+            raw = dict(get_safe_team_tactics(self.team))
+            raw["playbook"] = _collect()
+            self._tactics_commit_payload(raw)
+            messagebox.showinfo("保存", "セットプレー方針を保存しました。", parent=w)
+
+        def _reset() -> None:
+            d = get_default_team_tactics()["playbook"]
+            for k, cb in combos.items():
+                cur = str(d.get(k, "standard"))
+                vals = [b for _, b in level_pairs]
+                ints = [a for a, _ in level_pairs]
+                cb.set(vals[ints.index(cur)] if cur in ints else vals[1])
+
+        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn.pack(fill="x", pady=(12, 0))
+        ttk.Button(btn, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
+        ttk.Button(btn, text="標準に戻す", style="Menu.TButton", command=_reset).pack(side="left", padx=4)
+        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
+
+    def _open_tactics_roles_window(self, parent: tk.Toplevel) -> None:
+        if self.team is None:
+            return
+        ensure_team_tactics_on_team(self.team)
+        tactics = get_safe_team_tactics(self.team)
+        roles = dict(tactics.get("roles") or {})
+        roster = list(self._safe_get(self.team, "players", []) or [])
+        roster_sorted = sorted(
+            roster,
+            key=lambda p: (str(getattr(p, "position", "SF")), -int(getattr(p, "ovr", 0))),
+        )
+        main_pairs = [
+            ("none", "未設定"),
+            ("ace", "エース"),
+            ("second_scorer", "セカンドスコアラー"),
+            ("playmaker", "司令塔"),
+            ("shooter", "シューター"),
+            ("post_scorer", "ポスト得点役"),
+            ("defense_ace", "守備エース"),
+            ("rebounder", "リバウンド役"),
+            ("sixth_man", "シックスマン"),
+            ("energy", "エナジー役"),
+        ]
+        inv_pairs = [("high", "高い"), ("standard", "標準"), ("low", "低い")]
+        shot_pairs = [("aggressive", "積極的"), ("standard", "標準"), ("passive", "控えめ")]
+        clutch_pairs_r = [("go_to", "クラッチで任せる"), ("standard", "標準"), ("limited", "終盤は控えめ")]
+        pm_pairs = [("primary", "主担当"), ("secondary", "補助"), ("minimal", "ほぼ任せない")]
+        def_pairs = [("stopper", "相手主力担当"), ("standard", "標準"), ("light", "負担軽め")]
+
+        w = tk.Toplevel(parent)
+        w.title("役割設定")
+        w.geometry("720x460")
+        w.configure(bg="#15171c")
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+        body = ttk.Frame(wrap, style="Panel.TFrame")
+        body.pack(fill="both", expand=True)
+        lb_frame = ttk.Frame(body, style="Panel.TFrame", width=220)
+        lb_frame.pack(side="left", fill="y", padx=(0, 8))
+        ttk.Label(lb_frame, text="選手", font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
+        lb = tk.Listbox(lb_frame, height=16, bg="#1d2129", fg="#eef2f7", selectmode="browse")
+        lb.pack(fill="both", expand=True)
+        players_list: List[Any] = []
+        for p in roster_sorted:
+            pid = getattr(p, "player_id", None)
+            if pid is None:
+                continue
+            players_list.append(p)
+            lb.insert("end", f"{getattr(p, 'name', '-')} ({getattr(p, 'position', '?')})")
+
+        right = ttk.Frame(body, style="Panel.TFrame")
+        right.pack(side="left", fill="both", expand=True)
+
+        def _mk_combo(parent_f: ttk.Frame, label: str, pairs: List[Tuple[str, str]], cur: str) -> ttk.Combobox:
+            r = ttk.Frame(parent_f, style="Panel.TFrame")
+            r.pack(fill="x", pady=2)
+            ttk.Label(r, text=label, width=18).pack(side="left")
+            cb = ttk.Combobox(r, state="readonly", width=22)
+            vals = [b for _, b in pairs]
+            cb["values"] = vals
+            ints = [a for a, _ in pairs]
+            cb.set(vals[ints.index(cur)] if cur in ints else vals[0])
+            cb.pack(side="left", padx=4)
+            return cb
+
+        editors: Dict[str, ttk.Combobox] = {}
+        editors["main_role"] = _mk_combo(right, "メイン役割", main_pairs, "none")
+        editors["offense_involvement"] = _mk_combo(right, "攻撃関与度", inv_pairs, "standard")
+        editors["shot_priority"] = _mk_combo(right, "シュート優先度", shot_pairs, "standard")
+        editors["clutch_priority"] = _mk_combo(right, "終盤優先度", clutch_pairs_r, "standard")
+        editors["playmaking_role"] = _mk_combo(right, "プレメイク関与", pm_pairs, "secondary")
+        editors["defense_assignment"] = _mk_combo(right, "守備担当度", def_pairs, "standard")
+
+        role_defaults = {
+            "main_role": "none",
+            "offense_involvement": "standard",
+            "shot_priority": "standard",
+            "clutch_priority": "standard",
+            "playmaking_role": "secondary",
+            "defense_assignment": "standard",
+        }
+
+        def _load_player_row(idx: int) -> None:
+            if idx < 0 or idx >= len(players_list):
+                return
+            p = players_list[idx]
+            pid = int(getattr(p, "player_id", 0))
+            row = roles.get(str(pid)) or {}
+            pairs_for = {
+                "main_role": main_pairs,
+                "offense_involvement": inv_pairs,
+                "shot_priority": shot_pairs,
+                "clutch_priority": clutch_pairs_r,
+                "playmaking_role": pm_pairs,
+                "defense_assignment": def_pairs,
+            }
+            for ek, cb in editors.items():
+                cur = str(row.get(ek, role_defaults[ek]))
+                if ek == "main_role" and cur not in {a for a, _ in main_pairs}:
+                    cur = "none"
+                pairs = pairs_for[ek]
+                vals = [b for _, b in pairs]
+                ints = [a for a, _ in pairs]
+                cb.set(vals[ints.index(cur)] if cur in ints else vals[0])
+
+        def _read_combo(cb: ttk.Combobox, pairs: List[Tuple[str, str]]) -> str:
+            d = cb.get()
+            for a, b in pairs:
+                if b == d:
+                    return a
+            return pairs[0][0]
+
+        def _save_current_to_memory(idx: int) -> None:
+            if idx < 0 or idx >= len(players_list):
+                return
+            p = players_list[idx]
+            pid = int(getattr(p, "player_id", 0))
+            roles[str(pid)] = {
+                "main_role": _read_combo(editors["main_role"], main_pairs),
+                "offense_involvement": _read_combo(editors["offense_involvement"], inv_pairs),
+                "shot_priority": _read_combo(editors["shot_priority"], shot_pairs),
+                "clutch_priority": _read_combo(editors["clutch_priority"], clutch_pairs_r),
+                "playmaking_role": _read_combo(editors["playmaking_role"], pm_pairs),
+                "defense_assignment": _read_combo(editors["defense_assignment"], def_pairs),
+            }
+
+        last_sel: List[int] = [-1]
+
+        def _on_select(_evt: Any = None) -> None:
+            sel = lb.curselection()
+            if not sel:
+                return
+            if last_sel[0] >= 0:
+                _save_current_to_memory(last_sel[0])
+            idx = int(sel[0])
+            last_sel[0] = idx
+            _load_player_row(idx)
+
+        lb.bind("<<ListboxSelect>>", _on_select)
+
+        if players_list:
+            lb.selection_set(0)
+            last_sel[0] = 0
+            _load_player_row(0)
+
+        def _save() -> None:
+            sel = lb.curselection()
+            if sel:
+                _save_current_to_memory(int(sel[0]))
+            raw = dict(get_safe_team_tactics(self.team))
+            raw["roles"] = dict(roles)
+            self._tactics_commit_payload(raw)
+            messagebox.showinfo("保存", "役割設定を保存しました。", parent=w)
+
+        def _reset_player() -> None:
+            sel = lb.curselection()
+            if not sel:
+                return
+            idx = int(sel[0])
+            p = players_list[idx]
+            pid = int(getattr(p, "player_id", 0))
+            roles.pop(str(pid), None)
+            _load_player_row(idx)
+
+        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn.pack(fill="x", pady=(8, 0))
+        ttk.Button(btn, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
+        ttk.Button(btn, text="この選手を標準に戻す", style="Menu.TButton", command=_reset_player).pack(
+            side="left", padx=4
+        )
+        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
 
     def open_development_window(self) -> None:
         """Open a safe read-only development / growth subwindow."""

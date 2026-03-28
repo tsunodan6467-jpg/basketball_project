@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from .player import Player
 
 
@@ -19,6 +19,8 @@ class Team:
     usage_policy: str = "balanced"
     # チーム練習方針（毎週固定。変更時のみGMメニューから更新）
     team_training_focus: str = "balanced"  # balanced / shooting / defense / transition / precision_offense / intense_defense
+    # 戦術メニュー用拡張設定（Phase A: 永続化のみ。試合反映は Phase B 以降で Team.strategy 等と接続）
+    team_tactics: Dict[str, Any] = field(default_factory=dict)
 
     home_city: str = ""
     is_user_team: bool = False
@@ -342,6 +344,11 @@ class Team:
 
         if not hasattr(self, "finance_history") or self.finance_history is None:
             self.finance_history = []
+
+        if not hasattr(self, "team_tactics") or self.team_tactics is None:
+            self.team_tactics = {}
+        elif not isinstance(self.team_tactics, dict):
+            self.team_tactics = {}
 
     def reset_rookie_budget(self):
         self.rookie_budget_remaining = int(max(0, self.rookie_budget))
