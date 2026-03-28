@@ -365,6 +365,10 @@ class Team:
 
         ensure_pr_campaigns_on_team(self)
 
+        from basketball_sim.systems.merchandise_management import ensure_merchandise_on_team
+
+        ensure_merchandise_on_team(self)
+
     def reset_rookie_budget(self):
         self.rookie_budget_remaining = int(max(0, self.rookie_budget))
 

@@ -87,6 +87,16 @@ from basketball_sim.systems.pr_campaign_management import (
     format_pr_status_line,
     resolve_pr_round_context,
 )
+from basketball_sim.systems.merchandise_management import (
+    ADVANCE_COST,
+    MERCH_PRODUCTS,
+    advance_merchandise_phase,
+    ensure_merchandise_on_team,
+    estimate_dummy_merch_sales_lines,
+    format_merchandise_history_lines,
+    format_merchandise_row_display,
+    get_merchandise_item,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -909,8 +919,8 @@ class MainMenuView:
 
         window = tk.Toplevel(self.root)
         window.title(f"経営情報 - {self._team_name()}")
-        window.geometry("980x960")
-        window.minsize(880, 720)
+        window.geometry("980x1100")
+        window.minsize(880, 800)
         window.configure(bg="#15171c")
         try:
             window.transient(self.root)
@@ -939,6 +949,7 @@ class MainMenuView:
         content.rowconfigure(1, weight=1)
         content.rowconfigure(2, weight=0)
         content.rowconfigure(3, weight=0)
+        content.rowconfigure(4, weight=0)
 
         self.finance_summary_panel = self._create_panel(content, "財務サマリー")
         self.finance_summary_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=(0, 10))
@@ -1125,6 +1136,96 @@ class MainMenuView:
         self._pr_history_text.pack(fill="both", expand=True)
         self._pr_history_text.configure(state="disabled")
 
+        self.merch_panel = self._create_panel(content, "グッズ開発")
+        self.merch_panel.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        merch_inner = self._resolve_content_parent(self.merch_panel)
+        tk.Label(
+            merch_inner,
+            text="各ラインのフェーズを進めます（開発費は所持金から差し引き）。売上表示は簡易ダミーで、本番の収支・内訳とは未連携です。",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 10),
+            wraplength=900,
+            padx=2,
+            pady=(0, 8),
+        ).pack(fill="x")
+        merch_lines_fr = ttk.Frame(merch_inner, style="Card.TFrame")
+        merch_lines_fr.pack(fill="x", pady=(0, 8))
+        self._merch_rows: List[Tuple[str, tk.StringVar, ttk.Button]] = []
+        for tmpl in MERCH_PRODUCTS:
+            pid = str(tmpl["id"])
+            var = tk.StringVar(value="")
+            row_fr = ttk.Frame(merch_lines_fr, style="Card.TFrame")
+            row_fr.pack(fill="x", pady=3)
+            tk.Label(
+                row_fr,
+                textvariable=var,
+                bg="#222834",
+                fg="#d6dbe3",
+                anchor="w",
+                justify="left",
+                font=("Yu Gothic UI", 10),
+                wraplength=620,
+            ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+            btn = ttk.Button(
+                row_fr,
+                text="開発を進める",
+                style="Menu.TButton",
+                command=lambda p=pid: self._on_merch_advance(p),
+            )
+            btn.pack(side="right")
+            self._merch_rows.append((pid, var, btn))
+        tk.Label(
+            merch_inner,
+            text="売上・ランキング（ダミー）",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10),
+        ).pack(fill="x", pady=(6, 2))
+        self._merch_dummy_text = scrolledtext.ScrolledText(
+            merch_inner,
+            height=5,
+            wrap="word",
+            bg="#222834",
+            fg="#c5cad3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 9),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=4,
+            pady=4,
+        )
+        self._merch_dummy_text.pack(fill="x", pady=(0, 6))
+        self._merch_dummy_text.configure(state="disabled")
+        tk.Label(
+            merch_inner,
+            text="開発履歴（直近）",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10),
+        ).pack(fill="x", pady=(4, 2))
+        self._merch_hist_text = scrolledtext.ScrolledText(
+            merch_inner,
+            height=3,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 9),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=4,
+            pady=4,
+        )
+        self._merch_hist_text.pack(fill="both", expand=True)
+        self._merch_hist_text.configure(state="disabled")
+
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
 
@@ -1170,6 +1271,9 @@ class MainMenuView:
             self._pr_run_btn = None
             self._pr_history_text = None
             self._pr_status_var = None
+            self._merch_rows = []
+            self._merch_dummy_text = None
+            self._merch_hist_text = None
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -1316,6 +1420,71 @@ class MainMenuView:
             except tk.TclError:
                 pass
 
+    def _on_merch_advance(self, product_id: str) -> None:
+        team = self.team
+        if team is None:
+            return
+        item = get_merchandise_item(team, product_id)
+        if item is None:
+            return
+        ph = str(item.get("phase", "concept"))
+        if ph == "on_sale":
+            messagebox.showinfo("グッズ開発", "すでに発売中です。")
+            return
+        cost = int(ADVANCE_COST.get(ph, 0) or 0)
+        if cost <= 0:
+            return
+        if not messagebox.askyesno(
+            "グッズ開発",
+            f"次の工程に進みますか？\n必要資金: {self._format_money(cost)}",
+        ):
+            return
+        ok, msg = advance_merchandise_phase(team, product_id)
+        if ok:
+            messagebox.showinfo("グッズ開発", msg)
+        else:
+            messagebox.showwarning("グッズ開発", msg)
+        self._refresh_finance_window()
+        self.refresh()
+
+    def _refresh_merchandise_finance_block(self) -> None:
+        dummy_tw = getattr(self, "_merch_dummy_text", None)
+        hist_tw = getattr(self, "_merch_hist_text", None)
+        rows = getattr(self, "_merch_rows", None)
+        if self.team is None or not rows:
+            return
+        ensure_merchandise_on_team(self.team)
+        is_user = bool(getattr(self.team, "is_user_team", False))
+        for pid, var, btn in rows:
+            item = get_merchandise_item(self.team, pid)
+            if item is not None:
+                var.set(format_merchandise_row_display(item))
+            try:
+                if not is_user or (item is not None and str(item.get("phase")) == "on_sale"):
+                    btn.state(["disabled"])
+                else:
+                    btn.state(["!disabled"])
+            except tk.TclError:
+                pass
+        if dummy_tw is not None:
+            dtext = "\n".join(estimate_dummy_merch_sales_lines(self.team))
+            try:
+                dummy_tw.configure(state="normal")
+                dummy_tw.delete("1.0", tk.END)
+                dummy_tw.insert("1.0", dtext)
+                dummy_tw.configure(state="disabled")
+            except tk.TclError:
+                pass
+        if hist_tw is not None:
+            htext = "\n".join(format_merchandise_history_lines(self.team))
+            try:
+                hist_tw.configure(state="normal")
+                hist_tw.delete("1.0", tk.END)
+                hist_tw.insert("1.0", htext)
+                hist_tw.configure(state="disabled")
+            except tk.TclError:
+                pass
+
     def _refresh_finance_window(self) -> None:
         if getattr(self, "finance_header_var", None) is None:
             return
@@ -1433,10 +1602,11 @@ class MainMenuView:
 
         self._refresh_sponsor_finance_block()
         self._refresh_pr_finance_block()
+        self._refresh_merchandise_finance_block()
 
         self.finance_hint_var.set(
-            "「広報・ファン」はシーズン中・ラウンドあたり上限あり（資金減・人気/ファン微増。収入式は後段）。"
-            "スポンサーは契約タイプでスポンサー力を弱調整。施設・オーナー・財務は各パネル参照。"
+            "「グッズ開発」はフェーズ保存＋開発費（売上表示はダミー）。"
+            "広報はラウンド上限あり。スポンサー・施設・オーナー・財務は各パネル。"
         )
 
     def open_strategy_window(self) -> None:

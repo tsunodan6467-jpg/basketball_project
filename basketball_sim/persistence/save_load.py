@@ -128,6 +128,12 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
                 ensure_pr_campaigns_on_team(t)
             except Exception:
                 continue
+            try:
+                from basketball_sim.systems.merchandise_management import ensure_merchandise_on_team
+
+                ensure_merchandise_on_team(t)
+            except Exception:
+                continue
     return payload
 
 

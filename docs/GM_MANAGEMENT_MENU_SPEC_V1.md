@@ -169,3 +169,4 @@
 | 2026-03-28 | 優先3: `get_owner_mission_report_text` を分類・優先度・目標要約・報酬/ペナルティ・直近評価の内訳・過去2件に拡張。経営 GUI「オーナー・方針」をスクロールテキスト化。 |
 | 2026-03-28 | 優先4: `Team.management`（version）＋ `sponsors.main_contract_type` / `history`。`systems/sponsor_management.py` で契約確定と `sponsor_power` の弱い調整。経営 GUI にスポンサーパネル。 |
 | 2026-03-28 | 優先5: `management.pr_campaigns`（`round_*` キーで回数リセット・上限2/ラウンド）。`pr_campaign_management.py` でプリセット施策・局所 `money`/`popularity`/`fan_base`。経営 GUI に広報パネル。 |
+| 2026-03-28 | 優先6: `management.merchandise`（3ライン・フェーズ・履歴）。`merchandise_management.py` で工程進行と開発費のみ。売上は簡易ダミー表示（正本 revenue 未接続）。経営 GUI にグッズパネル。 |
