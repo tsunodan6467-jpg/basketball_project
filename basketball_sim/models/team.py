@@ -1492,34 +1492,46 @@ class Team:
             reverse=True
         )[:5]
 
-        self.history_seasons.append({
-            "season_index": len(self.history_seasons) + 1,
-            "league_level": self.league_level,
-            "regular_wins": self.regular_wins,
-            "regular_losses": self.regular_losses,
-            "points_for": self.regular_points_for,
-            "points_against": self.regular_points_against,
-            "point_diff": self.regular_points_for - self.regular_points_against,
-            "team_power": round(self.team_power, 2),
-            "coach_style": self.coach_style,
-            "strategy": self.strategy,
-            "usage_policy": self.usage_policy,
-            "bench_order": self.bench_order[:],
-            "top_players": [
-                {
-                    "player_id": getattr(p, "player_id", None),
-                    "player_name": getattr(p, "name", ""),
-                    "ovr": getattr(p, "ovr", 0),
-                    "acquisition_type": getattr(p, "acquisition_type", "unknown"),
-                    "season_points": getattr(p, "season_points", 0),
-                    "season_assists": getattr(p, "season_assists", 0),
-                    "season_rebounds": getattr(p, "season_rebounds", 0),
-                    "season_blocks": getattr(p, "season_blocks", 0),
-                    "season_steals": getattr(p, "season_steals", 0),
-                }
-                for p in top_players
-            ],
-        })
+        top_payload = [
+            {
+                "player_id": getattr(p, "player_id", None),
+                "player_name": getattr(p, "name", ""),
+                "ovr": getattr(p, "ovr", 0),
+                "acquisition_type": getattr(p, "acquisition_type", "unknown"),
+                "season_points": getattr(p, "season_points", 0),
+                "season_assists": getattr(p, "season_assists", 0),
+                "season_rebounds": getattr(p, "season_rebounds", 0),
+                "season_blocks": getattr(p, "season_blocks", 0),
+                "season_steals": getattr(p, "season_steals", 0),
+            }
+            for p in top_players
+        ]
+
+        # Season 終了時に _record_division_season_history が先に1行積むため、
+        # オフシーズンの reset で二重行にならないよう top_players のみ最終行へ合流する。
+        if self.history_seasons:
+            last = self.history_seasons[-1]
+            if isinstance(last, dict) and not last.get("top_players"):
+                last["top_players"] = top_payload
+                return
+
+        self.history_seasons.append(
+            {
+                "season_index": len(self.history_seasons) + 1,
+                "league_level": self.league_level,
+                "regular_wins": self.regular_wins,
+                "regular_losses": self.regular_losses,
+                "points_for": self.regular_points_for,
+                "points_against": self.regular_points_against,
+                "point_diff": self.regular_points_for - self.regular_points_against,
+                "team_power": round(self.team_power, 2),
+                "coach_style": self.coach_style,
+                "strategy": self.strategy,
+                "usage_policy": self.usage_policy,
+                "bench_order": self.bench_order[:],
+                "top_players": top_payload,
+            }
+        )
 
     def _get_available_players(self) -> List[Player]:
         return [

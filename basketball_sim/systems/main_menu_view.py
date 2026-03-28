@@ -115,6 +115,15 @@ from basketball_sim.systems.information_display import (
     format_awards_lines_for_division,
     player_stat_options,
 )
+from basketball_sim.systems.history_display import (
+    build_culture_lines,
+    build_episode_lines,
+    build_journey_lines,
+    fetch_legend_table_rows,
+    fetch_timeline_rows,
+    legend_view_options,
+    timeline_selection_detail_lines,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -3840,6 +3849,7 @@ class MainMenuView:
     # History window
     # ------------------------------------------------------------------
     def open_history_window(self) -> None:
+        """読み取り専用の歴史ウィンドウ（docs/HISTORY_MENU_SPEC_V1.md）。"""
         window = getattr(self, "_history_window", None)
         try:
             if window is not None and window.winfo_exists():
@@ -3851,16 +3861,18 @@ class MainMenuView:
 
         window = tk.Toplevel(self.root)
         window.title(f"{self._team_name()} - 歴史")
-        window.geometry("1120x820")
-        window.minsize(920, 680)
+        window.geometry("1160x860")
+        window.minsize(940, 700)
         window.configure(bg="#15171c")
+        try:
+            window.transient(self.root)
+        except Exception:
+            pass
         window.protocol("WM_DELETE_WINDOW", self._close_history_window)
         self._history_window = window
 
         outer = ttk.Frame(window, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
-        outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(1, weight=1)
 
         self.history_header_var = tk.StringVar(value="")
         self.history_hint_var = tk.StringVar(value="")
@@ -3870,7 +3882,7 @@ class MainMenuView:
             textvariable=self.history_header_var,
             style="SectionTitle.TLabel",
             anchor="w",
-        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        ).pack(fill="x", pady=(0, 6))
 
         ttk.Label(
             outer,
@@ -3880,29 +3892,219 @@ class MainMenuView:
             font=("Yu Gothic UI", 10),
             anchor="w",
             justify="left",
-        ).grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        ).pack(fill="x", pady=(0, 8))
 
-        text_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=10)
-        text_wrap.grid(row=2, column=0, sticky="nsew")
-        text_wrap.columnconfigure(0, weight=1)
-        text_wrap.rowconfigure(0, weight=1)
+        nb = ttk.Notebook(outer)
+        nb.pack(fill="both", expand=True, pady=(0, 8))
 
-        self.history_text = tk.Text(
-            text_wrap,
+        # --- H1 クラブ年表 ---
+        tab_tl = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_tl, text="クラブ年表")
+        tl_paned = ttk.Panedwindow(tab_tl, orient=tk.VERTICAL)
+        tl_paned.pack(fill="both", expand=True)
+        tl_top = ttk.Frame(tl_paned, style="Card.TFrame")
+        tl_bot = ttk.Frame(tl_paned, style="Card.TFrame")
+        tl_paned.add(tl_top, weight=3)
+        tl_paned.add(tl_bot, weight=2)
+
+        tcols = ("season", "lg", "rk", "w", "l", "pct", "pf", "pa", "diff")
+        self._history_timeline_tree = ttk.Treeview(
+            tl_top,
+            columns=tcols,
+            show="headings",
+            height=14,
+            selectmode="browse",
+        )
+        ht = self._history_timeline_tree
+        ht.heading("season", text="シーズン")
+        ht.heading("lg", text="区分")
+        ht.heading("rk", text="順位")
+        ht.heading("w", text="勝")
+        ht.heading("l", text="敗")
+        ht.heading("pct", text="勝率")
+        ht.heading("pf", text="得点")
+        ht.heading("pa", text="失点")
+        ht.heading("diff", text="得失差")
+        ht.column("season", width=88, anchor="w")
+        ht.column("lg", width=44, anchor="center")
+        ht.column("rk", width=44, anchor="center")
+        ht.column("w", width=36, anchor="center")
+        ht.column("l", width=36, anchor="center")
+        ht.column("pct", width=52, anchor="e")
+        ht.column("pf", width=52, anchor="e")
+        ht.column("pa", width=52, anchor="e")
+        ht.column("diff", width=56, anchor="e")
+        tlsb = ttk.Scrollbar(tl_top, orient="vertical", command=ht.yview)
+        ht.configure(yscrollcommand=tlsb.set)
+        ht.pack(side="left", fill="both", expand=True)
+        tlsb.pack(side="right", fill="y")
+        ht.bind("<<TreeviewSelect>>", self._on_history_timeline_select)
+
+        ttk.Label(tl_bot, text="行の詳細（マイルストーン・表彰・主力抜粋）", style="SectionTitle.TLabel").pack(
+            anchor="w", padx=4, pady=(0, 4)
+        )
+        self._history_timeline_detail = scrolledtext.ScrolledText(
+            tl_bot,
+            height=8,
             wrap="word",
             bg="#222834",
-            fg="#eef3f8",
-            insertbackground="#eef3f8",
-            relief="flat",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
             font=("Yu Gothic UI", 10),
-            padx=10,
-            pady=10,
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
         )
-        self.history_text.grid(row=0, column=0, sticky="nsew")
+        self._history_timeline_detail.pack(fill="both", expand=True)
+        self._history_timeline_detail.configure(state="disabled")
 
-        yscroll = ttk.Scrollbar(text_wrap, orient="vertical", command=self.history_text.yview)
-        yscroll.grid(row=0, column=1, sticky="ns")
-        self.history_text.configure(yscrollcommand=yscroll.set)
+        # --- H2 チームの歩み ---
+        tab_j = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_j, text="チームの歩み")
+        self._history_journey_text = scrolledtext.ScrolledText(
+            tab_j,
+            height=22,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._history_journey_text.pack(fill="both", expand=True)
+        self._history_journey_text.configure(state="disabled")
+
+        # --- H3 レジェンド ---
+        tab_lg = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_lg, text="レジェンド")
+        lg_tool = ttk.Frame(tab_lg, style="Root.TFrame")
+        lg_tool.pack(fill="x", pady=(0, 8))
+        ttk.Label(lg_tool, text="表示:", style="TopBar.TLabel").pack(side="left", padx=(0, 8))
+        self._history_legend_label_to_key = {lab: key for lab, key in legend_view_options()}
+        default_lg_label = legend_view_options()[0][0] if legend_view_options() else ""
+        self.history_legend_view_var = tk.StringVar(value=default_lg_label)
+        self._history_legend_combo = ttk.Combobox(
+            lg_tool,
+            textvariable=self.history_legend_view_var,
+            values=tuple(lab for lab, _k in legend_view_options()),
+            state="readonly",
+            width=26,
+        )
+        self._history_legend_combo.pack(side="left")
+        self._history_legend_combo.bind("<<ComboboxSelected>>", self._on_history_legend_combo_changed)
+        tk.Label(
+            tab_lg,
+            text="※ 通算系はキャリア通算に近い集計です（クラブ在籍のみではありません）。",
+            bg="#15171c",
+            fg="#9aa3af",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 6))
+
+        lg_fr = ttk.Frame(tab_lg, style="Card.TFrame")
+        lg_fr.pack(fill="both", expand=True)
+        lgcols = ("rk", "nm", "c1", "c2", "c3")
+        self._history_legend_tree = ttk.Treeview(
+            lg_fr,
+            columns=lgcols,
+            show="headings",
+            height=16,
+            selectmode="browse",
+        )
+        lgt = self._history_legend_tree
+        lgt.heading("rk", text="順位")
+        lgt.heading("nm", text="名前")
+        lgt.heading("c1", text="")
+        lgt.heading("c2", text="")
+        lgt.heading("c3", text="")
+        lgt.column("rk", width=44, anchor="center")
+        lgt.column("nm", width=160, anchor="w")
+        lgt.column("c1", width=88, anchor="e")
+        lgt.column("c2", width=88, anchor="e")
+        lgt.column("c3", width=120, anchor="w")
+        lgsb = ttk.Scrollbar(lg_fr, orient="vertical", command=lgt.yview)
+        lgt.configure(yscrollcommand=lgsb.set)
+        lgt.pack(side="left", fill="both", expand=True)
+        lgsb.pack(side="right", fill="y")
+
+        # --- H4 エピソード ---
+        tab_ep = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_ep, text="ドラマ・エピソード")
+        self._history_episode_text = scrolledtext.ScrolledText(
+            tab_ep,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._history_episode_text.pack(fill="both", expand=True)
+        self._history_episode_text.configure(state="disabled")
+
+        # --- H5 経営・文化 ---
+        tab_cu = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_cu, text="経営・文化")
+        self._history_culture_text = scrolledtext.ScrolledText(
+            tab_cu,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._history_culture_text.pack(fill="both", expand=True)
+        self._history_culture_text.configure(state="disabled")
+
+        # --- 全文レポート（従来の1画面分） ---
+        tab_full = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_full, text="全文レポート")
+        self._history_full_text = scrolledtext.ScrolledText(
+            tab_full,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._history_full_text.pack(fill="both", expand=True)
+        self._history_full_text.configure(state="disabled")
+
+        self._history_timeline_rows = []
+        self._history_milestone_cache = []
+        self._history_award_cache = []
+
+        hist_bottom = ttk.Frame(outer, style="Panel.TFrame", padding=(8, 4))
+        hist_bottom.pack(fill="x", pady=(6, 0))
+        ttk.Button(
+            hist_bottom,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._close_history_window,
+        ).pack(anchor="e")
 
         self._refresh_history_window()
 
@@ -3914,25 +4116,215 @@ class MainMenuView:
         finally:
             self._history_window = None
             self.history_text = None
+            self._history_timeline_tree = None
+            self._history_timeline_detail = None
+            self._history_journey_text = None
+            self._history_legend_tree = None
+            self._history_legend_combo = None
+            self._history_episode_text = None
+            self._history_culture_text = None
+            self._history_full_text = None
+            self._history_timeline_rows = []
+            self._history_milestone_cache = []
+            self._history_award_cache = []
+
+    def _on_history_timeline_select(self, _event: Any = None) -> None:
+        tree = getattr(self, "_history_timeline_tree", None)
+        det = getattr(self, "_history_timeline_detail", None)
+        team = getattr(self, "team", None)
+        if tree is None or det is None or team is None:
+            return
+        sel = tree.selection()
+        if not sel:
+            return
+        tags = tree.item(sel[0], "tags")
+        if not tags:
+            return
+        try:
+            idx = int(tags[0])
+        except (TypeError, ValueError):
+            return
+        rows = getattr(self, "_history_timeline_rows", None) or []
+        if idx < 0 or idx >= len(rows):
+            return
+        row = rows[idx]
+        season_disp = str(row.get("season", "-"))
+        lines = timeline_selection_detail_lines(
+            season_display=season_disp,
+            milestone_rows=list(getattr(self, "_history_milestone_cache", []) or []),
+            award_rows=list(getattr(self, "_history_award_cache", []) or []),
+            raw_history_seasons=list(getattr(team, "history_seasons", []) or []),
+        )
+        det.configure(state="normal")
+        det.delete("1.0", tk.END)
+        det.insert(tk.END, "\n".join(lines))
+        det.configure(state="disabled")
+
+    def _on_history_legend_combo_changed(self, _event: Any = None) -> None:
+        self._refresh_history_legend_panel()
+
+    def _refresh_history_legend_panel(self) -> None:
+        team = getattr(self, "team", None)
+        tree = getattr(self, "_history_legend_tree", None)
+        if tree is None:
+            return
+        label = ""
+        try:
+            label = str(self.history_legend_view_var.get())
+        except Exception:
+            pass
+        key = getattr(self, "_history_legend_label_to_key", {}).get(label, "club_legends")
+        rows = fetch_legend_table_rows(team, key, top_n=30)
+
+        h1, h2, h3 = "列1", "列2", "列3"
+        if key == "club_legends":
+            h1, h2, h3 = "得点", "レガシー", "概要"
+        elif key == "all_time_points":
+            h1, h2, h3 = "通算得点", "出場", "ピークOVR"
+        elif key == "all_time_games":
+            h1, h2, h3 = "出場", "通算得点", "ピークOVR"
+        elif key == "single_season_points":
+            h1, h2, h3 = "シーズン", "得点", "Ast"
+        elif key == "single_season_assists":
+            h1, h2, h3 = "シーズン", "Ast", "得点"
+        tree.heading("c1", text=h1)
+        tree.heading("c2", text=h2)
+        tree.heading("c3", text=h3)
+
+        try:
+            tree.delete(*tree.get_children())
+        except Exception:
+            pass
+        for r in rows:
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    r.get("rk", ""),
+                    r.get("name", ""),
+                    r.get("c1", ""),
+                    r.get("c2", ""),
+                    r.get("c3", ""),
+                ),
+            )
 
     def _refresh_history_window(self) -> None:
+        win = getattr(self, "_history_window", None)
+        if win is None:
+            return
+        try:
+            if not win.winfo_exists():
+                return
+        except Exception:
+            return
         if getattr(self, "history_header_var", None) is None:
             return
 
         self.history_header_var.set(f"{self._team_name()} 歴史")
         self.history_hint_var.set(
-            "読み取り専用の歴史画面です。クラブ史レポート / 最近の流れ / 最近のシーズン / マイルストーン / 近年の象徴的トピック / クラブ表彰 / クラブレジェンドを確認できます。"
+            "読み取り専用です。年表は同一シーズンが複数行ある場合、順位など情報の多い行を優先して表示します。"
+            " オフシーズン時の主力スナップショットは、シーズン終了時の順位行へマージして二重化しにくくしています。"
+            " 通算記録はキャリア通算に近い集計です。詳細は年表の行を選択してください。全文レポートは従来どおり1本です。"
         )
 
-        lines = self._build_history_report_lines()
-        history_text = getattr(self, "history_text", None)
-        if history_text is None:
-            return
+        team = getattr(self, "team", None)
 
-        history_text.configure(state="normal")
-        history_text.delete("1.0", "end")
-        history_text.insert("1.0", "\n".join(lines))
-        history_text.configure(state="disabled")
+        # マイルストーン・表彰キャッシュ（年表詳細用）
+        self._history_milestone_cache = []
+        self._history_award_cache = []
+        if team is not None:
+            mg = getattr(team, "get_club_history_milestone_rows", None)
+            if callable(mg):
+                try:
+                    self._history_milestone_cache = [
+                        x for x in (mg(limit=100) or []) if isinstance(x, dict)
+                    ]
+                except Exception:
+                    self._history_milestone_cache = []
+            ag = getattr(team, "get_club_history_award_rows", None)
+            if callable(ag):
+                try:
+                    self._history_award_cache = [x for x in (ag(limit=40) or []) if isinstance(x, dict)]
+                except Exception:
+                    self._history_award_cache = []
+
+        # H1 年表
+        tl_tree = getattr(self, "_history_timeline_tree", None)
+        if tl_tree is not None:
+            trows = fetch_timeline_rows(team, limit=120) if team is not None else []
+            self._history_timeline_rows = trows
+            try:
+                tl_tree.delete(*tl_tree.get_children())
+            except Exception:
+                pass
+            for i, r in enumerate(trows):
+                wp = r.get("win_pct", "-")
+                wp_s = f"{float(wp):.3f}" if isinstance(wp, (int, float)) else str(wp)
+                pf = r.get("points_for", "-")
+                pa = r.get("points_against", "-")
+                pd = r.get("point_diff", "-")
+                tl_tree.insert(
+                    "",
+                    "end",
+                    iid=f"ht{i}",
+                    values=(
+                        r.get("season", "-"),
+                        r.get("league_level", "-"),
+                        r.get("rank", "-"),
+                        r.get("wins", "-"),
+                        r.get("losses", "-"),
+                        wp_s,
+                        pf,
+                        pa,
+                        pd,
+                    ),
+                    tags=(str(i),),
+                )
+
+        det = getattr(self, "_history_timeline_detail", None)
+        if det is not None:
+            det.configure(state="normal")
+            det.delete("1.0", tk.END)
+            det.insert(
+                tk.END,
+                "年表の行を選択すると、このシーズンのマイルストーン・表彰・主力抜粋を表示します。\n"
+                "※ 表彰は行にシーズンが無い古いセーブでは空になりやすいです。",
+            )
+            det.configure(state="disabled")
+
+        jt = getattr(self, "_history_journey_text", None)
+        if jt is not None:
+            jlines = build_journey_lines(team)
+            jt.configure(state="normal")
+            jt.delete("1.0", tk.END)
+            jt.insert(tk.END, "\n".join(jlines))
+            jt.configure(state="disabled")
+
+        self._refresh_history_legend_panel()
+
+        et = getattr(self, "_history_episode_text", None)
+        if et is not None:
+            elines = build_episode_lines(team)
+            et.configure(state="normal")
+            et.delete("1.0", tk.END)
+            et.insert(tk.END, "\n".join(elines))
+            et.configure(state="disabled")
+
+        ct = getattr(self, "_history_culture_text", None)
+        if ct is not None:
+            clines = build_culture_lines(team)
+            ct.configure(state="normal")
+            ct.delete("1.0", tk.END)
+            ct.insert(tk.END, "\n".join(clines))
+            ct.configure(state="disabled")
+
+        ft = getattr(self, "_history_full_text", None)
+        if ft is not None:
+            flines = self._build_history_report_lines()
+            ft.configure(state="normal")
+            ft.delete("1.0", tk.END)
+            ft.insert(tk.END, "\n".join(flines))
+            ft.configure(state="disabled")
 
     def _build_history_report_lines(self) -> List[str]:
         team = getattr(self, "team", None)
