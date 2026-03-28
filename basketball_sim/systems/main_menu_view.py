@@ -80,6 +80,13 @@ from basketball_sim.systems.sponsor_management import (
     format_sponsor_history_lines,
     label_for_main_sponsor_type,
 )
+from basketball_sim.systems.pr_campaign_management import (
+    PR_CAMPAIGNS,
+    commit_pr_campaign,
+    format_pr_history_lines,
+    format_pr_status_line,
+    resolve_pr_round_context,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -902,8 +909,8 @@ class MainMenuView:
 
         window = tk.Toplevel(self.root)
         window.title(f"経営情報 - {self._team_name()}")
-        window.geometry("980x820")
-        window.minsize(860, 680)
+        window.geometry("980x960")
+        window.minsize(880, 720)
         window.configure(bg="#15171c")
         try:
             window.transient(self.root)
@@ -931,6 +938,7 @@ class MainMenuView:
         content.rowconfigure(0, weight=0)
         content.rowconfigure(1, weight=1)
         content.rowconfigure(2, weight=0)
+        content.rowconfigure(3, weight=0)
 
         self.finance_summary_panel = self._create_panel(content, "財務サマリー")
         self.finance_summary_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=(0, 10))
@@ -1057,6 +1065,66 @@ class MainMenuView:
         self._sponsor_history_text.pack(fill="both", expand=True)
         self._sponsor_history_text.configure(state="disabled")
 
+        self.pr_panel = self._create_panel(content, "広報・ファン施策")
+        self.pr_panel.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        pr_inner = self._resolve_content_parent(self.pr_panel)
+        self._pr_status_var = tk.StringVar(value="")
+        tk.Label(
+            pr_inner,
+            textvariable=self._pr_status_var,
+            bg="#222834",
+            fg="#d6dbe3",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 11),
+            wraplength=900,
+            padx=2,
+            pady=(0, 8),
+        ).pack(fill="x")
+        pr_row = ttk.Frame(pr_inner, style="Card.TFrame")
+        pr_row.pack(fill="x", pady=(0, 8))
+        self._pr_campaign_ids = [str(x["id"]) for x in PR_CAMPAIGNS]
+        pr_labels = [str(x["label"]) for x in PR_CAMPAIGNS]
+        self._pr_combo = ttk.Combobox(
+            pr_row,
+            values=pr_labels,
+            state="readonly",
+            width=32,
+            font=("Yu Gothic UI", 10),
+        )
+        self._pr_combo.pack(side="left", padx=(0, 10))
+        self._pr_run_btn = ttk.Button(
+            pr_row,
+            text="施策を実行",
+            style="Menu.TButton",
+            command=self._on_pr_campaign_run,
+        )
+        self._pr_run_btn.pack(side="left")
+        tk.Label(
+            pr_inner,
+            text="実行履歴（直近）",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10),
+        ).pack(fill="x", pady=(4, 2))
+        self._pr_history_text = scrolledtext.ScrolledText(
+            pr_inner,
+            height=4,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 9),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=4,
+            pady=4,
+        )
+        self._pr_history_text.pack(fill="both", expand=True)
+        self._pr_history_text.configure(state="disabled")
+
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
 
@@ -1098,6 +1166,10 @@ class MainMenuView:
             self._sponsor_apply_btn = None
             self._sponsor_history_text = None
             self._sponsor_status_var = None
+            self._pr_combo = None
+            self._pr_run_btn = None
+            self._pr_history_text = None
+            self._pr_status_var = None
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -1145,6 +1217,26 @@ class MainMenuView:
         self._refresh_finance_window()
         self.refresh()
 
+    def _on_pr_campaign_run(self) -> None:
+        team = self.team
+        if team is None:
+            return
+        combo = getattr(self, "_pr_combo", None)
+        ids = getattr(self, "_pr_campaign_ids", [])
+        if combo is None or not ids:
+            return
+        idx = combo.current()
+        if idx < 0 or idx >= len(ids):
+            messagebox.showwarning("広報・ファン", "施策を選択してください。")
+            return
+        ok, msg = commit_pr_campaign(team, ids[idx], self.season)
+        if ok:
+            messagebox.showinfo("広報・ファン", msg)
+        else:
+            messagebox.showwarning("広報・ファン", msg)
+        self._refresh_finance_window()
+        self.refresh()
+
     def _refresh_sponsor_finance_block(self) -> None:
         combo = getattr(self, "_sponsor_combo", None)
         hist_tw = getattr(self, "_sponsor_history_text", None)
@@ -1181,6 +1273,41 @@ class MainMenuView:
             pass
         if hist_tw is not None:
             htext = "\n".join(format_sponsor_history_lines(self.team))
+            try:
+                hist_tw.configure(state="normal")
+                hist_tw.delete("1.0", tk.END)
+                hist_tw.insert("1.0", htext)
+                hist_tw.configure(state="disabled")
+            except tk.TclError:
+                pass
+
+    def _refresh_pr_finance_block(self) -> None:
+        combo = getattr(self, "_pr_combo", None)
+        hist_tw = getattr(self, "_pr_history_text", None)
+        status_var = getattr(self, "_pr_status_var", None)
+        run_btn = getattr(self, "_pr_run_btn", None)
+        if combo is None or status_var is None or self.team is None:
+            return
+        season = self.season
+        line_a = format_pr_status_line(self.team, season)
+        pop = int(self._safe_get(self.team, "popularity", 0))
+        fb = int(self._safe_get(self.team, "fan_base", 0))
+        status_var.set(f"{line_a}\n人気: {pop} ／ ファン基盤: {fb:,}")
+        is_user = bool(getattr(self.team, "is_user_team", False))
+        _, allowed, _ = resolve_pr_round_context(season)
+        try:
+            if is_user and allowed:
+                combo.configure(state="readonly")
+                if run_btn is not None:
+                    run_btn.state(["!disabled"])
+            else:
+                combo.configure(state="disabled")
+                if run_btn is not None:
+                    run_btn.state(["disabled"])
+        except tk.TclError:
+            pass
+        if hist_tw is not None:
+            htext = "\n".join(format_pr_history_lines(self.team))
             try:
                 hist_tw.configure(state="normal")
                 hist_tw.delete("1.0", tk.END)
@@ -1305,11 +1432,11 @@ class MainMenuView:
                 pass
 
         self._refresh_sponsor_finance_block()
+        self._refresh_pr_finance_block()
 
         self.finance_hint_var.set(
-            "下部「スポンサー」でメイン契約タイプを選び「反映」で保存します（自チームのみ・スポンサー力を弱く調整）。"
-            "左下はオーナーミッション、右下は財務詳細です。"
-            "施設投資も自チームのみ（CLI と同一ロジック）。"
+            "「広報・ファン」はシーズン中・ラウンドあたり上限あり（資金減・人気/ファン微増。収入式は後段）。"
+            "スポンサーは契約タイプでスポンサー力を弱調整。施設・オーナー・財務は各パネル参照。"
         )
 
     def open_strategy_window(self) -> None:

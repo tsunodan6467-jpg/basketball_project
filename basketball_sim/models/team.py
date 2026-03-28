@@ -361,6 +361,10 @@ class Team:
 
         ensure_sponsor_management_on_team(self)
 
+        from basketball_sim.systems.pr_campaign_management import ensure_pr_campaigns_on_team
+
+        ensure_pr_campaigns_on_team(self)
+
     def reset_rookie_budget(self):
         self.rookie_budget_remaining = int(max(0, self.rookie_budget))
 
