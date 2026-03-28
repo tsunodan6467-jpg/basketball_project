@@ -97,6 +97,24 @@ from basketball_sim.systems.merchandise_management import (
     format_merchandise_row_display,
     get_merchandise_item,
 )
+from basketball_sim.systems.competition_display import competition_display_name
+from basketball_sim.systems.schedule_display import (
+    detail_text_for_upcoming_row,
+    format_season_event_matchup_line,
+    information_panel_schedule_lines,
+    next_round_schedule_lines,
+    past_league_result_rows,
+    round_month_label,
+    upcoming_rows_for_user_team,
+)
+from basketball_sim.systems.information_display import (
+    build_information_news_lines,
+    build_player_leaderboard_rows,
+    build_standings_rows,
+    build_team_summary_rows,
+    format_awards_lines_for_division,
+    player_stat_options,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -432,6 +450,11 @@ class MainMenuView:
                 self._refresh_gm_dashboard_window()
         except Exception:
             pass
+        try:
+            if getattr(self, "_schedule_window", None) is not None and self._schedule_window.winfo_exists():
+                self._refresh_schedule_window()
+        except Exception:
+            pass
         self._refresh_advance_button()
 
     def run(self) -> None:
@@ -598,16 +621,16 @@ class MainMenuView:
         if next_game is None:
             return [
                 "次の試合情報なし",
-                "試合日程を読み込めていません",
-                "HOME/AWAY: -",
+                "リーグ日程（SeasonEvent）も参照できませんでした",
+                "ホーム/アウェイ: -",
                 "相手情報: -",
-                "補足: 日程画面実装後に詳細連携予定",
+                "補足: 左メニュー「日程」で一覧を確認できます",
             ]
 
         game_type = self._first_non_empty(
             self._safe_get(next_game, "game_type", None),
             self._safe_get(next_game, "match_type", None),
-            "リーグ戦",
+            competition_display_name("regular_season"),
         )
         game_round = self._first_non_empty(
             self._safe_get(next_game, "round_name", None),
@@ -615,21 +638,25 @@ class MainMenuView:
             self._safe_get(next_game, "section", None),
             "-",
         )
-        game_date = self._format_date(
-            self._first_non_empty(
-                self._safe_get(next_game, "date", None),
-                self._safe_get(next_game, "game_date", None),
-                self._safe_get(next_game, "scheduled_date", None),
-                self._get_current_date(),
+        hint = self._safe_get(next_game, "schedule_date_hint", None)
+        if hint:
+            game_date = str(hint)
+        else:
+            game_date = self._format_date(
+                self._first_non_empty(
+                    self._safe_get(next_game, "date", None),
+                    self._safe_get(next_game, "game_date", None),
+                    self._safe_get(next_game, "scheduled_date", None),
+                    self._get_current_date(),
+                )
             )
-        )
 
         home_team = self._resolve_team_name(self._safe_get(next_game, "home_team", None))
         away_team = self._resolve_team_name(self._safe_get(next_game, "away_team", None))
         user_is_home = self._is_user_home(next_game)
         opponent = away_team if user_is_home else home_team
 
-        venue_text = "HOME" if user_is_home else "AWAY"
+        venue_text = "ホーム" if user_is_home else "アウェイ"
         opponent_rank = self._lookup_team_rank(opponent)
         opponent_record = self._lookup_team_record(opponent)
 
@@ -2838,9 +2865,39 @@ class MainMenuView:
         ovr = self._safe_get(player, "ovr", "-")
         return f"{name} {pos} OVR:{ovr}"
 
+    def _default_information_division(self) -> int:
+        lv = self._safe_int(self._safe_get(self.team, "league_level", 1))
+        if lv < 1:
+            lv = 1
+        if lv > 3:
+            lv = 3
+        return lv
+
+    def _information_division_level(self) -> int:
+        var = getattr(self, "information_division_var", None)
+        v = str(var.get() if var is not None else "D1")
+        try:
+            if v.startswith("D") and v[1:].isdigit():
+                return max(1, min(3, int(v[1:])))
+        except (TypeError, ValueError):
+            pass
+        return self._default_information_division()
+
+    def _information_player_stat_key(self) -> str:
+        lab = ""
+        try:
+            var = getattr(self, "information_player_stat_var", None)
+            if var is not None:
+                lab = str(var.get())
+        except Exception:
+            pass
+        m = getattr(self, "_information_stat_label_to_key", None)
+        if isinstance(m, dict) and lab in m:
+            return str(m[lab])
+        return "points"
 
     def open_information_window(self) -> None:
-        """Open a safe read-only season information subwindow."""
+        """Open a safe read-only season information subwindow (docs/INFORMATION_MENU_SPEC_V1.md)."""
         existing = getattr(self, "_information_window", None)
         try:
             if existing is not None and existing.winfo_exists():
@@ -2852,8 +2909,8 @@ class MainMenuView:
             pass
 
         window = tk.Toplevel(self.root)
-        window.title(f"情報 - シーズン進行 / 順位表 / 日程 ({self._team_name()})")
-        window.geometry("1180x760")
+        window.title(f"情報 ({self._team_name()})")
+        window.geometry("1180x820")
         window.minsize(980, 660)
         window.configure(bg="#15171c")
         try:
@@ -2865,7 +2922,7 @@ class MainMenuView:
         outer.pack(fill="both", expand=True)
 
         header = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
-        header.pack(fill="x", pady=(0, 12))
+        header.pack(fill="x", pady=(0, 10))
 
         self.information_header_var = tk.StringVar(value="")
         ttk.Label(
@@ -2875,41 +2932,270 @@ class MainMenuView:
             anchor="w",
         ).pack(fill="x")
 
-        top = ttk.Frame(outer, style="Root.TFrame")
-        top.pack(fill="x", pady=(0, 12))
-        top.columnconfigure(0, weight=1)
-        top.columnconfigure(1, weight=1)
+        div_default = f"D{self._default_information_division()}"
+        self.information_division_var = tk.StringVar(value=div_default)
 
-        self.info_progress_panel = self._create_panel(top, "シーズン進行")
+        stat_opts = player_stat_options()
+        self._information_stat_label_to_key = {lab: key for lab, key in stat_opts}
+        default_stat_label = next((lab for lab, key in stat_opts if key == "points"), stat_opts[0][0] if stat_opts else "")
+        self.information_player_stat_var = tk.StringVar(value=default_stat_label)
+
+        def _on_info_filter_change(_event: Any = None) -> None:
+            self._refresh_information_window()
+
+        nb = ttk.Notebook(outer)
+        nb.pack(fill="both", expand=True, pady=(0, 10))
+
+        # --- 概要 ---
+        tab_overview = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_overview, text="概要")
+        tab_overview.columnconfigure(0, weight=1)
+        tab_overview.columnconfigure(1, weight=1)
+        tab_overview.rowconfigure(0, weight=1)
+
+        top_ov = ttk.Frame(tab_overview, style="Root.TFrame")
+        top_ov.grid(row=0, column=0, columnspan=2, sticky="nsew", pady=(0, 10))
+        top_ov.columnconfigure(0, weight=1)
+        top_ov.columnconfigure(1, weight=1)
+
+        self.info_progress_panel = self._create_panel(top_ov, "シーズン進行")
         self.info_progress_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        self.info_schedule_panel = self._create_panel(top, "次ラウンド予定")
+        self.info_schedule_panel = self._create_panel(top_ov, "次ラウンド予定")
         self.info_schedule_panel.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
 
-        middle = ttk.Frame(outer, style="Root.TFrame")
-        middle.pack(fill="x", pady=(0, 12))
-        middle.columnconfigure(0, weight=1)
-        middle.columnconfigure(1, weight=1)
-        middle.columnconfigure(2, weight=1)
-
-        self.info_d1_panel = self._create_panel(middle, "D1順位表")
-        self.info_d1_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        self.info_d2_panel = self._create_panel(middle, "D2順位表")
-        self.info_d2_panel.grid(row=0, column=1, sticky="nsew", padx=8)
-        self.info_d3_panel = self._create_panel(middle, "D3順位表")
-        self.info_d3_panel.grid(row=0, column=2, sticky="nsew", padx=(8, 0))
-
-        self.info_comp_panel = self._create_panel(outer, "大会進行状況")
-        self.info_comp_panel.pack(fill="x")
+        self.info_comp_panel = self._create_panel(tab_overview, "大会進行状況")
+        self.info_comp_panel.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
         self.info_progress_lines = self._make_line_vars(self.info_progress_panel, 7)
         self.info_schedule_lines = self._make_line_vars(self.info_schedule_panel, 8)
-        self.info_d1_lines = self._make_line_vars(self.info_d1_panel, 10)
-        self.info_d2_lines = self._make_line_vars(self.info_d2_panel, 10)
-        self.info_d3_lines = self._make_line_vars(self.info_d3_panel, 10)
         self.info_comp_lines = self._make_line_vars(self.info_comp_panel, 8)
 
+        # --- 順位表 ---
+        tab_stand = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_stand, text="順位表")
+        st_tool = ttk.Frame(tab_stand, style="Root.TFrame")
+        st_tool.pack(fill="x", pady=(0, 8))
+        ttk.Label(st_tool, text="区分:", style="TopBar.TLabel").pack(side="left", padx=(0, 6))
+        st_div = ttk.Combobox(
+            st_tool,
+            textvariable=self.information_division_var,
+            values=("D1", "D2", "D3"),
+            state="readonly",
+            width=5,
+        )
+        st_div.pack(side="left")
+        st_div.bind("<<ComboboxSelected>>", _on_info_filter_change)
+
+        st_fr = ttk.Frame(tab_stand, style="Card.TFrame")
+        st_fr.pack(fill="both", expand=True)
+        cols_st = ("rk", "team", "w", "l", "pct", "pf", "pa", "diff", "mk")
+        self._information_standings_tree = ttk.Treeview(
+            st_fr,
+            columns=cols_st,
+            show="headings",
+            height=16,
+            selectmode="browse",
+        )
+        st_tree = self._information_standings_tree
+        st_tree.heading("rk", text="順位")
+        st_tree.heading("team", text="チーム")
+        st_tree.heading("w", text="勝")
+        st_tree.heading("l", text="敗")
+        st_tree.heading("pct", text="勝率")
+        st_tree.heading("pf", text="得点")
+        st_tree.heading("pa", text="失点")
+        st_tree.heading("diff", text="得失差")
+        st_tree.heading("mk", text="")
+        st_tree.column("rk", width=40, anchor="center")
+        st_tree.column("team", width=200, anchor="w")
+        st_tree.column("w", width=36, anchor="center")
+        st_tree.column("l", width=36, anchor="center")
+        st_tree.column("pct", width=52, anchor="e")
+        st_tree.column("pf", width=52, anchor="e")
+        st_tree.column("pa", width=52, anchor="e")
+        st_tree.column("diff", width=56, anchor="e")
+        st_tree.column("mk", width=40, anchor="center")
+        st_vsb = ttk.Scrollbar(st_fr, orient="vertical", command=st_tree.yview)
+        st_tree.configure(yscrollcommand=st_vsb.set)
+        st_tree.pack(side="left", fill="both", expand=True)
+        st_vsb.pack(side="right", fill="y")
+
+        # --- 個人成績（順位表の次 / INFORMATION_MENU_SPEC_V1） ---
+        tab_pl = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_pl, text="個人成績")
+        pl_tool = ttk.Frame(tab_pl, style="Root.TFrame")
+        pl_tool.pack(fill="x", pady=(0, 8))
+        ttk.Label(pl_tool, text="区分:", style="TopBar.TLabel").pack(side="left", padx=(0, 6))
+        pl_div = ttk.Combobox(
+            pl_tool,
+            textvariable=self.information_division_var,
+            values=("D1", "D2", "D3"),
+            state="readonly",
+            width=5,
+        )
+        pl_div.pack(side="left", padx=(0, 14))
+        pl_div.bind("<<ComboboxSelected>>", _on_info_filter_change)
+        ttk.Label(pl_tool, text="項目:", style="TopBar.TLabel").pack(side="left", padx=(0, 6))
+        pl_stat = ttk.Combobox(
+            pl_tool,
+            textvariable=self.information_player_stat_var,
+            values=tuple(lab for lab, _k in stat_opts),
+            state="readonly",
+            width=14,
+        )
+        pl_stat.pack(side="left")
+        pl_stat.bind("<<ComboboxSelected>>", _on_info_filter_change)
+
+        pl_note = ttk.Frame(tab_pl, style="Root.TFrame")
+        pl_note.pack(fill="x", pady=(0, 6))
+        tk.Label(
+            pl_note,
+            text="※ 出場1試合以上の選手のみ表示します。表彰・各タイトルの規定試合数とは別です。",
+            bg="#15171c",
+            fg="#9aa3af",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=960,
+        ).pack(fill="x", anchor="w")
+
+        pl_fr = ttk.Frame(tab_pl, style="Card.TFrame")
+        pl_fr.pack(fill="both", expand=True)
+        cols_pl = ("rk", "name", "tm", "pos", "ovr", "avg", "tot", "gp")
+        self._information_player_tree = ttk.Treeview(
+            pl_fr,
+            columns=cols_pl,
+            show="headings",
+            height=16,
+            selectmode="browse",
+        )
+        pl_tree = self._information_player_tree
+        pl_tree.heading("rk", text="順位")
+        pl_tree.heading("name", text="選手")
+        pl_tree.heading("tm", text="チーム")
+        pl_tree.heading("pos", text="Pos")
+        pl_tree.heading("ovr", text="OVR")
+        pl_tree.heading("avg", text="平均")
+        pl_tree.heading("tot", text="合計")
+        pl_tree.heading("gp", text="試合")
+        pl_tree.column("rk", width=40, anchor="center")
+        pl_tree.column("name", width=160, anchor="w")
+        pl_tree.column("tm", width=120, anchor="w")
+        pl_tree.column("pos", width=40, anchor="center")
+        pl_tree.column("ovr", width=44, anchor="center")
+        pl_tree.column("avg", width=52, anchor="e")
+        pl_tree.column("tot", width=52, anchor="e")
+        pl_tree.column("gp", width=44, anchor="center")
+        pl_vsb = ttk.Scrollbar(pl_fr, orient="vertical", command=pl_tree.yview)
+        pl_tree.configure(yscrollcommand=pl_vsb.set)
+        pl_tree.pack(side="left", fill="both", expand=True)
+        pl_vsb.pack(side="right", fill="y")
+
+        # --- チーム成績 ---
+        tab_team = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_team, text="チーム成績")
+        tm_tool = ttk.Frame(tab_team, style="Root.TFrame")
+        tm_tool.pack(fill="x", pady=(0, 8))
+        ttk.Label(tm_tool, text="区分:", style="TopBar.TLabel").pack(side="left", padx=(0, 6))
+        tm_div = ttk.Combobox(
+            tm_tool,
+            textvariable=self.information_division_var,
+            values=("D1", "D2", "D3"),
+            state="readonly",
+            width=5,
+        )
+        tm_div.pack(side="left")
+        tm_div.bind("<<ComboboxSelected>>", _on_info_filter_change)
+
+        tm_fr = ttk.Frame(tab_team, style="Card.TFrame")
+        tm_fr.pack(fill="both", expand=True)
+        cols_tm = ("rk", "team", "apf", "apa", "adif", "mk")
+        self._information_team_tree = ttk.Treeview(
+            tm_fr,
+            columns=cols_tm,
+            show="headings",
+            height=16,
+            selectmode="browse",
+        )
+        tm_tree = self._information_team_tree
+        tm_tree.heading("rk", text="順位")
+        tm_tree.heading("team", text="チーム")
+        tm_tree.heading("apf", text="平均得点")
+        tm_tree.heading("apa", text="平均失点")
+        tm_tree.heading("adif", text="平均得失差")
+        tm_tree.heading("mk", text="")
+        tm_tree.column("rk", width=40, anchor="center")
+        tm_tree.column("team", width=220, anchor="w")
+        tm_tree.column("apf", width=72, anchor="e")
+        tm_tree.column("apa", width=72, anchor="e")
+        tm_tree.column("adif", width=80, anchor="e")
+        tm_tree.column("mk", width=40, anchor="center")
+        tm_vsb = ttk.Scrollbar(tm_fr, orient="vertical", command=tm_tree.yview)
+        tm_tree.configure(yscrollcommand=tm_vsb.set)
+        tm_tree.pack(side="left", fill="both", expand=True)
+        tm_vsb.pack(side="right", fill="y")
+
+        # --- リーグニュース ---
+        tab_news = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_news, text="リーグニュース")
+        self._information_news_text = scrolledtext.ScrolledText(
+            tab_news,
+            height=18,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._information_news_text.pack(fill="both", expand=True)
+        self._information_news_text.configure(state="disabled")
+
+        # --- 表彰 ---
+        tab_aw = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_aw, text="表彰")
+        aw_tool = ttk.Frame(tab_aw, style="Root.TFrame")
+        aw_tool.pack(fill="x", pady=(0, 8))
+        ttk.Label(aw_tool, text="区分:", style="TopBar.TLabel").pack(side="left", padx=(0, 6))
+        aw_div = ttk.Combobox(
+            aw_tool,
+            textvariable=self.information_division_var,
+            values=("D1", "D2", "D3"),
+            state="readonly",
+            width=5,
+        )
+        aw_div.pack(side="left")
+        aw_div.bind("<<ComboboxSelected>>", _on_info_filter_change)
+
+        self._information_awards_text = scrolledtext.ScrolledText(
+            tab_aw,
+            height=18,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._information_awards_text.pack(fill="both", expand=True)
+        self._information_awards_text.configure(state="disabled")
+
+        for tr in (self._information_standings_tree, self._information_team_tree):
+            try:
+                tr.tag_configure("user", background="#2f3542")
+            except tk.TclError:
+                pass
+
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
-        bottom.pack(fill="x", pady=(12, 0))
+        bottom.pack(fill="x", pady=(0, 0))
 
         self.information_hint_var = tk.StringVar(value="")
         tk.Label(
@@ -2943,7 +3229,367 @@ class MainMenuView:
         finally:
             self._information_window = None
 
+    def open_schedule_window(self) -> None:
+        """読み取り専用の日程ウィンドウ（docs/SCHEDULE_MENU_SPEC_V1.md）。"""
+        if self.team is None:
+            messagebox.showwarning("日程", "チームが未接続です。", parent=self.root)
+            return
+
+        existing = getattr(self, "_schedule_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_schedule_window()
+                return
+        except Exception:
+            pass
+
+        window = tk.Toplevel(self.root)
+        window.title(f"日程 - {self._team_name()}")
+        window.geometry("1020x720")
+        window.minsize(920, 620)
+        window.configure(bg="#15171c")
+        try:
+            window.transient(self.root)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(window, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+
+        header = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
+        header.pack(fill="x", pady=(0, 12))
+        self.schedule_header_var = tk.StringVar(value="")
+        ttk.Label(header, textvariable=self.schedule_header_var, style="TopBar.TLabel", anchor="w").pack(
+            fill="x"
+        )
+
+        nb = ttk.Notebook(outer)
+        nb.pack(fill="both", expand=True)
+
+        tab_next = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        tab_up = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        tab_past = ttk.Frame(nb, style="Root.TFrame", padding=8)
+        nb.add(tab_next, text="次戦詳細")
+        nb.add(tab_up, text="今後の日程")
+        nb.add(tab_past, text="過去結果")
+
+        self._schedule_next_text = scrolledtext.ScrolledText(
+            tab_next,
+            height=18,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._schedule_next_text.pack(fill="both", expand=True)
+        self._schedule_next_text.configure(state="disabled")
+
+        filt_row = ttk.Frame(tab_up, style="Root.TFrame")
+        filt_row.pack(fill="x", pady=(0, 8))
+        ttk.Label(filt_row, text="表示フィルタ:", style="TopBar.TLabel").pack(side="left", padx=(0, 8))
+        self._schedule_filter_combo = ttk.Combobox(
+            filt_row,
+            state="readonly",
+            width=18,
+            values=("すべて", "日本リーグのみ"),
+        )
+        self._schedule_filter_combo.set("すべて")
+        self._schedule_filter_combo.pack(side="left")
+        self._schedule_filter_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_schedule_window())
+
+        up_paned = ttk.Panedwindow(tab_up, orient=tk.VERTICAL)
+        up_paned.pack(fill="both", expand=True)
+
+        tree_fr = ttk.Frame(up_paned, style="Card.TFrame")
+        det_fr = ttk.Frame(up_paned, style="Card.TFrame")
+        up_paned.add(tree_fr, weight=3)
+        up_paned.add(det_fr, weight=1)
+
+        cols = ("until", "rnd", "mon", "cup", "ha", "opp")
+        self._schedule_upcoming_tree = ttk.Treeview(
+            tree_fr,
+            columns=cols,
+            show="headings",
+            height=14,
+            selectmode="browse",
+        )
+        self._schedule_upcoming_tree.heading("until", text="あと")
+        self._schedule_upcoming_tree.heading("rnd", text="R")
+        self._schedule_upcoming_tree.heading("mon", text="月目安")
+        self._schedule_upcoming_tree.heading("cup", text="大会")
+        self._schedule_upcoming_tree.heading("ha", text="H/A")
+        self._schedule_upcoming_tree.heading("opp", text="対戦相手")
+        self._schedule_upcoming_tree.column("until", width=44, anchor="center")
+        self._schedule_upcoming_tree.column("rnd", width=44, anchor="center")
+        self._schedule_upcoming_tree.column("mon", width=72, anchor="center")
+        self._schedule_upcoming_tree.column("cup", width=120, anchor="w")
+        self._schedule_upcoming_tree.column("ha", width=40, anchor="center")
+        self._schedule_upcoming_tree.column("opp", width=220, anchor="w")
+        vsb = ttk.Scrollbar(tree_fr, orient="vertical", command=self._schedule_upcoming_tree.yview)
+        self._schedule_upcoming_tree.configure(yscrollcommand=vsb.set)
+        self._schedule_upcoming_tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+        self._schedule_upcoming_tree.bind("<<TreeviewSelect>>", self._on_schedule_upcoming_select)
+
+        ttk.Label(det_fr, text="行の詳細", style="SectionTitle.TLabel").pack(anchor="w", padx=4, pady=(0, 4))
+        self._schedule_upcoming_detail = scrolledtext.ScrolledText(
+            det_fr,
+            height=6,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self._schedule_upcoming_detail.pack(fill="both", expand=True)
+        self._schedule_upcoming_detail.configure(state="disabled")
+
+        past_paned = ttk.Panedwindow(tab_past, orient=tk.VERTICAL)
+        past_paned.pack(fill="both", expand=True)
+        pt_fr = ttk.Frame(past_paned, style="Card.TFrame")
+        pd_fr = ttk.Frame(past_paned, style="Card.TFrame")
+        past_paned.add(pt_fr, weight=3)
+        past_paned.add(pd_fr, weight=1)
+
+        pcols = ("no", "opp", "sc", "res", "ha", "rnd", "cup")
+        self._schedule_past_tree = ttk.Treeview(
+            pt_fr,
+            columns=pcols,
+            show="headings",
+            height=14,
+            selectmode="browse",
+        )
+        self._schedule_past_tree.heading("no", text="#")
+        self._schedule_past_tree.heading("opp", text="対戦相手")
+        self._schedule_past_tree.heading("sc", text="スコア")
+        self._schedule_past_tree.heading("res", text="結果")
+        self._schedule_past_tree.heading("ha", text="H/A")
+        self._schedule_past_tree.heading("rnd", text="節・R")
+        self._schedule_past_tree.heading("cup", text="大会")
+        self._schedule_past_tree.column("no", width=36, anchor="center")
+        self._schedule_past_tree.column("opp", width=150, anchor="w")
+        self._schedule_past_tree.column("sc", width=72, anchor="center")
+        self._schedule_past_tree.column("res", width=56, anchor="center")
+        self._schedule_past_tree.column("ha", width=40, anchor="center")
+        self._schedule_past_tree.column("rnd", width=56, anchor="center")
+        self._schedule_past_tree.column("cup", width=110, anchor="w")
+        pvsb = ttk.Scrollbar(pt_fr, orient="vertical", command=self._schedule_past_tree.yview)
+        self._schedule_past_tree.configure(yscrollcommand=pvsb.set)
+        self._schedule_past_tree.pack(side="left", fill="both", expand=True)
+        pvsb.pack(side="right", fill="y")
+        self._schedule_past_tree.bind("<<TreeviewSelect>>", self._on_schedule_past_select)
+
+        ttk.Label(pd_fr, text="詳細・注記", style="SectionTitle.TLabel").pack(anchor="w", padx=4, pady=(0, 4))
+        self._schedule_past_detail = scrolledtext.ScrolledText(
+            pd_fr,
+            height=6,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self._schedule_past_detail.pack(fill="both", expand=True)
+        self._schedule_past_detail.configure(state="disabled")
+
+        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
+        bottom.pack(fill="x", pady=(12, 0))
+        tk.Label(
+            bottom,
+            text="読み取り専用です。一覧は主に日本リーグの SeasonEvent 由来。過去結果は上が新しい順。カップ戦は大会進行（情報ウィンドウ）も併せて確認してください。",
+            bg="#1d2129",
+            fg="#9aa3af",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x")
+        ttk.Button(bottom, text="閉じる", style="Menu.TButton", command=self._on_close_schedule_window).pack(
+            anchor="e", pady=(8, 0)
+        )
+
+        self._schedule_window = window
+        self._schedule_upcoming_rows: List[Dict[str, Any]] = []
+        self._schedule_past_rows: List[Dict[str, Any]] = []
+        window.protocol("WM_DELETE_WINDOW", self._on_close_schedule_window)
+        self._refresh_schedule_window()
+
+    def _on_close_schedule_window(self) -> None:
+        w = getattr(self, "_schedule_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        finally:
+            self._schedule_window = None
+            self._schedule_upcoming_rows = []
+            self._schedule_past_rows = []
+
+    def _on_schedule_upcoming_select(self, _event: Any = None) -> None:
+        tree = getattr(self, "_schedule_upcoming_tree", None)
+        det = getattr(self, "_schedule_upcoming_detail", None)
+        if tree is None or det is None:
+            return
+        sel = tree.selection()
+        if not sel:
+            return
+        tags = tree.item(sel[0], "tags")
+        if not tags:
+            return
+        try:
+            idx = int(tags[0])
+        except (TypeError, ValueError):
+            return
+        rows = getattr(self, "_schedule_upcoming_rows", None) or []
+        if idx < 0 or idx >= len(rows):
+            return
+        text = detail_text_for_upcoming_row(rows[idx])
+        det.configure(state="normal")
+        det.delete("1.0", tk.END)
+        det.insert(tk.END, text)
+        det.configure(state="disabled")
+
+    def _on_schedule_past_select(self, _event: Any = None) -> None:
+        tree = getattr(self, "_schedule_past_tree", None)
+        det = getattr(self, "_schedule_past_detail", None)
+        if tree is None or det is None:
+            return
+        sel = tree.selection()
+        if not sel:
+            return
+        tags = tree.item(sel[0], "tags")
+        if not tags:
+            return
+        try:
+            idx = int(tags[0])
+        except (TypeError, ValueError):
+            return
+        rows = getattr(self, "_schedule_past_rows", None) or []
+        if idx < 0 or idx >= len(rows):
+            return
+        r = rows[idx]
+        lines = [
+            f"対戦相手: {r.get('opponent', '—')}",
+            f"スコア: {r.get('score', '—')}  /  {r.get('result', '—')}",
+            f"H/A: {r.get('ha_long', '—')} ({r.get('ha_short', '—')})",
+            f"大会: {r.get('competition_display', '—')}",
+            f"節・ラウンド: {r.get('round_label', '—')}",
+            f"延長: {r.get('ot_label', '—')}",
+            "",
+            r.get("note", ""),
+        ]
+        text = "\n".join(lines)
+        det.configure(state="normal")
+        det.delete("1.0", tk.END)
+        det.insert(tk.END, text)
+        det.configure(state="disabled")
+
+    def _refresh_schedule_window(self) -> None:
+        if getattr(self, "_schedule_window", None) is None:
+            return
+        try:
+            if not self._schedule_window.winfo_exists():
+                return
+        except Exception:
+            return
+
+        cr = self._safe_int(self._safe_get(self.season, "current_round", 0))
+        tr = self._safe_int(self._safe_get(self.season, "total_rounds", 0))
+        fin = bool(self._safe_get(self.season, "season_finished", False))
+        hdr = getattr(self, "schedule_header_var", None)
+        if hdr is not None:
+            hdr.set(
+                f"{self._team_name()} 日程    消化ラウンド {cr}/{tr}    "
+                f"{'シーズン終了' if fin else 'シーズン進行中'}"
+            )
+
+        # 次戦詳細
+        nt = getattr(self, "_schedule_next_text", None)
+        if nt is not None:
+            lines = next_round_schedule_lines(self.season, self.team)
+            nt.configure(state="normal")
+            nt.delete("1.0", tk.END)
+            nt.insert(tk.END, "\n".join(lines))
+            nt.configure(state="disabled")
+
+        league_only = False
+        combo = getattr(self, "_schedule_filter_combo", None)
+        if combo is not None:
+            try:
+                league_only = combo.get() == "日本リーグのみ"
+            except Exception:
+                league_only = False
+
+        rows = upcoming_rows_for_user_team(self.season, self.team, league_only=league_only)
+        self._schedule_upcoming_rows = rows
+
+        ut = getattr(self, "_schedule_upcoming_tree", None)
+        if ut is not None:
+            ut.delete(*ut.get_children())
+            for i, row in enumerate(rows):
+                ut.insert(
+                    "",
+                    "end",
+                    iid=f"u{i}",
+                    values=(
+                        row.get("rounds_until", ""),
+                        row.get("round", ""),
+                        row.get("month_label", ""),
+                        row.get("competition_display", ""),
+                        row.get("ha_short", ""),
+                        row.get("opponent", ""),
+                    ),
+                    tags=(str(i),),
+                )
+
+        past = past_league_result_rows(self.season, self.team)
+        self._schedule_past_rows = past
+
+        pt = getattr(self, "_schedule_past_tree", None)
+        if pt is not None:
+            pt.delete(*pt.get_children())
+            for i, row in enumerate(past):
+                pt.insert(
+                    "",
+                    "end",
+                    iid=f"p{i}",
+                    values=(
+                        row.get("display_order", ""),
+                        row.get("opponent", ""),
+                        row.get("score", ""),
+                        row.get("result", ""),
+                        row.get("ha_short", ""),
+                        row.get("round_label", ""),
+                        row.get("competition_display", ""),
+                    ),
+                    tags=(str(i),),
+                )
+
     def _refresh_information_window(self) -> None:
+        win = getattr(self, "_information_window", None)
+        if win is None:
+            return
+        try:
+            if not win.winfo_exists():
+                return
+        except Exception:
+            return
         if getattr(self, "information_header_var", None) is None:
             return
 
@@ -2966,89 +3612,167 @@ class MainMenuView:
             f"現在日付: {self._format_date(self._get_current_date())}",
             f"年度: {self._get_season_year()}",
         ]
-        for var, line in zip(self.info_progress_lines, progress_lines):
-            var.set(line)
+        ipl = getattr(self, "info_progress_lines", None)
+        if ipl:
+            for var, line in zip(ipl, progress_lines):
+                var.set(line)
 
         schedule_lines = self._build_information_schedule_lines()
-        while len(schedule_lines) < len(self.info_schedule_lines):
-            schedule_lines.append("")
-        for var, line in zip(self.info_schedule_lines, schedule_lines[: len(self.info_schedule_lines)]):
-            var.set(line)
-
-        d1_lines = self._build_information_standings_lines(1)
-        d2_lines = self._build_information_standings_lines(2)
-        d3_lines = self._build_information_standings_lines(3)
-        for vars_list, lines in (
-            (self.info_d1_lines, d1_lines),
-            (self.info_d2_lines, d2_lines),
-            (self.info_d3_lines, d3_lines),
-        ):
-            while len(lines) < len(vars_list):
-                lines.append("")
-            for var, line in zip(vars_list, lines[: len(vars_list)]):
+        isl = getattr(self, "info_schedule_lines", None)
+        if isl:
+            while len(schedule_lines) < len(isl):
+                schedule_lines.append("")
+            for var, line in zip(isl, schedule_lines[: len(isl)]):
                 var.set(line)
 
         comp_lines = self._build_information_competition_lines()
-        while len(comp_lines) < len(self.info_comp_lines):
-            comp_lines.append("")
-        for var, line in zip(self.info_comp_lines, comp_lines[: len(self.info_comp_lines)]):
-            var.set(line)
+        icl = getattr(self, "info_comp_lines", None)
+        if icl:
+            while len(comp_lines) < len(icl):
+                comp_lines.append("")
+            for var, line in zip(icl, comp_lines[: len(icl)]):
+                var.set(line)
 
-        self.information_hint_var.set(
-            "読み取り専用の情報画面です。シーズン進行 / 順位表 / 次ラウンド予定 / カップ戦進行を確認できます。"
-            " トレード／インシーズンFAの期限は消化ラウンド22以降でロック（3月第2週終了相当）。"
-        )
+        level = self._information_division_level()
+        ut = self.team
+
+        st_tree = getattr(self, "_information_standings_tree", None)
+        if st_tree is not None:
+            try:
+                st_tree.delete(*st_tree.get_children())
+            except Exception:
+                pass
+            srows = build_standings_rows(self.season, level, user_team=ut)
+            if not srows:
+                st_tree.insert("", "end", values=("", f"D{level}: データなし", "", "", "", "", "", "", ""))
+            else:
+                for i, r in enumerate(srows):
+                    tags = ("user",) if r.get("is_user_row") else ()
+                    wp = float(r.get("win_pct", 0.0) or 0.0)
+                    st_tree.insert(
+                        "",
+                        "end",
+                        iid=f"s{i}",
+                        values=(
+                            r.get("rank", ""),
+                            r.get("name", ""),
+                            r.get("wins", ""),
+                            r.get("losses", ""),
+                            f"{wp:.3f}",
+                            r.get("pf", ""),
+                            r.get("pa", ""),
+                            r.get("diff", ""),
+                            "自" if r.get("is_user_row") else "",
+                        ),
+                        tags=tags,
+                    )
+
+        tm_tree = getattr(self, "_information_team_tree", None)
+        if tm_tree is not None:
+            try:
+                tm_tree.delete(*tm_tree.get_children())
+            except Exception:
+                pass
+            trows = build_team_summary_rows(self.season, level)
+            if not trows:
+                tm_tree.insert("", "end", values=("", f"D{level}: データなし", "", "", "", ""))
+            else:
+                for i, r in enumerate(trows):
+                    tags = ("user",) if r.get("is_user_row") else ()
+                    tm_tree.insert(
+                        "",
+                        "end",
+                        iid=f"t{i}",
+                        values=(
+                            r.get("rank", ""),
+                            r.get("name", ""),
+                            f"{float(r.get('avg_pf', 0.0)):.1f}",
+                            f"{float(r.get('avg_pa', 0.0)):.1f}",
+                            f"{float(r.get('avg_diff', 0.0)):.1f}",
+                            "自" if r.get("is_user_row") else "",
+                        ),
+                        tags=tags,
+                    )
+
+        pl_tree = getattr(self, "_information_player_tree", None)
+        if pl_tree is not None:
+            try:
+                pl_tree.delete(*pl_tree.get_children())
+            except Exception:
+                pass
+            sk = self._information_player_stat_key()
+            prows = build_player_leaderboard_rows(
+                self.season, level, sk, top_n=50, min_games=1
+            )
+            if prows:
+                sample = prows[0]
+                try:
+                    pl_tree.heading("avg", text=str(sample.get("per_game_label", "平均")))
+                    pl_tree.heading("tot", text=str(sample.get("total_label", "合計")))
+                except Exception:
+                    pass
+            if not prows:
+                pl_tree.insert("", "end", values=("", f"D{level}: 該当選手なし", "", "", "", "", "", ""))
+            else:
+                for i, r in enumerate(prows):
+                    pl_tree.insert(
+                        "",
+                        "end",
+                        iid=f"p{i}",
+                        values=(
+                            r.get("rank", ""),
+                            r.get("name", ""),
+                            r.get("team_name", ""),
+                            r.get("position", ""),
+                            r.get("ovr", ""),
+                            r.get("per_game", ""),
+                            r.get("total", ""),
+                            r.get("games_played", ""),
+                        ),
+                    )
+
+        nt = getattr(self, "_information_news_text", None)
+        if nt is not None:
+            news_lines = build_information_news_lines(
+                team_name=self._team_name(),
+                rank_text=self._compute_rank_text(),
+                wins=self._safe_int(self._safe_get(self.team, "regular_wins", 0)),
+                losses=self._safe_int(self._safe_get(self.team, "regular_losses", 0)),
+                external_items=self.external_news_items,
+            )
+            nt.configure(state="normal")
+            nt.delete("1.0", tk.END)
+            nt.insert(tk.END, "\n".join(news_lines))
+            nt.configure(state="disabled")
+
+        at = getattr(self, "_information_awards_text", None)
+        if at is not None:
+            aw_lines = format_awards_lines_for_division(self.season, level)
+            at.configure(state="normal")
+            at.delete("1.0", tk.END)
+            at.insert(tk.END, "\n".join(aw_lines))
+            at.configure(state="disabled")
+
+        hint = getattr(self, "information_hint_var", None)
+        if hint is not None:
+            hint.set(
+                "読み取り専用です。概要はシーズン進行・次ラウンドの要約と大会状況です。"
+                " 試合の一覧・過去結果の詳細は左メニュー「日程」ウィンドウが正本です。"
+                " 順位表・チーム／個人成績はタブ上部の区分（D1〜D3）で切り替えます。"
+                " トレード／インシーズンFAは消化ラウンド22以降でロック（3月第2週終了相当）。"
+            )
 
     def _build_information_schedule_lines(self) -> List[str]:
-        next_round = self._safe_int(self._safe_get(self.season, "current_round", 0)) + 1
-        events = []
-        getter = getattr(self.season, "get_events_for_round", None)
-        if callable(getter):
-            try:
-                events = list(getter(next_round) or [])
-            except Exception:
-                events = []
+        try:
+            return information_panel_schedule_lines(self.season, max_events=7)
+        except Exception:
+            return ["日程表示の生成に失敗しました", "—"]
 
-        lines = [f"次ラウンド: {next_round}"]
-        if not events:
-            lines.append("予定試合は取得できませんでした")
-            lines.append("補足: phaseや日程状態により空のことがあります")
-            return lines
-
-        added = 0
-        for event in events:
-            matchup = self._format_season_event_matchup(event)
-            if matchup:
-                lines.append(matchup)
-                added += 1
-            if added >= 7:
-                break
-
-        if added == 0:
-            lines.append("試合予定はあるが対戦カードを整形できませんでした")
-        return lines
-
-    def _build_information_standings_lines(self, level: int) -> List[str]:
-        teams = self._get_league_teams_for_level(level)
-        if not teams:
-            return [f"D{level}: データなし"]
-
-        standings = teams
-        getter = getattr(self.season, "get_standings", None)
-        if callable(getter):
-            try:
-                standings = list(getter(teams) or teams)
-            except Exception:
-                standings = teams
-
-        lines = []
-        for idx, team in enumerate(standings[:9], start=1):
-            name = str(self._safe_get(team, "name", "-"))
-            wins = self._safe_int(self._safe_get(team, "regular_wins", 0))
-            losses = self._safe_int(self._safe_get(team, "regular_losses", 0))
-            marker = " ←自クラブ" if name == self._team_name() else ""
-            lines.append(f"{idx}. {name} {wins}勝{losses}敗{marker}")
-        return lines
+    def _format_season_event_matchup(self, event: Any) -> str:
+        try:
+            return format_season_event_matchup_line(event)
+        except Exception:
+            return ""
 
     def _build_information_competition_lines(self) -> List[str]:
         lines = []
@@ -3060,7 +3784,8 @@ class MainMenuView:
             self._safe_get(self._safe_get(self.season, "emperor_cup_results", {}), "champion", None)
         )
         lines.append(
-            f"天皇杯: {'開催中' if emperor_enabled else '未開催'} / 現在段階: {emperor_stage} / 優勝: {emperor_champion}"
+            f"{competition_display_name('emperor_cup')}: "
+            f"{'開催中' if emperor_enabled else '未開催'} / 現在段階: {emperor_stage} / 優勝: {emperor_champion}"
         )
 
         easl_enabled = bool(self._safe_get(self.season, "easl_enabled", False))
@@ -3070,7 +3795,8 @@ class MainMenuView:
             self._safe_get(self._safe_get(self.season, "easl_results", {}), "champion", None)
         )
         lines.append(
-            f"EASL: {'開催中' if easl_enabled else '未開催'} / 現在段階: {easl_stage} / 優勝: {easl_champion}"
+            f"{competition_display_name('easl')}: "
+            f"{'開催中' if easl_enabled else '未開催'} / 現在段階: {easl_stage} / 優勝: {easl_champion}"
         )
 
         acl_enabled = bool(self._safe_get(self.season, "acl_enabled", False))
@@ -3080,7 +3806,8 @@ class MainMenuView:
             self._safe_get(self._safe_get(self.season, "acl_results", {}), "champion", None)
         )
         lines.append(
-            f"ACL: {'開催中' if acl_enabled else '未開催'} / 現在段階: {acl_stage} / 優勝: {acl_champion}"
+            f"{competition_display_name('asia_cl')}: "
+            f"{'開催中' if acl_enabled else '未開催'} / 現在段階: {acl_stage} / 優勝: {acl_champion}"
         )
 
         competitions = self._safe_get(self.season, "competitions", {}) or {}
@@ -3100,36 +3827,6 @@ class MainMenuView:
 
         all_teams = list(self._iter_league_teams())
         return [t for t in all_teams if self._safe_int(self._safe_get(t, "league_level", 0)) == level]
-
-    def _format_season_event_matchup(self, event: Any) -> str:
-        home = self._resolve_team_name(
-            self._first_non_empty(
-                self._safe_get(event, "home_team", None),
-                self._safe_get(event, "team1", None),
-            )
-        )
-        away = self._resolve_team_name(
-            self._first_non_empty(
-                self._safe_get(event, "away_team", None),
-                self._safe_get(event, "team2", None),
-            )
-        )
-        if home != "-" and away != "-":
-            comp = self._first_non_empty(
-                self._safe_get(event, "competition_name", None),
-                self._safe_get(event, "label", None),
-                self._safe_get(event, "event_type", None),
-                "",
-            )
-            prefix = f"[{comp}] " if comp else ""
-            return f"{prefix}{home} vs {away}"
-
-        title = self._first_non_empty(
-            self._safe_get(event, "title", None),
-            self._safe_get(event, "name", None),
-            self._safe_get(event, "description", None),
-        )
-        return str(title) if title is not None else ""
 
     def _latest_stage_name(self, stage_logs: Any) -> str:
         if not isinstance(stage_logs, dict) or not stage_logs:
@@ -4733,6 +5430,9 @@ class MainMenuView:
         self._refresh_gm_dashboard_window()
 
     def _on_menu(self, key: str) -> None:
+        if key == "日程":
+            self.open_schedule_window()
+            return
         callback = self.menu_callbacks.get(key)
         if callback is not None:
             callback()
@@ -4880,32 +5580,70 @@ class MainMenuView:
             self._safe_get(self.season, "matches", None),
             self._safe_get(self.team, "schedule", None),
         )
-        if not candidates:
-            return None
-
         user_name = self._team_name()
         current_date = self._get_current_date()
 
-        for game in candidates:
-            home_name = self._resolve_team_name(self._safe_get(game, "home_team", None))
-            away_name = self._resolve_team_name(self._safe_get(game, "away_team", None))
-            if user_name not in (home_name, away_name):
+        if candidates:
+            for game in candidates:
+                home_name = self._resolve_team_name(self._safe_get(game, "home_team", None))
+                away_name = self._resolve_team_name(self._safe_get(game, "away_team", None))
+                if user_name not in (home_name, away_name):
+                    continue
+                played = self._first_non_empty(
+                    self._safe_get(game, "played", None),
+                    self._safe_get(game, "is_played", None),
+                    False,
+                )
+                if played:
+                    continue
+                game_date = self._first_non_empty(
+                    self._safe_get(game, "date", None),
+                    self._safe_get(game, "game_date", None),
+                    self._safe_get(game, "scheduled_date", None),
+                )
+                if game_date is not None and str(game_date) < str(current_date):
+                    continue
+                return game
+
+        return self._find_next_game_from_season_events()
+
+    def _find_next_game_from_season_events(self) -> Any:
+        """SeasonEvent（次ラウンド）から自チームの次戦を合成 dict で返す。"""
+        if self.season is None or self.team is None:
+            return None
+        if bool(self._safe_get(self.season, "season_finished", False)):
+            return None
+        cr = int(self._safe_get(self.season, "current_round", 0) or 0)
+        tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
+        nxt = cr + 1
+        if nxt > tr:
+            return None
+        getter = getattr(self.season, "get_events_for_round", None)
+        if not callable(getter):
+            return None
+        try:
+            events = list(getter(nxt) or [])
+        except Exception:
+            return None
+        user_name = self._team_name()
+        for ev in events:
+            if str(getattr(ev, "event_type", "") or "") != "game":
                 continue
-            played = self._first_non_empty(
-                self._safe_get(game, "played", None),
-                self._safe_get(game, "is_played", None),
-                False,
-            )
-            if played:
+            ht = getattr(ev, "home_team", None)
+            at = getattr(ev, "away_team", None)
+            hn = self._resolve_team_name(ht)
+            an = self._resolve_team_name(at)
+            if user_name not in (hn, an):
                 continue
-            game_date = self._first_non_empty(
-                self._safe_get(game, "date", None),
-                self._safe_get(game, "game_date", None),
-                self._safe_get(game, "scheduled_date", None),
-            )
-            if game_date is not None and str(game_date) < str(current_date):
-                continue
-            return game
+            ct = str(getattr(ev, "competition_type", "") or "regular_season")
+            hint = round_month_label(self.season, nxt)
+            return {
+                "home_team": ht,
+                "away_team": at,
+                "round_name": f"ラウンド{nxt}",
+                "game_type": competition_display_name(ct),
+                "schedule_date_hint": hint,
+            }
         return None
 
     def _is_user_home(self, game: Any) -> bool:
@@ -4976,7 +5714,7 @@ class MainMenuView:
     def _build_next_game_meaning(self, opponent_rank: str, venue_text: str) -> str:
         if opponent_rank in ("1位", "2位", "3位"):
             return f"上位相手との重要戦です。{venue_text}で勢いを作りたい試合です。"
-        if venue_text == "HOME":
+        if venue_text == "ホーム":
             return "ホームで確実に取りたい一戦です。"
         return "アウェイで流れを引き寄せたい試合です。"
 

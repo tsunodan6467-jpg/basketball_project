@@ -369,6 +369,10 @@ class Team:
 
         ensure_merchandise_on_team(self)
 
+        log = self.management.get("cpu_mgmt_log")
+        if not isinstance(log, list):
+            self.management["cpu_mgmt_log"] = []
+
     def reset_rookie_budget(self):
         self.rookie_budget_remaining = int(max(0, self.rookie_budget))
 

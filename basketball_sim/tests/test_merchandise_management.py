@@ -6,6 +6,7 @@ from basketball_sim.systems.merchandise_management import (
     ensure_merchandise_on_team,
     estimate_dummy_merch_sales_lines,
     get_merchandise_item,
+    management_merchandise_revenue_bonus,
 )
 
 
@@ -51,5 +52,44 @@ def test_dummy_sales_contains_estimate():
     t = Team(team_id=5, name="D", league_level=1, fan_base=3000, popularity=55)
     lines = estimate_dummy_merch_sales_lines(t)
     text = "\n".join(lines)
-    assert "ダミー" in text or "簡易" in text
+    assert "簡易" in text or "目安" in text
     assert "推定" in text
+
+
+def test_management_merch_bonus_zero_without_on_sale():
+    t = Team(team_id=6, name="N", league_level=1, popularity=50)
+    ensure_merchandise_on_team(t)
+    assert management_merchandise_revenue_bonus(t, league_level=1) == 0
+
+
+def test_management_merch_bonus_positive_with_on_sale():
+    t = Team(team_id=7, name="O", league_level=1, popularity=50)
+    ensure_merchandise_on_team(t)
+    for row in t.management["merchandise"]["items"]:
+        if row.get("id") == "jersey_alt":
+            row["phase"] = "on_sale"
+            break
+    b = management_merchandise_revenue_bonus(t, league_level=1)
+    assert b >= 150_000
+
+
+def test_offseason_merchandise_includes_management_bonus():
+    from basketball_sim.models.offseason import Offseason
+
+    base_team = Team(team_id=8, name="B", league_level=1, players=[], popularity=50)
+    ensure_merchandise_on_team(base_team)
+
+    boosted = Team(team_id=9, name="S", league_level=1, players=[], popularity=50)
+    ensure_merchandise_on_team(boosted)
+    for row in boosted.management["merchandise"]["items"]:
+        row["phase"] = "on_sale"
+
+    class _StubOff(Offseason):
+        def _get_team_wins(self, t):
+            return 15
+
+    stub = _StubOff.__new__(_StubOff)
+    tb, bbd = stub._calculate_team_revenue(base_team)
+    ts, sbd = stub._calculate_team_revenue(boosted)
+    assert sbd["merchandise"] == bbd["merchandise"] + management_merchandise_revenue_bonus(boosted, league_level=1)
+    assert ts - tb == management_merchandise_revenue_bonus(boosted, league_level=1)

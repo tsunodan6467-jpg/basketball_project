@@ -3217,6 +3217,11 @@ class Season:
             print(f"{i}. {t.name} - Popularity {t.popularity}")
 
     def _process_finances(self):
+        """
+        レガシー試算の CLI 表示のみ。`team.money` は変更しない。
+        年次の収支・所持金更新の正本はオフシーズン `Offseason._process_team_finances`
+        → `Team.record_financial_result`（二重計上防止）。
+        """
         finances_log = []
 
         for t in self.all_teams:
@@ -3285,11 +3290,6 @@ class Season:
             expenses = roster_salary + operating_cost
             profit = int(revenue - expenses)
 
-            t.money += profit
-
-            if t.money < -5000000:
-                t.money = -5000000
-
             finances_log.append({
                 "team": t,
                 "ticket_rev": ticket_revenue,
@@ -3301,6 +3301,7 @@ class Season:
             })
 
         print("\n[Richest Clubs]")
+        print("（参考: 下の Ticket/Sponsor/Profit は旧式試算。所持金ランキングは締め前残高・反映はオフシーズン財務が正本）")
         top_teams_finances = sorted(finances_log, key=lambda x: x["team"].money, reverse=True)[:5]
 
         for i, data in enumerate(top_teams_finances, 1):

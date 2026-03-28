@@ -2293,14 +2293,13 @@ def run_main_menu_ui_mode(
                 parent=root,
             )
 
-    # 「日程」: 1ラウンド進行。「GM」は未指定時 main_menu_view 既定（状況表示＋CLI案内）
+    # 「日程」: 日程ウィンドウ（読み取り専用）。1ラウンド進行は「次へ進む」。
     menu_callbacks = {
-        "日程": advance_one_round,
         "DEBUG_SKIP_TO_OFFSEASON": debug_skip_to_offseason,
     }
 
     print_separator("主画面UIモード開始")
-    print("『日程』または『次へ進む』で1ラウンド進行します。")
+    print("『日程』で日程ウィンドウ、『次へ進む』で1ラウンド進行します。")
     print("シーズン終了後は『オフシーズンを実行』→ 完了後、ウィンドウを閉じるとターミナルで年度進行メニューが続きます。")
     print("他メニューは段階的に接続します。")
 

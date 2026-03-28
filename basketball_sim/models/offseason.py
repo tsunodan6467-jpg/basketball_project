@@ -3118,6 +3118,12 @@ class Offseason:
             + fan_base * 950
             + max(0, wins - 15) * 2_250
         )
+        try:
+            from basketball_sim.systems.merchandise_management import management_merchandise_revenue_bonus
+
+            merch_revenue = int(merch_revenue + management_merchandise_revenue_bonus(team, league_level=league_level))
+        except Exception:
+            pass
 
         media_distribution = {1: 420_000, 2: 150_000, 3: 30_000}.get(league_level, 30_000)
 

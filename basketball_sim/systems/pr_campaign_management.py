@@ -8,6 +8,7 @@ docs/GM_MANAGEMENT_MENU_SPEC_V1.md §2.3
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from random import Random
 from typing import Any, Dict, List, Optional, Tuple
 
 MAX_ACTIONS_PER_ROUND = 2
@@ -92,6 +93,14 @@ def sync_pr_round_quota(team: Any, season: Any) -> Tuple[str, bool, str]:
 def commit_pr_campaign(team: Any, campaign_id: str, season: Any) -> Tuple[bool, str]:
     if not bool(getattr(team, "is_user_team", False)):
         return False, "自チームのみ広報施策を実行できます。"
+    return _commit_pr_campaign_core(team, campaign_id, season, actor="user")
+
+
+def _commit_pr_campaign_core(team: Any, campaign_id: str, season: Any, *, actor: str) -> Tuple[bool, str]:
+    if actor not in ("user", "cpu"):
+        return False, ""
+    if actor == "cpu" and bool(getattr(team, "is_user_team", False)):
+        return False, ""
     cid = str(campaign_id or "").strip()
     if cid not in PR_CAMPAIGN_IDS:
         return False, "不明な施策です。"
@@ -132,6 +141,7 @@ def commit_pr_campaign(team: Any, campaign_id: str, season: Any) -> Tuple[bool, 
         "cost": cost,
         "popularity_delta": pop_d,
         "fan_base_delta": fan_d,
+        "actor": actor,
     }
     hist = block["history"]
     hist.append(entry)
@@ -143,6 +153,17 @@ def commit_pr_campaign(team: Any, campaign_id: str, season: Any) -> Tuple[bool, 
         f"「{spec['label']}」を実施しました（-{cost:,} 円）。"
         f"人気 {pop_d:+}、ファン基盤 {fan_d:+}（試合収入式への本接続は後段）。",
     )
+
+
+def try_cpu_pr_campaign(team: Any, season: Any, rng: Random) -> bool:
+    """CPU クラブ用。低確率でランダム施策を 1 回試行。成功時 True。"""
+    if bool(getattr(team, "is_user_team", False)):
+        return False
+    if rng.random() >= 0.068:
+        return False
+    cid = rng.choice([x["id"] for x in PR_CAMPAIGNS])
+    ok, _ = _commit_pr_campaign_core(team, cid, season, actor="cpu")
+    return ok
 
 
 def format_pr_status_line(team: Any, season: Any) -> str:
@@ -173,8 +194,9 @@ def format_pr_history_lines(team: Any, *, limit: int = 10) -> List[str]:
         at = str(row.get("at", ""))[:19].replace("T", " ")
         label = str(row.get("label", "-"))
         cost = row.get("cost")
+        cpu_tag = "［CPU］" if str(row.get("actor", "user")) == "cpu" else ""
         if isinstance(cost, int):
-            lines.append(f"- {at}  {label}  （{cost:,} 円）")
+            lines.append(f"- {at}  {cpu_tag}{label}  （{cost:,} 円）")
         else:
-            lines.append(f"- {at}  {label}")
+            lines.append(f"- {at}  {cpu_tag}{label}")
     return lines

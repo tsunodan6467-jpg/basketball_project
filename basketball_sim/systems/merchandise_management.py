@@ -1,13 +1,14 @@
 """
 クラブグッズ開発（management 永続化・第1段は保存＋表示が主）。
 
-売上・本丸の revenue / §0.3 内訳にはまだ接続しない。
+発売中ラインはオフシーズン締めの merchandise 収入内訳にボーナスとして接続（折衷）。
 docs/GM_MANAGEMENT_MENU_SPEC_V1.md §2.4
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from random import Random
 from typing import Any, Dict, List, Optional, Tuple
 
 MERCH_PRODUCTS: Tuple[Dict[str, str], ...] = (
@@ -35,6 +36,39 @@ ADVANCE_COST: Dict[str, int] = {
 VALID_PHASES = frozenset(PHASE_ORDER)
 MAX_MERCH_HISTORY = 36
 MERCH_PRODUCT_IDS = frozenset(p["id"] for p in MERCH_PRODUCTS)
+
+# オフシーズン `record_financial_result` の merchandise 内訳に加算するボーナス（1 シーズン分・簡易式）
+_MGMT_MERCH_PER_LINE: Dict[int, int] = {1: 195_000, 2: 108_000, 3: 48_000}
+_MGMT_MERCH_BONUS_CAP = 2_800_000
+
+
+def management_merchandise_revenue_bonus(team: Any, *, league_level: int) -> int:
+    """
+    `management.merchandise` で「発売中」のラインごとに、年次収入内訳 merchandise に上乗せする額。
+    ベースの物販式（Offseason._calculate_team_revenue 内）とは別枠で足す（折衷配線）。
+    """
+    if hasattr(team, "_ensure_history_fields"):
+        team._ensure_history_fields()
+    ensure_merchandise_on_team(team)
+    block = team.management.get("merchandise")
+    if not isinstance(block, dict):
+        return 0
+    items = block.get("items")
+    if not isinstance(items, list):
+        return 0
+    released = sum(
+        1
+        for row in items
+        if isinstance(row, dict) and str(row.get("phase", "")) == "on_sale"
+    )
+    if released <= 0:
+        return 0
+    ll = int(league_level if league_level in (1, 2, 3) else 3)
+    per = int(_MGMT_MERCH_PER_LINE.get(ll, _MGMT_MERCH_PER_LINE[3]))
+    pop = int(getattr(team, "popularity", 50))
+    pop_mul = 1.0 + max(-0.12, min(0.18, (pop - 50) * 0.0045))
+    raw = int(per * released * pop_mul)
+    return int(max(0, min(raw, _MGMT_MERCH_BONUS_CAP)))
 
 
 def ensure_merchandise_on_team(team: Any) -> None:
@@ -93,6 +127,14 @@ def get_merchandise_item(team: Any, product_id: str) -> Optional[Dict[str, Any]]
 def advance_merchandise_phase(team: Any, product_id: str) -> Tuple[bool, str]:
     if not bool(getattr(team, "is_user_team", False)):
         return False, "自チームのみグッズ開発を進められます。"
+    return _advance_merchandise_phase_core(team, product_id, source="user")
+
+
+def _advance_merchandise_phase_core(team: Any, product_id: str, *, source: str) -> Tuple[bool, str]:
+    if source not in ("user", "cpu"):
+        return False, ""
+    if source == "cpu" and bool(getattr(team, "is_user_team", False)):
+        return False, ""
     pid = str(product_id or "").strip()
     if pid not in MERCH_PRODUCT_IDS:
         return False, "不明な商品ラインです。"
@@ -133,6 +175,7 @@ def advance_merchandise_phase(team: Any, product_id: str) -> Tuple[bool, str]:
         "from_phase": phase,
         "to_phase": nxt,
         "cost": cost,
+        "source": source,
     }
     hist = team.management["merchandise"]["history"]
     hist.append(entry)
@@ -140,6 +183,25 @@ def advance_merchandise_phase(team: Any, product_id: str) -> Tuple[bool, str]:
         hist.pop(0)
 
     return True, f"「{name}」を「{label}」まで進めました（-{cost:,} 円）。"
+
+
+def try_cpu_merchandise_advance(team: Any, season: Any, rng: Random) -> bool:
+    """CPU クラブ用。未発売ラインを低確率で 1 段階進行。成功時 True。"""
+    _ = season  # 将来のシーズンラベル用
+    if bool(getattr(team, "is_user_team", False)):
+        return False
+    if rng.random() >= 0.055:
+        return False
+    ensure_merchandise_on_team(team)
+    candidates = [
+        str(row["id"])
+        for row in team.management["merchandise"]["items"]
+        if isinstance(row, dict) and row.get("phase") != "on_sale"
+    ]
+    if not candidates:
+        return False
+    ok, _ = _advance_merchandise_phase_core(team, rng.choice(candidates), source="cpu")
+    return ok
 
 
 def format_merchandise_status_line(item: Dict[str, Any]) -> str:
@@ -163,7 +225,7 @@ def format_merchandise_row_display(item: Dict[str, Any]) -> str:
 
 
 def estimate_dummy_merch_sales_lines(team: Any) -> List[str]:
-    """§2.4: ダミー／簡易式。永続化・正本 revenue には混ぜない。"""
+    """§2.4: 目安表示用の簡易式。正本はオフシーズン締めの merchandise 内訳（＋発売中ボーナス）。"""
     ensure_merchandise_on_team(team)
     released = sum(
         1 for row in team.management["merchandise"]["items"] if row.get("phase") == "on_sale"
@@ -173,9 +235,12 @@ def estimate_dummy_merch_sales_lines(team: Any) -> List[str]:
     # 見かけ上の推定（保存しない）
     base = 120_000 + released * 95_000 + min(400_000, fb * 12) + max(0, pop - 50) * 2_200
     est = int(max(80_000, base))
+    bonus = management_merchandise_revenue_bonus(team, league_level=int(getattr(team, "league_level", 3)))
+    bonus_note = f"年次締めへの上乗せ（発売中ボーナス・目安）: 約 {bonus:,} 円" if bonus else "年次締めへの上乗せ（発売中ボーナス）: 0 円（発売中ラインなし）"
     lines = [
-        "【売上・ランキング（簡易・ダミー表示）】",
-        f"推定月次グッズ売上（目安）: 約 {est:,} 円 ※シミュレーション簡易式・本番収支とは未連携",
+        "【売上・ランキング（簡易表示）】",
+        f"推定月次グッズ売上（目安）: 約 {est:,} 円 ※あくまで目安",
+        bonus_note,
         f"発売中ライン数: {released} / {len(MERCH_PRODUCTS)}",
         "クラブ内人気（ダミー順）: ①応援タオル ②キーホルダー ③ユニフォーム関連",
     ]
@@ -196,8 +261,9 @@ def format_merchandise_history_lines(team: Any, *, limit: int = 6) -> List[str]:
         name = str(row.get("name", "-"))
         to_ph = PHASE_LABEL_JA.get(str(row.get("to_phase", "")), row.get("to_phase", ""))
         cost = row.get("cost")
+        cpu_tag = "［CPU］" if str(row.get("source", "user")) == "cpu" else ""
         if isinstance(cost, int):
-            lines.append(f"- {at}  {name} → {to_ph}  （{cost:,} 円）")
+            lines.append(f"- {at}  {cpu_tag}{name} → {to_ph}  （{cost:,} 円）")
         else:
-            lines.append(f"- {at}  {name} → {to_ph}")
+            lines.append(f"- {at}  {cpu_tag}{name} → {to_ph}")
     return lines
