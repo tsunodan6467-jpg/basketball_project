@@ -4,6 +4,7 @@ from typing import Tuple, List, Optional, Dict, Set
 
 from .team import Team
 from .player import Player
+import basketball_sim.config.game_constants as game_constants
 from basketball_sim.config.game_constants import (
     CLOCK_SECONDS_PER_REGULATION_QUARTER,
     FORFEIT_SCORE,
@@ -12,7 +13,6 @@ from basketball_sim.config.game_constants import (
     LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
     LEAGUE_ROSTER_FOREIGN_CAP,
     MINIMUM_ACTIVE_PLAYERS_FOR_GAME,
-    TACTICS_STARTER_OVR_MAX_DIFF,
 )
 from basketball_sim.systems.rotation import RotationSystem
 from basketball_sim.systems.team_tactics import (
@@ -1651,8 +1651,11 @@ class Match:
 
         L = list(B)
         tactics_introduced: Set[int] = set()
+        swaps_done = 0
 
         for pos in STARTER_POSITIONS:
+            if swaps_done >= int(game_constants.TACTICS_STARTER_MAX_SUBSTITUTIONS):
+                break
             tid = starters_map.get(pos)
             if tid is None:
                 continue
@@ -1678,7 +1681,7 @@ class Match:
 
             v_ovr = float(victim.get_effective_ovr())
             t_ovr = float(T.get_effective_ovr())
-            if abs(t_ovr - v_ovr) > float(TACTICS_STARTER_OVR_MAX_DIFF):
+            if abs(t_ovr - v_ovr) > float(game_constants.TACTICS_STARTER_OVR_MAX_DIFF):
                 continue
 
             L_prime = [T if p is victim else p for p in L]
@@ -1691,6 +1694,7 @@ class Match:
             if tid_self is not None:
                 tactics_introduced.add(int(tid_self))
             L = L_prime
+            swaps_done += 1
 
         return self._validate_lineup(L, B, team)
 

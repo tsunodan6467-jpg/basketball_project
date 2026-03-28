@@ -112,6 +112,46 @@ def test_match_applies_tactics_starter_only_within_ovr_gap():
     assert 204 not in ids
 
 
+def test_match_respects_tactics_starter_max_substitutions(monkeypatch):
+    """成功 swap が上限に達したら残りスロットは処理しない（TACTICS_STARTER_MAX_SUBSTITUTIONS）。"""
+    monkeypatch.setattr(
+        "basketball_sim.config.game_constants.TACTICS_STARTER_MAX_SUBSTITUTIONS",
+        1,
+    )
+
+    home = Team(team_id=1, name="Home", league_level=1)
+    # ソートで必ず 701〜705 が先発。706/707 は6番手以降かつ OVR 差≤3 で差し替え可能。
+    home.add_player(_player(701, "PG", ovr=88))
+    home.add_player(_player(702, "SG", ovr=89))
+    home.add_player(_player(703, "SF", ovr=88))
+    home.add_player(_player(704, "PF", ovr=87))
+    home.add_player(_player(705, "C", ovr=86))
+    home.add_player(_player(706, "PG", ovr=86))
+    home.add_player(_player(707, "SG", ovr=86))
+    home.add_player(_player(708, "PF", ovr=65))
+
+    home.team_tactics = {
+        "version": 1,
+        "rotation": {"starters": {"PG": 706, "SG": 707}},
+        "team_strategy": {},
+        "usage_policy": {},
+        "roles": {},
+        "playbook": {},
+    }
+    ensure_team_tactics_on_team(home)
+
+    away = Team(team_id=2, name="Away", league_level=1)
+    for i, pos in enumerate(["PG", "SG", "SF", "PF", "C", "PG", "SG", "SF"]):
+        away.add_player(_player(800 + i, pos, ovr=70))
+
+    m = Match(home_team=home, away_team=away)
+    ids = {getattr(p, "player_id", None) for p in m.home_starters}
+    assert 706 in ids
+    assert 701 not in ids
+    assert 707 not in ids
+    assert 702 in ids
+
+
 def test_match_skips_tactics_starter_when_ovr_gap_exceeds_three():
     home = Team(team_id=1, name="Home", league_level=1)
     home.add_player(_player(201, "C", ovr=85))

@@ -85,7 +85,7 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
 
 | 項目 | 内容 |
 |------|------|
-| **試合先発** | `Match._resolve_match_starters` が **本書 §3 の差し替えモデル**を実装。OVR 差上限は `config/game_constants.py` の `TACTICS_STARTER_OVR_MAX_DIFF`（既定 3）。 |
+| **試合先発** | `Match._resolve_match_starters` が **本書 §3 の差し替えモデル**を実装。`TACTICS_STARTER_OVR_MAX_DIFF`（OVR 差）と `TACTICS_STARTER_MAX_SUBSTITUTIONS`（成功 swap 回数上限）は `config/game_constants.py`。 |
 | **正規化済みスロット** | `get_normalized_rotation_starters_map`（`team_tactics.py`）で PG〜C を取得。 |
 | **`collect_tactics_starter_players`** | 5 スロット完備時の一覧取得用（テスト等）。試合先発の必須ヘルパではない。 |
 | **GM 画面の `Team.starting_lineup` / `get_starting_five()`** | **試合エンジンの先発正本には使わない**（現方針）。 |
@@ -114,19 +114,19 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
    `basketball_sim/config/game_constants.py` の **`TACTICS_STARTER_OVR_MAX_DIFF`**（既定 **3**）。  
    バランス調整は **原則この定数のみ**変更し、試合全体の他係数と混ぜない。
 
-6. **複数スロット**  
-   上限なし（PG→…→C の順で最大 5 回まで条件付き適用）。違法・重複になる差し替えは都度拒否。
+6. **複数スロットと差し替え回数の上限**  
+   スロットは PG→…→C の順。成功した差し替え（swap）の累計が **`TACTICS_STARTER_MAX_SUBSTITUTIONS`** に達したら、残りスロットは**見ない**（既定 **5**＝従来どおり最大 5 回まで試行可能）。  
+   違法・重複・条件不一致のスロットは従来どおりスキップし、swap カウントは増えない。
 
 ### 5.2 将来の調整候補（未実装）
 
-- 戦術差し替えの **最大人数**（例: 1 試合 N 人まで）。
 - **`roles`** や別指標による戦術適性の拡張。
 
 ---
 
 ## 6. 関連ファイル（目安）
 
-- `basketball_sim/config/game_constants.py` — `TACTICS_STARTER_OVR_MAX_DIFF`
+- `basketball_sim/config/game_constants.py` — `TACTICS_STARTER_OVR_MAX_DIFF`, `TACTICS_STARTER_MAX_SUBSTITUTIONS`
 - `basketball_sim/models/match.py` — `_resolve_match_starters`, `_pick_tactics_substitution_victim`, `_get_starting_five_from_players`, `_validate_lineup`
 - `basketball_sim/systems/team_tactics.py` — `rotation.starters` の正規化・取得
 - `basketball_sim/tests/test_team_tactics_phase_b.py` — 先発・規定まわりの回帰（仕様変更時に更新）
@@ -140,3 +140,4 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
 | 2026-03-28 | 初版: ユーザー案（ベース先発＋条件付き戦術差し替え・OVR 差 3・適性）を正本化。 |
 | 2026-03-28 | `Match._resolve_match_starters` に差し替えモデルを実装。§4 を実装済み表記に更新。 |
 | 2026-03-28 | §5 を v1 決定事項＋将来候補に整理。`TACTICS_STARTER_OVR_MAX_DIFF` を `game_constants` に集約。 |
+| 2026-03-28 | `TACTICS_STARTER_MAX_SUBSTITUTIONS`（既定 5）で戦術先発の成功 swap 回数上限を実装。§5.2 の「最大人数」を §5.1-6 に移管。 |

@@ -160,7 +160,7 @@ Steam正式リリース（目標単価: 1500円）
 【ゲームエンジン・ロジック】
 日本独自ルール： 「外国籍選手（3名枠・オンザコート制限）」「アジア・帰化枠（1名）」の登録・出場ロジックを厳格に再現。
 【試合先発と team_tactics（正本・参照）】
-- **詳細仕様**: `docs/MATCH_STARTING_LINEUP_RULES.md` を正とする（ベース先発＝`_get_starting_five_from_players`、戦術スロットは**条件付き差し替え**、初期版は **総合評価（effective OVR）差≤`TACTICS_STARTER_OVR_MAX_DIFF`**・**戦術適性**・**オンコート合法**、未指定スロットはベース維持）。**閾値の数値**は `basketball_sim/config/game_constants.py` の **`TACTICS_STARTER_OVR_MAX_DIFF`**（§5 と同じ）。
+- **詳細仕様**: `docs/MATCH_STARTING_LINEUP_RULES.md` を正とする（ベース先発＝`_get_starting_five_from_players`、戦術スロットは**条件付き差し替え**、初期版は **総合評価（effective OVR）差≤`TACTICS_STARTER_OVR_MAX_DIFF`**・**戦術適性**・**オンコート合法**、未指定スロットはベース維持）。**定数**は `basketball_sim/config/game_constants.py` の **`TACTICS_STARTER_OVR_MAX_DIFF`**（OVR 差）と **`TACTICS_STARTER_MAX_SUBSTITUTIONS`**（成功した差し替え回数の上限、既定 5）。
 - **GM ロスターの `starting_lineup` / `get_starting_five()`**: 試合エンジンの先発正本には**用いない**（戦術メニューと別経路）。統合する場合は上記ドキュメントと同時改訂。
 - **実装の所在**: `basketball_sim/models/match.py` の `_resolve_match_starters`、`basketball_sim/systems/team_tactics.py`。**コードと本書が食い違う場合は本書優先**で整合させる。
 長期シミュレーション： 何十年もシーズンを積み重ねられる設計。
