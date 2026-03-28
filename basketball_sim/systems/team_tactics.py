@@ -372,6 +372,20 @@ def collect_tactics_starter_players(team: Any, active_players: List[Any]) -> Opt
     return lineup
 
 
+def get_normalized_rotation_starters_map(team: Any) -> Dict[str, Optional[int]]:
+    """`rotation.starters` を PG〜C で正規化（部分指定可）。試合先発の差し替え判定用。"""
+    ensure_team_tactics_on_team(team)
+    tact = getattr(team, "team_tactics", None)
+    if not isinstance(tact, dict):
+        return {pos: None for pos in STARTER_POSITIONS}
+    rot = tact.get("rotation")
+    if not isinstance(rot, dict):
+        return {pos: None for pos in STARTER_POSITIONS}
+    norm = _normalize_starters(rot.get("starters"))
+    _dedupe_starters_inplace(norm)
+    return dict(norm)
+
+
 def get_rotation_target_minutes_by_player_id(team: Any) -> Dict[int, float]:
     """rotation.target_minutes を player_id -> 分 に正規化（試合オーバーレイ用。軽量読み取り）。"""
     raw = getattr(team, "team_tactics", None)

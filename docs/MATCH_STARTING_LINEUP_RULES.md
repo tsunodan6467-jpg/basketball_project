@@ -81,14 +81,14 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
 
 ---
 
-## 4. 現行実装との関係（追記時点のメモ）
+## 4. 現行実装との関係
 
 | 項目 | 内容 |
 |------|------|
-| **本書の差し替えモデル** | **目標仕様**。`Match._resolve_match_starters` を本アルゴリズムに合わせるのが正しい最終形。 |
-| **Phase B（過渡）** | 実装が「5 スロット完備かつ `collect_tactics_starter_players` が成功し `_validate_lineup` を通る場合、戦術 5 人をそのまま採用」になっている期間がある。**本書と異なる場合は本書に合わせて置き換える**。 |
-| **ヘルパ** | `basketball_sim/systems/team_tactics.py` の `collect_tactics_starter_players` 等。差し替えモデルでは **スロット単位の読み取り**や正規化再利用が中心になる。 |
-| **GM 画面の `Team.starting_lineup` / `get_starting_five()`** | **試合エンジンの先発正本には使わない**（現方針）。戦術メニューと GM ロスターは別経路。将来統合する場合は本書と GM 仕様を同時に改訂する。 |
+| **試合先発** | `Match._resolve_match_starters` が **本書 §3 の差し替えモデル**を実装。OVR 差上限は `TACTICS_STARTER_OVR_MAX_DIFF`（`match.py`、既定 3）。 |
+| **正規化済みスロット** | `get_normalized_rotation_starters_map`（`team_tactics.py`）で PG〜C を取得。 |
+| **`collect_tactics_starter_players`** | 5 スロット完備時の一覧取得用（テスト等）。試合先発の必須ヘルパではない。 |
+| **GM 画面の `Team.starting_lineup` / `get_starting_five()`** | **試合エンジンの先発正本には使わない**（現方針）。 |
 
 ---
 
@@ -114,3 +114,4 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
 | 日付 | 内容 |
 |------|------|
 | 2026-03-28 | 初版: ユーザー案（ベース先発＋条件付き戦術差し替え・OVR 差 3・適性）を正本化。 |
+| 2026-03-28 | `Match._resolve_match_starters` に差し替えモデルを実装。§4 を実装済み表記に更新。 |

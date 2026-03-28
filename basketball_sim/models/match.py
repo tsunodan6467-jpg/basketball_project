@@ -1,6 +1,6 @@
 import random
 from collections import Counter
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional, Dict, Set
 
 from .team import Team
 from .player import Player
@@ -14,7 +14,13 @@ from basketball_sim.config.game_constants import (
     MINIMUM_ACTIVE_PLAYERS_FOR_GAME,
 )
 from basketball_sim.systems.rotation import RotationSystem
-from basketball_sim.systems.team_tactics import collect_tactics_starter_players
+from basketball_sim.systems.team_tactics import (
+    STARTER_POSITIONS,
+    get_normalized_rotation_starters_map,
+)
+
+# docs/MATCH_STARTING_LINEUP_RULES.md — 戦術先発差し替えの OVR 差上限（初期版）
+TACTICS_STARTER_OVR_MAX_DIFF = 3
 
 
 class Match:
@@ -1578,16 +1584,117 @@ class Match:
         inactive = [p for p in players if p not in active]
         return active, inactive
 
+    def _lineup_five_distinct_player_ids(self, lineup: List[Player]) -> bool:
+        if len(lineup) != 5:
+            return False
+        ids = [getattr(p, "player_id", None) for p in lineup]
+        if any(i is None for i in ids):
+            return False
+        return len(set(ids)) == 5
+
+    def _lineup_passes_on_court_rules(self, lineup: List[Player]) -> bool:
+        if not self._lineup_five_distinct_player_ids(lineup):
+            return False
+        foreign = self._count_foreign(lineup, phase="on_court")
+        asia_nat = self._count_asia_nat(lineup, phase="on_court")
+        rule = self._get_competition_rule("on_court")
+        foreign_max = int(rule.get("foreign_max", 2))
+        special_max = int(rule.get("special_max", 1))
+        return foreign <= foreign_max and asia_nat <= special_max
+
+    def _pick_tactics_substitution_victim(
+        self,
+        lineup: List[Player],
+        T: Player,
+        tactics_introduced_ids: Set[int],
+    ) -> Optional[Player]:
+        """
+        docs/MATCH_STARTING_LINEUP_RULES.md §3.2:
+        第一候補: L 内で T と同一ポジの1人（OVR が T に最も近い、同率は L の先頭に近い方）。
+        フォールバック: まだ戦術差し替えで入れた選手でない席のうち OVR 最低（同率は L 先頭寄り）。
+        """
+        tpos = str(getattr(T, "position", "") or "SF")
+        same_pos = [p for p in lineup if str(getattr(p, "position", "") or "") == tpos]
+        if same_pos:
+            tovr = float(T.get_effective_ovr())
+
+            def _sp_key(p: Player) -> Tuple[float, int]:
+                return (abs(float(p.get_effective_ovr()) - tovr), lineup.index(p))
+
+            return min(same_pos, key=_sp_key)
+        pool = [p for p in lineup if getattr(p, "player_id", None) not in tactics_introduced_ids]
+        if not pool:
+            return None
+
+        def _pool_key(p: Player) -> Tuple[float, int]:
+            return (float(p.get_effective_ovr()), lineup.index(p))
+
+        return min(pool, key=_pool_key)
+
     def _resolve_match_starters(self, team: Team, active_players: List[Player]) -> List[Player]:
         """
-        team_tactics.rotation.starters が有効なら採用（オンコート規定は _validate_lineup で検査）。
-        欠損・重複・非アクティブ・規定違反時は _get_starting_five_from_players にフォールバック。
+        docs/MATCH_STARTING_LINEUP_RULES.md: ベース先発を正本とし、戦術スロットは条件付き差し替えのみ。
         """
-        fallback = self._get_starting_five_from_players(active_players)
-        tactics_lineup = collect_tactics_starter_players(team, active_players)
-        if tactics_lineup is not None and len(tactics_lineup) == 5:
-            return self._validate_lineup(tactics_lineup, fallback, team)
-        return fallback
+        B = self._get_starting_five_from_players(active_players)
+        active_by_id: Dict[int, Player] = {}
+        for p in active_players:
+            pid = getattr(p, "player_id", None)
+            if pid is None:
+                continue
+            try:
+                active_by_id[int(pid)] = p
+            except (TypeError, ValueError):
+                continue
+
+        try:
+            starters_map = get_normalized_rotation_starters_map(team)
+        except Exception:
+            return B
+
+        L = list(B)
+        tactics_introduced: Set[int] = set()
+
+        for pos in STARTER_POSITIONS:
+            tid = starters_map.get(pos)
+            if tid is None:
+                continue
+            try:
+                tid_i = int(tid)
+            except (TypeError, ValueError):
+                continue
+            T = active_by_id.get(tid_i)
+            if T is None:
+                continue
+            if str(getattr(T, "position", "") or "") != str(pos):
+                continue
+
+            tid_self = getattr(T, "player_id", None)
+            if tid_self is not None and any(getattr(p, "player_id", None) == tid_self for p in L):
+                continue
+
+            victim = self._pick_tactics_substitution_victim(L, T, tactics_introduced)
+            if victim is None:
+                continue
+            if getattr(victim, "player_id", None) == tid_self:
+                continue
+
+            v_ovr = float(victim.get_effective_ovr())
+            t_ovr = float(T.get_effective_ovr())
+            if abs(t_ovr - v_ovr) > float(TACTICS_STARTER_OVR_MAX_DIFF):
+                continue
+
+            L_prime = [T if p is victim else p for p in L]
+            if not self._lineup_passes_on_court_rules(L_prime):
+                continue
+
+            vid = getattr(victim, "player_id", None)
+            if vid is not None and vid in tactics_introduced:
+                tactics_introduced.discard(vid)
+            if tid_self is not None:
+                tactics_introduced.add(int(tid_self))
+            L = L_prime
+
+        return self._validate_lineup(L, B, team)
 
     def _get_starting_five_from_players(self, players: List[Player]) -> List[Player]:
         sorted_players = sorted(players, key=lambda p: p.get_roster_sort_weight(), reverse=True)

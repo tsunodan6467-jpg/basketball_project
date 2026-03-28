@@ -82,21 +82,19 @@ def test_get_rotation_target_minutes_by_player_id():
     assert len(m) == 1
 
 
-def test_match_uses_tactics_starters_when_valid():
-    low_ids = [101, 102, 103, 104, 105]
-    high_ids = [106, 107, 108]
-
+def test_match_applies_tactics_starter_only_within_ovr_gap():
+    """ベース先発が高評価でも、戦術1スロットは被害者との OVR 差≤3 なら差し替え可。"""
     home = Team(team_id=1, name="Home", league_level=1)
-    for i, pos in enumerate(["PG", "SG", "SF", "PF", "C"]):
-        home.add_player(_player(low_ids[i], pos, ovr=55))
-    for i, pos in enumerate(["PG", "SG", "SF"]):
-        home.add_player(_player(high_ids[i], pos, ovr=90))
+    home.add_player(_player(201, "C", ovr=85))
+    home.add_player(_player(202, "PF", ovr=85))
+    home.add_player(_player(203, "SF", ovr=85))
+    home.add_player(_player(204, "SG", ovr=80))
+    home.add_player(_player(205, "PG", ovr=85))
+    home.add_player(_player(206, "SG", ovr=78))
 
     home.team_tactics = {
         "version": 1,
-        "rotation": {
-            "starters": {"PG": 101, "SG": 102, "SF": 103, "PF": 104, "C": 105},
-        },
+        "rotation": {"starters": {"SG": 206}},
         "team_strategy": {},
         "usage_policy": {},
         "roles": {},
@@ -106,11 +104,70 @@ def test_match_uses_tactics_starters_when_valid():
 
     away = Team(team_id=2, name="Away", league_level=1)
     for i, pos in enumerate(["PG", "SG", "SF", "PF", "C", "PG", "SG", "SF"]):
-        away.add_player(_player(200 + i, pos, ovr=70))
+        away.add_player(_player(300 + i, pos, ovr=70))
 
     m = Match(home_team=home, away_team=away)
     ids = {getattr(p, "player_id", None) for p in m.home_starters}
-    assert ids == set(low_ids)
+    assert 206 in ids
+    assert 204 not in ids
+
+
+def test_match_skips_tactics_starter_when_ovr_gap_exceeds_three():
+    home = Team(team_id=1, name="Home", league_level=1)
+    home.add_player(_player(201, "C", ovr=85))
+    home.add_player(_player(202, "PF", ovr=85))
+    home.add_player(_player(203, "SF", ovr=85))
+    home.add_player(_player(204, "SG", ovr=80))
+    home.add_player(_player(205, "PG", ovr=85))
+    home.add_player(_player(207, "SG", ovr=70))
+
+    home.team_tactics = {
+        "version": 1,
+        "rotation": {"starters": {"SG": 207}},
+        "team_strategy": {},
+        "usage_policy": {},
+        "roles": {},
+        "playbook": {},
+    }
+    ensure_team_tactics_on_team(home)
+
+    away = Team(team_id=2, name="Away", league_level=1)
+    for i, pos in enumerate(["PG", "SG", "SF", "PF", "C", "PG", "SG", "SF"]):
+        away.add_player(_player(400 + i, pos, ovr=70))
+
+    m = Match(home_team=home, away_team=away)
+    ids = {getattr(p, "player_id", None) for p in m.home_starters}
+    assert 204 in ids
+    assert 207 not in ids
+
+
+def test_match_skips_tactics_when_player_position_mismatches_slot():
+    home = Team(team_id=1, name="Home", league_level=1)
+    home.add_player(_player(201, "C", ovr=85))
+    home.add_player(_player(202, "PF", ovr=85))
+    home.add_player(_player(203, "SF", ovr=85))
+    home.add_player(_player(204, "SG", ovr=80))
+    home.add_player(_player(205, "PG", ovr=85))
+    home.add_player(_player(206, "SG", ovr=78))
+
+    home.team_tactics = {
+        "version": 1,
+        "rotation": {"starters": {"PG": 206}},
+        "team_strategy": {},
+        "usage_policy": {},
+        "roles": {},
+        "playbook": {},
+    }
+    ensure_team_tactics_on_team(home)
+
+    away = Team(team_id=2, name="Away", league_level=1)
+    for i, pos in enumerate(["PG", "SG", "SF", "PF", "C", "PG", "SG", "SF"]):
+        away.add_player(_player(500 + i, pos, ovr=70))
+
+    m = Match(home_team=home, away_team=away)
+    ids = {getattr(p, "player_id", None) for p in m.home_starters}
+    assert 205 in ids
+    assert 206 not in ids
 
 
 def test_match_falls_back_when_tactics_violates_on_court_foreign_cap():
