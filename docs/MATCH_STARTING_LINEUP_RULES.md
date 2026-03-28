@@ -115,7 +115,7 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
    バランス調整は **原則この定数のみ**変更し、試合全体の他係数と混ぜない。
 
 6. **複数スロットと差し替え回数の上限**  
-   スロットは PG→…→C の順。成功した差し替え（swap）の累計が **`TACTICS_STARTER_MAX_SUBSTITUTIONS`** に達したら、残りスロットは**見ない**（既定 **5**＝従来どおり最大 5 回まで試行可能）。  
+   スロットは PG→…→C の順。成功した差し替え（swap）の累計が **`TACTICS_STARTER_MAX_SUBSTITUTIONS`** に達したら、残りスロットは**見ない**（既定 **3**。最大まで許す場合は `game_constants` で **5** に変更）。  
    違法・重複・条件不一致のスロットは従来どおりスキップし、swap カウントは増えない。
 
 ### 5.2 将来の調整候補（未実装）
@@ -140,4 +140,5 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
 | 2026-03-28 | 初版: ユーザー案（ベース先発＋条件付き戦術差し替え・OVR 差 3・適性）を正本化。 |
 | 2026-03-28 | `Match._resolve_match_starters` に差し替えモデルを実装。§4 を実装済み表記に更新。 |
 | 2026-03-28 | §5 を v1 決定事項＋将来候補に整理。`TACTICS_STARTER_OVR_MAX_DIFF` を `game_constants` に集約。 |
-| 2026-03-28 | `TACTICS_STARTER_MAX_SUBSTITUTIONS`（既定 5）で戦術先発の成功 swap 回数上限を実装。§5.2 の「最大人数」を §5.1-6 に移管。 |
+| 2026-03-28 | `TACTICS_STARTER_MAX_SUBSTITUTIONS`（当初既定 5）で戦術先発の成功 swap 回数上限を実装。§5.2 の「最大人数」を §5.1-6 に移管。 |
+| 2026-03-28 | 既定を **3** に変更（プレイ感優先。5 に戻すと PG〜C フル差し替え可能）。 |

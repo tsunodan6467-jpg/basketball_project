@@ -41,8 +41,8 @@ LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP = 1
 # ベース先発との effective OVR 差がこの値を超える指定は無視する。バランス調整は本定数のみ変える。
 TACTICS_STARTER_OVR_MAX_DIFF = 3
 # 1 試合あたり、戦術指定で先発に「入れ替えて採用」する回数の上限（成功した swap のみカウント）。
-# 5 ＝ PG〜C を順に試し得る上限（従来どおり実質フル）。3 などに下げると戦術の全スロットが条件を満しても控えめに留まる。
-TACTICS_STARTER_MAX_SUBSTITUTIONS = 5
+# 既定 3＝ベース先発を崩しすぎないバランス。フルに近づける場合は 5（PG〜C すべてが条件を満てば最大 5 swap）。
+TACTICS_STARTER_MAX_SUBSTITUTIONS = 3
 
 # サラリー（Step 3: リーグキャップ・ソフト上限・贅沢税の単一ソース）
 # 金額はすべて円。D1 ソフトキャップ = ハード × SALARY_SOFT_LIMIT_MULTIPLIER（既定 1.2）→ 12億円。
