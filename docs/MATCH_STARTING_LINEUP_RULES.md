@@ -38,13 +38,13 @@
 
 **置き換え対象（victim）の推奨定義**
 
-1. **第一候補**: `L` のうち `T.position` と同一ポジションの選手がいれば、その中で **1 人**を選ぶ（複数いる場合は **OVR が最も `T` に近い**、同率は `L` 内の先頭など、実装で固定）。
-2. **同一ポジがいない場合のフォールバック**: `L` のうち、まだ「戦術指定による差し替えで入れた選手」でない席から **OVR 最低の 1 人**を victim とする、など **1 行ルール**をコードコメントと本書に明記して固定する（未決定なら実装 PR で決め、本書を更新）。
+1. **第一候補**: `L` のうち `T.position` と同一ポジションの選手がいれば、その中で **1 人**を選ぶ（**§5.1-2**: OVR が最も `T` に近い、同率は `L.index` 最小）。
+2. **同一ポジがいない場合のフォールバック**: **§5.1-3** どおり、`tactics_introduced` に含まれないメンバーのうち **OVR 最低**（同率は `L` 先頭寄り）。
 
 **許可条件（すべて満たすこと）**
 
 1. **出場可能**: `T` が `active` に存在する。
-2. **OVR 差**: `abs(T.get_effective_ovr() - victim.get_effective_ovr()) <= 3`（**初期版の定数**。調整時は `game_constants` 等への集約を検討）。
+2. **OVR 差**: `abs(T.get_effective_ovr() - victim.get_effective_ovr()) <= TACTICS_STARTER_OVR_MAX_DIFF`（`game_constants.py`、既定 3。§5.1-5）。
 3. **戦術適性**: 少なくとも `T.position == pos`（初期版）。
 4. **適用後の合法チェック**: `T` で victim を置き換えた `L'` がルール上合法。
 
@@ -85,25 +85,49 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
 
 | 項目 | 内容 |
 |------|------|
-| **試合先発** | `Match._resolve_match_starters` が **本書 §3 の差し替えモデル**を実装。OVR 差上限は `TACTICS_STARTER_OVR_MAX_DIFF`（`match.py`、既定 3）。 |
+| **試合先発** | `Match._resolve_match_starters` が **本書 §3 の差し替えモデル**を実装。OVR 差上限は `config/game_constants.py` の `TACTICS_STARTER_OVR_MAX_DIFF`（既定 3）。 |
 | **正規化済みスロット** | `get_normalized_rotation_starters_map`（`team_tactics.py`）で PG〜C を取得。 |
 | **`collect_tactics_starter_players`** | 5 スロット完備時の一覧取得用（テスト等）。試合先発の必須ヘルパではない。 |
 | **GM 画面の `Team.starting_lineup` / `get_starting_five()`** | **試合エンジンの先発正本には使わない**（現方針）。 |
 
 ---
 
-## 5. 実装前に固定しておくとよい項目
+## 5. 設計上の決定事項（v1 実装）
 
-1. **ベース 5 人の並び**（リスト順のままか、表示用に PG〜C へ並べ替えるか）。
-2. **victim が取れない・同ポジ複数時**のタイブレーク。
-3. **戦術適性**をポジ一致のみで開始するか、`roles` を同時に入れるか。
-4. **複数スロット連続適用**で全員戦術寄りになることの許容（必要なら「1 試合あたり最大 N 人まで差し替え」など上限を本書に追加）。
+### 5.1 確定済み（プレイ感・コードと一致）
+
+1. **ベース 5 人の並び**  
+   `_get_starting_five_from_players` が返す **リスト順**を `L` の初期状態とする（PG〜C への並べ替えはしない）。
+
+2. **victim（同ポジが L にいるとき）**  
+   `T.position` と同一の選手のうち、`get_effective_ovr()` が **T に最も近い** 1 人。  
+   **同率**は `L.index(p)` が **小さい**方（先頭寄り）。
+
+3. **victim フォールバック（ベース先発に T と同ポジがいないとき）**  
+   `tactics_introduced`（戦術差し替えで先発に入れた選手の `player_id`）に **含まれない** メンバーのみを候補とし、そのうち **OVR 最低**の 1 人。  
+   **同率**は `L.index(p)` が **小さい**方。候補が空ならそのスロットはスキップ。
+
+4. **戦術適性（初期版）**  
+   **`T.position == スロット名`（PG〜C）** のみ。`team_tactics.roles` は未使用。
+
+5. **OVR 差上限**  
+   `basketball_sim/config/game_constants.py` の **`TACTICS_STARTER_OVR_MAX_DIFF`**（既定 **3**）。  
+   バランス調整は **原則この定数のみ**変更し、試合全体の他係数と混ぜない。
+
+6. **複数スロット**  
+   上限なし（PG→…→C の順で最大 5 回まで条件付き適用）。違法・重複になる差し替えは都度拒否。
+
+### 5.2 将来の調整候補（未実装）
+
+- 戦術差し替えの **最大人数**（例: 1 試合 N 人まで）。
+- **`roles`** や別指標による戦術適性の拡張。
 
 ---
 
 ## 6. 関連ファイル（目安）
 
-- `basketball_sim/models/match.py` — `_resolve_match_starters`, `_get_starting_five_from_players`, `_validate_lineup`
+- `basketball_sim/config/game_constants.py` — `TACTICS_STARTER_OVR_MAX_DIFF`
+- `basketball_sim/models/match.py` — `_resolve_match_starters`, `_pick_tactics_substitution_victim`, `_get_starting_five_from_players`, `_validate_lineup`
 - `basketball_sim/systems/team_tactics.py` — `rotation.starters` の正規化・取得
 - `basketball_sim/tests/test_team_tactics_phase_b.py` — 先発・規定まわりの回帰（仕様変更時に更新）
 
@@ -115,3 +139,4 @@ return validate_final(L, fallback=B)    // 最終的に必ず合法な 5 人
 |------|------|
 | 2026-03-28 | 初版: ユーザー案（ベース先発＋条件付き戦術差し替え・OVR 差 3・適性）を正本化。 |
 | 2026-03-28 | `Match._resolve_match_starters` に差し替えモデルを実装。§4 を実装済み表記に更新。 |
+| 2026-03-28 | §5 を v1 決定事項＋将来候補に整理。`TACTICS_STARTER_OVR_MAX_DIFF` を `game_constants` に集約。 |

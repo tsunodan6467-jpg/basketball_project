@@ -37,6 +37,10 @@ LEAGUE_ROSTER_ASIA_NATURALIZED_CAP = 1
 LEAGUE_ONCOURT_FOREIGN_CAP = 2
 LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP = 1
 
+# 戦術メニュー先発の条件付き差し替え（Match._resolve_match_starters）。正本: docs/MATCH_STARTING_LINEUP_RULES.md
+# ベース先発との effective OVR 差がこの値を超える指定は無視する。バランス調整は本定数のみ変える。
+TACTICS_STARTER_OVR_MAX_DIFF = 3
+
 # サラリー（Step 3: リーグキャップ・ソフト上限・贅沢税の単一ソース）
 # 金額はすべて円。D1 ソフトキャップ = ハード × SALARY_SOFT_LIMIT_MULTIPLIER（既定 1.2）→ 12億円。
 SALARY_SOFT_LIMIT_MULTIPLIER = 1.20

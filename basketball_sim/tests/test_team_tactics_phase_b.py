@@ -141,6 +141,38 @@ def test_match_skips_tactics_starter_when_ovr_gap_exceeds_three():
     assert 207 not in ids
 
 
+def test_match_fallback_victim_when_base_lineup_has_no_same_position():
+    """ベース先発に SG がいないとき、フォールバックで OVR 最低席と差し替え（§5.1-3）。"""
+    home = Team(team_id=1, name="Home", league_level=1)
+    home.add_player(_player(301, "PG", ovr=92))
+    home.add_player(_player(302, "PG", ovr=91))
+    home.add_player(_player(303, "SF", ovr=90))
+    home.add_player(_player(304, "PF", ovr=89))
+    home.add_player(_player(305, "C", ovr=88))
+    home.add_player(_player(306, "SG", ovr=87))
+    home.add_player(_player(307, "SG", ovr=70))
+    home.add_player(_player(308, "PF", ovr=65))
+
+    home.team_tactics = {
+        "version": 1,
+        "rotation": {"starters": {"SG": 306}},
+        "team_strategy": {},
+        "usage_policy": {},
+        "roles": {},
+        "playbook": {},
+    }
+    ensure_team_tactics_on_team(home)
+
+    away = Team(team_id=2, name="Away", league_level=1)
+    for i, pos in enumerate(["PG", "SG", "SF", "PF", "C", "PG", "SG", "SF"]):
+        away.add_player(_player(600 + i, pos, ovr=70))
+
+    m = Match(home_team=home, away_team=away)
+    ids = {getattr(p, "player_id", None) for p in m.home_starters}
+    assert 306 in ids
+    assert 305 not in ids
+
+
 def test_match_skips_tactics_when_player_position_mismatches_slot():
     home = Team(team_id=1, name="Home", league_level=1)
     home.add_player(_player(201, "C", ovr=85))

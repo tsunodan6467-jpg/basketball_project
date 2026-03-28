@@ -12,15 +12,13 @@ from basketball_sim.config.game_constants import (
     LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
     LEAGUE_ROSTER_FOREIGN_CAP,
     MINIMUM_ACTIVE_PLAYERS_FOR_GAME,
+    TACTICS_STARTER_OVR_MAX_DIFF,
 )
 from basketball_sim.systems.rotation import RotationSystem
 from basketball_sim.systems.team_tactics import (
     STARTER_POSITIONS,
     get_normalized_rotation_starters_map,
 )
-
-# docs/MATCH_STARTING_LINEUP_RULES.md — 戦術先発差し替えの OVR 差上限（初期版）
-TACTICS_STARTER_OVR_MAX_DIFF = 3
 
 
 class Match:
