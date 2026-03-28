@@ -6,6 +6,7 @@ from basketball_sim.config.game_constants import (
 )
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.team_tactics import get_rotation_target_minutes_by_player_id
 
 
 class RotationSystem:
@@ -83,6 +84,11 @@ class RotationSystem:
 
         # 同一ペア往復抑制
         self.last_pair_swap_possession: Dict[Tuple[int, int], int] = {}
+
+        try:
+            self._tactics_target_minutes = get_rotation_target_minutes_by_player_id(team)
+        except Exception:
+            self._tactics_target_minutes = {}
 
     def _debug(self, message: str):
         if self.DEBUG_ROTATION:
@@ -340,6 +346,25 @@ class RotationSystem:
                         target += 3.5
 
             targets[key] = self._clamp_target_minutes(target)
+
+        overlay = getattr(self, "_tactics_target_minutes", None) or {}
+        if overlay:
+            blend = 0.20
+            for p in sorted_players:
+                key = self._player_key(p)
+                pid = getattr(p, "player_id", None)
+                if pid is None:
+                    continue
+                try:
+                    pid_i = int(pid)
+                except (TypeError, ValueError):
+                    continue
+                if pid_i not in overlay:
+                    continue
+                o = self._clamp_target_minutes(float(overlay[pid_i]))
+                base = float(targets.get(key, 22.0))
+                merged = base + (o - base) * blend
+                targets[key] = self._clamp_target_minutes(merged)
 
         return targets
 

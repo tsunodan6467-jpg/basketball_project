@@ -1607,7 +1607,16 @@ class Team:
         ordered_players: List[Player] = []
         used_ids = set()
 
-        for player_id in self.bench_order:
+        order_ids: List[int] = list(self.bench_order)
+        if not order_ids:
+            try:
+                from basketball_sim.systems.team_tactics import get_rotation_bench_order_player_ids
+
+                order_ids = get_rotation_bench_order_player_ids(self)
+            except Exception:
+                order_ids = []
+
+        for player_id in order_ids:
             player = available_map.get(player_id)
             if player is None:
                 continue

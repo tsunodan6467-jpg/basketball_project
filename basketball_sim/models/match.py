@@ -14,6 +14,7 @@ from basketball_sim.config.game_constants import (
     MINIMUM_ACTIVE_PLAYERS_FOR_GAME,
 )
 from basketball_sim.systems.rotation import RotationSystem
+from basketball_sim.systems.team_tactics import collect_tactics_starter_players
 
 
 class Match:
@@ -91,8 +92,8 @@ class Match:
         self._print_active_roster(self.home_team, self.home_active_players, self.home_inactive)
         self._print_active_roster(self.away_team, self.away_active_players, self.away_inactive)
 
-        self.home_starters = self._get_starting_five_from_players(self.home_active_players)
-        self.away_starters = self._get_starting_five_from_players(self.away_active_players)
+        self.home_starters = self._resolve_match_starters(self.home_team, self.home_active_players)
+        self.away_starters = self._resolve_match_starters(self.away_team, self.away_active_players)
 
         self._print_starting_five(self.home_team, self.home_starters)
         self._print_starting_five(self.away_team, self.away_starters)
@@ -1576,6 +1577,17 @@ class Match:
 
         inactive = [p for p in players if p not in active]
         return active, inactive
+
+    def _resolve_match_starters(self, team: Team, active_players: List[Player]) -> List[Player]:
+        """
+        team_tactics.rotation.starters が有効なら採用（オンコート規定は _validate_lineup で検査）。
+        欠損・重複・非アクティブ・規定違反時は _get_starting_five_from_players にフォールバック。
+        """
+        fallback = self._get_starting_five_from_players(active_players)
+        tactics_lineup = collect_tactics_starter_players(team, active_players)
+        if tactics_lineup is not None and len(tactics_lineup) == 5:
+            return self._validate_lineup(tactics_lineup, fallback, team)
+        return fallback
 
     def _get_starting_five_from_players(self, players: List[Player]) -> List[Player]:
         sorted_players = sorted(players, key=lambda p: p.get_roster_sort_weight(), reverse=True)

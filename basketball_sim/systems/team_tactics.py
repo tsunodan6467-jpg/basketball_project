@@ -1,7 +1,8 @@
 """
-チーム戦術設定（Phase A: 永続化・正規化のみ。試合シミュへの反映は Phase B 以降）。
+チーム戦術設定。
 
-Team.team_tactics に格納する dict のデフォルト・欠損補完・安全取得。
+Phase A: 永続化・正規化・メニュー。
+Phase B: rotation（先発5人・控え順・目標分数）を試合ローテへ弱く接続（詳細は Match / RotationSystem）。
 """
 
 from __future__ import annotations
@@ -327,6 +328,77 @@ def _roster_player_ids(team: Any) -> Set[int]:
         except (TypeError, ValueError):
             continue
     return ids
+
+
+def collect_tactics_starter_players(team: Any, active_players: List[Any]) -> Optional[List[Any]]:
+    """
+    rotation.starters が PG〜C すべて埋まり、アクティブに存在し、選手IDが5人とも異なるときだけ
+    その順の Player リストを返す。それ以外は None（呼び出し側でアルゴリズム先発へフォールバック）。
+    """
+    raw = getattr(team, "team_tactics", None)
+    if not isinstance(raw, dict):
+        return None
+    rot = raw.get("rotation")
+    if not isinstance(rot, dict):
+        return None
+    norm = _normalize_starters(rot.get("starters"))
+    _dedupe_starters_inplace(norm)
+
+    by_id: Dict[int, Any] = {}
+    for p in active_players:
+        if p is None:
+            continue
+        pid = getattr(p, "player_id", None)
+        if pid is None:
+            continue
+        try:
+            by_id[int(pid)] = p
+        except (TypeError, ValueError):
+            continue
+
+    lineup: List[Any] = []
+    seen: Set[int] = set()
+    for pos in STARTER_POSITIONS:
+        pid = norm.get(pos)
+        if pid is None:
+            return None
+        if pid in seen:
+            return None
+        p = by_id.get(int(pid))
+        if p is None:
+            return None
+        lineup.append(p)
+        seen.add(pid)
+    return lineup
+
+
+def get_rotation_target_minutes_by_player_id(team: Any) -> Dict[int, float]:
+    """rotation.target_minutes を player_id -> 分 に正規化（試合オーバーレイ用。軽量読み取り）。"""
+    raw = getattr(team, "team_tactics", None)
+    if not isinstance(raw, dict):
+        return {}
+    rot = raw.get("rotation")
+    if not isinstance(rot, dict):
+        return {}
+    raw_map = _normalize_target_minutes(rot.get("target_minutes"))
+    out: Dict[int, float] = {}
+    for k, v in raw_map.items():
+        pid = _safe_int_pid(k)
+        if pid is None:
+            continue
+        out[pid] = float(v)
+    return out
+
+
+def get_rotation_bench_order_player_ids(team: Any) -> List[int]:
+    """rotation.bench_order を正規化した ID 列（Team.bench_order が空のときの控え優先のフォールバック用）。"""
+    raw = getattr(team, "team_tactics", None)
+    if not isinstance(raw, dict):
+        return []
+    rot = raw.get("rotation")
+    if not isinstance(rot, dict):
+        return []
+    return _normalize_bench_order(rot.get("bench_order"))
 
 
 def ensure_team_tactics_on_team(team: Any) -> None:
