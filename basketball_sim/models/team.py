@@ -785,6 +785,42 @@ class Team:
         self.owner_mission_history.append(history_payload)
         return history_payload
 
+    @staticmethod
+    def _owner_mission_category_label(category: Any) -> str:
+        labels = {
+            "results": "成績",
+            "finance": "財務",
+            "development": "育成",
+        }
+        key = str(category or "").strip()
+        return labels.get(key, key or "その他")
+
+    @staticmethod
+    def _owner_mission_priority_label(priority: Any) -> str:
+        labels = {"high": "高", "medium": "中", "low": "低"}
+        key = str(priority or "medium").strip()
+        return labels.get(key, key)
+
+    @staticmethod
+    def _owner_mission_target_summary(mission: dict) -> str:
+        tt = mission.get("target_type")
+        tv = mission.get("target_value", 0)
+        try:
+            tv_int = int(tv)
+        except (TypeError, ValueError):
+            tv_int = 0
+        if tt == "wins_at_least":
+            return f"目標: {tv_int}勝以上"
+        if tt == "rank_at_most":
+            return f"目標: {tv_int}位以内"
+        if tt == "cashflow_at_least":
+            return f"目標: 収支 {tv_int:+,} 円以上"
+        if tt == "payroll_within_budget":
+            return f"目標: 給与総額 {tv_int:,} 円＋8%以内"
+        if tt == "young_core_count_at_least":
+            return f"目標: 若手有望株 {tv_int} 人以上"
+        return ""
+
     def get_owner_mission_report_text(self) -> str:
         self._ensure_history_fields()
         missions = self.refresh_owner_missions(force=False)
@@ -795,33 +831,72 @@ class Team:
             f"オーナー方針: {self._get_owner_expectation_label()}",
             f"オーナー信頼度: {int(self.owner_trust)} / 100",
             "",
-            "【今季ミッション】",
+            "【今季ミッション一覧】",
         ]
 
         if missions:
-            for mission in missions:
-                lines.append(
-                    f"- {mission.get('title', '-')}"
-                    f" [{mission.get('priority', 'medium')}]"
-                )
-                lines.append(f"  内容: {mission.get('description', '')}")
-                lines.append(f"  進捗: {mission.get('progress_text', '未評価')}")
+            for i, mission in enumerate(missions, start=1):
+                cat = self._owner_mission_category_label(mission.get("category"))
+                pr = self._owner_mission_priority_label(mission.get("priority"))
+                title = mission.get("title", "-")
+                lines.append(f"{i}. [{cat}・優先度:{pr}] {title}")
+                desc = str(mission.get("description", "") or "").strip()
+                if desc:
+                    lines.append(f"   説明: {desc}")
+                tgt = self._owner_mission_target_summary(mission)
+                if tgt:
+                    lines.append(f"   {tgt}")
+                try:
+                    rw = int(mission.get("reward_trust", 0))
+                    pn = int(mission.get("penalty_trust", 0))
+                except (TypeError, ValueError):
+                    rw, pn = 0, 0
+                lines.append(f"   報酬/ペナルティ: 達成で信頼 {rw:+} ／ 未達で信頼 {pn:+}")
+                lines.append(f"   進捗: {mission.get('progress_text', '未評価')}")
+                lines.append("")
         else:
             lines.append("- まだミッションは設定されていません。")
+            lines.append("")
 
         if self.owner_mission_history:
             latest = self.owner_mission_history[-1]
-            lines.append("")
-            lines.append("【前回評価】")
+            lines.append("【直近シーズンの評価】")
+            sl = latest.get("season_label")
+            if sl:
+                lines.append(f"対象: {sl}")
             lines.append(
-                f"信頼度変動: {int(latest.get('trust_delta_total', 0)):+} "
-                f"/ 評価後信頼度: {int(latest.get('owner_trust_after', self.owner_trust))}"
+                f"信頼度の合計変動: {int(latest.get('trust_delta_total', 0)):+} "
+                f"→ 評価後 {int(latest.get('owner_trust_after', self.owner_trust))} / 100"
             )
+            lines.append("内訳:")
             for row in latest.get("results", []):
                 state = "達成" if row.get("status") == "success" else "未達"
-                lines.append(f"- {row.get('title', '-')}: {state} ({row.get('progress_text', '')})")
+                try:
+                    td = int(row.get("trust_delta", 0))
+                except (TypeError, ValueError):
+                    td = 0
+                lines.append(
+                    f"  - {row.get('title', '-')}: {state}（信頼 {td:+}）"
+                    f" — {row.get('progress_text', '')}"
+                )
+            lines.append("")
 
-        return "\n".join(lines)
+            older = list(reversed(self.owner_mission_history[:-1]))[:2]
+            if older:
+                lines.append("【過去の評価（最大2件）】")
+                for entry in older:
+                    label = entry.get("season_label") or "（シーズン未記録）"
+                    try:
+                        total_d = int(entry.get("trust_delta_total", 0))
+                        after = int(entry.get("owner_trust_after", 0))
+                    except (TypeError, ValueError):
+                        total_d, after = 0, int(self.owner_trust)
+                    lines.append(f"- {label}: 信頼合計 {total_d:+} → 評価後 {after} / 100")
+                lines.append("")
+
+        lines.append("※ ミッションの編集は行えません。評価はオフシーズン処理で更新されます。")
+
+        return "\n".join(lines).rstrip()
 
 
     def count_foreign_players(self, players: Optional[List[Player]] = None) -> int:
