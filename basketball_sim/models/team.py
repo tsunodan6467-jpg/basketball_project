@@ -21,6 +21,8 @@ class Team:
     team_training_focus: str = "balanced"  # balanced / shooting / defense / transition / precision_offense / intense_defense
     # 戦術メニュー用拡張設定（Phase A: 永続化のみ。試合反映は Phase B 以降で Team.strategy 等と接続）
     team_tactics: Dict[str, Any] = field(default_factory=dict)
+    # 経営メニュー用ネスト（version キー付き）。スポンサー・広報等はここに集約。
+    management: Dict[str, Any] = field(default_factory=dict)
 
     home_city: str = ""
     is_user_team: bool = False
@@ -349,6 +351,15 @@ class Team:
             self.team_tactics = {}
         elif not isinstance(self.team_tactics, dict):
             self.team_tactics = {}
+
+        if not hasattr(self, "management") or self.management is None:
+            self.management = {}
+        elif not isinstance(self.management, dict):
+            self.management = {}
+
+        from basketball_sim.systems.sponsor_management import ensure_sponsor_management_on_team
+
+        ensure_sponsor_management_on_team(self)
 
     def reset_rookie_budget(self):
         self.rookie_budget_remaining = int(max(0, self.rookie_budget))

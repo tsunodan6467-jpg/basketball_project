@@ -167,3 +167,4 @@
 | 2026-03-28 | 第1稿: 6分類・CPU 裏経営・週次会計・内訳正本（推奨）を反映。 |
 | 2026-03-28 | 優先2 追記: `finance_history` に `breakdown_revenue` / `breakdown_expense`（合計＝正本）、経営 GUI「詳細レポート」に内訳・直近履歴・見込みプレースホルダ。 |
 | 2026-03-28 | 優先3: `get_owner_mission_report_text` を分類・優先度・目標要約・報酬/ペナルティ・直近評価の内訳・過去2件に拡張。経営 GUI「オーナー・方針」をスクロールテキスト化。 |
+| 2026-03-28 | 優先4: `Team.management`（version）＋ `sponsors.main_contract_type` / `history`。`systems/sponsor_management.py` で契約確定と `sponsor_power` の弱い調整。経営 GUI にスポンサーパネル。 |

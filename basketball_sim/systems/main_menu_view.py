@@ -73,6 +73,13 @@ from basketball_sim.systems.facility_investment import (
     commit_facility_upgrade,
     get_facility_upgrade_cost,
 )
+from basketball_sim.systems.sponsor_management import (
+    MAIN_SPONSOR_TYPES,
+    commit_main_sponsor_contract,
+    ensure_sponsor_management_on_team,
+    format_sponsor_history_lines,
+    label_for_main_sponsor_type,
+)
 from basketball_sim.utils.user_settings import (
     KEY_ACTION_CLOSE_SUBWINDOW,
     apply_tk_window_settings,
@@ -895,8 +902,8 @@ class MainMenuView:
 
         window = tk.Toplevel(self.root)
         window.title(f"経営情報 - {self._team_name()}")
-        window.geometry("980x700")
-        window.minsize(860, 600)
+        window.geometry("980x820")
+        window.minsize(860, 680)
         window.configure(bg="#15171c")
         try:
             window.transient(self.root)
@@ -923,6 +930,7 @@ class MainMenuView:
         content.columnconfigure(1, weight=1)
         content.rowconfigure(0, weight=0)
         content.rowconfigure(1, weight=1)
+        content.rowconfigure(2, weight=0)
 
         self.finance_summary_panel = self._create_panel(content, "財務サマリー")
         self.finance_summary_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=(0, 10))
@@ -989,6 +997,66 @@ class MainMenuView:
         self.finance_report_text.pack(fill="both", expand=True)
         self.finance_report_text.configure(state="disabled")
 
+        self.sponsor_panel = self._create_panel(content, "スポンサー（メイン契約）")
+        self.sponsor_panel.grid(row=2, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
+        sponsor_inner = self._resolve_content_parent(self.sponsor_panel)
+        self._sponsor_status_var = tk.StringVar(value="")
+        tk.Label(
+            sponsor_inner,
+            textvariable=self._sponsor_status_var,
+            bg="#222834",
+            fg="#d6dbe3",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 11),
+            wraplength=900,
+            padx=2,
+            pady=(0, 8),
+        ).pack(fill="x")
+        sponsor_row = ttk.Frame(sponsor_inner, style="Card.TFrame")
+        sponsor_row.pack(fill="x", pady=(0, 8))
+        self._sponsor_type_ids = [str(x["id"]) for x in MAIN_SPONSOR_TYPES]
+        combo_labels = [str(x["label"]) for x in MAIN_SPONSOR_TYPES]
+        self._sponsor_combo = ttk.Combobox(
+            sponsor_row,
+            values=combo_labels,
+            state="readonly",
+            width=36,
+            font=("Yu Gothic UI", 10),
+        )
+        self._sponsor_combo.pack(side="left", padx=(0, 10))
+        self._sponsor_apply_btn = ttk.Button(
+            sponsor_row,
+            text="メイン契約を反映",
+            style="Menu.TButton",
+            command=self._on_sponsor_contract_apply,
+        )
+        self._sponsor_apply_btn.pack(side="left")
+        tk.Label(
+            sponsor_inner,
+            text="契約変更履歴（直近）",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10),
+        ).pack(fill="x", pady=(4, 2))
+        self._sponsor_history_text = scrolledtext.ScrolledText(
+            sponsor_inner,
+            height=5,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 9),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=4,
+            pady=4,
+        )
+        self._sponsor_history_text.pack(fill="both", expand=True)
+        self._sponsor_history_text.configure(state="disabled")
+
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
 
@@ -1026,6 +1094,10 @@ class MainMenuView:
             self._facility_upgrade_buttons = {}
             self.finance_report_text = None
             self.owner_report_text = None
+            self._sponsor_combo = None
+            self._sponsor_apply_btn = None
+            self._sponsor_history_text = None
+            self._sponsor_status_var = None
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -1052,6 +1124,70 @@ class MainMenuView:
             self.refresh()
         else:
             messagebox.showwarning("施設投資", msg2)
+
+    def _on_sponsor_contract_apply(self) -> None:
+        team = self.team
+        if team is None:
+            return
+        combo = getattr(self, "_sponsor_combo", None)
+        ids = getattr(self, "_sponsor_type_ids", [])
+        if combo is None or not ids:
+            return
+        idx = combo.current()
+        if idx < 0 or idx >= len(ids):
+            messagebox.showwarning("スポンサー", "契約タイプを選択してください。")
+            return
+        ok, msg = commit_main_sponsor_contract(team, ids[idx])
+        if ok:
+            messagebox.showinfo("スポンサー", msg)
+        else:
+            messagebox.showwarning("スポンサー", msg)
+        self._refresh_finance_window()
+        self.refresh()
+
+    def _refresh_sponsor_finance_block(self) -> None:
+        combo = getattr(self, "_sponsor_combo", None)
+        hist_tw = getattr(self, "_sponsor_history_text", None)
+        status_var = getattr(self, "_sponsor_status_var", None)
+        apply_btn = getattr(self, "_sponsor_apply_btn", None)
+        if combo is None or status_var is None or self.team is None:
+            return
+        ensure_sponsor_management_on_team(self.team)
+        cur = str(self.team.management.get("sponsors", {}).get("main_contract_type", "standard"))
+        ids = getattr(self, "_sponsor_type_ids", [])
+        for i, tid in enumerate(ids):
+            if tid == cur:
+                try:
+                    combo.current(i)
+                except tk.TclError:
+                    pass
+                break
+        sp = int(self._safe_get(self.team, "sponsor_power", 0))
+        status_var.set(
+            f"現在のメイン契約: {label_for_main_sponsor_type(cur)} ｜ スポンサー力 {sp}／100 "
+            "（次回オフシーズン締めのスポンサー収入内訳に反映）"
+        )
+        is_user = bool(getattr(self.team, "is_user_team", False))
+        try:
+            if is_user:
+                combo.configure(state="readonly")
+                if apply_btn is not None:
+                    apply_btn.state(["!disabled"])
+            else:
+                combo.configure(state="disabled")
+                if apply_btn is not None:
+                    apply_btn.state(["disabled"])
+        except tk.TclError:
+            pass
+        if hist_tw is not None:
+            htext = "\n".join(format_sponsor_history_lines(self.team))
+            try:
+                hist_tw.configure(state="normal")
+                hist_tw.delete("1.0", tk.END)
+                hist_tw.insert("1.0", htext)
+                hist_tw.configure(state="disabled")
+            except tk.TclError:
+                pass
 
     def _refresh_finance_window(self) -> None:
         if getattr(self, "finance_header_var", None) is None:
@@ -1168,10 +1304,12 @@ class MainMenuView:
             except tk.TclError:
                 pass
 
+        self._refresh_sponsor_finance_block()
+
         self.finance_hint_var.set(
-            "左下「オーナー・方針」にミッション一覧（分類・報酬）と評価履歴を表示します。"
-            "右下「詳細レポート」は財務内訳・推移です。"
-            "自チームのみ「施設を強化」から投資可能（CLI と同一ロジック）。"
+            "下部「スポンサー」でメイン契約タイプを選び「反映」で保存します（自チームのみ・スポンサー力を弱く調整）。"
+            "左下はオーナーミッション、右下は財務詳細です。"
+            "施設投資も自チームのみ（CLI と同一ロジック）。"
         )
 
     def open_strategy_window(self) -> None:
