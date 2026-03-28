@@ -28,7 +28,7 @@ Notes
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import scrolledtext, ttk, messagebox
 from datetime import datetime, date
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
@@ -955,7 +955,23 @@ class MainMenuView:
         btn_row.columnconfigure(0, weight=1)
         btn_row.columnconfigure(1, weight=1)
         self.owner_lines = self._make_line_vars(self.owner_panel, 6)
-        self.finance_report_lines = self._make_line_vars(self.finance_report_panel, 8)
+        report_parent = self._resolve_content_parent(self.finance_report_panel)
+        self.finance_report_text = scrolledtext.ScrolledText(
+            report_parent,
+            height=16,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self.finance_report_text.pack(fill="both", expand=True)
+        self.finance_report_text.configure(state="disabled")
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
@@ -977,7 +993,7 @@ class MainMenuView:
             bottom,
             text="閉じる",
             style="Menu.TButton",
-            command=window.destroy,
+            command=self._on_close_finance_window,
         ).pack(anchor="e", pady=(8, 0))
 
         self._finance_window = window
@@ -992,6 +1008,7 @@ class MainMenuView:
         finally:
             self._finance_window = None
             self._facility_upgrade_buttons = {}
+            self.finance_report_text = None
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -1109,31 +1126,30 @@ class MainMenuView:
         for var, line in zip(self.owner_lines, owner_lines):
             var.set(line)
 
-        report_text = ""
-        report_getter = getattr(self.team, "get_finance_report_text", None)
-        if callable(report_getter):
+        report_body = ""
+        detail_getter = getattr(self.team, "get_finance_report_detail_text", None)
+        if callable(detail_getter):
             try:
-                report_text = str(report_getter() or "")
+                report_body = str(detail_getter() or "")
             except Exception:
-                report_text = ""
+                report_body = ""
+        if not report_body.strip():
+            from basketball_sim.systems.finance_report_display import format_finance_report_detail_lines
 
-        report_lines = [line.strip() for line in report_text.splitlines() if line.strip()]
-        if not report_lines:
-            report_lines = [
-                "詳細レポート未生成",
-                f"所持金: {self._format_money(money)}",
-                f"年俸予算: {self._format_money(budget)}",
-                f"人気: {self._safe_int_text(popularity)}",
-                f"前季収支: {self._format_signed_money(cashflow)}",
-            ]
-        while len(report_lines) < len(self.finance_report_lines):
-            report_lines.append("")
-        for var, line in zip(self.finance_report_lines, report_lines[: len(self.finance_report_lines)]):
-            var.set(line)
+            report_body = "\n".join(format_finance_report_detail_lines(self.team))
+        tw = getattr(self, "finance_report_text", None)
+        if tw is not None:
+            try:
+                tw.configure(state="normal")
+                tw.delete("1.0", tk.END)
+                tw.insert("1.0", report_body)
+                tw.configure(state="disabled")
+            except tk.TclError:
+                pass
 
         self.finance_hint_var.set(
-            "自チームでは「施設を強化」から投資できます（確認ダイアログあり・CLI と同一ロジック）。"
-            "他チーム閲覧時はボタンは無効です。予算操作などその他は後続フェーズです。"
+            "右下「詳細レポート」に収支内訳（記録がある場合）・財務推移・見込みプレースホルダを表示します。"
+            "自チームのみ「施設を強化」から投資可能（CLI と同一ロジック）。予算操作などは後続フェーズです。"
         )
 
     def open_strategy_window(self) -> None:

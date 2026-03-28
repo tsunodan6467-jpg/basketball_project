@@ -3082,7 +3082,7 @@ class Offseason:
             p.injury_games_left = 0
 
 
-    def _calculate_team_revenue(self, team: Team) -> int:
+    def _calculate_team_revenue(self, team: Team) -> tuple[int, dict[str, int]]:
         wins = self._get_team_wins(team)
         league_level = int(getattr(team, "league_level", 3))
         popularity = int(getattr(team, "popularity", 50))
@@ -3140,10 +3140,17 @@ class Offseason:
             elif wins >= 16:
                 performance_bonus = 14_000
 
-        total_revenue = gate_revenue + sponsor_revenue + merch_revenue + media_distribution + performance_bonus
-        return int(total_revenue)
+        breakdown = {
+            "gate": gate_revenue,
+            "sponsor": sponsor_revenue,
+            "merchandise": merch_revenue,
+            "media": media_distribution,
+            "performance_bonus": performance_bonus,
+        }
+        total_revenue = int(sum(breakdown.values()))
+        return total_revenue, breakdown
 
-    def _calculate_team_expenses(self, team: Team) -> tuple[int, int, int]:
+    def _calculate_team_expenses(self, team: Team) -> tuple[int, int, int, dict[str, int]]:
         payroll = int(sum(max(0, int(getattr(p, "salary", 0))) for p in getattr(team, "players", [])))
 
         league_level = int(getattr(team, "league_level", 3))
@@ -3185,18 +3192,19 @@ class Offseason:
 
         fan_service_cost = int(360_000 + popularity * 18_000)
 
-        total_expense = int(
-            payroll
-            + facility_maintenance
-            + scouting_and_ops
-            + travel_cost
-            + league_fee
-            + admin_cost
-            + game_ops_cost
-            + underperformance_penalty
-            + fan_service_cost
-        )
-        return total_expense, payroll, facility_maintenance
+        breakdown = {
+            "payroll": payroll,
+            "facility_maintenance": facility_maintenance,
+            "scouting_and_ops": scouting_and_ops,
+            "travel": travel_cost,
+            "league_fee": league_fee,
+            "admin": admin_cost,
+            "game_ops": game_ops_cost,
+            "underperformance_penalty": underperformance_penalty,
+            "fan_service": fan_service_cost,
+        }
+        total_expense = int(sum(breakdown.values()))
+        return total_expense, payroll, facility_maintenance, breakdown
 
     def _get_owner_expectation_label(self, team: Team, wins: int) -> str:
         current = str(getattr(team, "owner_expectation", "stay_competitive"))
@@ -3333,13 +3341,9 @@ class Offseason:
                 team.money = 10_000_000
 
             wins = self._get_team_wins(team)
-            revenue = self._calculate_team_revenue(team)
-            expense, payroll, facility_maintenance = self._calculate_team_expenses(team)
-            cashflow = int(revenue - expense)
+            revenue, revenue_breakdown = self._calculate_team_revenue(team)
+            expense, payroll, facility_maintenance, expense_breakdown = self._calculate_team_expenses(team)
 
-            team.revenue_last_season = revenue
-            team.expense_last_season = expense
-            team.cashflow_last_season = cashflow
             league_level = int(getattr(team, "league_level", 3))
             base_budget = {1: 7_900_000, 2: 5_450_000, 3: 3_650_000}.get(league_level, 3_650_000)
             team.payroll_budget = max(
@@ -3363,7 +3367,11 @@ class Offseason:
                 self._get_owner_expectation_label(team, wins)
             )
 
-            team.money = int(getattr(team, "money", 0) + cashflow - luxury_tax)
+            expense_total = int(expense + luxury_tax)
+            expense_breakdown_for_record = dict(expense_breakdown)
+            if luxury_tax:
+                expense_breakdown_for_record["luxury_tax"] = int(luxury_tax)
+            cashflow = int(revenue - expense_total)
 
             if is_payroll_over_club_budget is not None and is_payroll_over_club_budget(
                 payroll, int(getattr(team, "payroll_budget", 0))
@@ -3377,48 +3385,44 @@ class Offseason:
                 try:
                     team.record_financial_result(
                         revenue=revenue,
-                        expense=expense,
-                        cashflow=cashflow,
+                        expense=expense_total,
                         note=f"Wins:{wins} / Payroll:{payroll:,} / Facility:{facility_maintenance:,}",
+                        breakdown_revenue=revenue_breakdown,
+                        breakdown_expense=expense_breakdown_for_record,
                     )
-                except TypeError:
-                    try:
-                        team.record_financial_result(revenue, expense, cashflow)
-                    except Exception:
-                        if hasattr(team, "finance_history"):
-                            team.finance_history.append({
-                                "revenue": revenue,
-                                "expense": expense,
-                                "cashflow": cashflow,
-                                "wins": wins,
-                                "payroll": payroll,
-                                "facility_maintenance": facility_maintenance,
-                            })
                 except Exception:
                     if hasattr(team, "finance_history"):
                         team.finance_history.append({
                             "revenue": revenue,
-                            "expense": expense,
+                            "expense": expense_total,
                             "cashflow": cashflow,
                             "wins": wins,
                             "payroll": payroll,
                             "facility_maintenance": facility_maintenance,
                         })
+                        team.money = int(getattr(team, "money", 0) + cashflow)
+                        team.revenue_last_season = revenue
+                        team.expense_last_season = expense_total
+                        team.cashflow_last_season = cashflow
             elif hasattr(team, "finance_history"):
                 team.finance_history.append({
                     "revenue": revenue,
-                    "expense": expense,
+                    "expense": expense_total,
                     "cashflow": cashflow,
                     "wins": wins,
                     "payroll": payroll,
                     "facility_maintenance": facility_maintenance,
                 })
+                team.money = int(getattr(team, "money", 0) + cashflow)
+                team.revenue_last_season = revenue
+                team.expense_last_season = expense_total
+                team.cashflow_last_season = cashflow
 
             fin_extra = f" | Cap:{cap_label}" if cap_label else ""
             tax_extra = f" | LuxuryTax:{luxury_tax:,}円" if luxury_tax else ""
             print(
                 f"[FINANCE] D{getattr(team, 'league_level', 3)} | {team.name} | "
-                f"Revenue:{revenue:,}円 | Expense:{expense:,}円 | Payroll:{payroll:,}円 | "
+                f"Revenue:{revenue:,}円 | Expense:{expense_total:,}円 | Payroll:{payroll:,}円 | "
                 f"Facility:{facility_maintenance:,}円 | Cashflow:{cashflow:,}円 | Money:{int(getattr(team, 'money', 0)):,}円"
                 f"{fin_extra}{tax_extra}"
             )
@@ -3426,7 +3430,7 @@ class Offseason:
             if self._is_user_team(team):
                 print(f"\n=== USER TEAM FINANCE REPORT: {team.name} ===")
                 print(
-                    f"売上: {revenue:,}円 / 支出: {expense:,}円 / 人件費: {payroll:,}円 / "
+                    f"売上: {revenue:,}円 / 支出: {expense_total:,}円 / 人件費: {payroll:,}円 / "
                     f"施設維持費: {facility_maintenance:,}円"
                 )
                 print(

@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Mapping
 from .player import Player
 
 
@@ -381,6 +381,9 @@ class Team:
         expense: int,
         note: str = "",
         season_label: Optional[str] = None,
+        *,
+        breakdown_revenue: Optional[Mapping[str, int]] = None,
+        breakdown_expense: Optional[Mapping[str, int]] = None,
     ) -> dict:
         self._ensure_history_fields()
 
@@ -401,8 +404,26 @@ class Team:
             "ending_money": int(self.money),
             "note": note,
         }
+        br = self._coerce_finance_breakdown(breakdown_revenue)
+        be = self._coerce_finance_breakdown(breakdown_expense)
+        if br is not None and sum(br.values()) == revenue:
+            payload["breakdown_revenue"] = dict(br)
+        if be is not None and sum(be.values()) == expense:
+            payload["breakdown_expense"] = dict(be)
         self.finance_history.append(payload)
         return payload
+
+    @staticmethod
+    def _coerce_finance_breakdown(raw: Any) -> Optional[Dict[str, int]]:
+        if raw is None or not isinstance(raw, Mapping):
+            return None
+        out: Dict[str, int] = {}
+        for k, v in raw.items():
+            try:
+                out[str(k)] = int(v)
+            except (TypeError, ValueError):
+                continue
+        return out or None
 
     def get_finance_report_text(self) -> str:
         self._ensure_history_fields()
@@ -445,7 +466,14 @@ class Team:
             if latest.get("note"):
                 lines.append(f"最新メモ: {latest['note']}")
 
+        lines.append("内訳・財務推移の詳細は経営ウィンドウ「詳細レポート」を参照。")
+
         return "\n".join(lines)
+
+    def get_finance_report_detail_text(self, *, history_limit: int = 5) -> str:
+        from basketball_sim.systems.finance_report_display import format_finance_report_detail_lines
+
+        return "\n".join(format_finance_report_detail_lines(self, history_limit=history_limit))
 
 
     def _get_owner_expectation_label(self) -> str:
