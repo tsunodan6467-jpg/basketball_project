@@ -31,7 +31,7 @@ CONTRACT_ROSTER_MAX = 13
 CONTRACT_ROSTER_MIN_SEASON = 10
 
 # B リーグ風・国内リーグ基準（試合登録 / オンコート）
-# Match.COMPETITION_RULES の regular_season / playoff / final_boss と整合
+# systems.competition_rules.COMPETITION_RULES の regular_season / playoff / final_boss と整合
 LEAGUE_ROSTER_FOREIGN_CAP = 3
 LEAGUE_ROSTER_ASIA_NATURALIZED_CAP = 1
 LEAGUE_ONCOURT_FOREIGN_CAP = 2
@@ -44,20 +44,22 @@ TACTICS_STARTER_OVR_MAX_DIFF = 3
 # 既定 3＝ベース先発を崩しすぎないバランス。フルに近づける場合は 5（PG〜C すべてが条件を満てば最大 5 swap）。
 TACTICS_STARTER_MAX_SUBSTITUTIONS = 3
 
-# サラリー（Step 3: リーグキャップ・ソフト上限・贅沢税の単一ソース）
-# 金額はすべて円。D1 ソフトキャップ = ハード × SALARY_SOFT_LIMIT_MULTIPLIER（既定 1.2）→ 12億円。
-SALARY_SOFT_LIMIT_MULTIPLIER = 1.20
-# ディビジョン別「ハードキャップ」（年俸合計の目安上限。ソフトはこれ×乗数）
+# サラリー（Step 3: リーグ年俸上限・贅沢税の単一ソース）
+# 金額はすべて円。制度上の基準額は 12 億（全 D 同一）。get_soft_cap は get_hard_cap × 下記乗数（既定 1.0 で同一額）。
+SALARY_SOFT_LIMIT_MULTIPLIER = 1.0
+# ディビジョン別リーグ年俸上限（salary_cap_budget.get_hard_cap の正本。旧称ハード＝現ソフトと同額）
 LEAGUE_SALARY_CAP_BY_DIVISION = {
-    1: 1_000_000_000,   # 10億 → ソフト 12億（D1）
-    2: 1_000_000_000,   # 10億 → ソフト 12億（D2）
-    3: 1_000_000_000,   # 10億 → ソフト 12億（D3）
+    1: 1_200_000_000,   # 12億（D1）
+    2: 1_200_000_000,   # 12億（D2）
+    3: 1_200_000_000,   # 12億（D3）
 }
-# 後方互換・省略時は D1 のハードキャップ
+# 後方互換・省略時は D1 のリーグ年俸上限
 LEAGUE_SALARY_CAP = LEAGUE_SALARY_CAP_BY_DIVISION[1]
 
-# 選手年俸の OVR ベース（contract_logic.calculate_desired_salary の一次項と一致）
-PLAYER_SALARY_BASE_PER_OVR = 1_800_000
+# 選手年俸の OVR ベース（再契約・希望年俸・FA 下限等。開幕ロスター専用は下記ジェネレータ用）
+PLAYER_SALARY_BASE_PER_OVR = 1_000_000
+# 開幕ロスター・架空プール・国際FA生成など generator 系のみ（PR2: 12 億付近に寄せる）
+GENERATOR_INITIAL_SALARY_BASE_PER_OVR = 1_220_000
 
 # ペイロール下限（円）。0 は「下限なし」（違反・降格ペナルティなし）
 PAYROLL_FLOOR_BY_DIVISION = {
@@ -66,7 +68,7 @@ PAYROLL_FLOOR_BY_DIVISION = {
     3: 0,
 }
 
-# ソフトキャップ超過分に対する段階式ぜいたく税（ドラフト RB の _tax_extra と同型）
+# リーグ年俸上限超過分に対する段階式ぜいたく税（ドラフト RB の _tax_extra と同型）
 # 超過額 over に対し: 最初の幅 w1 に倍率 m1、次の w2 に m2、残りに m3
 PAYROLL_LUXURY_TAX_BRACKET_WIDTH_1 = 200_000_000   # 2億円分
 PAYROLL_LUXURY_TAX_BRACKET_WIDTH_2 = 500_000_000   # 5億円分

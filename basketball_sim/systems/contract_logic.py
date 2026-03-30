@@ -31,7 +31,7 @@ from basketball_sim.systems.salary_cap_budget import get_hard_cap, league_level_
 # -----------------------------
 SALARY_CAP_DEFAULT = LEAGUE_SALARY_CAP
 # SALARY_SOFT_LIMIT_MULTIPLIER は game_constants の正本を再エクスポート（trade / free_agency 等の互換）
-# ソフト上限の実数値は salary_cap_budget.get_soft_cap と一致させること
+# リーグ年俸上限の実数値は salary_cap_budget.get_hard_cap / get_soft_cap（同一額）と一致させること
 MIN_SALARY_DEFAULT = 300_000
 MAX_CONTRACT_YEARS_DEFAULT = 5
 
@@ -632,6 +632,59 @@ def release_expired_players_to_fa(
             )
 
     return moved
+
+
+# -----------------------------
+# 新規世界生成: 開幕ペイロールをリーグ年俸上限近傍に収める
+# -----------------------------
+def normalize_team_payroll_under_league_cap(team: object, *, margin: float = 0.98) -> bool:
+    """
+    新規世界生成専用。年俸合計がリーグ上限×margin を超えるときだけ、
+    各選手の salary を比例縮小して target 以下にする。相対的な高低は概ね維持。
+
+    既存セーブのロード後には呼ばないこと（セーブ互換・意図しない再調整を避ける）。
+    """
+    players = [p for p in getattr(team, "players", []) or [] if p is not None]
+    if not players:
+        return False
+
+    league_cap = int(get_hard_cap(league_level=league_level_for_team(team)))
+    floor_sum = MIN_SALARY_DEFAULT * len(players)
+    target = max(floor_sum, int(league_cap * margin))
+
+    total = get_team_payroll(team)
+    if total <= target:
+        return False
+
+    factor = target / max(1, total)
+    adjusted: List[Tuple[object, int]] = []
+    for p in players:
+        old = max(MIN_SALARY_DEFAULT, safe_getattr_int(p, "salary", 0))
+        adjusted.append((p, max(MIN_SALARY_DEFAULT, int(round(old * factor)))))
+
+    diff = target - sum(s for _, s in adjusted)
+    if diff != 0 and adjusted:
+        idx = max(range(len(adjusted)), key=lambda i: adjusted[i][1])
+        p0, s0 = adjusted[idx]
+        adjusted[idx] = (p0, max(MIN_SALARY_DEFAULT, s0 + diff))
+
+    for p, s in adjusted:
+        setattr(p, "salary", int(s))
+    return True
+
+
+def normalize_team_payroll_under_hard_cap(team: object, *, margin: float = 0.98) -> bool:
+    """後方互換名。normalize_team_payroll_under_league_cap と同一。"""
+    return normalize_team_payroll_under_league_cap(team, margin=margin)
+
+
+def normalize_initial_payrolls_for_teams(teams: Iterable[object]) -> int:
+    """全チームに normalize_team_payroll_under_league_cap を適用。調整したチーム数を返す。"""
+    n = 0
+    for team in teams:
+        if normalize_team_payroll_under_league_cap(team):
+            n += 1
+    return n
 
 
 # -----------------------------

@@ -1,5 +1,5 @@
 import random
-from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
+from basketball_sim.config.game_constants import GENERATOR_INITIAL_SALARY_BASE_PER_OVR
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 
@@ -29,8 +29,8 @@ def sync_player_id_counter_from_world(teams, free_agents) -> int:
 
 
 def calculate_initial_salary(ovr: int) -> int:
-    """OVRをもとに初期年俸を計算します（希望年俸のベーススケールと整合）。"""
-    return int(ovr) * PLAYER_SALARY_BASE_PER_OVR
+    """OVR をもとに generator が付与する初期年俸（開幕ペイロール用。契約希望額は PLAYER_SALARY_BASE_PER_OVR）。"""
+    return int(ovr) * GENERATOR_INITIAL_SALARY_BASE_PER_OVR
 
 
 def _assign_extended_attributes(player: Player, pos: str, ovr: int) -> None:

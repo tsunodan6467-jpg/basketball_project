@@ -1,6 +1,7 @@
 """
-Step 3: ソフトキャップ・贅沢税・ペイロール判定の単一入口。
+Step 3: リーグ年俸上限（12 億・全 D 同一）・贅沢税・ペイロール判定の単一入口。
 
+get_hard_cap / get_soft_cap は同一額（SALARY_SOFT_LIMIT_MULTIPLIER=1.0）。
 契約を「増やせる/増やせない」は別ルール（枠・交渉）と組み合わせて使う。
 """
 
@@ -36,7 +37,8 @@ def league_level_for_team(team: Optional[object]) -> int:
 
 def get_hard_cap(salary_cap: Optional[int] = None, *, league_level: Optional[int] = None) -> int:
     """
-    明示 salary_cap があればそれをハードキャップとして用いる（テスト・上書き用）。
+    リーグ年俸上限（円）。API 名は後方互換のため get_hard_cap のまま。
+    明示 salary_cap があればそれを上限として用いる（テスト・上書き用）。
     なければ league_level（省略時 D1）のリーグ既定を使う。
     """
     if salary_cap is not None:
@@ -46,17 +48,15 @@ def get_hard_cap(salary_cap: Optional[int] = None, *, league_level: Optional[int
 
 
 def get_soft_cap(salary_cap: Optional[int] = None, *, league_level: Optional[int] = None) -> int:
+    """贅沢税・上限判定の閾値。乗数 1.0 時は get_hard_cap と同一。"""
     return int(round(get_hard_cap(salary_cap, league_level=league_level) * SALARY_SOFT_LIMIT_MULTIPLIER))
 
 
 def cap_status(payroll: int, salary_cap: Optional[int] = None, *, league_level: Optional[int] = None) -> str:
-    """under_cap | over_cap | over_soft_cap"""
-    h = get_hard_cap(salary_cap, league_level=league_level)
+    """under_cap | over_soft_cap（10億〜12億の中間帯は廃止。閾値はリーグ上限＝ソフトと同一）。"""
     s = get_soft_cap(salary_cap, league_level=league_level)
-    if payroll > s:
+    if int(payroll) > s:
         return "over_soft_cap"
-    if payroll > h:
-        return "over_cap"
     return "under_cap"
 
 
@@ -64,7 +64,7 @@ def payroll_exceeds_soft_cap(
     payroll: int, salary_cap: Optional[int] = None, *, league_level: Optional[int] = None
 ) -> bool:
     """
-    プロジェクト後ペイロールがソフト上限を超えるか。
+    プロジェクト後ペイロールがリーグ年俸上限（ソフト閾値）を超えるか。
     再契約（evaluate_resign）・オフシーズン再契約UI・FA の上限感の共通判定に使う。
     """
     return cap_status(int(payroll), salary_cap=salary_cap, league_level=league_level) == "over_soft_cap"
@@ -77,7 +77,7 @@ def compute_luxury_tax(
     league_level: Optional[int] = None,
 ) -> int:
     """
-    ソフトキャップ超過分に対する段階式贅沢税（整数）。
+    リーグ年俸上限超過分に対する段階式贅沢税（整数）。
     ドラフト RB の _tax_extra_for_total_spend と同型。
     """
     soft = get_soft_cap(salary_cap, league_level=league_level)
@@ -127,7 +127,7 @@ def can_absorb_salary_under_soft_cap(
     league_level: Optional[int] = None,
 ) -> Tuple[bool, int, str]:
     """
-    トレード/FA の「ソフト上限を超えるか」判定のみ（ブロックはしない）。
+    トレード/FA の「リーグ年俸上限を超えるか」判定のみ（ブロックはしない）。
     return: (ok_under_soft, projected, cap_status_str)
     """
     proj = projected_payroll_after_swap(current_payroll, outgoing_salary, incoming_salary)

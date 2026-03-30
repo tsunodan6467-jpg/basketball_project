@@ -5,7 +5,9 @@ from typing import List, Tuple, Dict, Optional, Set
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.competition_rules import league_contract_active_rule
 from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.japan_regulation import count_regulation_slots
 from basketball_sim.systems.salary_cap_budget import get_soft_cap, league_level_for_team
 
 
@@ -50,17 +52,10 @@ class TradeSystem:
             return "win_now"
         return "balanced"
 
-    def _is_foreign(self, player: Player) -> bool:
-        return getattr(player, "nationality", "Japan") == "Foreign"
-
-    def _is_asia_or_naturalized(self, player: Player) -> bool:
-        return getattr(player, "nationality", "Japan") in ("Asia", "Naturalized")
-
-    def _count_foreign(self, players: List[Player]) -> int:
-        return sum(1 for p in players if self._is_foreign(p))
-
-    def _count_asia_nat(self, players: List[Player]) -> int:
-        return sum(1 for p in players if self._is_asia_or_naturalized(p))
+    def _league_roster_rule_ok(self, players: List[Player]) -> bool:
+        rule = league_contract_active_rule()
+        foreign, special = count_regulation_slots(players, rule)
+        return foreign <= int(rule.get("foreign_max", 3)) and special <= int(rule.get("special_max", 1))
 
     def _get_active_roster_after_trade(
         self,
@@ -79,12 +74,7 @@ class TradeSystem:
         receive_player: Player
     ) -> bool:
         roster = self._get_active_roster_after_trade(team, send_player, receive_player)
-
-        foreign = self._count_foreign(roster)
-        asia_nat = self._count_asia_nat(roster)
-
-        # ロスター全体は従来ルールに合わせる
-        return foreign <= 3 and asia_nat <= 1
+        return self._league_roster_rule_ok(roster)
 
     def _position_depth(self, team: Team) -> Dict[str, int]:
         depth = {pos: 0 for pos in self.POSITION_KEYS}
@@ -420,9 +410,7 @@ class TradeSystem:
         self,
         roster_after: List[Player],
     ) -> bool:
-        foreign = self._count_foreign(roster_after)
-        asia_nat = self._count_asia_nat(roster_after)
-        return foreign <= 3 and asia_nat <= 1
+        return self._league_roster_rule_ok(roster_after)
 
     def _calc_cash_rb_score(self, cash_change: int, rb_change: int) -> float:
         # スコアスケール: 目標は “選手価値との差が極端にならない” こと

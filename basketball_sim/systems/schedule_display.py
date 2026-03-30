@@ -62,6 +62,198 @@ def round_month_label(season: Any, round_number: int) -> str:
     return "—"
 
 
+def _team_key_for_schedule(team: Any) -> int:
+    tid = getattr(team, "team_id", None)
+    return int(tid) if tid is not None else id(team)
+
+
+def user_still_active_in_emperor_cup_field(season: Any, user_team: Any) -> bool:
+    """全日本カップのブラケットにまだ残っている（または未開催前で登録済み）か。"""
+    if season is None or user_team is None:
+        return False
+    uid = _team_key_for_schedule(user_team)
+    cur = getattr(season, "emperor_cup_current_teams", None) or []
+    if any(_team_key_for_schedule(t) == uid for t in cur):
+        return True
+    played = getattr(season, "emperor_cup_played_stages", None) or set()
+    if not played:
+        bye = getattr(season, "emperor_cup_bye_teams", None) or []
+        r1 = getattr(season, "emperor_cup_round1_teams", None) or []
+        return any(_team_key_for_schedule(t) == uid for t in bye) or any(
+            _team_key_for_schedule(t) == uid for t in r1
+        )
+    return False
+
+
+def user_team_participates_in_easl_stage(season: Any, user_team: Any, stage: Optional[str]) -> bool:
+    """
+    表示用: 当該 EASL ステージで自チームが関与する見込みがあるか（SeasonEvent 非格納の補完用）。
+    シミュ正本の再現ではなく、漏れ防止のためのヒューリスティック。
+    """
+    if season is None or user_team is None:
+        return False
+    st = str(stage or "").strip()
+    if not st:
+        return False
+    if not bool(getattr(season, "easl_enabled", False)):
+        return False
+
+    matchdays = getattr(season, "easl_matchdays", None) or {}
+    if st.startswith("group_md"):
+        pairs = matchdays.get(st, []) or []
+        for home_team, away_team in pairs:
+            if _team_matches_side(user_team, home_team) or _team_matches_side(user_team, away_team):
+                return True
+        return False
+
+    if st == "semifinal":
+        ko = getattr(season, "easl_knockout_teams", None) or []
+        if ko:
+            return any(_team_matches_side(user_team, t) for t in ko)
+        groups = getattr(season, "easl_groups", None) or {}
+        for tlist in groups.values():
+            for t in tlist:
+                if _team_matches_side(user_team, t):
+                    return True
+        return False
+
+    if st == "final":
+        fin = getattr(season, "easl_current_finalists", None) or []
+        if fin:
+            return any(_team_matches_side(user_team, t) for t in fin)
+        ko = getattr(season, "easl_knockout_teams", None) or []
+        if ko:
+            return any(_team_matches_side(user_team, t) for t in ko)
+        return False
+
+    return False
+
+
+def _append_national_window_placeholder_if_needed(
+    season: Any,
+    user_team: Any,
+    round_number: int,
+    rounds_until: int,
+    month_label: str,
+    rows: List[Dict[str, Any]],
+) -> None:
+    """
+    代表ウィンドウ週は日本リーグの SeasonEvent が空になりやすい。
+    全日本カップ / EASL と同様、日程「すべて」で見落としにくいよう表示のみ補完する。
+    """
+    if season is None or user_team is None:
+        return
+    if any(int(row.get("round") or 0) == int(round_number) for row in rows):
+        return
+    nat_get = getattr(season, "_get_round_national_window", None)
+    if not callable(nat_get):
+        return
+    try:
+        window_key = nat_get(int(round_number))
+    except Exception:
+        return
+    if not window_key:
+        return
+    resolve = getattr(season, "_resolve_national_team_window_type", None)
+    window_type: Optional[str] = None
+    if callable(resolve):
+        try:
+            window_type = resolve(window_key)
+        except Exception:
+            window_type = None
+    label_fn = getattr(season, "_get_national_team_window_label", None)
+    label = label_fn(window_type) if callable(label_fn) else "代表ウィーク"
+    rows.append(
+        {
+            "round": int(round_number),
+            "rounds_until": rounds_until,
+            "month_label": month_label,
+            "competition_type": "national_team_window",
+            "competition_display": label,
+            "competition_category": competition_category("national_team_window"),
+            "ha_short": "—",
+            "ha_long": "（代表ウィンドウ）",
+            "opponent": "（日本リーグの対戦カードはありません）",
+            "event_id": f"national_window_r{int(round_number)}",
+            "label": str(window_key),
+        }
+    )
+
+
+def is_schedule_row_display_supplement(row: Dict[str, Any]) -> bool:
+    """SeasonEvent に無い行を日程タブで補完しているか（表示専用）。"""
+    eid = str(row.get("event_id") or "")
+    return (
+        eid.startswith("emperor_cup_week_r")
+        or eid.startswith("easl_week_r")
+        or eid.startswith("national_window_r")
+    )
+
+
+def count_user_games_in_sim_round(season: Any, user_team: Any, round_number: int) -> int:
+    """シミュレーション1ラウンド（進行1回）に含まれる自チームの game イベント数。"""
+    if season is None or user_team is None:
+        return 0
+    getter = getattr(season, "get_events_for_round", None)
+    if not callable(getter):
+        return 0
+    try:
+        events = list(getter(int(round_number)) or [])
+    except Exception:
+        return 0
+    n = 0
+    for ev in events:
+        if str(getattr(ev, "event_type", "") or "") != "game":
+            continue
+        h = getattr(ev, "home_team", None)
+        a = getattr(ev, "away_team", None)
+        if _team_matches_side(user_team, h) or _team_matches_side(user_team, a):
+            n += 1
+    return n
+
+
+def next_advance_display_hints(season: Any, user_team: Any) -> Tuple[str, str]:
+    """
+    案A（表示のみ）: 進行1回あたりの自チーム試合数とまとめ進行の説明。
+    Returns:
+        (advance_button_area の複数行向け, 「次の試合」パネル向け1行)
+    使えないときは ("", "")。
+    """
+    if season is None or user_team is None:
+        return "", ""
+    if bool(getattr(season, "season_finished", False)):
+        return "", ""
+    cr = int(getattr(season, "current_round", 0) or 0)
+    tr = int(getattr(season, "total_rounds", 0) or 0)
+    nxt = cr + 1
+    if nxt > tr:
+        return "", ""
+    ng = count_user_games_in_sim_round(season, user_team, nxt)
+    month_lbl = round_month_label(season, nxt)
+    if ng <= 0:
+        block_a = (
+            f"次の「次へ進む」1回で進むのはラウンド {nxt}/{tr}（{month_lbl}）です。"
+            f"自チームの対戦カード（リーグ等）はこのラウンドではありません（代表・杯などは同じ進行で処理される場合があります）。"
+        )
+        one = (
+            f"進行予告: ラウンド{nxt}・自チームの対戦カード0件（杯等は同進行）／試合の合間の介入なし"
+        )
+    elif ng == 1:
+        block_a = (
+            f"次の「次へ進む」1回で進むのはラウンド {nxt}/{tr}（{month_lbl}）です。"
+            f"この進行に自チームの試合は合計 1 試合です。"
+        )
+        one = f"進行予告: ラウンド{nxt}・自チーム 1試合をまとめてシミュ／試合の合間の介入なし"
+    else:
+        block_a = (
+            f"次の「次へ進む」1回で進むのはラウンド {nxt}/{tr}（{month_lbl}）です。"
+            f"この進行に自チームの試合は合計 {ng} 試合あり、まとめてシミュされます。"
+        )
+        one = f"進行予告: ラウンド{nxt}・自チーム {ng}試合まとめ進行／試合の合間の介入なし"
+    block_b = "同じラウンド内では、試合と試合のあいだに個別で戦術を変えることはできません（進行前の設定がそのまま使われます）。"
+    return f"{block_a}\n{block_b}", one
+
+
 def upcoming_rows_for_user_team(
     season: Any,
     user_team: Any,
@@ -121,6 +313,65 @@ def upcoming_rows_for_user_team(
                     "label": str(getattr(ev, "label", "") or ""),
                 }
             )
+
+        if not league_only:
+            cup_checker = getattr(season, "_should_play_emperor_cup_this_round", None)
+            if callable(cup_checker) and cup_checker(r) and user_still_active_in_emperor_cup_field(
+                season, user_team
+            ):
+                has_cup_row = any(
+                    str(row.get("competition_type") or "") == "emperor_cup" and int(row.get("round") or 0) == r
+                    for row in rows
+                )
+                if not has_cup_row:
+                    rows.append(
+                        {
+                            "round": r,
+                            "rounds_until": rounds_until,
+                            "month_label": month_lbl,
+                            "competition_type": "emperor_cup",
+                            "competition_display": "全日本カップ",
+                            "competition_category": "cup",
+                            "ha_short": "—",
+                            "ha_long": "（大会週）",
+                            "opponent": "（同ラウンド進行で消化・対戦は抽選）",
+                            "event_id": f"emperor_cup_week_r{r}",
+                            "label": "",
+                        }
+                    )
+
+            stage_getter = getattr(season, "_get_round_easl_stage", None)
+            if callable(stage_getter):
+                try:
+                    easl_stage = stage_getter(r)
+                except Exception:
+                    easl_stage = None
+                if easl_stage and user_team_participates_in_easl_stage(season, user_team, easl_stage):
+                    has_easl_row = any(
+                        str(row.get("competition_type") or "") == "easl"
+                        and int(row.get("round") or 0) == r
+                        for row in rows
+                    )
+                    if not has_easl_row:
+                        rows.append(
+                            {
+                                "round": r,
+                                "rounds_until": rounds_until,
+                                "month_label": month_lbl,
+                                "competition_type": "easl",
+                                "competition_display": competition_display_name("easl"),
+                                "competition_category": competition_category("easl"),
+                                "ha_short": "—",
+                                "ha_long": "（大会週）",
+                                "opponent": "（同ラウンド進行で消化・組み合わせは抽選）",
+                                "event_id": f"easl_week_r{r}_{easl_stage}",
+                                "label": str(easl_stage),
+                            }
+                        )
+
+            _append_national_window_placeholder_if_needed(
+                season, user_team, r, rounds_until, month_lbl, rows
+            )
     return rows
 
 
@@ -161,15 +412,63 @@ def next_round_schedule_lines(season: Any, user_team: Any) -> List[str]:
         comp = competition_display_name_from_event(ev)
         mine.append(f"・{comp}  {ha_s}  vs {opp}")
 
+    cup_fn = getattr(season, "_should_play_emperor_cup_this_round", None)
+    if callable(cup_fn) and cup_fn(nxt) and user_still_active_in_emperor_cup_field(season, user_team):
+        mine.append("・全日本カップ（同ラウンド進行で消化・日程タブの「すべて」にも表示）")
+
+    easl_get = getattr(season, "_get_round_easl_stage", None)
+    if callable(easl_get):
+        try:
+            easl_stage = easl_get(nxt)
+        except Exception:
+            easl_stage = None
+        if easl_stage and user_team_participates_in_easl_stage(season, user_team, easl_stage):
+            mine.append(
+                f"・{competition_display_name('easl')}（同ラウンド進行で消化・日程タブの「すべて」にも表示）"
+            )
+
+    nat_get = getattr(season, "_get_round_national_window", None)
+    if callable(nat_get):
+        try:
+            nat_key = nat_get(nxt)
+        except Exception:
+            nat_key = None
+        if nat_key:
+            resolve = getattr(season, "_resolve_national_team_window_type", None)
+            wtype: Optional[str] = None
+            if callable(resolve):
+                try:
+                    wtype = resolve(nat_key)
+                except Exception:
+                    wtype = None
+            label_fn = getattr(season, "_get_national_team_window_label", None)
+            nat_label = label_fn(wtype) if callable(label_fn) else "代表ウィーク"
+            mine.append(
+                f"・{nat_label}（日本リーグの対戦カードなし・日程「すべて」で表示補完）"
+            )
+
     month_lbl = round_month_label(season, nxt)
-    header = f"次に進むラウンド: {nxt} / {total}  （{month_lbl}）"
+    header = f"次の進行（ラウンド {nxt} / 全 {total}・{month_lbl}）"
+    ng = count_user_games_in_sim_round(season, user_team, nxt)
+    if ng <= 0:
+        count_line = "この進行に含まれる自チームの対戦カード（game）: 0 試合（杯・代表などは下の行と同じ進行で処理）"
+    elif ng == 1:
+        count_line = "この進行に含まれる自チームの対戦カード（game）: 1 試合"
+    else:
+        count_line = f"この進行に含まれる自チームの対戦カード（game）: {ng} 試合（同一ラウンド内はまとめてシミュ）"
+    footer = (
+        "「次へ進む」1回＝このラウンドまるごと進みます。"
+        "試合の合間に個別の戦術介入はありません（進行前の設定が同じラウンド内すべてに使われます）。"
+    )
+
     if not mine:
         return [
             header,
-            "このラウンドに自チームのリーグ予定はありません（代表ウィーク等の可能性があります）。",
-            "補足: 全日本カップ・東アジアカップ等は別経路で消化されるため、別画面の大会進行で確認してください。",
+            count_line,
+            "このラウンドに自チームのリーグ対戦の行はありません（代表ウィーク・杯週の可能性があります）。",
+            footer,
         ]
-    return [header, *mine]
+    return [header, count_line, *mine, footer]
 
 
 def format_season_event_matchup_line(event: Any) -> str:
@@ -211,7 +510,7 @@ def information_panel_schedule_lines(season: Any, *, max_events: int = 7) -> Lis
         return ["日程データを取得できませんでした。", "—"]
 
     month_lbl = round_month_label(season, nxt)
-    lines = [f"次ラウンド: {nxt} / {tr}  （{month_lbl}）"]
+    lines = [f"次の進行で消化するラウンド: {nxt} / {tr}  （{month_lbl}）"]
     added = 0
     for ev in events:
         if str(getattr(ev, "event_type", "") or "") != "game":
@@ -308,4 +607,9 @@ def detail_text_for_upcoming_row(row: Dict[str, Any]) -> str:
     lbl = row.get("label")
     if lbl:
         lines.append(f"内部ラベル: {lbl}")
+    if is_schedule_row_display_supplement(row):
+        lines.append(
+            "※この行は SeasonEvent に無い大会・ウィンドウのため、日程タブでは表示補完です。"
+            "進行は他の行と同じラウンド内で一括処理されます。"
+        )
     return "\n".join(lines)

@@ -1,5 +1,6 @@
 import random
 from collections import Counter
+from itertools import combinations
 from typing import Tuple, List, Optional, Dict, Set
 
 from .team import Team
@@ -8,13 +9,16 @@ import basketball_sim.config.game_constants as game_constants
 from basketball_sim.config.game_constants import (
     CLOCK_SECONDS_PER_REGULATION_QUARTER,
     FORFEIT_SCORE,
-    LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
-    LEAGUE_ONCOURT_FOREIGN_CAP,
-    LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
-    LEAGUE_ROSTER_FOREIGN_CAP,
     MINIMUM_ACTIVE_PLAYERS_FOR_GAME,
 )
+from basketball_sim.systems.competition_rules import get_competition_rule, normalize_competition_type
+from basketball_sim.systems.japan_regulation import (
+    count_regulation_slots,
+    lineup_passes_on_court,
+    player_regulation_bucket_from_rule,
+)
 from basketball_sim.systems.rotation import RotationSystem
+from basketball_sim.systems.injury_lineup_autorepair import auto_repair_lineup_for_injuries
 from basketball_sim.systems.team_tactics import (
     STARTER_POSITIONS,
     get_normalized_rotation_starters_map,
@@ -85,7 +89,7 @@ class Match:
         self.home_score = 0
         self.away_score = 0
         self.is_playoff = is_playoff
-        self.competition_type = self._normalize_competition_type(competition_type)
+        self.competition_type = normalize_competition_type(competition_type)
 
         self.current_possession = 0
         self.total_possessions = 0
@@ -105,8 +109,12 @@ class Match:
         self.home_current_lineup = list(self.home_starters)
         self.away_current_lineup = list(self.away_starters)
 
-        self.home_rotation = RotationSystem(self.home_team, self.home_active_players, self.home_starters)
-        self.away_rotation = RotationSystem(self.away_team, self.away_active_players, self.away_starters)
+        self.home_rotation = RotationSystem(
+            self.home_team, self.home_active_players, self.home_starters, competition_type=self.competition_type
+        )
+        self.away_rotation = RotationSystem(
+            self.away_team, self.away_active_players, self.away_starters, competition_type=self.competition_type
+        )
 
         self._minutes_tracker = {}
         self.play_by_play_log: List[Dict] = []
@@ -264,6 +272,12 @@ class Match:
 
         self.home_team.process_injury_recovery()
         self.away_team.process_injury_recovery()
+
+        try:
+            auto_repair_lineup_for_injuries(self.home_team, competition_type=self.competition_type)
+            auto_repair_lineup_for_injuries(self.away_team, competition_type=self.competition_type)
+        except Exception:
+            pass
 
         self._print_minutes_log(self.home_team, self.home_active_players)
         self._print_minutes_log(self.away_team, self.away_active_players)
@@ -1320,115 +1334,20 @@ class Match:
         for play in plays[-tail_count:]:
             print(f"  {self._format_play_sequence_for_debug(play)}")
 
-    COMPETITION_RULES = {
-        "regular_season": {
-            "active": {
-                "foreign_max": LEAGUE_ROSTER_FOREIGN_CAP,
-                "special_max": LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
-                "asia_as_foreign": False,
-                "special_label": "Asia/帰化",
-            },
-            "on_court": {
-                "foreign_max": LEAGUE_ONCOURT_FOREIGN_CAP,
-                "special_max": LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
-                "asia_as_foreign": False,
-                "special_label": "Asia/帰化",
-            },
-        },
-        "playoff": {
-            "active": {
-                "foreign_max": LEAGUE_ROSTER_FOREIGN_CAP,
-                "special_max": LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
-                "asia_as_foreign": False,
-                "special_label": "Asia/帰化",
-            },
-            "on_court": {
-                "foreign_max": LEAGUE_ONCOURT_FOREIGN_CAP,
-                "special_max": LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
-                "asia_as_foreign": False,
-                "special_label": "Asia/帰化",
-            },
-        },
-        "final_boss": {
-            "active": {
-                "foreign_max": LEAGUE_ROSTER_FOREIGN_CAP,
-                "special_max": LEAGUE_ROSTER_ASIA_NATURALIZED_CAP,
-                "asia_as_foreign": False,
-                "special_label": "Asia/帰化",
-            },
-            "on_court": {
-                "foreign_max": LEAGUE_ONCOURT_FOREIGN_CAP,
-                "special_max": LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
-                "asia_as_foreign": False,
-                "special_label": "Asia/帰化",
-            },
-        },
-        "emperor_cup": {
-            "active": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": True, "special_label": "帰化"},
-            "on_court": {"foreign_max": 1, "special_max": 1, "asia_as_foreign": True, "special_label": "帰化"},
-        },
-        "easl": {
-            "active": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-            "on_court": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-        },
-        "asia_cup": {
-            "active": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-            "on_court": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-        },
-        "asia_cl": {
-            "active": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-            "on_court": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-        },
-        "intercontinental": {
-            "active": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-            "on_court": {"foreign_max": 2, "special_max": 1, "asia_as_foreign": False, "special_label": "帰化/アジア"},
-        },
-    }
-
-    def _normalize_competition_type(self, competition_type: Optional[str]) -> str:
-        normalized = str(competition_type or "regular_season").strip().lower()
-        return normalized if normalized in self.COMPETITION_RULES else "regular_season"
-
     def _get_competition_rule(self, phase: str) -> Dict[str, object]:
-        rules = self.COMPETITION_RULES.get(self.competition_type, self.COMPETITION_RULES["regular_season"])
-        if phase in rules:
-            return rules[phase]
-        return self.COMPETITION_RULES["regular_season"][phase]
+        return get_competition_rule(self.competition_type, phase)
 
     def _get_player_regulation_bucket(self, player: Player, phase: str) -> str:
-        nat = getattr(player, "nationality", "Japan")
-        rule = self._get_competition_rule(phase)
-
-        if nat == "Foreign":
-            return "foreign"
-        if nat == "Naturalized":
-            return "special"
-        if nat == "Asia":
-            return "foreign" if bool(rule.get("asia_as_foreign", False)) else "special"
-        return "domestic"
+        return player_regulation_bucket_from_rule(player, self._get_competition_rule(phase))
 
     def _count_regulation_slots(self, players: List[Player], phase: str) -> Tuple[int, int]:
-        foreign = 0
-        special = 0
-        for player in players:
-            bucket = self._get_player_regulation_bucket(player, phase)
-            if bucket == "foreign":
-                foreign += 1
-            elif bucket == "special":
-                special += 1
-        return foreign, special
+        return count_regulation_slots(players, self._get_competition_rule(phase))
 
     def _get_regulation_log_labels(self, phase: str) -> Tuple[str, str]:
         rule = self._get_competition_rule(phase)
         foreign_label = "外国籍扱い" if bool(rule.get("asia_as_foreign", False)) else "外国籍"
         special_label = str(rule.get("special_label", "Asia/帰化"))
         return foreign_label, special_label
-
-    def _is_foreign(self, player: Player) -> bool:
-        return getattr(player, "nationality", "Japan") == "Foreign"
-
-    def _is_asia_or_naturalized(self, player: Player) -> bool:
-        return getattr(player, "nationality", "Japan") in ("Asia", "Naturalized")
 
     def _count_foreign(self, players: List[Player], phase: str = "on_court") -> int:
         foreign, _ = self._count_regulation_slots(players, phase)
@@ -1582,23 +1501,8 @@ class Match:
         inactive = [p for p in players if p not in active]
         return active, inactive
 
-    def _lineup_five_distinct_player_ids(self, lineup: List[Player]) -> bool:
-        if len(lineup) != 5:
-            return False
-        ids = [getattr(p, "player_id", None) for p in lineup]
-        if any(i is None for i in ids):
-            return False
-        return len(set(ids)) == 5
-
     def _lineup_passes_on_court_rules(self, lineup: List[Player]) -> bool:
-        if not self._lineup_five_distinct_player_ids(lineup):
-            return False
-        foreign = self._count_foreign(lineup, phase="on_court")
-        asia_nat = self._count_asia_nat(lineup, phase="on_court")
-        rule = self._get_competition_rule("on_court")
-        foreign_max = int(rule.get("foreign_max", 2))
-        special_max = int(rule.get("special_max", 1))
-        return foreign <= foreign_max and asia_nat <= special_max
+        return lineup_passes_on_court(lineup, self._get_competition_rule("on_court"))
 
     def _pick_tactics_substitution_victim(
         self,
@@ -1698,10 +1602,26 @@ class Match:
 
         return self._validate_lineup(L, B, team)
 
+    def _find_best_legal_starting_five(self, sorted_players: List[Player], on_court_rule: Dict[str, object]) -> Optional[List[Player]]:
+        """可能ならオンコート枠を満たす5人を探索（同一大会ルール）。"""
+        n = len(sorted_players)
+        if n < 5:
+            return None
+        best: Optional[List[Player]] = None
+        best_key: Optional[float] = None
+        for combo in combinations(sorted_players, 5):
+            lu = list(combo)
+            if lineup_passes_on_court(lu, on_court_rule):
+                key = sum(p.get_roster_sort_weight() for p in lu)
+                if best_key is None or key > best_key:
+                    best = lu
+                    best_key = key
+        return best
+
     def _get_starting_five_from_players(self, players: List[Player]) -> List[Player]:
         sorted_players = sorted(players, key=lambda p: p.get_roster_sort_weight(), reverse=True)
 
-        starters = []
+        starters: List[Player] = []
         rule = self._get_competition_rule("on_court")
         foreign_max = int(rule.get("foreign_max", 2))
         special_max = int(rule.get("special_max", 1))
@@ -1720,15 +1640,22 @@ class Match:
 
             starters.append(p)
 
-        if len(starters) < 5:
-            for p in sorted_players:
-                if p in starters:
-                    continue
-                starters.append(p)
-                if len(starters) >= 5:
-                    break
+        if len(starters) >= 5:
+            return starters[:5]
 
-        return starters[:5]
+        best = self._find_best_legal_starting_five(sorted_players, rule)
+        if best is not None:
+            return best
+
+        # 合法5人が組めない極端ケースのみ、旧来の充足（後段 _validate_lineup がフォールバック）
+        combined = list(starters)
+        for p in sorted_players:
+            if p in combined:
+                continue
+            combined.append(p)
+            if len(combined) >= 5:
+                break
+        return combined[:5]
 
     def _calculate_team_strength_from_players(self, team: Team, lineup: List[Player]) -> Tuple[float, float]:
         if not lineup:
@@ -1927,13 +1854,8 @@ class Match:
 
         unique = unique[:5]
 
-        foreign = self._count_foreign(unique, phase="on_court")
-        asia_nat = self._count_asia_nat(unique, phase="on_court")
         rule = self._get_competition_rule("on_court")
-        foreign_max = int(rule.get("foreign_max", 2))
-        special_max = int(rule.get("special_max", 1))
-
-        if foreign > foreign_max or asia_nat > special_max:
+        if not lineup_passes_on_court(unique, rule):
             return fallback
 
         return unique
@@ -2663,6 +2585,12 @@ class Match:
 
         self.home_team.process_injury_recovery()
         self.away_team.process_injury_recovery()
+
+        try:
+            auto_repair_lineup_for_injuries(self.home_team)
+            auto_repair_lineup_for_injuries(self.away_team)
+        except Exception:
+            pass
 
         self._print_minutes_log(self.home_team, self.home_active_players)
         self._print_minutes_log(self.away_team, self.away_active_players)

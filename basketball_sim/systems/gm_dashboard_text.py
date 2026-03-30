@@ -11,7 +11,11 @@ from __future__ import annotations
 from typing import Any, List, Tuple
 
 from basketball_sim.systems.contract_logic import get_team_payroll
-from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap, league_level_for_team
+from basketball_sim.systems.salary_cap_budget import (
+    cap_status,
+    get_soft_cap,
+    league_level_for_team,
+)
 
 
 def sort_roster_for_gm_view(players: List[Any]) -> List[Any]:
@@ -297,36 +301,26 @@ def format_team_identity_text(team: Any) -> str:
 def format_salary_cap_text(team: Any) -> str:
     payroll = int(get_team_payroll(team))
     lv = league_level_for_team(team)
-    hard_cap = int(get_hard_cap(league_level=lv))
-    soft_cap = int(get_soft_cap(league_level=lv))
+    league_cap = int(get_soft_cap(league_level=lv))
 
-    if payroll > soft_cap:
-        status = "OVER SOFT CAP"
-    elif payroll > hard_cap:
-        status = "OVER CAP"
+    st = cap_status(payroll, league_level=lv)
+    if st == "over_soft_cap":
+        status = "サラリーキャップ超過（贅沢税の対象。補強・契約はルール上制限され得ます）"
     else:
-        status = "UNDER CAP"
+        status = "キャップ内"
 
-    cap_space = hard_cap - payroll
-    soft_room = soft_cap - payroll
+    room = league_cap - payroll
 
     lines = [
-        f"Team Payroll : {payroll:,}円",
-        f"Hard Cap     : {hard_cap:,}円",
-        f"Soft Cap     : {soft_cap:,}円",
-        "League Rule  : 全ディビジョン共通 ソフト12億円",
+        f"チーム年俸合計   : {payroll:,}円",
+        f"サラリーキャップ : {league_cap:,}円（D{lv}・全ディビジョン同一・12億円）",
         "",
-        f"Status       : {status}",
+        f"状態             : {status}",
     ]
-    if cap_space >= 0:
-        lines.append(f"Cap Space    : {cap_space:,}円")
+    if room >= 0:
+        lines.append(f"キャップまでの余裕 : {room:,}円")
     else:
-        lines.append(f"Cap Over     : {abs(cap_space):,}円")
-
-    if soft_room >= 0:
-        lines.append(f"Soft Room    : {soft_room:,}円")
-    else:
-        lines.append(f"Soft Over    : {abs(soft_room):,}円")
+        lines.append(f"キャップ超過分     : {abs(room):,}円（贅沢税は年俸合計ベースで計算）")
 
     return "\n".join(lines)
 

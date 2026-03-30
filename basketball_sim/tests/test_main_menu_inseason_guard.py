@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from basketball_sim.config.game_constants import REGULAR_SEASON_TRANSACTION_CUTOFF_ROUND
 from basketball_sim.systems.main_menu_view import MainMenuView, wrap_menu_callback_with_inseason_transaction_guard
+from basketball_sim.systems.season_transaction_rules import INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA
 
 
 def _bare_view() -> MainMenuView:
@@ -65,6 +66,29 @@ def test_wrap_menu_callback_blocks_when_locked():
         wrapped = wrap_menu_callback_with_inseason_transaction_guard(view, cb)
         wrapped()
     assert called == []
+
+
+def test_format_hr_trade_fa_guidance_contains_cli_path_when_unlocked():
+    view = _bare_view()
+    view.season = SimpleNamespace(
+        current_round=REGULAR_SEASON_TRANSACTION_CUTOFF_ROUND - 1,
+        total_rounds=22,
+        season_finished=False,
+    )
+    text = view._format_hr_trade_fa_guidance_text()
+    assert "8. GMメニュー" in text
+    assert "10. トレード" in text
+
+
+def test_format_hr_trade_fa_guidance_includes_lock_message_when_locked():
+    view = _bare_view()
+    view.season = SimpleNamespace(
+        current_round=REGULAR_SEASON_TRANSACTION_CUTOFF_ROUND,
+        total_rounds=22,
+        season_finished=False,
+    )
+    text = view._format_hr_trade_fa_guidance_text()
+    assert INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA in text
 
 
 def test_wrap_menu_callback_runs_when_allowed():

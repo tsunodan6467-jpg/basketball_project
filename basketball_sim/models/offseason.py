@@ -1,5 +1,5 @@
 import random
-from typing import List, Optional, Dict
+from typing import Any, Callable, List, Optional, Dict
 
 from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
 from basketball_sim.systems.salary_cap_budget import (
@@ -161,9 +161,18 @@ class Offseason:
     各処理は決められた順序で呼び出されます。
     """
 
-    def __init__(self, teams: List[Team], free_agents: List[Player]):
+    def __init__(
+        self,
+        teams: List[Team],
+        free_agents: List[Player],
+        *,
+        draft_ui_prompt_target: Optional[Any] = None,
+        draft_ui_prompt_bid: Optional[Any] = None,
+    ):
         self.teams = teams
         self.free_agents = free_agents
+        self._draft_ui_prompt_target: Optional[Callable[..., Any]] = draft_ui_prompt_target
+        self._draft_ui_prompt_bid: Optional[Callable[..., Any]] = draft_ui_prompt_bid
         self.draft_pool: List[Player] = []
         # 来年のドラフト候補（次オフのドラフトで使う）をリーグ状態として保持するための一時バッファ
         self.future_draft_pool: List[Player] = []
@@ -512,7 +521,13 @@ class Offseason:
             self._generate_draft_pool()
         self._run_draft_combine()
         # 正本: docs/DRAFT_AUCTION_SYSTEM.md
-        conduct_auction_draft(self.teams, self.draft_pool, self.free_agents)
+        conduct_auction_draft(
+            self.teams,
+            self.draft_pool,
+            self.free_agents,
+            ui_prompt_target=self._draft_ui_prompt_target,
+            ui_prompt_bid=self._draft_ui_prompt_bid,
+        )
 
         self._off_phase(12)
         from basketball_sim.systems.trade import conduct_trades

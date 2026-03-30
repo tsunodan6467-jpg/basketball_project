@@ -4,6 +4,7 @@ from basketball_sim.config.game_constants import (
     LEAGUE_SALARY_CAP,
     LEAGUE_SALARY_CAP_BY_DIVISION,
     PAYROLL_LUXURY_TAX_BRACKET_WIDTH_1,
+    SALARY_SOFT_LIMIT_MULTIPLIER,
 )
 from basketball_sim.models.team import Team
 from basketball_sim.systems.salary_cap_budget import (
@@ -21,13 +22,14 @@ from basketball_sim.systems.salary_cap_budget import (
 
 def test_hard_soft_cap_d1_defaults():
     assert get_hard_cap() == LEAGUE_SALARY_CAP == LEAGUE_SALARY_CAP_BY_DIVISION[1]
-    assert get_soft_cap() == int(round(LEAGUE_SALARY_CAP * 1.20))
+    assert get_soft_cap() == int(round(LEAGUE_SALARY_CAP * SALARY_SOFT_LIMIT_MULTIPLIER))
+    assert get_hard_cap() == get_soft_cap()
 
 
 def test_hard_cap_by_division():
     assert get_hard_cap(league_level=2) == LEAGUE_SALARY_CAP_BY_DIVISION[2]
     assert get_soft_cap(league_level=3) == int(
-        round(LEAGUE_SALARY_CAP_BY_DIVISION[3] * 1.20)
+        round(LEAGUE_SALARY_CAP_BY_DIVISION[3] * SALARY_SOFT_LIMIT_MULTIPLIER)
     )
     assert get_hard_cap(league_level=1) == get_hard_cap(league_level=2) == get_hard_cap(league_level=3)
 
@@ -35,8 +37,9 @@ def test_hard_cap_by_division():
 def test_cap_status_tiers():
     h = get_hard_cap()
     s = get_soft_cap()
+    assert h == s
     assert cap_status(h - 1) == "under_cap"
-    assert cap_status(h + 1) == "over_cap"
+    assert cap_status(h + 1) == "over_soft_cap"
     assert cap_status(s + 1) == "over_soft_cap"
 
 

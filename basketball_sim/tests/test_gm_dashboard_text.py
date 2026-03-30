@@ -55,8 +55,9 @@ def test_format_salary_cap_contains_payroll():
     p = _player(1)
     t.add_player(p)
     text = format_salary_cap_text(t)
-    assert "Team Payroll" in text
-    assert "Hard Cap" in text
+    assert "チーム年俸合計" in text
+    assert "サラリーキャップ" in text
+    assert "12億円" in text
 
 
 def test_format_gm_roster_lists_player():

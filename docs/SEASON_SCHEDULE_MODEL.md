@@ -53,3 +53,4 @@
 
 - リポジトリ直下 **`.cursorrules`** … 本モデルの要約を参照
 - 実装: `basketball_sim/models/season.py`（`ROUND_CONFIG` 等）
+- **生成ルール（2026-03）**: リーグカードは `Season.collect_league_week_matchups`（土日同一相手・水曜は別相手・水曜 1 試合＝3 試合週時）。`ROUND_CONFIG` の R2/R4 はコード上まだ **2 試合/週**（`has_midweek_league` のみ True）で、本表の「3」とは差分あり。

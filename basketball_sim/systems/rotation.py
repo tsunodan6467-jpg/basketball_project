@@ -1,11 +1,9 @@
 from typing import List, Optional, Dict, Tuple
 
-from basketball_sim.config.game_constants import (
-    LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP,
-    LEAGUE_ONCOURT_FOREIGN_CAP,
-)
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.competition_rules import get_competition_rule, normalize_competition_type
+from basketball_sim.systems.japan_regulation import count_regulation_slots
 from basketball_sim.systems.team_tactics import get_rotation_target_minutes_by_player_id
 
 
@@ -45,9 +43,11 @@ class RotationSystem:
         self,
         team: Team,
         active_players: List[Player],
-        starters: Optional[List[Player]] = None
+        starters: Optional[List[Player]] = None,
+        competition_type: str = "regular_season",
     ):
         self.team = team
+        self._competition_type = normalize_competition_type(competition_type)
         self.active_players = [p for p in active_players if not p.is_injured() and not p.is_retired]
 
         sorted_players = sorted(
@@ -96,18 +96,6 @@ class RotationSystem:
 
     def _player_key(self, player: Player) -> int:
         return id(player)
-
-    def _is_foreign(self, player: Player) -> bool:
-        return getattr(player, "nationality", "Japan") == "Foreign"
-
-    def _is_asia_or_naturalized(self, player: Player) -> bool:
-        return getattr(player, "nationality", "Japan") in ("Asia", "Naturalized")
-
-    def _count_foreign(self, players: List[Player]) -> int:
-        return sum(1 for p in players if self._is_foreign(p))
-
-    def _count_asia_nat(self, players: List[Player]) -> int:
-        return sum(1 for p in players if self._is_asia_or_naturalized(p))
 
     def _get_minutes(self, player: Player) -> float:
         return self.player_minutes.get(self._player_key(player), 0.0)
@@ -457,13 +445,9 @@ class RotationSystem:
         idx = new_lineup.index(out_player)
         new_lineup[idx] = in_player
 
-        foreign = self._count_foreign(new_lineup)
-        asia_nat = self._count_asia_nat(new_lineup)
-
-        return (
-            foreign <= LEAGUE_ONCOURT_FOREIGN_CAP
-            and asia_nat <= LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP
-        )
+        on_court = get_competition_rule(self._competition_type, "on_court")
+        foreign, special = count_regulation_slots(new_lineup, on_court)
+        return foreign <= int(on_court.get("foreign_max", 2)) and special <= int(on_court.get("special_max", 1))
 
     def _pair_swap_blocked(self, out_player: Player, in_player: Player, possession: int) -> bool:
         if self._get_minutes(in_player) <= 2.0:

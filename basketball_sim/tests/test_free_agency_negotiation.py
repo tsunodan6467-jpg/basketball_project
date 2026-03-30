@@ -95,6 +95,7 @@ def test_cap_status_is_aligned_with_shared_budget_module():
     team = Team(team_id=1, name="T", league_level=1)
     hard = fa._hard_cap(team)
     soft = fa._soft_cap(team)
+    assert hard == soft
     assert fa._cap_status(hard - 1, team) == "under_cap"
-    assert fa._cap_status(hard + 1, team) == "over_cap"
+    assert fa._cap_status(hard + 1, team) == "over_soft_cap"
     assert fa._cap_status(soft + 1, team) == "over_soft_cap"

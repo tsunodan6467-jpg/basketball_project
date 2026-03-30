@@ -35,6 +35,7 @@ from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
     SALARY_SOFT_LIMIT_MULTIPLIER,
     get_team_payroll,
+    normalize_initial_payrolls_for_teams,
 )
 from basketball_sim.systems.gm_dashboard_text import (
     format_bench_order_text,
@@ -2084,8 +2085,9 @@ def _main_menu_advance_button_and_hint(season_finished: bool, offseason_complete
     if offseason_completed:
         return (
             "次のシーズンへ…",
-            "オフシーズンは完了しています。『次のシーズンへ…』で次年度開始の確認が開きます。"
-            "メインを閉じるとターミナルの年度進行メニューにも移れます。",
+            "オフシーズンは完了しています。ここから次シーズンを開始できます。"
+            "『次のシーズンへ…』で確認が開きます。"
+            "メインを閉じると、CLIの年度進行メニューに続きます（当面、年度更新の標準はそちらです）。",
         )
     return (
         "オフシーズンを実行",
@@ -2119,10 +2121,10 @@ def _gui_prompt_next_season_after_offseason_gate(
     root = tk._default_root
     tail = (
         "次のシーズンを主画面から始めますか？\n"
-        "（「いいえ」の場合はメインウィンドウを閉じると、従来どおりターミナルの年度進行メニューから続けられます。）"
+        "（「いいえ」ならメインを閉じると、CLIの年度進行メニューから続けられます。）"
     )
     title = "年度進行" if repeat_prompt else "完了"
-    body = tail if repeat_prompt else ("オフシーズンが終わりました。\n\n" + tail)
+    body = tail if repeat_prompt else ("オフシーズンが完了しました。ここから次シーズンを開始できます。\n\n" + tail)
 
     if root is not None:
         go_gui = messagebox.askyesno(title, body, parent=root)
@@ -2131,8 +2133,8 @@ def _gui_prompt_next_season_after_offseason_gate(
         else:
             messagebox.showinfo(
                 "年度進行",
-                "メインウィンドウを閉じると、ターミナルに年度進行メニューが続きます。\n"
-                "次シーズン・セーブはそこから操作できます。",
+                "メインを閉じると、CLIの年度進行メニューに続きます。\n"
+                "次シーズンやセーブはそこから操作できます（当面の標準導線はCLIです）。",
                 parent=root,
             )
     else:
@@ -2340,6 +2342,8 @@ def build_initial_game_world():
 
     free_agents = []
     assign_fictional_teams_and_rival(teams, user_team, fictional_pool, free_agents)
+
+    normalize_initial_payrolls_for_teams(teams)
 
     return teams, free_agents, user_team, icon_player
 
@@ -2753,7 +2757,17 @@ def run_main_menu_ui_mode(
                     return
             print_separator("オフシーズン開始（UIモード）")
             try:
-                offseason = Offseason(teams, free_agents)
+                off_kw = {}
+                if root is not None:
+                    from basketball_sim.systems import draft_auction_tk
+
+                    off_kw["draft_ui_prompt_target"] = lambda t, s, d, c: draft_auction_tk.prompt_draft_target(
+                        root, t, s, d, c
+                    )
+                    off_kw["draft_ui_prompt_bid"] = lambda t, m, c, rem, bb: draft_auction_tk.prompt_draft_bid(
+                        root, t, m, c, rem, bb
+                    )
+                offseason = Offseason(teams, free_agents, **off_kw)
                 offseason.run()
             except Exception as exc:
                 print(f"オフシーズン処理中にエラー: {exc}")
@@ -2824,11 +2838,18 @@ def run_main_menu_ui_mode(
         if not ui_flow.get("dirty"):
             return True
         root = tk._default_root
+        body = (
+            "未保存の変更がある可能性があります（最後のセーブ以降に進行しました）。\n"
+            "閉じてよいですか？"
+        )
+        if ui_flow.get("offseason_completed"):
+            body += (
+                "\n\nオフ完了済み：メインを閉じると、CLIの年度進行メニューに続きます。"
+            )
         return bool(
             messagebox.askokcancel(
                 "メインウィンドウを閉じる",
-                "未保存の変更がある可能性があります（最後のセーブ以降に進行しました）。\n"
-                "閉じてよいですか？",
+                body,
                 parent=root,
             )
         )
@@ -2844,8 +2865,10 @@ def run_main_menu_ui_mode(
     print_separator("主画面UIモード開始")
     print("『日程』で日程ウィンドウ、『次へ進む』で1ラウンド進行します。")
     print(
-        "シーズン終了後は『オフシーズンを実行』→ 完了後、主画面から次シーズンを開始するか、"
-        "ウィンドウを閉じてターミナルの年度進行メニューに移れます。"
+        "シーズン終了後は『オフシーズンを実行』。完了後は『次のシーズンへ…』で次シーズン開始の確認が開きます。"
+    )
+    print(
+        "メインを閉じるとCLIの年度進行メニューに続きます（当面、年度更新の標準はCLIの年度進行メニューです）。"
     )
     print("他メニューは段階的に接続します。")
 

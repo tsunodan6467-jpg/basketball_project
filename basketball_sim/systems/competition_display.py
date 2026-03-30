@@ -18,6 +18,7 @@ _COMPETITION_TYPE_LABEL_JA: dict[str, str] = {
     "intercontinental": "世界一決定戦",
     "playoff": "ディビジョンPO",
     "final_boss": "スペシャルマッチ",
+    "national_team_window": "日本代表ウィンドウ",
 }
 
 CompetitionCategory = Literal["domestic_league", "domestic_cup", "international_club", "other"]
@@ -40,6 +41,8 @@ def competition_category(competition_type: Optional[str]) -> CompetitionCategory
         return "domestic_cup"
     if k in {"easl", "asia_cl", "intercontinental", "final_boss"}:
         return "international_club"
+    if k == "national_team_window":
+        return "other"
     if k == "playoff":
         return "other"
     return "other"

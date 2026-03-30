@@ -18,8 +18,8 @@ What this file provides
 
 Notes
 -----
-- This file is intentionally read-mostly. The only mutating action is an optional
-  callback such as on_advance(view), which is injected from outside.
+- This file is intentionally read-mostly. Mutations: optional on_advance (injected),
+  and 人事ウィンドウの契約＋1年延長・契約解除（FA）（条件付き）。
 - The UI tolerates partial data. Missing values fall back to safe placeholders.
 - Detailed screen transitions are not implemented yet; each left menu item is a
   safe callback hook point.
@@ -75,6 +75,11 @@ from basketball_sim.systems.facility_investment import (
     commit_facility_upgrade,
     get_facility_upgrade_cost,
 )
+from basketball_sim.config.game_constants import CONTRACT_ROSTER_MIN_SEASON, PLAYER_SALARY_BASE_PER_OVR
+from basketball_sim.systems.contract_logic import (
+    MAX_CONTRACT_YEARS_DEFAULT,
+    apply_contract_extension,
+)
 from basketball_sim.systems.sponsor_management import (
     MAIN_SPONSOR_TYPES,
     commit_main_sponsor_contract,
@@ -100,8 +105,11 @@ from basketball_sim.systems.merchandise_management import (
     get_merchandise_item,
 )
 from basketball_sim.systems.competition_display import competition_display_name
+from basketball_sim.systems import japan_regulation_display as jp_reg_display
 from basketball_sim.systems.schedule_display import (
+    count_user_games_in_sim_round,
     detail_text_for_upcoming_row,
+    next_advance_display_hints,
     format_season_event_matchup_line,
     information_panel_schedule_lines,
     next_round_schedule_lines,
@@ -143,10 +151,13 @@ SystemMenuCallback = Callable[["MainMenuView"], None]
 class MainMenuView:
     """Phase 4 minimal main menu / dashboard view."""
 
+    # 左メニュー表示名: 閲覧・各メニューへの案内・CLI ショートカット（編集の正本は人事・戦術・経営・情報）
+    CLUB_GUIDE_MENU_LABEL = "クラブ案内"
+
     MENU_ITEMS = [
         "日程",
         "人事",
-        "GM",
+        CLUB_GUIDE_MENU_LABEL,
         "経営",
         "強化",
         "戦術",
@@ -154,6 +165,13 @@ class MainMenuView:
         "歴史",
         "システム",
     ]
+
+    # ホーム「やること」0件時の1行（算出・表示のみ。セーブ対象外）
+    HOME_TASKS_EMPTY_LINE = (
+        "（ホーム上の「やること」はありません。各メニューから随時確認できます）"
+    )
+
+    _LINEUP_SLOT_LABELS = ("PG枠", "SG枠", "SF枠", "PF枠", "C枠")
 
     STRATEGY_LABELS = {
         "balanced": "バランス",
@@ -200,6 +218,8 @@ class MainMenuView:
         self.advance_primary_ui_fn = advance_primary_ui_fn
         self.external_news_items = news_items
         self.external_tasks = tasks
+        self._roster_item_to_player: Dict[str, Any] = {}
+        self._injury_autorepair_task_supplement: str = ""
 
         self.root = root or tk.Tk()
         self.root.title(title)
@@ -252,6 +272,13 @@ class MainMenuView:
             "Primary.TButton",
             font=("Yu Gothic UI", 12, "bold"),
             padding=(18, 12),
+            foreground="#f8fafc",
+            background="#2f4f9e",
+        )
+        self.style.map(
+            "Primary.TButton",
+            foreground=[("disabled", "#8892a0"), ("pressed", "#f8fafc"), ("active", "#f8fafc")],
+            background=[("disabled", "#3a4150"), ("pressed", "#243a78"), ("active", "#3a5fc4")],
         )
 
     def _build_ui(self) -> None:
@@ -288,53 +315,154 @@ class MainMenuView:
             anchor="w", pady=(0, 10)
         )
 
+        self._menu_buttons: Dict[str, ttk.Button] = {}
         for label in self.MENU_ITEMS:
-            ttk.Button(
+            btn = ttk.Button(
                 left_panel,
                 text=label,
                 style="Menu.TButton",
                 command=lambda key=label: self._on_menu(key),
-            ).pack(fill="x", pady=5)
+            )
+            btn.pack(fill="x", pady=5)
+            self._menu_buttons[label] = btn
 
-        # Center / right layout
+        # Center / right: 行高は各列フレーム内で独立。横は Panedwindow＋初期サッシュで
+        # 「次の試合・クラブ状況」を広く、「今やること・ニュース・次へ」を狭く固定（weight だけだと
+        # ScrolledText 既定幅などで列の最小幅が釣り合い、半々に見えやすい）。
         content = ttk.Frame(body, style="Root.TFrame")
         content.grid(row=0, column=1, sticky="nsew")
-        content.columnconfigure(0, weight=5)
-        content.columnconfigure(1, weight=3)
+        content.columnconfigure(0, weight=1)
         content.rowconfigure(0, weight=1)
-        content.rowconfigure(1, weight=1)
 
-        self.next_game_panel = self._create_panel(content, "次の試合")
-        self.next_game_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 12), pady=(0, 12))
+        self._home_center_right_paned = ttk.Panedwindow(content, orient=tk.HORIZONTAL)
+        self._home_center_right_paned.grid(row=0, column=0, sticky="nsew")
 
-        self.club_summary_panel = self._create_panel(content, "クラブ状況サマリー")
-        self.club_summary_panel.grid(row=1, column=0, sticky="nsew", padx=(0, 12))
+        center_col = ttk.Frame(self._home_center_right_paned, style="Root.TFrame", padding=(0, 0, 12, 0))
+        center_col.columnconfigure(0, weight=1)
+        center_col.rowconfigure(0, weight=4, uniform="home_center")
+        center_col.rowconfigure(1, weight=6, uniform="home_center")
 
-        self.tasks_panel = self._create_panel(content, "要対応案件")
-        self.tasks_panel.grid(row=0, column=1, sticky="nsew", pady=(0, 12))
+        right_col = ttk.Frame(self._home_center_right_paned, style="Root.TFrame")
+        right_col.columnconfigure(0, weight=1)
+        right_col.rowconfigure(0, weight=4, uniform="home_right")
+        right_col.rowconfigure(1, weight=4, uniform="home_right")
+        right_col.rowconfigure(2, weight=2, uniform="home_right")
 
-        right_bottom = ttk.Frame(content, style="Root.TFrame")
-        right_bottom.grid(row=1, column=1, sticky="nsew")
-        right_bottom.rowconfigure(0, weight=1)
-        right_bottom.rowconfigure(1, weight=0)
+        self._home_center_right_paned.add(center_col, weight=5)
+        self._home_center_right_paned.add(right_col, weight=3)
 
-        self.news_panel = self._create_panel(right_bottom, "ニュース")
-        self.news_panel.grid(row=0, column=0, sticky="nsew", pady=(0, 12))
+        self._home_cr_split_done = False
 
-        advance_wrap = ttk.Frame(right_bottom, style="Panel.TFrame", padding=12)
-        advance_wrap.grid(row=1, column=0, sticky="ew")
-        advance_wrap.columnconfigure(0, weight=1)
+        def _apply_home_center_right_split(_event: Any = None) -> None:
+            if self._home_cr_split_done:
+                return
+            pw = getattr(self, "_home_center_right_paned", None)
+            if pw is None:
+                return
+            try:
+                total = int(pw.winfo_width())
+                # 初期レイアウト前の小さい幅で確定しない（Configure 連打は使わない）
+                if total < 520:
+                    return
+                # 左メニュー外のこのペイン内で、中央:右 ≒ 5:3（中央 62.5%）
+                pw.sashpos(0, max(240, int(total * 5 / 8)))
+                self._home_cr_split_done = True
+            except tk.TclError:
+                pass
 
-        self.advance_hint_var = tk.StringVar(value="")
-        self.advance_hint_label = ttk.Label(
-            advance_wrap,
-            textvariable=self.advance_hint_var,
-            background="#1d2129",
-            foreground="#ffd38a",
-            font=("Yu Gothic UI", 10),
-            anchor="w",
+        self._home_center_right_paned.bind("<Map>", _apply_home_center_right_split)
+        self.root.after_idle(_apply_home_center_right_split)
+        self.root.after(200, _apply_home_center_right_split)
+
+        self.next_game_panel = self._create_panel(center_col, "次の試合")
+        self.next_game_panel.grid(row=0, column=0, sticky="nsew", pady=(0, 12))
+
+        self.club_summary_panel = self._create_panel(center_col, "クラブ状況サマリー")
+        self.club_summary_panel.grid(row=1, column=0, sticky="nsew")
+
+        ng_inner = self._resolve_content_parent(self.next_game_panel)
+        ng_inner.columnconfigure(0, weight=1)
+        ng_inner.rowconfigure(0, weight=1)
+        _, self._next_game_scroll_inner = self._home_embed_vertical_scroll(
+            ng_inner, grid_row=0, bg="#222834"
         )
-        self.advance_hint_label.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+        cs_inner = self._resolve_content_parent(self.club_summary_panel)
+        cs_inner.columnconfigure(0, weight=1)
+        cs_inner.rowconfigure(0, weight=1)
+        _, self._club_scroll_inner = self._home_embed_vertical_scroll(
+            cs_inner, grid_row=0, bg="#222834"
+        )
+
+        self.tasks_panel = self._create_panel(right_col, "今やること")
+        self.tasks_panel.grid(row=0, column=0, sticky="nsew", pady=(0, 12))
+        tasks_content = self._resolve_content_parent(self.tasks_panel)
+        tasks_content.columnconfigure(0, weight=1)
+        tasks_content.rowconfigure(0, weight=0)
+        tasks_content.rowconfigure(1, weight=1)
+        self.tasks_summary_var = tk.StringVar(value="")
+        tk.Label(
+            tasks_content,
+            textvariable=self.tasks_summary_var,
+            bg="#222834",
+            fg="#a8b4c8",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=360,
+            padx=2,
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 4))
+        _, self._tasks_scroll_inner = self._home_embed_vertical_scroll(
+            tasks_content, grid_row=1, bg="#222834"
+        )
+
+        self.news_panel = self._create_panel(right_col, "ニュース")
+        self.news_panel.grid(row=1, column=0, sticky="nsew", pady=(0, 12))
+        news_content = self._resolve_content_parent(self.news_panel)
+        news_content.columnconfigure(0, weight=1)
+        news_content.rowconfigure(0, weight=1)
+        self.news_text = scrolledtext.ScrolledText(
+            news_content,
+            height=4,
+            width=36,
+            wrap="word",
+            bg="#222834",
+            fg="#eef3f8",
+            insertbackground="#eef3f8",
+            font=("Yu Gothic UI", 11),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self.news_text.grid(row=0, column=0, sticky="nsew")
+        self.news_text.configure(state="disabled")
+
+        advance_wrap = ttk.Frame(right_col, style="Panel.TFrame", padding=(12, 10))
+        advance_wrap.grid(row=2, column=0, sticky="nsew")
+        advance_wrap.columnconfigure(0, weight=1)
+        advance_wrap.rowconfigure(0, weight=1)
+        advance_wrap.rowconfigure(1, weight=0)
+        advance_wrap.rowconfigure(2, weight=0)
+
+        self._advance_hint_text = scrolledtext.ScrolledText(
+            advance_wrap,
+            height=3,
+            width=36,
+            wrap="word",
+            bg="#1d2129",
+            fg="#ffd38a",
+            insertbackground="#ffd38a",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=4,
+            pady=4,
+        )
+        self._advance_hint_text.grid(row=0, column=0, sticky="nsew", pady=(0, 6))
+        self._advance_hint_text.configure(state="disabled")
 
         self.advance_button = ttk.Button(
             advance_wrap,
@@ -364,10 +492,21 @@ class MainMenuView:
             anchor="w",
         ).pack(fill="x")
 
-        self.next_game_lines = self._make_line_vars(self.next_game_panel, 5)
-        self.club_summary_lines = self._make_line_vars(self.club_summary_panel, 6)
-        self.task_lines = self._make_bullet_vars(self.tasks_panel, 3, prefix="! ")
-        self.news_lines = self._make_bullet_vars(self.news_panel, 4, prefix="・")
+        self.next_game_lines = self._make_line_vars(
+            self.next_game_panel, 6, content_parent=self._next_game_scroll_inner
+        )
+        self.club_summary_lines = self._make_line_vars(
+            self.club_summary_panel, 6, content_parent=self._club_scroll_inner
+        )
+        self.task_lines = self._make_bullet_vars(
+            self.tasks_panel, 3, prefix="• ", content_parent=self._tasks_scroll_inner
+        )
+        self._task_injury_detail_button = ttk.Button(
+            self._tasks_scroll_inner,
+            text="負傷者の詳細・行動ガイド",
+            style="Menu.TButton",
+            command=self._on_home_injury_detail_click,
+        )
 
     def _create_panel(self, parent: tk.Misc, title: str) -> ttk.Frame:
         panel = ttk.Frame(parent, style="Panel.TFrame", padding=14)
@@ -386,8 +525,112 @@ class MainMenuView:
     def _resolve_content_parent(self, panel: ttk.Frame) -> tk.Misc:
         return getattr(panel, "content_frame", panel)
 
-    def _make_line_vars(self, panel: ttk.Frame, count: int) -> List[tk.StringVar]:
-        content_parent = self._resolve_content_parent(panel)
+    def _home_embed_vertical_scroll(
+        self,
+        parent: tk.Misc,
+        *,
+        grid_row: int,
+        bg: str = "#222834",
+    ) -> Tuple[tk.Canvas, tk.Frame]:
+        """ホーム各パネル用: 親の grid_row に Canvas＋縦スクロールを置き、内側 Frame を返す。"""
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(grid_row, weight=1)
+        canvas = tk.Canvas(parent, bg=bg, highlightthickness=0)
+        vsb = ttk.Scrollbar(parent, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        inner = tk.Frame(canvas, bg=bg)
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_inner_configure(_event: Any = None) -> None:
+            bbox = canvas.bbox("all")
+            if bbox is not None:
+                canvas.configure(scrollregion=bbox)
+
+        inner.bind("<Configure>", _on_inner_configure)
+
+        def _on_canvas_configure(event: Any) -> None:
+            try:
+                canvas.itemconfigure(win_id, width=event.width)
+            except tk.TclError:
+                pass
+
+        canvas.bind("<Configure>", _on_canvas_configure)
+
+        def _wheel(event: Any) -> str:
+            if getattr(event, "delta", 0):
+                canvas.yview_scroll(int(-event.delta / 120), "units")
+            return "break"
+
+        canvas.bind("<MouseWheel>", _wheel)
+        inner.bind("<MouseWheel>", _wheel)
+        canvas.bind("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
+        canvas.bind("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
+        inner.bind("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
+        inner.bind("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
+
+        canvas.grid(row=grid_row, column=0, sticky="nsew")
+        vsb.grid(row=grid_row, column=1, sticky="ns")
+        return canvas, inner
+
+    @staticmethod
+    def _shorten_home_advance_hint(text: str, max_len: int = 220) -> str:
+        s = str(text or "").strip()
+        if len(s) <= max_len:
+            return s
+        return s[: max(1, max_len - 1)] + "…"
+
+    def _set_home_advance_hint(self, text: str) -> None:
+        tw = getattr(self, "_advance_hint_text", None)
+        if tw is None:
+            return
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", self._shorten_home_advance_hint(text))
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _jpn_text_button(
+        self,
+        parent: tk.Misc,
+        text: str,
+        command: Any,
+        *,
+        primary: bool = False,
+        side: str = "right",
+        padx: int = 0,
+        pady: int = 0,
+    ) -> tk.Button:
+        """ttk が環境によって日本語ラベルを欠落させる場合のフォールバック用 tk.Button。"""
+        bg = "#2f4f9e" if primary else "#3a4558"
+        fg = "#f4f7fb"
+        active_bg = "#3a5fc4" if primary else "#4a5568"
+        btn = tk.Button(
+            parent,
+            text=text,
+            command=command,
+            font=("Yu Gothic UI", 10, "bold" if primary else "normal"),
+            bg=bg,
+            fg=fg,
+            activebackground=active_bg,
+            activeforeground=fg,
+            relief="flat",
+            padx=14,
+            pady=8,
+            cursor="hand2",
+        )
+        btn.pack(side=side, padx=padx, pady=pady)
+        return btn
+
+    def _make_line_vars(
+        self,
+        panel: ttk.Frame,
+        count: int,
+        *,
+        content_parent: Optional[tk.Misc] = None,
+    ) -> List[tk.StringVar]:
+        content_parent = content_parent or self._resolve_content_parent(panel)
         vars_: List[tk.StringVar] = []
         for i in range(count):
             var = tk.StringVar(value="")
@@ -407,8 +650,15 @@ class MainMenuView:
             vars_.append(var)
         return vars_
 
-    def _make_bullet_vars(self, panel: ttk.Frame, count: int, prefix: str) -> List[tk.StringVar]:
-        content_parent = self._resolve_content_parent(panel)
+    def _make_bullet_vars(
+        self,
+        panel: ttk.Frame,
+        count: int,
+        prefix: str,
+        *,
+        content_parent: Optional[tk.Misc] = None,
+    ) -> List[tk.StringVar]:
+        content_parent = content_parent or self._resolve_content_parent(panel)
         vars_: List[tk.StringVar] = []
         for _ in range(count):
             var = tk.StringVar(value="")
@@ -472,11 +722,21 @@ class MainMenuView:
             self._system_menu_window = None
 
     def refresh(self) -> None:
+        self._injury_autorepair_task_supplement = ""
+        if self.team is not None:
+            note = getattr(self.team, "_injury_autorepair_notice_jp", None)
+            if isinstance(note, str) and note.strip():
+                self._injury_autorepair_task_supplement = note.strip()
+                try:
+                    delattr(self.team, "_injury_autorepair_notice_jp")
+                except Exception:
+                    pass
         self._refresh_top_bar()
         self._refresh_season_status()
         self._refresh_next_game()
         self._refresh_club_summary()
         self._refresh_tasks()
+        self._refresh_menu_injury_badges()
         self._refresh_news()
         try:
             if getattr(self, "_roster_window", None) is not None and self._roster_window.winfo_exists():
@@ -582,7 +842,9 @@ class MainMenuView:
         try:
             messagebox.showwarning(
                 "トレード・インシーズンFAは不可",
-                INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
+                "期限ルールにより、現在は実行できません。\n"
+                "（オフシーズンは別処理で進行します）\n\n"
+                + INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
                 parent=p,
             )
         except Exception:
@@ -592,26 +854,75 @@ class MainMenuView:
     # ------------------------------------------------------------------
     # Refresh helpers
     # ------------------------------------------------------------------
+    def _game_progress_summary(self) -> str:
+        if self.season is None:
+            return "—"
+        if bool(self._safe_get(self.season, "season_finished", False)):
+            sn = int(self._safe_get(self.season, "season_no", 1) or 1)
+            return f"{sn}年目・レギュラー終了（オフ／次年度へ）"
+        cr = int(self._safe_get(self.season, "current_round", 0) or 0)
+        tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
+        sn = int(self._safe_get(self.season, "season_no", 1) or 1)
+        nxt = cr + 1
+        month = round_month_label(self.season, nxt) if tr > 0 and nxt <= tr else "—"
+        return f"{sn}年目・消化ラウンド {cr}/{tr}（次 ~{month}）"
+
+    @staticmethod
+    def _is_home_tasks_empty_line(line: str) -> bool:
+        s = str(line)
+        return s.startswith("（要確認の項目はありません") or s.startswith(
+            "（ホーム上の「やること」はありません"
+        )
+
+    def _home_task_urgent_normal_counts(self, lines: List[str]) -> Optional[Tuple[int, int]]:
+        if not lines:
+            return None
+        if len(lines) == 1 and self._is_home_tasks_empty_line(lines[0]):
+            return None
+        urgent = sum(1 for x in lines if str(x).startswith("[優先]"))
+        normal = len(lines) - urgent
+        return (urgent, normal)
+
+    @staticmethod
+    def _format_task_line_for_display(line: str) -> str:
+        s = str(line)
+        if s.startswith("[優先] "):
+            return "【急ぎ】" + s[5:]
+        if s.startswith("[任意] "):
+            return "【あとで】" + s[5:]
+        return s
+
+    def _task_status_short(self) -> str:
+        lines = self._get_task_lines()
+        counts = self._home_task_urgent_normal_counts(lines)
+        if counts is None:
+            return "なし"
+        urgent, normal = counts
+        total = urgent + normal
+        if urgent and normal:
+            return f"急ぎ{urgent}・あとで{normal}（計{total}）"
+        if urgent:
+            return f"急ぎ{urgent}（計{total}）"
+        return f"あとで{normal}（計{total}）"
+
     def _refresh_top_bar(self) -> None:
-        current_date = self._format_date(self._get_current_date())
-        season_year = self._get_season_year()
+        progress = self._game_progress_summary()
         league_level = self._safe_get(self.team, "league_level", "-")
         rank = self._compute_rank_text()
         wins = self._safe_get(self.team, "regular_wins", 0)
         losses = self._safe_get(self.team, "regular_losses", 0)
         money = self._safe_get(self.team, "money", 0)
         owner_trust = self._get_owner_trust_text()
-        task_count = len(self._get_tasks())
+        task_short = self._task_status_short()
 
         text = (
-            f"日付: {current_date}    "
-            f"年度: {season_year}    "
+            f"進行: {progress}    "
             f"リーグ: D{league_level}    "
             f"順位: {rank}    "
             f"戦績: {wins}勝{losses}敗    "
             f"資金: {self._format_money(money)}    "
             f"オーナー信頼: {owner_trust}    "
-            f"要対応: {task_count}件"
+            f"やること: {task_short}"
         )
         self.top_bar_var.set(text)
 
@@ -625,6 +936,24 @@ class MainMenuView:
             )
             return
         if bool(self._safe_get(self.season, "season_finished", False)):
+            lbl = None
+            if self.advance_primary_ui_fn is not None:
+                try:
+                    lbl, _ = self.advance_primary_ui_fn()
+                except Exception:
+                    lbl = None
+            if lbl == "次のシーズンへ…":
+                self.season_status_var.set(
+                    "進行: オフ完了・次年度開始待ち（年度進行ゲート）  |  "
+                    "シーズン: 終了  |  トレード／インシーズンFA: オフシーズン（制限なし）"
+                )
+                return
+            if lbl == "オフシーズンを実行":
+                self.season_status_var.set(
+                    "進行: シーズン終了（オフ未実行）  |  "
+                    "シーズン: 終了  |  トレード／インシーズンFA: オフシーズン（『オフシーズンを実行』で進める）"
+                )
+                return
             self.season_status_var.set(
                 "シーズン: 終了  |  トレード／インシーズンFA: オフシーズン（『次へ進む』でオフ処理）"
             )
@@ -633,7 +962,17 @@ class MainMenuView:
         tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
         unlocked = self.inseason_roster_moves_allowed()
         tx = "可（ラウンド22消化後まで）" if unlocked else "期限切れ（シーズン終了まで不可）"
-        self.season_status_var.set(f"消化ラウンド: {cr}/{tr}  |  トレード／インシーズンFA: {tx}")
+        phase = ""
+        if self.advance_primary_ui_fn is not None:
+            try:
+                plbl, _ = self.advance_primary_ui_fn()
+                if plbl == "次へ進む":
+                    phase = "進行: レギュラー中  |  "
+            except Exception:
+                pass
+        self.season_status_var.set(
+            f"{phase}消化ラウンド: {cr}/{tr}  |  トレード／インシーズンFA: {tx}"
+        )
 
     def _roster_transaction_status_text(self) -> str:
         """情報画面用の短い文言。"""
@@ -645,10 +984,52 @@ class MainMenuView:
             return "可（ラウンド22消化後まで）"
         return "期限切れ（シーズン終了まで不可）"
 
+    def _format_hr_trade_fa_guidance_text(self) -> str:
+        """人事ウィンドウ用: トレード／インシーズンFA の正本案内（CLI 手順は main.py と同一）。"""
+        cr = int(self._safe_get(self.season, "current_round", 0) or 0)
+        tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
+        fin = self.season is not None and bool(self._safe_get(self.season, "season_finished", False))
+        if self.season is None:
+            sched = "消化ラウンド: —（シーズン未接続）\n"
+            lock_line = "シーズンに接続すると、レギュラー中のトレード／インシーズンFA の期限表示が更新されます。"
+        elif fin:
+            sched = f"消化ラウンド: {cr}/{tr}（シーズン終了・オフシーズン）\n"
+            lock_line = (
+                "現在はオフシーズンです。トレード・FA はオフシーズン処理（再契約・FA・ドラフト等）を"
+                "メインの進行から進めてください。"
+            )
+        else:
+            sched = f"消化ラウンド: {cr}/{tr}\n"
+            if self.inseason_roster_moves_allowed():
+                lock_line = (
+                    "レギュラー中のトレード／インシーズンFA は「ラウンド22消化後」まで可能です"
+                    "（3月第2週終了相当）。"
+                )
+            else:
+                lock_line = INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA
+        tx = self._roster_transaction_status_text()
+        return (
+            "【当面の運用】\n"
+            "・トレード／インシーズンFA の標準導線は CLI メニューです。\n"
+            "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、CLI 導線の案内を担当します。\n\n"
+            "【現在の条件】\n"
+            f"{sched}"
+            f"{lock_line}\n"
+            f"レギュラー中のトレード／インシーズンFA（可否の要約）: {tx}\n\n"
+            "【このウィンドウ（GUI）でできること】\n"
+            "・ロスター表での閲覧、契約の＋1年延長（条件あり）、契約解除による FA 送り（インシーズンは"
+            "トレード／インシーズンFA と同じ期限でロック）。\n\n"
+            "【まだターミナル（CLI）で行うこと】\n"
+            "・他チームとのトレード、インシーズンFA の本操作、新規契約交渉などは GUI 未対応です。\n"
+            "・実行はシーズンメニュー「8. GMメニュー」→「10. トレード」が正本です。\n"
+            "・期限後は CLI 側でもブロックされます（上記と同じルール）。\n\n"
+            "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
+        )
+
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
-        for var, line in zip(self.next_game_lines, info):
-            var.set(line)
+        for i, var in enumerate(self.next_game_lines):
+            var.set(info[i] if i < len(info) else "")
 
     def _refresh_club_summary(self) -> None:
         info = self._build_club_summary_info()
@@ -656,37 +1037,77 @@ class MainMenuView:
             var.set(line)
 
     def _refresh_tasks(self) -> None:
-        tasks = self._get_tasks()
+        tasks = self._get_task_lines()
         count = len(tasks)
-        shown = tasks[:3]
+        empty_placeholder = len(tasks) == 1 and self._is_home_tasks_empty_line(tasks[0])
+        shown = [] if empty_placeholder else tasks[:3]
+
+        counts = self._home_task_urgent_normal_counts(tasks)
+        if counts is None:
+            self.tasks_summary_var.set(
+                "いま対応が必要な項目はありません（状況は各メニューで確認できます）。"
+            )
+        else:
+            urgent, normal = counts
+            overflow = max(0, count - len(shown))
+            summary = (
+                f"内訳: 急ぎ {urgent} 件・あとで確認 {normal} 件（計 {urgent + normal} 件）"
+            )
+            if overflow:
+                summary += f" ※この欄は最大 {len(shown)} 件まで表示（ほか {overflow} 件）"
+            self.tasks_summary_var.set(summary)
 
         for i, var in enumerate(self.task_lines):
             if i < len(shown):
-                var.set(f"! {shown[i]}")
+                var.set(f"• {self._format_task_line_for_display(shown[i])}")
             else:
                 var.set("")
 
         season_finished = bool(self._safe_get(self.season, "season_finished", False))
+        progress_hint = ""
+        if not season_finished and self.season is not None and self.team is not None:
+            progress_hint, _ = next_advance_display_hints(self.season, self.team)
         if season_finished:
+            fin_msg = (
+                "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます"
+                "（数分かかる場合があります）。"
+            )
             if self.advance_primary_ui_fn is not None:
                 try:
                     _, hint = self.advance_primary_ui_fn()
-                    self.advance_hint_var.set(
-                        hint
-                        or "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
-                    )
+                    self._set_home_advance_hint(hint or fin_msg)
                 except Exception:
-                    self.advance_hint_var.set(
-                        "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
-                    )
+                    self._set_home_advance_hint(fin_msg)
             else:
-                self.advance_hint_var.set(
-                    "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。"
-                )
-        elif count > 0:
-            self.advance_hint_var.set(f"未処理案件が {count} 件あります。必要なら先に確認してください。")
+                self._set_home_advance_hint(fin_msg)
+        elif not empty_placeholder and count > 0:
+            task_line = (
+                f"未対応 {count} 件。上の「今やること」で確認（急ぎ／あとで）。"
+            )
+            if self._injured_players_on_user_team():
+                task_line += " 負傷は「負傷者の詳細・行動ガイド」。"
+            if progress_hint:
+                self._set_home_advance_hint(f"{progress_hint}\n{task_line}")
+            else:
+                self._set_home_advance_hint(task_line)
         else:
-            self.advance_hint_var.set("")
+            self._set_home_advance_hint(progress_hint)
+
+        inj_btn = getattr(self, "_task_injury_detail_button", None)
+        if inj_btn is not None:
+            injured_here = bool(self._injured_players_on_user_team())
+            show_inj = (
+                injured_here
+                and self.external_tasks is None
+                and not empty_placeholder
+            )
+            try:
+                if show_inj:
+                    inj_btn.pack(fill="x", pady=(8, 0))
+                else:
+                    inj_btn.pack_forget()
+            except tk.TclError:
+                pass
 
     def _refresh_advance_button(self) -> None:
         if self.advance_primary_ui_fn is not None:
@@ -701,16 +1122,26 @@ class MainMenuView:
 
     def _refresh_news(self) -> None:
         news = self._get_news_items()[:4]
-        for i, var in enumerate(self.news_lines):
-            if i < len(news):
-                var.set(f"・{news[i]}")
-            else:
-                var.set("")
+        tw = getattr(self, "news_text", None)
+        if tw is None:
+            return
+        lines = [f"・{n}" for n in news]
+        body = "\n".join(lines) if lines else ""
+        if not body.strip():
+            body = "（表示できるニュースがありません）"
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
 
     # ------------------------------------------------------------------
     # Data builders
     # ------------------------------------------------------------------
     def _build_next_game_info(self) -> List[str]:
+        _, panel_hint = next_advance_display_hints(self.season, self.team)
         next_game = self._find_next_game()
         if next_game is None:
             return [
@@ -719,6 +1150,7 @@ class MainMenuView:
                 "ホーム/アウェイ: -",
                 "相手情報: -",
                 "補足: 左メニュー「日程」で一覧を確認できます",
+                panel_hint or "",
             ]
 
         game_type = self._first_non_empty(
@@ -757,13 +1189,15 @@ class MainMenuView:
         meaning = self._build_next_game_meaning(opponent_rank, venue_text)
         compare = self._build_next_game_compare(opponent_rank, opponent_record)
 
-        return [
+        lines = [
             f"{game_round} / {game_type} / {game_date}",
             f"{home_team} vs {away_team}",
             f"{venue_text} / 相手順位: {opponent_rank} / 相手戦績: {opponent_record}",
             meaning,
             compare,
+            panel_hint or "",
         ]
+        return lines
 
     def _build_club_summary_info(self) -> List[str]:
         rank = self._compute_rank_text()
@@ -797,7 +1231,6 @@ class MainMenuView:
             from basketball_sim.systems.salary_cap_budget import (
                 cap_status,
                 compute_luxury_tax,
-                get_hard_cap,
                 get_payroll_floor,
                 get_soft_cap,
                 league_level_for_team,
@@ -805,19 +1238,17 @@ class MainMenuView:
 
             payroll = int(get_team_payroll(team))
             lv = league_level_for_team(team)
-            hard = int(get_hard_cap(league_level=lv))
-            soft = int(get_soft_cap(league_level=lv))
+            league_cap = int(get_soft_cap(league_level=lv))
             st = cap_status(payroll, league_level=lv)
             status_ja = {
                 "under_cap": "キャップ内",
-                "over_cap": "ハード超過",
-                "over_soft_cap": "ソフト超過",
+                "over_soft_cap": "キャップ超過",
             }.get(st, st)
-            room_soft = soft - payroll
+            room_soft = league_cap - payroll
             if room_soft >= 0:
-                room_str = f"ソフト余裕 {room_soft:,}円"
+                room_str = f"キャップ余裕 {room_soft:,}円"
             else:
-                room_str = f"ソフト超過 {abs(room_soft):,}円"
+                room_str = f"キャップ超過 {abs(room_soft):,}円"
             tax = int(compute_luxury_tax(payroll, league_level=lv))
             tax_str = f" / 贅沢税 {tax:,}円" if tax > 0 else ""
             bud = int(self._safe_get(team, "payroll_budget", 0) or 0)
@@ -830,7 +1261,7 @@ class MainMenuView:
             if floor > 0 and payroll < floor:
                 floor_str = f" | ⚠ ペイロール下限未満（要 {floor:,}円以上・シーズン終了時は降格の対象）"
             return (
-                f"給与合計 {payroll:,}円（ハード {hard:,}円 / ソフト {soft:,}円 / 全D共通ソフト12億）"
+                f"給与合計 {payroll:,}円（サラリーキャップ {league_cap:,}円・全D共通12億）"
                 f" | {status_ja} | {room_str}{tax_str}{bud_str}{floor_str}"
             )
         except Exception:
@@ -839,7 +1270,7 @@ class MainMenuView:
 
 
     def open_roster_window(self) -> None:
-        """Open a safe read-only roster subwindow."""
+        """人事・ロスター: トレード／FA 案内（正本）、表、詳細ロスター。＋1年延長・FA 解除は条件付き。"""
         existing = getattr(self, "_roster_window", None)
         try:
             if existing is not None and existing.winfo_exists():
@@ -851,9 +1282,9 @@ class MainMenuView:
             pass
 
         window = tk.Toplevel(self.root)
-        window.title(f"ロスター一覧 - {self._team_name()}")
-        window.geometry("980x620")
-        window.minsize(860, 520)
+        window.title(f"人事・ロスター - {self._team_name()}")
+        window.geometry("980x800")
+        window.minsize(860, 620)
         window.configure(bg="#15171c")
         try:
             window.transient(self.root)
@@ -874,9 +1305,56 @@ class MainMenuView:
             anchor="w",
         ).pack(fill="x")
 
+        self.roster_jp_header_var = tk.StringVar(value="")
+        tk.Label(
+            outer,
+            textvariable=self.roster_jp_header_var,
+            bg="#1d2129",
+            fg="#c8d0dc",
+            justify="left",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+            padx=14,
+            pady=6,
+            wraplength=900,
+        ).pack(fill="x", pady=(0, 8))
+
+        trade_fa_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
+        trade_fa_wrap.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            trade_fa_wrap,
+            text="トレード・FA（当面の標準導線はCLI／この画面は案内と一部操作）",
+            style="TopBar.TLabel",
+            anchor="w",
+        ).pack(fill="x", anchor="w", pady=(0, 6))
+        tf_row = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
+        tf_row.pack(fill="both", expand=False)
+        tf_row.columnconfigure(0, weight=1)
+        tf_row.rowconfigure(0, weight=1)
+        self.roster_trade_fa_text = tk.Text(
+            tf_row,
+            wrap="word",
+            height=9,
+            bg="#1d2129",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            padx=8,
+            pady=8,
+        )
+        tf_vsb = ttk.Scrollbar(tf_row, orient="vertical", command=self.roster_trade_fa_text.yview)
+        self.roster_trade_fa_text.configure(yscrollcommand=tf_vsb.set)
+        self.roster_trade_fa_text.grid(row=0, column=0, sticky="nsew")
+        tf_vsb.grid(row=0, column=1, sticky="ns")
+
         columns = ("role", "name", "pos", "ovr", "pot", "age", "fatigue", "morale", "salary", "years")
-        tree_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=10)
-        tree_wrap.pack(fill="both", expand=True)
+
+        roster_paned = ttk.Panedwindow(outer, orient="vertical")
+        roster_paned.pack(fill="both", expand=True)
+
+        tree_wrap = ttk.Frame(roster_paned, style="Panel.TFrame", padding=10)
+        roster_paned.add(tree_wrap, weight=3)
 
         self.roster_tree = ttk.Treeview(
             tree_wrap,
@@ -924,6 +1402,45 @@ class MainMenuView:
         tree_wrap.columnconfigure(0, weight=1)
         tree_wrap.rowconfigure(0, weight=1)
 
+        detail_outer = ttk.Frame(roster_paned, style="Panel.TFrame", padding=(10, 6, 10, 10))
+        roster_paned.add(detail_outer, weight=2)
+        detail_outer.columnconfigure(0, weight=1)
+        ttk.Label(
+            detail_outer,
+            text="詳細ロスター（テキスト一覧・閲覧専用）",
+            style="TopBar.TLabel",
+            anchor="w",
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+        ttk.Label(
+            detail_outer,
+            text="表と同一ロスターです。並び・体裁は GM 表示ルール（docs/GM_ROSTER_DISPLAY_RULES.md）に沿います。",
+            wraplength=900,
+            font=("Yu Gothic UI", 9),
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        text_host = ttk.Frame(detail_outer, style="Panel.TFrame", padding=0)
+        text_host.grid(row=2, column=0, columnspan=2, sticky="nsew")
+        detail_outer.rowconfigure(2, weight=1)
+        text_host.rowconfigure(0, weight=1)
+        text_host.columnconfigure(0, weight=1)
+        self.roster_detail_text = tk.Text(
+            text_host,
+            wrap="none",
+            height=10,
+            bg="#222834",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+            font=("Consolas", 10),
+            relief="flat",
+            padx=10,
+            pady=8,
+        )
+        rdt_vsb = ttk.Scrollbar(text_host, orient="vertical", command=self.roster_detail_text.yview)
+        rdt_hsb = ttk.Scrollbar(text_host, orient="horizontal", command=self.roster_detail_text.xview)
+        self.roster_detail_text.configure(yscrollcommand=rdt_vsb.set, xscrollcommand=rdt_hsb.set)
+        self.roster_detail_text.grid(row=0, column=0, sticky="nsew")
+        rdt_vsb.grid(row=0, column=1, sticky="ns")
+        rdt_hsb.grid(row=1, column=0, sticky="ew")
+
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
 
@@ -940,12 +1457,22 @@ class MainMenuView:
             pady=2,
         ).pack(fill="x", anchor="w")
 
-        ttk.Button(
-            bottom,
-            text="閉じる",
-            style="Menu.TButton",
-            command=window.destroy,
-        ).pack(anchor="e", pady=(8, 0))
+        btn_row = tk.Frame(bottom, bg="#1d2129")
+        btn_row.pack(fill="x", pady=(8, 0))
+        self._jpn_text_button(
+            btn_row,
+            "＋1年延長",
+            self._on_roster_extend_one_year_selected,
+            side="left",
+        )
+        self._jpn_text_button(
+            btn_row,
+            "契約解除（FAへ）",
+            self._on_roster_release_selected,
+            side="left",
+            padx=(8, 0),
+        )
+        self._jpn_text_button(btn_row, "閉じる", self._on_close_roster_window, side="right")
 
         self._roster_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_roster_window)
@@ -958,6 +1485,146 @@ class MainMenuView:
                 window.destroy()
         finally:
             self._roster_window = None
+            self._roster_item_to_player.clear()
+
+    def _on_roster_extend_one_year_selected(self) -> None:
+        """contract_logic.apply_contract_extension を GUI から1回だけ適用（年俸据え置き）。"""
+        parent = getattr(self, "_roster_window", None) or self.root
+        tree = getattr(self, "roster_tree", None)
+        if tree is None:
+            return
+        sel = tree.selection()
+        if not sel:
+            messagebox.showinfo("人事", "一覧から選手を選択してください。", parent=parent)
+            return
+        player = self._roster_item_to_player.get(sel[0])
+        if player is None:
+            messagebox.showwarning(
+                "人事",
+                "選択の解決に失敗しました。一度閉じて開き直してください。",
+                parent=parent,
+            )
+            return
+        team = self.team
+        if team is None:
+            messagebox.showwarning("人事", "チームが未接続です。", parent=parent)
+            return
+        roster = list(self._safe_get(team, "players", []) or [])
+        if player not in roster:
+            messagebox.showwarning("人事", "当チームのロスターにいない選手です。", parent=parent)
+            return
+        cur = int(getattr(player, "contract_years_left", 0) or 0)
+        if cur <= 0:
+            messagebox.showwarning(
+                "人事",
+                "残契約年数がないため延長できません。",
+                parent=parent,
+            )
+            return
+        if cur >= MAX_CONTRACT_YEARS_DEFAULT:
+            messagebox.showwarning(
+                "人事",
+                f"残年数が上限（{MAX_CONTRACT_YEARS_DEFAULT} 年）に達しているため、これ以上の延長はできません。",
+                parent=parent,
+            )
+            return
+        name = str(getattr(player, "name", "選手"))
+        if not messagebox.askyesno(
+            "人事",
+            f"{name} の契約を 1 年延長しますか？（年俸・役割は据え置き）",
+            parent=parent,
+        ):
+            return
+        apply_contract_extension(team, player, add_years=1)
+        add_hist = getattr(team, "add_history_transaction", None)
+        if callable(add_hist):
+            try:
+                add_hist("gui_extension", player, "GUI人事：契約＋1年")
+            except Exception:
+                pass
+        messagebox.showinfo("人事", f"{name} の契約を 1 年延長しました。", parent=parent)
+        self._refresh_roster_window()
+        try:
+            self.refresh()
+        except Exception:
+            pass
+
+    def _on_roster_release_selected(self) -> None:
+        parent = getattr(self, "_roster_window", None) or self.root
+        tree = getattr(self, "roster_tree", None)
+        if tree is None:
+            return
+        sel = tree.selection()
+        if not sel:
+            messagebox.showinfo("人事", "一覧から選手を選択してください。", parent=parent)
+            return
+        player = self._roster_item_to_player.get(sel[0])
+        if player is None:
+            messagebox.showwarning(
+                "人事",
+                "選択の解決に失敗しました。一度閉じて開き直してください。",
+                parent=parent,
+            )
+            return
+        if not self.ensure_inseason_roster_moves_allowed(parent):
+            return
+        if bool(getattr(player, "icon_locked", False)) or bool(getattr(player, "is_icon", False)):
+            messagebox.showwarning(
+                "人事",
+                "この選手は契約解除できません（アイコン／保護選手）。",
+                parent=parent,
+            )
+            return
+        team = self.team
+        players = list(self._safe_get(team, "players", []) or [])
+        if len(players) <= CONTRACT_ROSTER_MIN_SEASON:
+            messagebox.showwarning(
+                "人事",
+                f"契約選手は最低 {CONTRACT_ROSTER_MIN_SEASON} 人必要です（現状 {len(players)} 人）。解除できません。",
+                parent=parent,
+            )
+            return
+        name = str(getattr(player, "name", "選手"))
+        if not messagebox.askyesno(
+            "人事",
+            f"{name} を契約解除し、フリーエージェントに送りますか？",
+            parent=parent,
+        ):
+            return
+        season = getattr(self, "season", None)
+        if season is None:
+            messagebox.showwarning(
+                "人事",
+                "シーズン未接続のため FA プールへ追加できません。",
+                parent=parent,
+            )
+            return
+        fa_list = getattr(season, "free_agents", None)
+        if fa_list is None:
+            messagebox.showwarning("人事", "FA プールが未初期化です。", parent=parent)
+            return
+        team.remove_player(player)
+        setattr(player, "contract_years_left", 0)
+        if int(getattr(player, "salary", 0) or 0) <= 0:
+            setattr(
+                player,
+                "salary",
+                max(int(getattr(player, "ovr", 0) or 0) * PLAYER_SALARY_BASE_PER_OVR, 300_000),
+            )
+        if player not in fa_list:
+            fa_list.append(player)
+        add_hist = getattr(team, "add_history_transaction", None)
+        if callable(add_hist):
+            try:
+                add_hist("gui_release", player, "GUI人事：契約解除")
+            except Exception:
+                pass
+        messagebox.showinfo("人事", f"{name} を FA に送りました。", parent=parent)
+        self._refresh_roster_window()
+        try:
+            self.refresh()
+        except Exception:
+            pass
 
     def _refresh_roster_window(self) -> None:
         tree = getattr(self, "roster_tree", None)
@@ -969,6 +1636,8 @@ class MainMenuView:
                 tree.delete(item)
         except Exception:
             return
+
+        self._roster_item_to_player.clear()
 
         players = list(self._safe_get(self.team, "players", []) or [])
         players_sorted = sort_roster_for_gm_view(players)
@@ -1006,11 +1675,12 @@ class MainMenuView:
             salary = self._format_money(self._safe_get(player, "salary", 0))
             years = str(self._safe_get(player, "contract_years_left", "-"))
 
-            tree.insert(
+            iid = tree.insert(
                 "",
                 "end",
                 values=(role, name, pos, ovr, pot, age, fatigue, morale, salary, years),
             )
+            self._roster_item_to_player[iid] = player
 
         team_name = self._team_name()
         count = len(players_sorted)
@@ -1021,10 +1691,39 @@ class MainMenuView:
         self.roster_header_var.set(
             f"{team_name} ロスター一覧    人数: {count}    平均OVR: {avg_ovr:.1f}"
         )
-        self.roster_hint_var.set(
-            "並び: ポジション順(PG→C)→同ポジ内OVR降順（docs/GM_ROSTER_DISPLAY_RULES.md と共通）。"
-            "先発・6th・控え番号は Team の起用ロジックに基づきます。読み取り専用。"
+        jp_h = getattr(self, "roster_jp_header_var", None)
+        if jp_h is not None and self.team is not None:
+            try:
+                jp_h.set(jp_reg_display.format_roster_window_jp_header(self.season, self.team))
+            except Exception:
+                jp_h.set("")
+        unlocked = self.inseason_roster_moves_allowed()
+        lock_line_release = (
+            "契約解除: 実行可（要選手選択）。"
+            if unlocked
+            else "契約解除: レギュラー後半はロック（トレード／インシーズンFA と同じ期限）。"
         )
+        self.roster_hint_var.set(
+            "【詳細ロスター】下のペインは全文テキスト一覧（閲覧専用）。表と同一メンバーで、並びは GM 表示ルールに準拠します。\n"
+            "並び: ポジション順(PG→C)→同ポジ内OVR降順（docs/GM_ROSTER_DISPLAY_RULES.md と共通）。"
+            "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
+            "【今できる操作（人事画面）】閲覧。＋1年延長（年俸据え置き・残年数が 1 年以上かつ"
+            f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
+            "【トレード／インシーズンFA】当面の標準導線は CLI メニューです。"
+            "手順・可否の正本はウィンドウ上部の案内を参照し、"
+            "実行はシーズンメニュー「8. GMメニュー」→「10. トレード」。"
+        )
+
+        trade_txt = getattr(self, "roster_trade_fa_text", None)
+        if trade_txt is not None:
+            self._gm_set_readonly_text(trade_txt, self._format_hr_trade_fa_guidance_text())
+
+        detail_txt = getattr(self, "roster_detail_text", None)
+        if detail_txt is not None:
+            if self.team is not None:
+                self._gm_set_readonly_text(detail_txt, format_gm_roster_text(self.team))
+            else:
+                self._gm_set_readonly_text(detail_txt, "チームが未接続です。")
 
     def open_finance_window(self) -> None:
         """Open a safe read-only finance / management subwindow."""
@@ -1047,6 +1746,10 @@ class MainMenuView:
             window.transient(self.root)
         except Exception:
             pass
+        try:
+            window.withdraw()
+        except tk.TclError:
+            pass
 
         outer = ttk.Frame(window, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
@@ -1054,7 +1757,7 @@ class MainMenuView:
         header = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
         header.pack(fill="x", pady=(0, 12))
 
-        self.finance_header_var = tk.StringVar(value="")
+        self.finance_header_var = tk.StringVar(value="経営メニュー")
         ttk.Label(
             header,
             textvariable=self.finance_header_var,
@@ -1062,12 +1765,71 @@ class MainMenuView:
             anchor="w",
         ).pack(fill="x")
 
-        content = ttk.Frame(outer, style="Root.TFrame")
-        content.pack(fill="both", expand=True)
+        fin_purpose = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
+        fin_purpose.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            fin_purpose,
+            text=(
+                "【経営メニュー】この画面は、現状確認・一部投資操作・案内を行う画面です。"
+                "財務/施設/オーナーの計算・評価の正本は共通ロジック側で処理されます。"
+                "シーズン収支の正本反映はオフシーズンの財務締めで行われます。"
+                "（施設投資など一部支出は実行時に反映されます）"
+                "財務サマリー・キャップ閲覧、施設投資、オーナー方針、"
+                "収支の詳細レポート、スポンサー・広報・グッズ開発をまとめて扱う画面です。"
+                "下にスクロールすると各ブロックが続きます。"
+                "開いた時点で各欄に現在値、または「履歴なし・未実行・未設定・対象なし」に相当する説明が入ります。"
+                "操作で増えるのは主に履歴や確定メッセージです。"
+            ),
+            wraplength=1020,
+            font=("Yu Gothic UI", 10),
+            justify="left",
+        ).pack(anchor="w")
+
+        fin_scroll_wrap = ttk.Frame(outer, style="Root.TFrame")
+        fin_scroll_wrap.pack(fill="both", expand=True)
+
+        fin_canvas = tk.Canvas(
+            fin_scroll_wrap,
+            bg="#15171c",
+            highlightthickness=0,
+        )
+        fin_vsb = ttk.Scrollbar(fin_scroll_wrap, orient="vertical", command=fin_canvas.yview)
+        fin_canvas.configure(yscrollcommand=fin_vsb.set)
+
+        content = ttk.Frame(fin_canvas, style="Root.TFrame")
+        fin_canvas_win = fin_canvas.create_window((0, 0), window=content, anchor="nw")
+
+        def _finance_scrollregion(_event: Any = None) -> None:
+            fin_canvas.update_idletasks()
+            bbox = fin_canvas.bbox("all")
+            if bbox:
+                fin_canvas.configure(scrollregion=bbox)
+
+        def _finance_canvas_inner_width(event: Any) -> None:
+            try:
+                fin_canvas.itemconfigure(fin_canvas_win, width=event.width)
+            except tk.TclError:
+                pass
+
+        content.bind("<Configure>", lambda _e: _finance_scrollregion())
+        fin_canvas.bind("<Configure>", _finance_canvas_inner_width)
+
+        def _finance_hub_mousewheel(event: Any) -> None:
+            if getattr(event, "delta", 0):
+                fin_canvas.yview_scroll(int(-event.delta / 120), "units")
+
+        window.bind("<MouseWheel>", _finance_hub_mousewheel)
+        window.bind("<Button-4>", lambda _e: fin_canvas.yview_scroll(-1, "units"))
+        window.bind("<Button-5>", lambda _e: fin_canvas.yview_scroll(1, "units"))
+
+        fin_canvas.pack(side="left", fill="both", expand=True)
+        fin_vsb.pack(side="right", fill="y")
+        self._finance_scroll_canvas = fin_canvas
+
         content.columnconfigure(0, weight=1)
         content.columnconfigure(1, weight=1)
         content.rowconfigure(0, weight=0)
-        content.rowconfigure(1, weight=1)
+        content.rowconfigure(1, weight=0)
         content.rowconfigure(2, weight=0)
         content.rowconfigure(3, weight=0)
         content.rowconfigure(4, weight=0)
@@ -1084,9 +1846,50 @@ class MainMenuView:
         self.finance_report_panel = self._create_panel(content, "詳細レポート")
         self.finance_report_panel.grid(row=1, column=1, sticky="nsew")
 
+        fin_sum_inner = self._resolve_content_parent(self.finance_summary_panel)
+        ttk.Label(
+            fin_sum_inner,
+            text="クラブの資金（現在値）・年俸予算・前季収支・人気の要約",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
         self.finance_summary_lines = self._make_line_vars(self.finance_summary_panel, 6)
-        self.facility_lines = self._make_line_vars(self.facility_panel, 6)
+        ttk.Separator(fin_sum_inner, orient="horizontal").pack(fill="x", pady=(14, 8))
+        ttk.Label(
+            fin_sum_inner,
+            text="サラリーキャップ（閲覧）",
+            style="SectionTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 6))
+        ttk.Label(
+            fin_sum_inner,
+            text="リーグキャップ・ペイロール・契約の読み取り専用です（編集は人事・CLI等の従来導線）。"
+            "収支の本格締めはオフシーズン処理で反映されます。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
+        self._finance_cap_text = scrolledtext.ScrolledText(
+            fin_sum_inner,
+            height=10,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self._finance_cap_text.pack(fill="both", expand=False, pady=(0, 4))
+        self._finance_cap_text.configure(state="disabled")
+
         fac_content = self._resolve_content_parent(self.facility_panel)
+        ttk.Label(
+            fac_content,
+            text="施設レベル・市場／ファン指標（下のボタンで段階強化）。"
+            "投資時に費用が反映され、施設レベルと関連指標が更新されます。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
+        self.facility_lines = self._make_line_vars(self.facility_panel, 6)
         btn_row = ttk.Frame(fac_content, style="Card.TFrame")
         btn_row.pack(fill="x", pady=(12, 0))
         self._facility_upgrade_buttons: Dict[str, ttk.Button] = {}
@@ -1103,6 +1906,12 @@ class MainMenuView:
         btn_row.columnconfigure(0, weight=1)
         btn_row.columnconfigure(1, weight=1)
         owner_parent = self._resolve_content_parent(self.owner_panel)
+        ttk.Label(
+            owner_parent,
+            text="オーナーからの期待・信頼・ミッション（チームデータに依存）。"
+            "ミッションは主にオフシーズンに評価・更新されます。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
         self.owner_report_text = scrolledtext.ScrolledText(
             owner_parent,
             height=14,
@@ -1120,6 +1929,12 @@ class MainMenuView:
         self.owner_report_text.pack(fill="both", expand=True)
         self.owner_report_text.configure(state="disabled")
         report_parent = self._resolve_content_parent(self.finance_report_panel)
+        ttk.Label(
+            report_parent,
+            text="前季までの収入内訳・支出内訳・財務履歴（記録ベース）。"
+            "シーズン収支の正本反映はオフシーズンの財務締めです。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
         self.finance_report_text = scrolledtext.ScrolledText(
             report_parent,
             height=16,
@@ -1143,6 +1958,17 @@ class MainMenuView:
         self._sponsor_status_var = tk.StringVar(value="")
         tk.Label(
             sponsor_inner,
+            text="メインスポンサー契約の種類を選び「反映」で確定します。下は契約変更の直近履歴です。",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 4))
+        tk.Label(
+            sponsor_inner,
             textvariable=self._sponsor_status_var,
             bg="#222834",
             fg="#d6dbe3",
@@ -1151,8 +1977,7 @@ class MainMenuView:
             font=("Yu Gothic UI", 11),
             wraplength=900,
             padx=2,
-            pady=(0, 8),
-        ).pack(fill="x")
+        ).pack(fill="x", pady=(0, 8))
         sponsor_row = ttk.Frame(sponsor_inner, style="Card.TFrame")
         sponsor_row.pack(fill="x", pady=(0, 8))
         self._sponsor_type_ids = [str(x["id"]) for x in MAIN_SPONSOR_TYPES]
@@ -1165,6 +1990,10 @@ class MainMenuView:
             font=("Yu Gothic UI", 10),
         )
         self._sponsor_combo.pack(side="left", padx=(0, 10))
+        try:
+            self._sponsor_combo.current(0)
+        except tk.TclError:
+            pass
         self._sponsor_apply_btn = ttk.Button(
             sponsor_row,
             text="メイン契約を反映",
@@ -1203,6 +2032,17 @@ class MainMenuView:
         self._pr_status_var = tk.StringVar(value="")
         tk.Label(
             pr_inner,
+            text="シーズン中の実行回数に上限があるファン向け施策です。下は実行履歴です。",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 4))
+        tk.Label(
+            pr_inner,
             textvariable=self._pr_status_var,
             bg="#222834",
             fg="#d6dbe3",
@@ -1211,8 +2051,7 @@ class MainMenuView:
             font=("Yu Gothic UI", 11),
             wraplength=900,
             padx=2,
-            pady=(0, 8),
-        ).pack(fill="x")
+        ).pack(fill="x", pady=(0, 8))
         pr_row = ttk.Frame(pr_inner, style="Card.TFrame")
         pr_row.pack(fill="x", pady=(0, 8))
         self._pr_campaign_ids = [str(x["id"]) for x in PR_CAMPAIGNS]
@@ -1225,6 +2064,10 @@ class MainMenuView:
             font=("Yu Gothic UI", 10),
         )
         self._pr_combo.pack(side="left", padx=(0, 10))
+        try:
+            self._pr_combo.current(0)
+        except tk.TclError:
+            pass
         self._pr_run_btn = ttk.Button(
             pr_row,
             text="施策を実行",
@@ -1270,8 +2113,7 @@ class MainMenuView:
             font=("Yu Gothic UI", 10),
             wraplength=900,
             padx=2,
-            pady=(0, 8),
-        ).pack(fill="x")
+        ).pack(fill="x", pady=(0, 8))
         merch_lines_fr = ttk.Frame(merch_inner, style="Card.TFrame")
         merch_lines_fr.pack(fill="x", pady=(0, 8))
         self._merch_rows: List[Tuple[str, tk.StringVar, ttk.Button]] = []
@@ -1350,29 +2192,49 @@ class MainMenuView:
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
 
+        tk.Label(
+            bottom,
+            text=(
+                "レイアウト: 上段＝財務・施設 ／ 中段＝オーナー・詳細レポート ／ 下段＝スポンサー・広報・グッズ。"
+                " 右端の縦バーで全体をスクロールできます。"
+            ),
+            bg="#1d2129",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=1020,
+            padx=2,
+        ).pack(fill="x", anchor="w", pady=(0, 4))
+
         self.finance_hint_var = tk.StringVar(value="")
         tk.Label(
             bottom,
             textvariable=self.finance_hint_var,
             bg="#1d2129",
-            fg="#d6dbe3",
+            fg="#c5cad3",
             anchor="w",
             justify="left",
-            font=("Yu Gothic UI", 10),
+            font=("Yu Gothic UI", 9),
             padx=2,
             pady=2,
         ).pack(fill="x", anchor="w")
 
-        ttk.Button(
-            bottom,
-            text="閉じる",
-            style="Menu.TButton",
-            command=self._on_close_finance_window,
-        ).pack(anchor="e", pady=(8, 0))
+        bf = tk.Frame(bottom, bg="#1d2129")
+        bf.pack(anchor="e", pady=(8, 0))
+        self._jpn_text_button(bf, "閉じる", self._on_close_finance_window, side="right")
 
         self._finance_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_finance_window)
-        self._refresh_finance_window()
+        try:
+            self._refresh_finance_window()
+        finally:
+            try:
+                window.update_idletasks()
+                window.deiconify()
+                window.lift()
+            except tk.TclError:
+                pass
 
     def _on_close_finance_window(self) -> None:
         window = getattr(self, "_finance_window", None)
@@ -1395,6 +2257,7 @@ class MainMenuView:
             self._merch_rows = []
             self._merch_dummy_text = None
             self._merch_hist_text = None
+            self._finance_scroll_canvas = None
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -1467,7 +2330,26 @@ class MainMenuView:
         hist_tw = getattr(self, "_sponsor_history_text", None)
         status_var = getattr(self, "_sponsor_status_var", None)
         apply_btn = getattr(self, "_sponsor_apply_btn", None)
-        if combo is None or status_var is None or self.team is None:
+        if combo is None or status_var is None:
+            return
+        if self.team is None:
+            status_var.set(
+                "（チーム未接続）メイン契約・スポンサー力は表示できません。メインでチームに接続してください。"
+            )
+            try:
+                combo.configure(state="disabled")
+                if apply_btn is not None:
+                    apply_btn.state(["disabled"])
+            except tk.TclError:
+                pass
+            if hist_tw is not None:
+                try:
+                    hist_tw.configure(state="normal")
+                    hist_tw.delete("1.0", tk.END)
+                    hist_tw.insert("1.0", "（チーム未接続のため履歴はありません）")
+                    hist_tw.configure(state="disabled")
+                except tk.TclError:
+                    pass
             return
         ensure_sponsor_management_on_team(self.team)
         cur = str(self.team.management.get("sponsors", {}).get("main_contract_type", "standard"))
@@ -1498,6 +2380,8 @@ class MainMenuView:
             pass
         if hist_tw is not None:
             htext = "\n".join(format_sponsor_history_lines(self.team))
+            if not str(htext).strip():
+                htext = "履歴なし（メイン契約の変更履歴はまだありません）。"
             try:
                 hist_tw.configure(state="normal")
                 hist_tw.delete("1.0", tk.END)
@@ -1511,7 +2395,24 @@ class MainMenuView:
         hist_tw = getattr(self, "_pr_history_text", None)
         status_var = getattr(self, "_pr_status_var", None)
         run_btn = getattr(self, "_pr_run_btn", None)
-        if combo is None or status_var is None or self.team is None:
+        if combo is None or status_var is None:
+            return
+        if self.team is None:
+            status_var.set("（チーム未接続）広報・ファン施策の状態は表示できません。")
+            try:
+                combo.configure(state="disabled")
+                if run_btn is not None:
+                    run_btn.state(["disabled"])
+            except tk.TclError:
+                pass
+            if hist_tw is not None:
+                try:
+                    hist_tw.configure(state="normal")
+                    hist_tw.delete("1.0", tk.END)
+                    hist_tw.insert("1.0", "（チーム未接続のため履歴はありません）")
+                    hist_tw.configure(state="disabled")
+                except tk.TclError:
+                    pass
             return
         season = self.season
         line_a = format_pr_status_line(self.team, season)
@@ -1533,6 +2434,8 @@ class MainMenuView:
             pass
         if hist_tw is not None:
             htext = "\n".join(format_pr_history_lines(self.team))
+            if not str(htext).strip():
+                htext = "履歴なし（広報施策の実行履歴はまだありません）。"
             try:
                 hist_tw.configure(state="normal")
                 hist_tw.delete("1.0", tk.END)
@@ -1572,7 +2475,31 @@ class MainMenuView:
         dummy_tw = getattr(self, "_merch_dummy_text", None)
         hist_tw = getattr(self, "_merch_hist_text", None)
         rows = getattr(self, "_merch_rows", None)
-        if self.team is None or not rows:
+        if not rows:
+            return
+        if self.team is None:
+            for _pid, var, btn in rows:
+                var.set("（チーム未接続）ライン状態は表示できません。")
+                try:
+                    btn.state(["disabled"])
+                except tk.TclError:
+                    pass
+            if dummy_tw is not None:
+                try:
+                    dummy_tw.configure(state="normal")
+                    dummy_tw.delete("1.0", tk.END)
+                    dummy_tw.insert("1.0", "（チーム未接続・ダミー売上は表示しません）")
+                    dummy_tw.configure(state="disabled")
+                except tk.TclError:
+                    pass
+            if hist_tw is not None:
+                try:
+                    hist_tw.configure(state="normal")
+                    hist_tw.delete("1.0", tk.END)
+                    hist_tw.insert("1.0", "（チーム未接続のため開発履歴はありません）")
+                    hist_tw.configure(state="disabled")
+                except tk.TclError:
+                    pass
             return
         ensure_merchandise_on_team(self.team)
         is_user = bool(getattr(self.team, "is_user_team", False))
@@ -1580,6 +2507,8 @@ class MainMenuView:
             item = get_merchandise_item(self.team, pid)
             if item is not None:
                 var.set(format_merchandise_row_display(item))
+            else:
+                var.set("（ライン未取得）接続とデータを確認してください。")
             try:
                 if not is_user or (item is not None and str(item.get("phase")) == "on_sale"):
                     btn.state(["disabled"])
@@ -1589,6 +2518,8 @@ class MainMenuView:
                 pass
         if dummy_tw is not None:
             dtext = "\n".join(estimate_dummy_merch_sales_lines(self.team))
+            if not str(dtext).strip():
+                dtext = "ダミー売上の目安を算出できません（データ不足）。発売ラインができると表示されます。"
             try:
                 dummy_tw.configure(state="normal")
                 dummy_tw.delete("1.0", tk.END)
@@ -1598,6 +2529,8 @@ class MainMenuView:
                 pass
         if hist_tw is not None:
             htext = "\n".join(format_merchandise_history_lines(self.team))
+            if not str(htext).strip():
+                htext = "履歴なし（グッズ開発の履歴はまだありません）。"
             try:
                 hist_tw.configure(state="normal")
                 hist_tw.delete("1.0", tk.END)
@@ -1626,9 +2559,14 @@ class MainMenuView:
         expense = self._safe_get(self.team, "expense_last_season", profile.get("expense_last_season", 0))
         cashflow = self._safe_get(self.team, "cashflow_last_season", profile.get("cashflow_last_season", 0))
 
-        self.finance_header_var.set(
-            f"{team_name} 経営画面    所持金: {self._format_money(money)}    前季収支: {self._format_signed_money(cashflow)}"
-        )
+        if self.team is None:
+            self.finance_header_var.set(
+                "（チーム未接続）経営画面 — 下記は参照用のプレースホルダです"
+            )
+        else:
+            self.finance_header_var.set(
+                f"{team_name} 経営画面    所持金: {self._format_money(money)}    前季収支: {self._format_signed_money(cashflow)}"
+            )
 
         summary_lines = [
             f"所持金: {self._format_money(money)}",
@@ -1641,24 +2579,51 @@ class MainMenuView:
         for var, line in zip(self.finance_summary_lines, summary_lines):
             var.set(line)
 
+        cap_tw = getattr(self, "_finance_cap_text", None)
+        if cap_tw is not None:
+            if self.team is not None:
+                try:
+                    cap_body = format_salary_cap_text(self.team)
+                except Exception:
+                    cap_body = "サラリーキャップ情報を取得できませんでした。"
+            else:
+                cap_body = "チームが未接続です。"
+            try:
+                cap_tw.configure(state="normal")
+                cap_tw.delete("1.0", tk.END)
+                cap_tw.insert("1.0", cap_body)
+                cap_tw.configure(state="disabled")
+            except tk.TclError:
+                pass
+
         market_size = self._safe_get(self.team, "market_size", profile.get("market_size", 1.0))
         fan_base = self._safe_get(self.team, "fan_base", profile.get("fan_base", 0))
         season_tickets = self._safe_get(self.team, "season_ticket_base", profile.get("season_ticket_base", 0))
         sponsor_power = self._safe_get(self.team, "sponsor_power", profile.get("sponsor_power", 0))
 
         facility_lines: List[str] = []
-        for fk in FACILITY_ORDER:
-            lv = int(self._safe_get(self.team, fk, profile.get(fk, 1)))
-            flabel = FACILITY_LABELS.get(fk, fk)
-            if lv >= FACILITY_MAX_LEVEL:
-                facility_lines.append(f"{flabel}: Lv{lv}（最大）")
-            else:
-                nxt = get_facility_upgrade_cost(self.team, fk)
-                facility_lines.append(f"{flabel}: Lv{lv} → 次回 {self._format_money(nxt)}")
-        facility_lines.append(f"市場規模: {market_size}")
-        facility_lines.append(
-            f"ファン基盤: {self._safe_int_text(fan_base)} / シーズン券: {self._safe_int_text(season_tickets)} / スポンサー力: {self._safe_int_text(sponsor_power)}"
-        )
+        if self.team is None:
+            for fk in FACILITY_ORDER:
+                flabel = FACILITY_LABELS.get(fk, fk)
+                facility_lines.append(f"{flabel}: （チーム未接続）Lv・次回費用は接続後に表示")
+            facility_lines.append(f"市場規模: {market_size}（未接続時は既定の参照値）")
+            facility_lines.append(
+                f"ファン基盤: {self._safe_int_text(fan_base)} ／ シーズン券: {self._safe_int_text(season_tickets)} ／ "
+                f"スポンサー力: {self._safe_int_text(sponsor_power)}（未接続時は 0 または既定）"
+            )
+        else:
+            for fk in FACILITY_ORDER:
+                lv = int(self._safe_get(self.team, fk, profile.get(fk, 1)))
+                flabel = FACILITY_LABELS.get(fk, fk)
+                if lv >= FACILITY_MAX_LEVEL:
+                    facility_lines.append(f"{flabel}: Lv{lv}（最大）")
+                else:
+                    nxt = get_facility_upgrade_cost(self.team, fk)
+                    facility_lines.append(f"{flabel}: Lv{lv} → 次回 {self._format_money(nxt)}")
+            facility_lines.append(f"市場規模: {market_size}")
+            facility_lines.append(
+                f"ファン基盤: {self._safe_int_text(fan_base)} / シーズン券: {self._safe_int_text(season_tickets)} / スポンサー力: {self._safe_int_text(sponsor_power)}"
+            )
         for var, line in zip(self.facility_lines, facility_lines):
             var.set(line)
 
@@ -1676,20 +2641,28 @@ class MainMenuView:
                     pass
 
         owner_body = ""
-        om_getter = getattr(self.team, "get_owner_mission_report_text", None)
-        if callable(om_getter):
-            try:
-                owner_body = str(om_getter() or "")
-            except Exception:
-                owner_body = ""
-        if not owner_body.strip():
-            owner_expectation = self._safe_get(self.team, "owner_expectation", profile.get("owner_expectation", "-"))
-            owner_trust = self._safe_get(self.team, "owner_trust", profile.get("owner_trust", "-"))
+        if self.team is None:
             owner_body = (
-                f"オーナー期待値: {owner_expectation}\n"
-                f"オーナー信頼: {self._safe_int_text(owner_trust)} / 100\n"
-                "（詳細テキストを取得できませんでした）"
+                "（チームがメイン画面から未接続です）\n"
+                "オーナー期待・信頼・ミッションは、チーム接続後にここに表示されます。"
             )
+        else:
+            om_getter = getattr(self.team, "get_owner_mission_report_text", None)
+            if callable(om_getter):
+                try:
+                    owner_body = str(om_getter() or "")
+                except Exception:
+                    owner_body = ""
+            if not owner_body.strip():
+                owner_expectation = self._safe_get(
+                    self.team, "owner_expectation", profile.get("owner_expectation", "-")
+                )
+                owner_trust = self._safe_get(self.team, "owner_trust", profile.get("owner_trust", "-"))
+                owner_body = (
+                    f"オーナー期待値: {owner_expectation}\n"
+                    f"オーナー信頼: {self._safe_int_text(owner_trust)} / 100\n"
+                    "（詳細テキストを取得できませんでした）"
+                )
         ow = getattr(self, "owner_report_text", None)
         if ow is not None:
             try:
@@ -1701,16 +2674,23 @@ class MainMenuView:
                 pass
 
         report_body = ""
-        detail_getter = getattr(self.team, "get_finance_report_detail_text", None)
-        if callable(detail_getter):
-            try:
-                report_body = str(detail_getter() or "")
-            except Exception:
-                report_body = ""
-        if not report_body.strip():
-            from basketball_sim.systems.finance_report_display import format_finance_report_detail_lines
+        if self.team is None:
+            report_body = (
+                "（チーム未接続）\n"
+                "接続後は、前季までの収入内訳・支出内訳・財務推移が表示されます。\n"
+                "オフシーズン締め後に内訳スナップショットが記録されている場合は、その内容がここに出ます。"
+            )
+        else:
+            detail_getter = getattr(self.team, "get_finance_report_detail_text", None)
+            if callable(detail_getter):
+                try:
+                    report_body = str(detail_getter() or "")
+                except Exception:
+                    report_body = ""
+            if not report_body.strip():
+                from basketball_sim.systems.finance_report_display import format_finance_report_detail_lines
 
-            report_body = "\n".join(format_finance_report_detail_lines(self.team))
+                report_body = "\n".join(format_finance_report_detail_lines(self.team))
         tw = getattr(self, "finance_report_text", None)
         if tw is not None:
             try:
@@ -1726,9 +2706,12 @@ class MainMenuView:
         self._refresh_merchandise_finance_block()
 
         self.finance_hint_var.set(
-            "「グッズ開発」はフェーズ保存＋開発費（売上表示はダミー）。"
-            "広報はラウンド上限あり。スポンサー・施設・オーナー・財務は各パネル。"
+            "※この画面は現状確認・一部投資操作・案内を担当します。"
+            "収支の正本反映はオフシーズン財務締め、施設投資の支出は実行時に反映されます。"
+            "グッズ売上表示は簡易ダミーです。"
         )
+
+        self._update_finance_window_scrollregion()
 
     def open_strategy_window(self) -> None:
         """Open a safe read-only strategy / rotation subwindow."""
@@ -1774,12 +2757,24 @@ class MainMenuView:
 
         nav = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 0, 0, 8))
         nav.pack(fill="x")
-        ttk.Label(nav, text="戦術設定（各画面で保存）", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 6))
+        ttk.Label(
+            nav,
+            text="戦術設定（各画面で保存）。左パネルで戦術・HC・起用方針。右パネルで先発・6th・ベンチ。",
+            style="SectionTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 6))
         row_a = ttk.Frame(nav, style="Panel.TFrame")
         row_a.pack(fill="x")
         row_b = ttk.Frame(nav, style="Panel.TFrame")
         row_b.pack(fill="x", pady=(4, 0))
         hub_ref = window
+
+        def _strat_parent() -> tk.Misc:
+            try:
+                if hub_ref is not None and hub_ref.winfo_exists():
+                    return hub_ref
+            except Exception:
+                pass
+            return self.root
 
         def _nav_btn(fr: ttk.Frame, label: str, opener: Any) -> None:
             ttk.Button(fr, text=label, style="Menu.TButton", command=opener, width=20).pack(
@@ -1812,12 +2807,51 @@ class MainMenuView:
             lambda: self._open_tactics_playbook_window(hub_ref),
         )
 
-        content = ttk.Frame(outer, style="Root.TFrame")
-        content.pack(fill="both", expand=True)
+        scroll_wrap = ttk.Frame(outer, style="Root.TFrame")
+        scroll_wrap.pack(fill="both", expand=True)
+
+        strat_canvas = tk.Canvas(
+            scroll_wrap,
+            bg="#15171c",
+            highlightthickness=0,
+        )
+        strat_vsb = ttk.Scrollbar(scroll_wrap, orient="vertical", command=strat_canvas.yview)
+        strat_canvas.configure(yscrollcommand=strat_vsb.set)
+
+        content = ttk.Frame(strat_canvas, style="Root.TFrame")
+        strat_canvas_win = strat_canvas.create_window((0, 0), window=content, anchor="nw")
+
+        def _strategy_scrollregion(_event: Any = None) -> None:
+            strat_canvas.update_idletasks()
+            bbox = strat_canvas.bbox("all")
+            if bbox:
+                strat_canvas.configure(scrollregion=bbox)
+
+        def _strategy_canvas_inner_width(event: Any) -> None:
+            try:
+                strat_canvas.itemconfigure(strat_canvas_win, width=event.width)
+            except tk.TclError:
+                pass
+
+        content.bind("<Configure>", lambda _e: _strategy_scrollregion())
+        strat_canvas.bind("<Configure>", _strategy_canvas_inner_width)
+
+        def _strategy_hub_mousewheel(event: Any) -> None:
+            if getattr(event, "delta", 0):
+                strat_canvas.yview_scroll(int(-event.delta / 120), "units")
+
+        window.bind("<MouseWheel>", _strategy_hub_mousewheel)
+        window.bind("<Button-4>", lambda _e: strat_canvas.yview_scroll(-1, "units"))
+        window.bind("<Button-5>", lambda _e: strat_canvas.yview_scroll(1, "units"))
+
+        strat_canvas.pack(side="left", fill="both", expand=True)
+        strat_vsb.pack(side="right", fill="y")
+        self._strategy_scroll_canvas = strat_canvas
+
         content.columnconfigure(0, weight=1)
         content.columnconfigure(1, weight=1)
         content.rowconfigure(0, weight=0)
-        content.rowconfigure(1, weight=1)
+        content.rowconfigure(1, weight=0)
 
         strategy_panel = ttk.Frame(content, style="Panel.TFrame", padding=12)
         strategy_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 8), pady=(0, 12))
@@ -1846,6 +2880,78 @@ class MainMenuView:
                 pady=2,
             ).pack(fill="x", anchor="w")
 
+        ttk.Separator(strategy_panel, orient="horizontal").pack(fill="x", pady=(12, 8))
+        ttk.Label(
+            strategy_panel,
+            text="試合に効く基本方針（保存）",
+            style="SectionTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            strategy_panel,
+            text="Team.strategy・coach_style・usage_policy をまとめて反映します。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
+
+        self._gm_label_to_key_strategy = {lab: k for k, lab in STRATEGY_OPTIONS}
+        self._gm_label_to_key_coach = {lab: k for k, lab in COACH_STYLE_OPTIONS}
+        self._gm_label_to_key_usage = {lab: k for k, lab in USAGE_POLICY_OPTIONS}
+
+        pol_grid = ttk.Frame(strategy_panel, style="Panel.TFrame", padding=(0, 2))
+        pol_grid.pack(fill="x", pady=(0, 4))
+        pol_grid.columnconfigure(1, weight=1)
+
+        self._strat_combo_strategy = ttk.Combobox(
+            pol_grid,
+            state="readonly",
+            width=28,
+            values=[lab for _, lab in STRATEGY_OPTIONS],
+        )
+        self._strat_combo_coach = ttk.Combobox(
+            pol_grid,
+            state="readonly",
+            width=28,
+            values=[lab for _, lab in COACH_STYLE_OPTIONS],
+        )
+        self._strat_combo_usage = ttk.Combobox(
+            pol_grid,
+            state="readonly",
+            width=28,
+            values=[lab for _, lab in USAGE_POLICY_OPTIONS],
+        )
+        ttk.Label(pol_grid, text="チーム戦術", font=("Yu Gothic UI", 9)).grid(row=0, column=0, sticky="w", pady=4)
+        self._strat_combo_strategy.grid(row=0, column=1, sticky="ew", pady=4, padx=(10, 0))
+        ttk.Label(pol_grid, text="HCスタイル", font=("Yu Gothic UI", 9)).grid(row=1, column=0, sticky="w", pady=4)
+        self._strat_combo_coach.grid(row=1, column=1, sticky="ew", pady=4, padx=(10, 0))
+        self._strat_combo_coach.bind("<<ComboboxSelected>>", self._on_strat_coach_selection_changed)
+        ttk.Label(pol_grid, text="起用方針", font=("Yu Gothic UI", 9)).grid(row=2, column=0, sticky="w", pady=4)
+        self._strat_combo_usage.grid(row=2, column=1, sticky="ew", pady=4, padx=(10, 0))
+
+        ttk.Label(
+            strategy_panel,
+            text="HC変更時の強化メニュー解放プレビュー（現在のHCと比較）",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(8, 4))
+        self._strat_coach_preview_text = tk.Text(
+            strategy_panel,
+            wrap="word",
+            bg="#222834",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+            font=("Consolas", 10),
+            relief="flat",
+            height=7,
+            padx=10,
+            pady=8,
+        )
+        self._strat_coach_preview_text.pack(fill="x", pady=(0, 6))
+
+        ttk.Button(
+            strategy_panel,
+            text="基本方針を反映",
+            style="Primary.TButton",
+            command=lambda: self._on_apply_strat_team_policy(_strat_parent()),
+        ).pack(anchor="w", pady=(2, 0))
+
         self.lineup_lines = []
         for _ in range(10):
             var = tk.StringVar(value="")
@@ -1861,6 +2967,129 @@ class MainMenuView:
                 padx=2,
                 pady=2,
             ).pack(fill="x", anchor="w")
+
+        ttk.Separator(lineup_panel, orient="horizontal").pack(fill="x", pady=(10, 8))
+
+        self.strat_jp_block_var = tk.StringVar(value="")
+        tk.Label(
+            lineup_panel,
+            textvariable=self.strat_jp_block_var,
+            bg="#1d2129",
+            fg="#c8d0dc",
+            justify="left",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+            padx=2,
+            pady=4,
+            wraplength=420,
+        ).pack(fill="x", anchor="w")
+        self.strat_starter_warn_var = tk.StringVar(value="")
+        tk.Label(
+            lineup_panel,
+            textvariable=self.strat_starter_warn_var,
+            bg="#1d2129",
+            fg="#e8a035",
+            justify="left",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+            padx=2,
+            pady=(0, 6),
+            wraplength=420,
+        ).pack(fill="x", anchor="w")
+
+        ttk.Label(
+            lineup_panel,
+            text="起用の編集（試合に反映）",
+            style="SectionTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 6))
+        ttk.Label(
+            lineup_panel,
+            text="先発はポジ枠ごとに1人ずつ差し替え。6th・ベンチは控えの序列を変更できます。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
+
+        self._strat_candidate_players: List[Any] = []
+        self._strat_sixth_candidate_players: List[Any] = []
+        self._strat_bench_players: List[Any] = []
+
+        slot_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 4))
+        slot_row.pack(fill="x", pady=(0, 4))
+        ttk.Label(slot_row, text="差し替え枠", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
+        self._strat_combo_lineup_slot = ttk.Combobox(
+            slot_row,
+            state="readonly",
+            width=10,
+            values=list(self._LINEUP_SLOT_LABELS),
+        )
+        self._strat_combo_lineup_slot.pack(side="left", padx=(0, 10))
+        self._strat_combo_lineup_slot.bind(
+            "<<ComboboxSelected>>",
+            lambda _e: self._sync_strat_lineup_candidates(),
+        )
+        ttk.Label(slot_row, text="候補", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
+        self._strat_combo_lineup_candidate = ttk.Combobox(
+            slot_row,
+            state="readonly",
+            width=42,
+        )
+        self._strat_combo_lineup_candidate.pack(side="left", padx=(0, 10))
+        self._strat_btn_apply_lineup = ttk.Button(
+            slot_row,
+            text="反映（確認）",
+            style="Primary.TButton",
+            command=lambda: self._on_apply_strat_starting_slot(_strat_parent()),
+        )
+        self._strat_btn_apply_lineup.pack(side="left")
+
+        sixth_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 4))
+        sixth_row.pack(fill="x", pady=(0, 4))
+        ttk.Label(sixth_row, text="6thマン", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
+        self._strat_combo_sixth = ttk.Combobox(sixth_row, state="readonly", width=44)
+        self._strat_combo_sixth.pack(side="left", padx=(0, 10))
+        self._strat_btn_apply_sixth = ttk.Button(
+            sixth_row,
+            text="6thを反映（確認）",
+            style="Primary.TButton",
+            command=lambda: self._on_apply_strat_sixth_man(_strat_parent()),
+        )
+        self._strat_btn_apply_sixth.pack(side="left", padx=(0, 8))
+        ttk.Button(
+            sixth_row,
+            text="自動6thに戻す（確認）",
+            style="Menu.TButton",
+            command=lambda: self._on_reset_sixth_man_gui(_strat_parent()),
+        ).pack(side="left")
+
+        bench_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 4))
+        bench_row.pack(fill="x", pady=(0, 4))
+        ttk.Label(bench_row, text="ベンチ入替", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
+        self._strat_combo_bench_a = ttk.Combobox(bench_row, state="readonly", width=28)
+        self._strat_combo_bench_a.pack(side="left", padx=(0, 6))
+        ttk.Label(bench_row, text="⇔", font=("Yu Gothic UI", 9)).pack(side="left", padx=4)
+        self._strat_combo_bench_b = ttk.Combobox(bench_row, state="readonly", width=28)
+        self._strat_combo_bench_b.pack(side="left", padx=(0, 10))
+        self._strat_btn_bench_swap = ttk.Button(
+            bench_row,
+            text="入替（確認）",
+            style="Primary.TButton",
+            command=lambda: self._on_apply_strat_bench_swap(_strat_parent()),
+        )
+        self._strat_btn_bench_swap.pack(side="left", padx=(0, 8))
+        ttk.Button(
+            bench_row,
+            text="自動ベンチに戻す（確認）",
+            style="Menu.TButton",
+            command=lambda: self._on_reset_bench_order_gui(_strat_parent()),
+        ).pack(side="left")
+
+        reset_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 6))
+        reset_row.pack(fill="x", pady=(0, 4))
+        ttk.Button(
+            reset_row,
+            text="自動スタメンに戻す（確認）",
+            style="Menu.TButton",
+            command=lambda: self._on_reset_starting_lineup_gui(_strat_parent()),
+        ).pack(side="left")
 
         self.strategy_hint_var = tk.StringVar(value="")
         tk.Label(
@@ -1893,6 +3122,35 @@ class MainMenuView:
                 window.destroy()
         finally:
             self._strategy_window = None
+            self._strategy_scroll_canvas = None
+
+    def _update_strategy_window_scrollregion(self) -> None:
+        canvas = getattr(self, "_strategy_scroll_canvas", None)
+        if canvas is None:
+            return
+        try:
+            if not canvas.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        canvas.update_idletasks()
+        bbox = canvas.bbox("all")
+        if bbox:
+            canvas.configure(scrollregion=bbox)
+
+    def _update_finance_window_scrollregion(self) -> None:
+        canvas = getattr(self, "_finance_scroll_canvas", None)
+        if canvas is None:
+            return
+        try:
+            if not canvas.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        canvas.update_idletasks()
+        bbox = canvas.bbox("all")
+        if bbox:
+            canvas.configure(scrollregion=bbox)
 
     def _refresh_strategy_window(self) -> None:
         if not hasattr(self, "strategy_header_var"):
@@ -1948,9 +3206,43 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "概要は読み取り専用です。GMタブの「戦術・HC・起用」で試合に効く strategy / usage_policy を変更できます。"
-            " team_tactics の細かい設定は Phase B 以降でシミュへ接続予定です。"
+            "左パネル「試合に効く基本方針」で戦術・HC・起用方針を変更できます。"
+            "右パネル「起用の編集」で先発・6th・ベンチを変更できます。"
+            "上段ボタンから team_tactics の細かい設定（Phase A は試合未連携）。"
         )
+
+        jp_blk = getattr(self, "strat_jp_block_var", None)
+        jp_warn = getattr(self, "strat_starter_warn_var", None)
+        if jp_blk is not None and self.team is not None:
+            try:
+                ct = jp_reg_display.gui_next_competition_type(self.season, self.team)
+                jp_blk.set(
+                    jp_reg_display.format_contract_roster_summary(self.team)
+                    + "\n\n"
+                    + jp_reg_display.format_competition_rules_brief(ct)
+                )
+            except Exception:
+                jp_blk.set("")
+        if jp_warn is not None and self.team is not None:
+            try:
+                ct = jp_reg_display.gui_next_competition_type(self.season, self.team)
+                jp_warn.set(jp_reg_display.format_starting_lineup_caution(self.team, ct))
+            except Exception:
+                jp_warn.set("")
+
+        if hasattr(self, "_strat_combo_strategy"):
+            self._sync_strategy_policy_combos(
+                self._strat_combo_strategy,
+                self._strat_combo_coach,
+                self._strat_combo_usage,
+            )
+            self._refresh_policy_coach_preview(self._strat_combo_coach, self._strat_coach_preview_text)
+        if hasattr(self, "_strat_combo_lineup_slot"):
+            self._sync_strat_lineup_edit()
+            self._sync_strat_sixth_edit()
+            self._sync_strat_bench_edit()
+
+        self._update_strategy_window_scrollregion()
 
     def _tactics_roster_player_ids(self) -> set:
         ids: set = set()
@@ -2253,11 +3545,11 @@ class MainMenuView:
             for pid, sc in scales.items():
                 sc.set(20.0)
 
-        btn = ttk.Frame(wrap, style="Panel.TFrame")
+        btn = tk.Frame(wrap, bg="#1d2129")
         btn.pack(fill="x", pady=(8, 0))
-        ttk.Button(btn, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
-        ttk.Button(btn, text="標準に戻す", style="Menu.TButton", command=_reset).pack(side="left", padx=4)
-        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
+        self._jpn_text_button(btn, "保存", _save, primary=True, side="left", padx=4)
+        self._jpn_text_button(btn, "標準に戻す", _reset, side="left", padx=4)
+        self._jpn_text_button(btn, "閉じる", w.destroy, side="right", padx=4)
 
     def _open_tactics_usage_policy_window(self, parent: tk.Toplevel) -> None:
         if self.team is None:
@@ -2617,6 +3909,20 @@ class MainMenuView:
             anchor="w",
         ).pack(fill="x")
 
+        purpose = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
+        purpose.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            purpose,
+            text=(
+                "【強化メニュー】チーム練習・個別練習の方針、スペシャル練習の解放条件、"
+                "選手ごとの育成指標と見立てをまとめて確認する画面です（主に読み取り）。"
+                "変更は下部の「チーム練習を変更」「個別練習を変更」から行えます。"
+            ),
+            wraplength=1020,
+            font=("Yu Gothic UI", 10),
+            justify="left",
+        ).pack(anchor="w")
+
         top = ttk.Frame(outer, style="Root.TFrame")
         top.pack(fill="x", pady=(0, 12))
         top.columnconfigure(0, weight=1)
@@ -2637,7 +3943,14 @@ class MainMenuView:
         table_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=10)
         table_wrap.pack(fill="both", expand=True)
         table_wrap.columnconfigure(0, weight=1)
-        table_wrap.rowconfigure(0, weight=1)
+        table_wrap.rowconfigure(1, weight=1)
+
+        ttk.Label(
+            table_wrap,
+            text="ロスター別の育成一覧（POT・development・年齢帯・見立て）",
+            style="TopBar.TLabel",
+            anchor="w",
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
 
         columns = ("name", "pos", "age", "ovr", "pot", "dev", "games", "stage", "outlook")
         self.development_tree = ttk.Treeview(
@@ -2676,9 +3989,9 @@ class MainMenuView:
         vsb = ttk.Scrollbar(table_wrap, orient="vertical", command=self.development_tree.yview)
         hsb = ttk.Scrollbar(table_wrap, orient="horizontal", command=self.development_tree.xview)
         self.development_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-        self.development_tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
+        self.development_tree.grid(row=1, column=0, sticky="nsew")
+        vsb.grid(row=1, column=1, sticky="ns")
+        hsb.grid(row=2, column=0, sticky="ew")
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
@@ -2703,8 +4016,7 @@ class MainMenuView:
             anchor="w",
             font=("Yu Gothic UI", 10, "bold"),
             padx=2,
-            pady=(8, 2),
-        ).pack(fill="x", anchor="w")
+        ).pack(fill="x", anchor="w", pady=(8, 2))
         self._development_log_frame = tk.Frame(bottom, bg="#1d2129")
         self._development_log_frame.pack(fill="x", anchor="w")
 
@@ -2732,7 +4044,14 @@ class MainMenuView:
 
         self._development_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_development_window)
+        self.development_hint_intro_var.set(
+            "補足: 数値はセーブ済みの選手データに依存します。列が足りない項目は今後の拡張で表示される場合があります。"
+        )
         self._refresh_development_window()
+        try:
+            window.update_idletasks()
+        except tk.TclError:
+            pass
 
     def _on_close_development_window(self) -> None:
         window = getattr(self, "_development_window", None)
@@ -2773,17 +4092,25 @@ class MainMenuView:
         if players_sorted:
             avg_dev = sum(self._safe_float(self._safe_get(p, "development", 0)) for p in players_sorted) / len(players_sorted)
 
-        self.development_header_var.set(
-            f"{self._team_name()} 強化・育成状況    育成有望株: {top_name} (POT {top_pot})"
-        )
+        team_tf_key = str(self._safe_get(self.team, "team_training_focus", "balanced") or "balanced")
+        team_tf_label = self._get_team_training_label(team_tf_key)
+
+        if self.team is None:
+            self.development_header_var.set(
+                "（チーム未接続）強化・育成状況 — 下記は参照用プレースホルダです"
+            )
+        else:
+            self.development_header_var.set(
+                f"{self._team_name()} 強化・育成状況    育成有望株: {top_name} (POT {top_pot})"
+            )
 
         summary_lines = [
             f"ロスター人数: {len(players_sorted)}",
+            f"チーム練習方針: {team_tf_label}",
             f"若手(23歳以下): {young_count}",
             f"全盛期(24-31歳): {prime_count}",
             f"ベテラン(32歳以上): {veteran_count}",
-            f"平均育成値: {avg_dev:.1f}",
-            f"育成有望株: {top_name}",
+            f"平均育成値(development): {avg_dev:.1f}",
         ]
         for var, line in zip(self.development_summary_lines, summary_lines):
             var.set(line)
@@ -2800,37 +4127,52 @@ class MainMenuView:
             var.set(line)
 
         special_lines = self._build_current_special_training_lines(self.team)
-        while len(special_lines) < len(self.development_special_lines):
-            special_lines.append("")
-        for var, line in zip(self.development_special_lines, special_lines[: len(self.development_special_lines)]):
-            var.set(line)
+        slot_n = len(self.development_special_lines)
+        while len(special_lines) < slot_n:
+            special_lines.append("（この行は予備／表示項目なし）")
+        for i, var in enumerate(self.development_special_lines):
+            var.set(special_lines[i] if i < len(special_lines) else "（表示なし）")
 
         tree = getattr(self, "development_tree", None)
         if tree is not None:
             for item in tree.get_children():
                 tree.delete(item)
-            for player in players_sorted:
-                age = self._safe_int(self._safe_get(player, "age", 0))
-                stage = self._get_age_stage_text(age)
-                outlook = self._build_player_development_outlook(player)
+            if not players_sorted:
+                if self.team is None:
+                    pname = "（チーム未接続）"
+                    outlook = "メイン画面でチームに接続するとロスターが表示されます。"
+                else:
+                    pname = "（ロスターに選手がいません）"
+                    outlook = "選手が所属すると自動で行が追加されます。"
                 tree.insert(
                     "",
                     "end",
-                    values=(
-                        str(self._safe_get(player, "name", "-")),
-                        str(self._safe_get(player, "position", "-")),
-                        str(self._safe_get(player, "age", "-")),
-                        str(self._safe_get(player, "ovr", "-")),
-                        str(self._safe_get(player, "potential", "-")),
-                        str(self._safe_get(player, "development", "-")),
-                        str(self._safe_get(player, "games_played", 0)),
-                        stage,
-                        outlook,
-                    ),
+                    values=(pname, "—", "—", "—", "—", "—", "—", "—", outlook),
                 )
+            else:
+                for player in players_sorted:
+                    age = self._safe_int(self._safe_get(player, "age", 0))
+                    stage = self._get_age_stage_text(age)
+                    outlook = self._build_player_development_outlook(player)
+                    tree.insert(
+                        "",
+                        "end",
+                        values=(
+                            str(self._safe_get(player, "name", "-")),
+                            str(self._safe_get(player, "position", "-")),
+                            str(self._safe_get(player, "age", "-")),
+                            str(self._safe_get(player, "ovr", "-")),
+                            str(self._safe_get(player, "potential", "-")),
+                            str(self._safe_get(player, "development", "-")),
+                            str(self._safe_get(player, "games_played", 0)),
+                            stage,
+                            outlook,
+                        ),
+                    )
 
         self.development_hint_intro_var.set(
-            "読み取り専用の強化画面です。potential / development / 年齢 / 試合数 / 戦術相性を確認できます。"
+            "上段パネル: 人数・練習方針・HC/戦術の育成への効き方・スペシャル練習。"
+            "下表: 選手ごとの POT / development / 試合出場 / 年齢帯 / 見立て。"
         )
         self._refresh_development_training_log_widgets()
 
@@ -3045,10 +4387,43 @@ class MainMenuView:
         nb.add(tab_overview, text="概要")
         tab_overview.columnconfigure(0, weight=1)
         tab_overview.columnconfigure(1, weight=1)
-        tab_overview.rowconfigure(0, weight=1)
+        tab_overview.rowconfigure(0, weight=0)
+        tab_overview.rowconfigure(1, weight=1)
+        tab_overview.rowconfigure(2, weight=0)
+
+        self.info_team_profile_panel = self._create_panel(tab_overview, "チーム情報（閲覧）")
+        self.info_team_profile_panel.grid(row=0, column=0, columnspan=2, sticky="nsew", pady=(0, 10))
+        tprof_inner = self._resolve_content_parent(self.info_team_profile_panel)
+        tk.Label(
+            tprof_inner,
+            text="クラブ属性の正本です（ホーム・愛称等）。左メニュー「クラブ案内」の同名タブは案内のみです。",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=960,
+            padx=2,
+        ).pack(fill="x", pady=(0, 6))
+        self._information_team_identity_text = scrolledtext.ScrolledText(
+            tprof_inner,
+            height=10,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self._information_team_identity_text.pack(fill="both", expand=False, pady=(0, 4))
+        self._information_team_identity_text.configure(state="disabled")
 
         top_ov = ttk.Frame(tab_overview, style="Root.TFrame")
-        top_ov.grid(row=0, column=0, columnspan=2, sticky="nsew", pady=(0, 10))
+        top_ov.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(0, 10))
         top_ov.columnconfigure(0, weight=1)
         top_ov.columnconfigure(1, weight=1)
 
@@ -3058,7 +4433,7 @@ class MainMenuView:
         self.info_schedule_panel.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
 
         self.info_comp_panel = self._create_panel(tab_overview, "大会進行状況")
-        self.info_comp_panel.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        self.info_comp_panel.grid(row=2, column=0, columnspan=2, sticky="nsew")
 
         self.info_progress_lines = self._make_line_vars(self.info_progress_panel, 7)
         self.info_schedule_lines = self._make_line_vars(self.info_schedule_panel, 8)
@@ -3304,12 +4679,9 @@ class MainMenuView:
             pady=2,
         ).pack(fill="x", anchor="w")
 
-        ttk.Button(
-            bottom,
-            text="閉じる",
-            style="Menu.TButton",
-            command=window.destroy,
-        ).pack(anchor="e", pady=(8, 0))
+        bf = tk.Frame(bottom, bg="#1d2129")
+        bf.pack(anchor="e", pady=(8, 0))
+        self._jpn_text_button(bf, "閉じる", window.destroy, side="right")
 
         self._information_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_information_window)
@@ -3508,16 +4880,16 @@ class MainMenuView:
         bottom.pack(fill="x", pady=(12, 0))
         tk.Label(
             bottom,
-            text="読み取り専用です。一覧は主に日本リーグの SeasonEvent 由来。過去結果は上が新しい順。カップ戦は大会進行（情報ウィンドウ）も併せて確認してください。",
+            text="読み取り専用です。一覧は主に日本リーグの SeasonEvent 由来です。「すべて」では全日本カップ・東アジアカップ・代表ウィンドウ等を表示補完しています（行を選ぶと詳細に注記あり）。過去結果は上が新しい順。",
             bg="#1d2129",
             fg="#9aa3af",
             anchor="w",
             justify="left",
             font=("Yu Gothic UI", 9),
         ).pack(fill="x")
-        ttk.Button(bottom, text="閉じる", style="Menu.TButton", command=self._on_close_schedule_window).pack(
-            anchor="e", pady=(8, 0)
-        )
+        bf = tk.Frame(bottom, bg="#1d2129")
+        bf.pack(anchor="e", pady=(8, 0))
+        self._jpn_text_button(bf, "閉じる", self._on_close_schedule_window, side="right")
 
         self._schedule_window = window
         self._schedule_upcoming_rows: List[Dict[str, Any]] = []
@@ -3608,10 +4980,17 @@ class MainMenuView:
         fin = bool(self._safe_get(self.season, "season_finished", False))
         hdr = getattr(self, "schedule_header_var", None)
         if hdr is not None:
-            hdr.set(
-                f"{self._team_name()} 日程    消化ラウンド {cr}/{tr}    "
-                f"{'シーズン終了' if fin else 'シーズン進行中'}"
-            )
+            parts = [
+                f"{self._team_name()} 日程",
+                f"消化ラウンド {cr}/{tr}",
+                "シーズン終了" if fin else "シーズン進行中",
+            ]
+            if not fin and self.season is not None and self.team is not None:
+                nxt = cr + 1
+                if nxt <= tr:
+                    ng = count_user_games_in_sim_round(self.season, self.team, nxt)
+                    parts.append(f"次の進行の自チーム試合: {ng}（1回でまとめてシミュ）")
+            hdr.set("    ".join(parts))
 
         # 次戦詳細
         nt = getattr(self, "_schedule_next_text", None)
@@ -3696,6 +5075,23 @@ class MainMenuView:
         self.information_header_var.set(
             f"{self._team_name()} 情報画面    ラウンド {current_round}/{total_rounds}    phase: {phase}"
         )
+
+        titw = getattr(self, "_information_team_identity_text", None)
+        if titw is not None:
+            if self.team is not None:
+                try:
+                    tid_body = format_team_identity_text(self.team)
+                except Exception:
+                    tid_body = "チーム情報を取得できませんでした。"
+            else:
+                tid_body = "チームが未接続です。"
+            try:
+                titw.configure(state="normal")
+                titw.delete("1.0", tk.END)
+                titw.insert("1.0", tid_body)
+                titw.configure(state="disabled")
+            except tk.TclError:
+                pass
 
         progress_lines = [
             f"現在ラウンド: {current_round}/{total_rounds}",
@@ -4184,12 +5580,9 @@ class MainMenuView:
 
         hist_bottom = ttk.Frame(outer, style="Panel.TFrame", padding=(8, 4))
         hist_bottom.pack(fill="x", pady=(6, 0))
-        ttk.Button(
-            hist_bottom,
-            text="閉じる",
-            style="Menu.TButton",
-            command=self._close_history_window,
-        ).pack(anchor="e")
+        hf = tk.Frame(hist_bottom, bg="#1d2129")
+        hf.pack(anchor="e")
+        self._jpn_text_button(hf, "閉じる", self._close_history_window, side="right")
 
         self._refresh_history_window()
 
@@ -4781,31 +6174,23 @@ class MainMenuView:
     # Interaction handlers
     # ------------------------------------------------------------------
     def _format_gm_cli_hint_block(self) -> str:
-        """シーズン状況＋CLI 案内（GM ウィンドウ上部）。"""
+        """クラブ案内ウィンドウ上部: 閲覧・案内・CLI ショートカット。トレード／FA 詳細は人事。"""
         cr = int(self._safe_get(self.season, "current_round", 0) or 0)
         tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
-        fin = self.season is not None and bool(self._safe_get(self.season, "season_finished", False))
-        unlocked = self.inseason_roster_moves_allowed()
-        if self.season is None:
-            lock_line = "シーズンが未接続です。"
-        elif fin:
-            lock_line = (
-                "現在はオフシーズンです。トレード・FA はオフシーズン処理（再契約・FA・ドラフト等）で行います。"
-            )
-        elif unlocked:
-            lock_line = (
-                "レギュラー中のトレード／インシーズンFA は「ラウンド22消化後」まで可能です（3月第2週終了相当）。"
-            )
-        else:
-            lock_line = (
-                "レギュラー中のトレード／インシーズンFA は期限切れです。シーズン終了まで人事の強化はできません。"
-            )
         return (
+            "【クラブ案内】編集の正本は人事・戦術・経営・情報の各メニューです。"
+            "ここは閲覧・案内・ターミナル（CLI）へのショートカットのみです（実行画面ではありません）。\n\n"
+            "【トレード／インシーズンFA】当面の標準導線は CLI メニューです。\n"
             f"消化ラウンド: {cr}/{tr}\n"
-            f"{lock_line}\n\n"
-            "「スタメン・ベンチ」タブでスタメン1枠・6th・ベンチ入替を反映できます（確認ダイアログ付き）。"
-            "「戦術・HC・起用」タブで戦術・HCスタイル・起用方針を変更できます。"
-            "トレード・インシーズンFAはウィンドウ下の「トレード・FA（ターミナル案内）」で可否を確認できます。"
+            "トレード・インシーズンFA の手順・可否の正本は、左メニュー「人事」ウィンドウ上部の案内を参照してください。\n"
+            "ウィンドウ下のボタンはターミナル（CLI）へのショートカットです。\n\n"
+            "先発・6th・ベンチの編集は左メニュー「戦術」（起用の編集）。"
+            "当窓の「スタメン・ベンチ」は参照のみです。"
+            "戦術・HC・起用方針の編集は左メニュー「戦術」（試合に効く基本方針）。"
+            "当窓の「戦術・HC・起用」は参照のみです。"
+            "サラリーキャップの数値は左メニュー「経営」の「財務サマリー」下部。当窓の「サラリーキャップ」は案内のみです。"
+            "チーム属性は左メニュー「情報」の「概要」上部。当窓の「チーム情報」は案内のみです。"
+            "ロスター全文テキストは左メニュー「人事」の「詳細ロスター」。当窓の「ロスター」は案内のみです。"
             "施設投資もターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
         )
 
@@ -4825,20 +6210,88 @@ class MainMenuView:
         except Exception:
             return
         self._gm_set_readonly_text(self._gm_hint_text, self._format_gm_cli_hint_block())
-        self._gm_set_readonly_text(self._gm_text_team, format_team_identity_text(self.team))
-        self._gm_set_readonly_text(self._gm_text_cap, format_salary_cap_text(self.team))
-        self._gm_set_readonly_text(self._gm_text_roster, format_gm_roster_text(self.team))
+        self._gm_set_readonly_text(self._gm_text_team, self._format_gm_team_tab_guidance_text())
+        self._gm_set_readonly_text(self._gm_text_cap, self._format_gm_cap_tab_guidance_text())
+        self._gm_set_readonly_text(self._gm_text_roster, self._format_gm_roster_tab_guidance_text())
         self._gm_set_readonly_text(self._gm_text_lineup, format_lineup_snapshot_text(self.team))
-        self._sync_gm_lineup_edit()
-        self._sync_gm_sixth_edit()
-        self._sync_gm_bench_edit()
-        self._sync_gm_strategy_combos()
+        if hasattr(self, "_gm_team_policy_text"):
+            self._gm_set_readonly_text(
+                self._gm_team_policy_text,
+                self._format_gm_team_policy_readonly_text(),
+            )
 
-    def _sync_gm_strategy_combos(self) -> None:
-        if self.team is None or not hasattr(self, "_combo_strategy"):
+    def _format_gm_team_tab_guidance_text(self) -> str:
+        if self.team is None:
+            return (
+                "チームが未接続です。\n\n"
+                "チーム情報（クラブ属性）の参照は、左メニュー「情報」→「概要」タブ上部の"
+                "「チーム情報（閲覧）」を開いてください。"
+            )
+        return (
+            "チーム名・ホーム球場・愛称などクラブ属性の詳細は、左メニュー「情報」を開き、"
+            "「概要」タブ上部の「チーム情報（閲覧）」にまとめました。\n\n"
+            "このタブは案内のみです。数値の正は情報画面を参照してください。"
+        )
+
+    def _format_gm_cap_tab_guidance_text(self) -> str:
+        if self.team is None:
+            return (
+                "チームが未接続です。\n\n"
+                "サラリーキャップの参照は、左メニュー「経営」ウィンドウの"
+                "「財務サマリー」下部「サラリーキャップ（閲覧）」を開いてください。"
+            )
+        return (
+            "サラリーキャップ・ペイロールの詳細な参照は、左メニュー「経営」を開き、"
+            "「財務サマリー」パネル下部の「サラリーキャップ（閲覧）」にまとめました。\n\n"
+            "このタブは案内のみです。数値の正は経営画面と、"
+            "ホームのクラブ状況サマリー（給与・キャップ一行）を参照してください。"
+        )
+
+    def _format_gm_roster_tab_guidance_text(self) -> str:
+        if self.team is None:
+            return (
+                "チームが未接続です。\n\n"
+                "ロスターの全文テキスト一覧は、左メニュー「人事」を開き、"
+                "ウィンドウ下部の「詳細ロスター（テキスト一覧）」を参照してください。"
+            )
+        return (
+            "ロスター全員のテキスト一覧（並び・体裁は docs/GM_ROSTER_DISPLAY_RULES.md）の参照は、"
+            "左メニュー「人事」を開き、表の下のペイン「詳細ロスター（テキスト一覧）」にまとめました。\n\n"
+            "契約の＋1年延長・FA 解除などの操作は、人事ウィンドウ上部の表から選手を選んで行ってください。\n\n"
+            "このタブは案内のみです。"
+        )
+
+    def _format_gm_team_policy_readonly_text(self) -> str:
+        if self.team is None:
+            return "—"
+        sk = getattr(self.team, "strategy", "balanced")
+        ck = getattr(self.team, "coach_style", "balanced")
+        uk = getattr(self.team, "usage_policy", "balanced")
+        st = self.STRATEGY_LABELS.get(str(sk), str(sk))
+        ct = self.COACH_STYLE_LABELS.get(str(ck), str(ck))
+        ut = self.USAGE_POLICY_LABELS.get(str(uk), str(uk))
+        lines = [
+            "編集は左メニュー「戦術」ウィンドウの左パネル「試合に効く基本方針」から行ってください。",
+            "",
+            f"戦術 (Team.strategy): {st}",
+            f"HCスタイル: {ct}",
+            f"起用方針 (Team.usage_policy): {ut}",
+            "",
+            "【強化メニューとの関連（現在のHC条件）】",
+        ]
+        lines.extend(self._build_current_special_training_lines(self.team))
+        return "\n".join(lines)
+
+    def _sync_strategy_policy_combos(
+        self,
+        combo_strategy: ttk.Combobox,
+        combo_coach: ttk.Combobox,
+        combo_usage: ttk.Combobox,
+    ) -> None:
+        if self.team is None:
             return
 
-        def _set(combo: ttk.Combobox, options, current_key: str) -> None:
+        def _set(combo: ttk.Combobox, options: Any, current_key: str) -> None:
             cur = str(current_key)
             for k, lab in options:
                 if k == cur:
@@ -4846,17 +6299,19 @@ class MainMenuView:
                     return
             combo.set(options[0][1])
 
-        _set(self._combo_strategy, STRATEGY_OPTIONS, getattr(self.team, "strategy", "balanced"))
-        _set(self._combo_coach, COACH_STYLE_OPTIONS, getattr(self.team, "coach_style", "balanced"))
-        _set(self._combo_usage, USAGE_POLICY_OPTIONS, getattr(self.team, "usage_policy", "balanced"))
-        self._refresh_gm_coach_preview()
+        _set(combo_strategy, STRATEGY_OPTIONS, getattr(self.team, "strategy", "balanced"))
+        _set(combo_coach, COACH_STYLE_OPTIONS, getattr(self.team, "coach_style", "balanced"))
+        _set(combo_usage, USAGE_POLICY_OPTIONS, getattr(self.team, "usage_policy", "balanced"))
 
-    def _refresh_gm_coach_preview(self) -> None:
-        text_widget = getattr(self, "_gm_coach_preview_text", None)
+    def _refresh_policy_coach_preview(
+        self,
+        coach_combo: ttk.Combobox,
+        text_widget: tk.Text,
+    ) -> None:
         if text_widget is None or self.team is None:
             return
         try:
-            selected_label = self._combo_coach.get()
+            selected_label = coach_combo.get()
             selected_key = self._gm_label_to_key_coach.get(
                 selected_label,
                 getattr(self.team, "coach_style", "balanced"),
@@ -4867,12 +6322,16 @@ class MainMenuView:
         lines = self._build_coach_unlock_diff_lines(old_key, str(selected_key))
         self._gm_set_readonly_text(text_widget, "\n".join(lines))
 
-    def _on_gm_coach_selection_changed(self, _event: Any = None) -> None:
-        self._refresh_gm_coach_preview()
+    def _on_strat_coach_selection_changed(self, _event: Any = None) -> None:
+        if hasattr(self, "_strat_combo_coach") and hasattr(self, "_strat_coach_preview_text"):
+            self._refresh_policy_coach_preview(
+                self._strat_combo_coach,
+                self._strat_coach_preview_text,
+            )
 
-    def _gm_slot_label_to_index(self, label: str) -> int:
+    def _lineup_slot_label_to_index(self, label: str) -> int:
         try:
-            return self._gm_slot_labels.index(label)
+            return self._LINEUP_SLOT_LABELS.index(label)
         except (ValueError, AttributeError):
             return 0
 
@@ -4882,82 +6341,74 @@ class MainMenuView:
             f"OVR{int(getattr(p, 'ovr', 0))} id={getattr(p, 'player_id', '')}"
         )
 
-    def _sync_gm_lineup_candidates(self) -> None:
-        if self.team is None or not hasattr(self, "_gm_combo_lineup_slot"):
+    def _sync_strat_lineup_candidates(self) -> None:
+        if self.team is None or not hasattr(self, "_strat_combo_lineup_slot"):
             return
         starters = get_current_starting_five(self.team)
         if len(starters) < 5:
-            self._gm_candidate_players = []
-            self._gm_combo_lineup_candidate.configure(values=[])
-            self._gm_combo_lineup_candidate.set("")
+            self._strat_candidate_players = []
+            self._strat_combo_lineup_candidate.configure(values=[])
+            self._strat_combo_lineup_candidate.set("")
             return
         try:
-            lab = self._gm_combo_lineup_slot.get()
+            lab = self._strat_combo_lineup_slot.get()
         except tk.TclError:
-            lab = self._gm_slot_labels[0]
-        slot_index = self._gm_slot_label_to_index(lab)
+            lab = self._LINEUP_SLOT_LABELS[0]
+        slot_index = self._lineup_slot_label_to_index(lab)
         cands = get_available_starting_candidates(self.team, starters, slot_index)
-        self._gm_candidate_players = list(cands)
+        self._strat_candidate_players = list(cands)
         values = [self._gm_candidate_label_for_player(p) for p in cands]
-        self._gm_combo_lineup_candidate.configure(values=values)
+        self._strat_combo_lineup_candidate.configure(values=values)
         if values:
-            self._gm_combo_lineup_candidate.set(values[0])
+            self._strat_combo_lineup_candidate.set(values[0])
         else:
-            self._gm_combo_lineup_candidate.set("")
+            self._strat_combo_lineup_candidate.set("")
 
-    def _sync_gm_lineup_edit(self) -> None:
-        if self.team is None or not hasattr(self, "_gm_combo_lineup_slot"):
+    def _sync_strat_lineup_edit(self) -> None:
+        if self.team is None or not hasattr(self, "_strat_combo_lineup_slot"):
             return
         starters = get_current_starting_five(self.team)
         ok = len(starters) >= 5
         state = "readonly" if ok else "disabled"
-        self._gm_combo_lineup_slot.configure(state=state)
-        self._gm_combo_lineup_candidate.configure(state=state)
-        self._gm_btn_apply_lineup_slot.configure(state="normal" if ok else "disabled")
+        self._strat_combo_lineup_slot.configure(state=state)
+        self._strat_combo_lineup_candidate.configure(state=state)
+        self._strat_btn_apply_lineup.configure(state="normal" if ok else "disabled")
         if not ok:
-            self._gm_candidate_players = []
-            self._gm_combo_lineup_candidate.configure(values=[])
-            self._gm_combo_lineup_candidate.set("")
+            self._strat_candidate_players = []
+            self._strat_combo_lineup_candidate.configure(values=[])
+            self._strat_combo_lineup_candidate.set("")
             return
         try:
-            cur = self._gm_combo_lineup_slot.get()
+            cur = self._strat_combo_lineup_slot.get()
         except tk.TclError:
             cur = ""
-        if not cur or cur not in getattr(self, "_gm_slot_labels", ()):
-            self._gm_combo_lineup_slot.set(self._gm_slot_labels[0])
-        self._sync_gm_lineup_candidates()
+        if not cur or cur not in self._LINEUP_SLOT_LABELS:
+            self._strat_combo_lineup_slot.set(self._LINEUP_SLOT_LABELS[0])
+        self._sync_strat_lineup_candidates()
 
-    def _on_gm_slot_lineup_changed(self) -> None:
-        self._sync_gm_lineup_candidates()
-
-    def _on_apply_gm_starting_slot(self) -> None:
+    def _on_apply_strat_starting_slot(self, parent: tk.Misc) -> None:
         if self.team is None:
             return
-        w = getattr(self, "_gm_window", None)
-        try:
-            parent = w if w is not None and w.winfo_exists() else self.root
-        except Exception:
-            parent = self.root
         starters = get_current_starting_five(self.team)
         if len(starters) < 5:
             messagebox.showwarning("スタメン", "スタメンが5人未満のため変更できません。", parent=parent)
             return
         try:
-            lab = self._gm_combo_lineup_slot.get()
+            lab = self._strat_combo_lineup_slot.get()
         except tk.TclError:
-            lab = self._gm_slot_labels[0]
-        slot_index = self._gm_slot_label_to_index(lab)
+            lab = self._LINEUP_SLOT_LABELS[0]
+        slot_index = self._lineup_slot_label_to_index(lab)
         try:
-            sel = self._gm_combo_lineup_candidate.get()
+            sel = self._strat_combo_lineup_candidate.get()
         except tk.TclError:
             sel = ""
-        values = [self._gm_candidate_label_for_player(p) for p in self._gm_candidate_players]
+        values = [self._gm_candidate_label_for_player(p) for p in self._strat_candidate_players]
         try:
             idx = values.index(sel)
         except ValueError:
             messagebox.showwarning("スタメン", "候補を選択してください。", parent=parent)
             return
-        player = self._gm_candidate_players[idx]
+        player = self._strat_candidate_players[idx]
         try:
             ok = messagebox.askokcancel(
                 "スタメン差し替え",
@@ -4976,55 +6427,50 @@ class MainMenuView:
         self.refresh()
         messagebox.showinfo("完了", "スタメンを更新しました。", parent=parent)
 
-    def _bench_slot_labels(self) -> List[str]:
+    def _strat_bench_slot_labels(self) -> List[str]:
         return [
             f"{i + 1}. {self._gm_candidate_label_for_player(p)}"
-            for i, p in enumerate(self._gm_bench_players)
+            for i, p in enumerate(self._strat_bench_players)
         ]
 
-    def _sync_gm_sixth_edit(self) -> None:
-        if self.team is None or not hasattr(self, "_gm_combo_sixth"):
+    def _sync_strat_sixth_edit(self) -> None:
+        if self.team is None or not hasattr(self, "_strat_combo_sixth"):
             return
         cands = get_sixth_man_candidates(self.team)
-        self._gm_sixth_candidate_players = list(cands)
+        self._strat_sixth_candidate_players = list(cands)
         values = [self._gm_candidate_label_for_player(p) for p in cands]
-        self._gm_combo_sixth.configure(values=values)
+        self._strat_combo_sixth.configure(values=values)
         if values:
-            self._gm_combo_sixth.set(values[0])
+            self._strat_combo_sixth.set(values[0])
         else:
-            self._gm_combo_sixth.set("")
-        self._gm_btn_apply_sixth.configure(state="normal" if values else "disabled")
+            self._strat_combo_sixth.set("")
+        self._strat_btn_apply_sixth.configure(state="normal" if values else "disabled")
 
-    def _sync_gm_bench_edit(self) -> None:
-        if self.team is None or not hasattr(self, "_gm_combo_bench_a"):
+    def _sync_strat_bench_edit(self) -> None:
+        if self.team is None or not hasattr(self, "_strat_combo_bench_a"):
             return
         bench = get_current_bench_order(self.team)
-        self._gm_bench_players = list(bench)
-        labels = self._bench_slot_labels()
+        self._strat_bench_players = list(bench)
+        labels = self._strat_bench_slot_labels()
         if len(bench) < 2:
-            self._gm_combo_bench_a.configure(values=[], state="disabled")
-            self._gm_combo_bench_b.configure(values=[], state="disabled")
-            self._gm_combo_bench_a.set("")
-            self._gm_combo_bench_b.set("")
-            self._gm_btn_bench_swap.configure(state="disabled")
+            self._strat_combo_bench_a.configure(values=[], state="disabled")
+            self._strat_combo_bench_b.configure(values=[], state="disabled")
+            self._strat_combo_bench_a.set("")
+            self._strat_combo_bench_b.set("")
+            self._strat_btn_bench_swap.configure(state="disabled")
             return
-        for combo in (self._gm_combo_bench_a, self._gm_combo_bench_b):
+        for combo in (self._strat_combo_bench_a, self._strat_combo_bench_b):
             combo.configure(values=labels, state="readonly")
-        self._gm_combo_bench_a.set(labels[0])
-        self._gm_combo_bench_b.set(labels[1])
-        self._gm_btn_bench_swap.configure(state="normal")
+        self._strat_combo_bench_a.set(labels[0])
+        self._strat_combo_bench_b.set(labels[1])
+        self._strat_btn_bench_swap.configure(state="normal")
 
-    def _on_apply_gm_sixth_man(self) -> None:
+    def _on_apply_strat_sixth_man(self, parent: tk.Misc) -> None:
         if self.team is None:
             return
-        w = getattr(self, "_gm_window", None)
+        values = [self._gm_candidate_label_for_player(p) for p in self._strat_sixth_candidate_players]
         try:
-            parent = w if w is not None and w.winfo_exists() else self.root
-        except Exception:
-            parent = self.root
-        values = [self._gm_candidate_label_for_player(p) for p in self._gm_sixth_candidate_players]
-        try:
-            sel = self._gm_combo_sixth.get()
+            sel = self._strat_combo_sixth.get()
         except tk.TclError:
             sel = ""
         try:
@@ -5032,7 +6478,7 @@ class MainMenuView:
         except ValueError:
             messagebox.showwarning("6thマン", "候補を選択してください。", parent=parent)
             return
-        player = self._gm_sixth_candidate_players[idx]
+        player = self._strat_sixth_candidate_players[idx]
         try:
             ok = messagebox.askokcancel(
                 "6thマン",
@@ -5051,14 +6497,9 @@ class MainMenuView:
         self.refresh()
         messagebox.showinfo("完了", "6thマンを更新しました。", parent=parent)
 
-    def _on_reset_sixth_man_gui(self) -> None:
+    def _on_reset_sixth_man_gui(self, parent: tk.Misc) -> None:
         if self.team is None:
             return
-        w = getattr(self, "_gm_window", None)
-        try:
-            parent = w if w is not None and w.winfo_exists() else self.root
-        except Exception:
-            parent = self.root
         try:
             ok = messagebox.askokcancel(
                 "自動6thに戻す",
@@ -5081,22 +6522,17 @@ class MainMenuView:
         self.refresh()
         messagebox.showinfo("完了", "6thマンを自動選出に戻しました。", parent=parent)
 
-    def _on_apply_gm_bench_swap(self) -> None:
+    def _on_apply_strat_bench_swap(self, parent: tk.Misc) -> None:
         if self.team is None:
             return
-        w = getattr(self, "_gm_window", None)
-        try:
-            parent = w if w is not None and w.winfo_exists() else self.root
-        except Exception:
-            parent = self.root
-        self._gm_bench_players = list(get_current_bench_order(self.team))
-        labels = self._bench_slot_labels()
-        if len(self._gm_bench_players) < 2:
+        self._strat_bench_players = list(get_current_bench_order(self.team))
+        labels = self._strat_bench_slot_labels()
+        if len(self._strat_bench_players) < 2:
             messagebox.showwarning("ベンチ", "ベンチが2人未満のため入れ替えできません。", parent=parent)
             return
         try:
-            sa = self._gm_combo_bench_a.get()
-            sb = self._gm_combo_bench_b.get()
+            sa = self._strat_combo_bench_a.get()
+            sb = self._strat_combo_bench_b.get()
         except tk.TclError:
             return
         try:
@@ -5108,8 +6544,8 @@ class MainMenuView:
         if idx_a == idx_b:
             messagebox.showwarning("ベンチ", "異なる2つの番号を選んでください。", parent=parent)
             return
-        pa = self._gm_bench_players[idx_a]
-        pb = self._gm_bench_players[idx_b]
+        pa = self._strat_bench_players[idx_a]
+        pb = self._strat_bench_players[idx_b]
         try:
             ok = messagebox.askokcancel(
                 "ベンチ入替",
@@ -5129,14 +6565,9 @@ class MainMenuView:
         self.refresh()
         messagebox.showinfo("完了", "ベンチ序列を更新しました。", parent=parent)
 
-    def _on_reset_bench_order_gui(self) -> None:
+    def _on_reset_bench_order_gui(self, parent: tk.Misc) -> None:
         if self.team is None:
             return
-        w = getattr(self, "_gm_window", None)
-        try:
-            parent = w if w is not None and w.winfo_exists() else self.root
-        except Exception:
-            parent = self.root
         try:
             ok = messagebox.askokcancel(
                 "自動ベンチに戻す",
@@ -5159,19 +6590,14 @@ class MainMenuView:
         self.refresh()
         messagebox.showinfo("完了", "ベンチ序列を自動に戻しました。", parent=parent)
 
-    def _on_apply_gm_strategy(self) -> None:
+    def _on_apply_strat_team_policy(self, parent: tk.Misc) -> None:
         if self.team is None:
             return
-        w = getattr(self, "_gm_window", None)
         try:
-            parent = w if w is not None and w.winfo_exists() else self.root
-        except Exception:
-            parent = self.root
-        try:
-            sk = self._gm_label_to_key_strategy[self._combo_strategy.get()]
-            ck = self._gm_label_to_key_coach[self._combo_coach.get()]
-            uk = self._gm_label_to_key_usage[self._combo_usage.get()]
-        except (KeyError, tk.TclError):
+            sk = self._gm_label_to_key_strategy[self._strat_combo_strategy.get()]
+            ck = self._gm_label_to_key_coach[self._strat_combo_coach.get()]
+            uk = self._gm_label_to_key_usage[self._strat_combo_usage.get()]
+        except (KeyError, tk.TclError, AttributeError):
             messagebox.showerror("エラー", "選択値を取得できませんでした。", parent=parent)
             return
         old_coach = str(getattr(self.team, "coach_style", "balanced") or "balanced")
@@ -5179,7 +6605,7 @@ class MainMenuView:
         if not ok:
             messagebox.showerror("反映できません", msg, parent=parent)
             return
-        self._refresh_gm_dashboard_window()
+        self.refresh()
         lines = ["戦術・HC・起用方針を反映しました。"]
         if old_coach != ck:
             lines.append("")
@@ -5323,9 +6749,14 @@ class MainMenuView:
         team = getattr(self, "team", None)
         logs = list(getattr(team, "training_change_log", []) or []) if team is not None else []
         if not logs:
+            empty_msg = (
+                "（直近の練習変更履歴はありません）"
+                if team is not None
+                else "（チーム未接続のため履歴を表示できません）"
+            )
             tk.Label(
                 frame,
-                text="  なし",
+                text=f"  {empty_msg}",
                 bg="#1d2129",
                 fg="#9aa3b2",
                 anchor="w",
@@ -5574,20 +7005,15 @@ class MainMenuView:
         ttk.Button(btn, text="反映", style="Primary.TButton", command=_apply).pack(side="left")
         ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
 
-    def _on_reset_starting_lineup_gui(self) -> None:
+    def _on_reset_starting_lineup_gui(self, parent: tk.Misc) -> None:
         """カスタムスタメン解除（Team.clear_starting_lineup）。確認ダイアログ付き。"""
         if self.team is None:
             return
-        w = getattr(self, "_gm_window", None)
-        try:
-            parent = w if w is not None and w.winfo_exists() else self.root
-        except Exception:
-            parent = self.root
         try:
             ok = messagebox.askokcancel(
                 "自動スタメンに戻す",
                 "カスタムスタメン（手動設定）を解除し、チームの自動選出に戻しますか？\n\n"
-                "※ 6thマンの設定はそのままです。変更はCLIのGMメニューから行えます。",
+                "※ 6thマンの設定はそのままです。",
                 parent=parent,
             )
         except Exception:
@@ -5607,7 +7033,7 @@ class MainMenuView:
         messagebox.showinfo("完了", "スタメンを自動選出に戻しました。", parent=parent)
 
     def _on_gm_cli_trade_fa_hint(self) -> None:
-        """トレード／インシーズンFA 相当の可否を CLI と同じガードで確認し、ターミナル操作を案内する。"""
+        """CLI ショートカット。可否ロックは ensure と同一。詳細案内の正本は人事。"""
         w = getattr(self, "_gm_window", None)
         try:
             parent = w if w is not None and w.winfo_exists() else self.root
@@ -5617,8 +7043,10 @@ class MainMenuView:
             return
         messagebox.showinfo(
             "ターミナルでトレード・FA",
-            "シーズンメニューで「8. GMメニュー」→「10. トレード」から操作します。\n"
-            "（レギュラー中のトレード・インシーズンFAは期限後は同じくメニュー側でブロックされます。）",
+            "ここは案内・ショートカット用で、トレード／インシーズンFA の実行画面ではありません。\n"
+            "手順の詳細と現在の条件は、左メニュー「人事」ウィンドウ上部の案内を参照してください。\n\n"
+            "実行はシーズンメニュー「8. GMメニュー」→「10. トレード」が正本です。\n"
+            "（左メニュー「クラブ案内」は編集窓ではありません。）",
             parent=parent,
         )
 
@@ -5632,9 +7060,9 @@ class MainMenuView:
         self._gm_window = None
 
     def _open_gm_dashboard_window(self) -> None:
-        """GM: チーム情報／キャップ／ロスターは閲覧。戦術・HC・起用とスタメン／6th／ベンチはタブ内で反映。トレード等は CLI。"""
+        """クラブ案内: 閲覧・案内・CLI ショートカット。正本は人事・戦術・経営・情報。"""
         if self.team is None:
-            messagebox.showwarning("GM", "チームが未接続です。", parent=self.root)
+            messagebox.showwarning(self.CLUB_GUIDE_MENU_LABEL, "チームが未接続です。", parent=self.root)
             return
 
         existing = getattr(self, "_gm_window", None)
@@ -5648,7 +7076,7 @@ class MainMenuView:
             pass
 
         window = tk.Toplevel(self.root)
-        window.title(f"GM - {self._team_name()}")
+        window.title(f"{self.CLUB_GUIDE_MENU_LABEL} - {self._team_name()}")
         window.geometry("920x720")
         window.minsize(800, 560)
         window.configure(bg="#15171c")
@@ -5665,7 +7093,7 @@ class MainMenuView:
 
         self._gm_hint_text = tk.Text(
             hint_wrap,
-            height=5,
+            height=7,
             wrap="word",
             bg="#1d2129",
             fg="#d6dbe3",
@@ -5704,94 +7132,25 @@ class MainMenuView:
             tab.columnconfigure(0, weight=1)
             return txt
 
-        def _make_lineup_tab() -> None:
-            tab = ttk.Frame(nb, style="Root.TFrame", padding=6)
+        def _make_lineup_readonly_tab() -> None:
+            tab = ttk.Frame(nb, style="Root.TFrame", padding=10)
             nb.add(tab, text="スタメン・ベンチ")
-            tab.rowconfigure(3, weight=1)
+            tab.rowconfigure(1, weight=1)
             tab.columnconfigure(0, weight=1)
-
-            self._gm_slot_labels = ("PG枠", "SG枠", "SF枠", "PF枠", "C枠")
-            edit_row = ttk.Frame(tab, style="Panel.TFrame", padding=(4, 6))
-            edit_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
-            ttk.Label(edit_row, text="差し替え枠", font=("Yu Gothic UI", 9)).pack(
-                side="left", padx=(0, 6)
-            )
-            self._gm_combo_lineup_slot = ttk.Combobox(
-                edit_row,
-                state="readonly",
-                width=10,
-                values=list(self._gm_slot_labels),
-            )
-            self._gm_combo_lineup_slot.pack(side="left", padx=(0, 12))
-            self._gm_combo_lineup_slot.bind(
-                "<<ComboboxSelected>>",
-                lambda _e: self._on_gm_slot_lineup_changed(),
-            )
-            ttk.Label(edit_row, text="候補", font=("Yu Gothic UI", 9)).pack(
-                side="left", padx=(0, 6)
-            )
-            self._gm_combo_lineup_candidate = ttk.Combobox(
-                edit_row,
-                state="readonly",
-                width=42,
-            )
-            self._gm_combo_lineup_candidate.pack(side="left", padx=(0, 12))
-            self._gm_candidate_players: List[Any] = []
-            self._gm_btn_apply_lineup_slot = ttk.Button(
-                edit_row,
-                text="反映（確認）",
-                style="Primary.TButton",
-                command=self._on_apply_gm_starting_slot,
-            )
-            self._gm_btn_apply_lineup_slot.pack(side="left")
-
-            sixth_row = ttk.Frame(tab, style="Panel.TFrame", padding=(4, 6))
-            sixth_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
-            ttk.Label(sixth_row, text="6thマン", font=("Yu Gothic UI", 9)).pack(
-                side="left", padx=(0, 6)
-            )
-            self._gm_combo_sixth = ttk.Combobox(sixth_row, state="readonly", width=44)
-            self._gm_combo_sixth.pack(side="left", padx=(0, 10))
-            self._gm_sixth_candidate_players: List[Any] = []
-            self._gm_btn_apply_sixth = ttk.Button(
-                sixth_row,
-                text="6thを反映（確認）",
-                style="Primary.TButton",
-                command=self._on_apply_gm_sixth_man,
-            )
-            self._gm_btn_apply_sixth.pack(side="left", padx=(0, 8))
-            ttk.Button(
-                sixth_row,
-                text="自動6thに戻す（確認）",
-                style="Menu.TButton",
-                command=self._on_reset_sixth_man_gui,
-            ).pack(side="left")
-
-            bench_row = ttk.Frame(tab, style="Panel.TFrame", padding=(4, 6))
-            bench_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 6))
-            ttk.Label(bench_row, text="ベンチ入替", font=("Yu Gothic UI", 9)).pack(
-                side="left", padx=(0, 6)
-            )
-            self._gm_combo_bench_a = ttk.Combobox(bench_row, state="readonly", width=28)
-            self._gm_combo_bench_a.pack(side="left", padx=(0, 6))
-            ttk.Label(bench_row, text="⇔", font=("Yu Gothic UI", 9)).pack(side="left", padx=4)
-            self._gm_combo_bench_b = ttk.Combobox(bench_row, state="readonly", width=28)
-            self._gm_combo_bench_b.pack(side="left", padx=(0, 10))
-            self._gm_bench_players: List[Any] = []
-            self._gm_btn_bench_swap = ttk.Button(
-                bench_row,
-                text="入替（確認）",
-                style="Primary.TButton",
-                command=self._on_apply_gm_bench_swap,
-            )
-            self._gm_btn_bench_swap.pack(side="left", padx=(0, 8))
-            ttk.Button(
-                bench_row,
-                text="自動ベンチに戻す（確認）",
-                style="Menu.TButton",
-                command=self._on_reset_bench_order_gui,
-            ).pack(side="left")
-
+            notice = ttk.Frame(tab, style="Panel.TFrame", padding=(0, 0, 0, 8))
+            notice.grid(row=0, column=0, sticky="ew")
+            ttk.Label(
+                notice,
+                text="先発・6th・ベンチの編集は、左メニュー「戦術」を開き、右パネル「起用の編集（試合に反映）」から行ってください。",
+                wraplength=820,
+                font=("Yu Gothic UI", 10),
+            ).pack(anchor="w")
+            ttk.Label(
+                notice,
+                text="このタブは参照のみです（ターミナル「8. GMメニュー」からも同様の操作が可能な場合があります）。",
+                wraplength=820,
+                font=("Yu Gothic UI", 9),
+            ).pack(anchor="w", pady=(6, 0))
             txt = tk.Text(
                 tab,
                 wrap="none",
@@ -5806,69 +7165,124 @@ class MainMenuView:
             vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
             hsb = ttk.Scrollbar(tab, orient="horizontal", command=txt.xview)
             txt.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
-            txt.grid(row=3, column=0, sticky="nsew")
-            vsb.grid(row=3, column=1, sticky="ns")
-            hsb.grid(row=4, column=0, columnspan=2, sticky="ew")
-
-            btn_row = ttk.Frame(tab, style="Panel.TFrame", padding=(8, 4))
-            btn_row.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(4, 0))
-            ttk.Button(
-                btn_row,
-                text="自動スタメンに戻す（確認）",
-                style="Menu.TButton",
-                command=self._on_reset_starting_lineup_gui,
-            ).pack(side="left", padx=(0, 8))
-            ttk.Label(
-                btn_row,
-                text="スタメン／6th／ベンチは上段。解除ボタンはカスタム設定のリセット。トレード等はCLI。",
-                font=("Yu Gothic UI", 9),
-            ).pack(side="left")
-
+            txt.grid(row=1, column=0, sticky="nsew")
+            vsb.grid(row=1, column=1, sticky="ns")
+            hsb.grid(row=2, column=0, sticky="ew")
             self._gm_text_lineup = txt
 
-        self._gm_text_team = _make_tab("チーム情報")
-        self._gm_text_cap = _make_tab("サラリーキャップ")
-        self._gm_text_roster = _make_tab("ロスター")
-        _make_lineup_tab()
+        def _make_team_guidance_tab() -> None:
+            tab = ttk.Frame(nb, style="Root.TFrame", padding=10)
+            nb.add(tab, text="チーム情報")
+            tab.rowconfigure(1, weight=1)
+            tab.columnconfigure(0, weight=1)
+            notice = ttk.Frame(tab, style="Panel.TFrame", padding=(0, 0, 0, 8))
+            notice.grid(row=0, column=0, sticky="ew")
+            ttk.Label(
+                notice,
+                text="（閲覧・案内のみ／正本は情報「概要」）",
+                font=("Yu Gothic UI", 10, "bold"),
+            ).pack(anchor="w")
+            txt = tk.Text(
+                tab,
+                wrap="word",
+                bg="#222834",
+                fg="#e8ecf0",
+                insertbackground="#e8ecf0",
+                font=("Yu Gothic UI", 10),
+                relief="flat",
+                padx=10,
+                pady=10,
+            )
+            vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
+            txt.configure(yscrollcommand=vsb.set)
+            txt.grid(row=1, column=0, sticky="nsew")
+            vsb.grid(row=1, column=1, sticky="ns")
+            self._gm_text_team = txt
 
-        tab_st = ttk.Frame(nb, style="Root.TFrame", padding=14)
+        _make_team_guidance_tab()
+
+        def _make_cap_guidance_tab() -> None:
+            tab = ttk.Frame(nb, style="Root.TFrame", padding=10)
+            nb.add(tab, text="サラリーキャップ")
+            tab.rowconfigure(1, weight=1)
+            tab.columnconfigure(0, weight=1)
+            notice = ttk.Frame(tab, style="Panel.TFrame", padding=(0, 0, 0, 8))
+            notice.grid(row=0, column=0, sticky="ew")
+            ttk.Label(
+                notice,
+                text="（閲覧・案内のみ／正本は経営「財務サマリー」）",
+                font=("Yu Gothic UI", 10, "bold"),
+            ).pack(anchor="w")
+            txt = tk.Text(
+                tab,
+                wrap="word",
+                bg="#222834",
+                fg="#e8ecf0",
+                insertbackground="#e8ecf0",
+                font=("Yu Gothic UI", 10),
+                relief="flat",
+                padx=10,
+                pady=10,
+            )
+            vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
+            txt.configure(yscrollcommand=vsb.set)
+            txt.grid(row=1, column=0, sticky="nsew")
+            vsb.grid(row=1, column=1, sticky="ns")
+            self._gm_text_cap = txt
+
+        _make_cap_guidance_tab()
+
+        def _make_roster_guidance_tab() -> None:
+            tab = ttk.Frame(nb, style="Root.TFrame", padding=10)
+            nb.add(tab, text="ロスター")
+            tab.rowconfigure(1, weight=1)
+            tab.columnconfigure(0, weight=1)
+            notice = ttk.Frame(tab, style="Panel.TFrame", padding=(0, 0, 0, 8))
+            notice.grid(row=0, column=0, sticky="ew")
+            ttk.Label(
+                notice,
+                text="（閲覧・案内のみ／正本は人事「詳細ロスター」）",
+                font=("Yu Gothic UI", 10, "bold"),
+            ).pack(anchor="w")
+            txt = tk.Text(
+                tab,
+                wrap="word",
+                bg="#222834",
+                fg="#e8ecf0",
+                insertbackground="#e8ecf0",
+                font=("Yu Gothic UI", 10),
+                relief="flat",
+                padx=10,
+                pady=10,
+            )
+            vsb = ttk.Scrollbar(tab, orient="vertical", command=txt.yview)
+            txt.configure(yscrollcommand=vsb.set)
+            txt.grid(row=1, column=0, sticky="nsew")
+            vsb.grid(row=1, column=1, sticky="ns")
+            self._gm_text_roster = txt
+
+        _make_roster_guidance_tab()
+        _make_lineup_readonly_tab()
+
+        tab_st = ttk.Frame(nb, style="Root.TFrame", padding=12)
         nb.add(tab_st, text="戦術・HC・起用")
-        tab_st.columnconfigure(1, weight=1)
-
-        self._gm_label_to_key_strategy = {lab: k for k, lab in STRATEGY_OPTIONS}
-        self._gm_label_to_key_coach = {lab: k for k, lab in COACH_STYLE_OPTIONS}
-        self._gm_label_to_key_usage = {lab: k for k, lab in USAGE_POLICY_OPTIONS}
-
-        def _strategy_row(row: int, label: str, combo: ttk.Combobox) -> None:
-            ttk.Label(tab_st, text=label).grid(row=row, column=0, sticky="w", pady=6)
-            combo.grid(row=row, column=1, sticky="ew", pady=6, padx=(12, 0))
-
-        self._combo_strategy = ttk.Combobox(
-            tab_st,
-            state="readonly",
-            width=34,
-            values=[lab for _, lab in STRATEGY_OPTIONS],
-        )
-        _strategy_row(0, "戦術", self._combo_strategy)
-
-        self._combo_coach = ttk.Combobox(
-            tab_st,
-            state="readonly",
-            width=34,
-            values=[lab for _, lab in COACH_STYLE_OPTIONS],
-        )
-        _strategy_row(1, "HCスタイル", self._combo_coach)
-        self._combo_coach.bind("<<ComboboxSelected>>", self._on_gm_coach_selection_changed)
-
-        self._combo_usage = ttk.Combobox(
-            tab_st,
-            state="readonly",
-            width=34,
-            values=[lab for _, lab in USAGE_POLICY_OPTIONS],
-        )
-        _strategy_row(2, "起用方針", self._combo_usage)
-
-        self._gm_coach_preview_text = tk.Text(
+        tab_st.rowconfigure(1, weight=1)
+        tab_st.columnconfigure(0, weight=1)
+        notice_st = ttk.Frame(tab_st, style="Panel.TFrame", padding=(0, 0, 0, 8))
+        notice_st.grid(row=0, column=0, sticky="ew")
+        ttk.Label(
+            notice_st,
+            text="戦術・HCスタイル・起用方針の編集は、左メニュー「戦術」を開き、左パネル「試合に効く基本方針」から行ってください。",
+            wraplength=820,
+            font=("Yu Gothic UI", 10),
+        ).pack(anchor="w")
+        ttk.Label(
+            notice_st,
+            text="このタブは閲覧・参照のみです（編集は左メニュー「戦術」）。",
+            wraplength=820,
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(6, 0))
+        self._gm_team_policy_text = tk.Text(
             tab_st,
             wrap="word",
             bg="#222834",
@@ -5876,31 +7290,25 @@ class MainMenuView:
             insertbackground="#e8ecf0",
             font=("Consolas", 10),
             relief="flat",
-            height=9,
             padx=10,
             pady=10,
         )
-        self._gm_coach_preview_text.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(10, 0))
-        tab_st.rowconfigure(3, weight=1)
-
-        ttk.Button(
-            tab_st,
-            text="設定を反映",
-            style="Primary.TButton",
-            command=self._on_apply_gm_strategy,
-        ).grid(row=4, column=0, columnspan=2, sticky="ew", pady=(18, 0))
+        self._gm_team_policy_text.grid(row=1, column=0, sticky="nsew")
+        st_vsb = ttk.Scrollbar(tab_st, orient="vertical", command=self._gm_team_policy_text.yview)
+        st_vsb.grid(row=1, column=1, sticky="ns")
+        self._gm_team_policy_text.configure(yscrollcommand=st_vsb.set)
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=10)
         bottom.pack(fill="x", pady=(10, 0))
         ttk.Button(
             bottom,
-            text="トレード・FA（ターミナル案内）",
+            text="トレード・FA（CLI・詳細は人事）",
             style="Menu.TButton",
             command=self._on_gm_cli_trade_fa_hint,
         ).pack(side="left")
-        ttk.Button(bottom, text="閉じる", style="Menu.TButton", command=self._on_close_gm_window).pack(
-            side="right"
-        )
+        gf = tk.Frame(bottom, bg="#1d2129")
+        gf.pack(side="right")
+        self._jpn_text_button(gf, "閉じる", self._on_close_gm_window, side="right")
 
         self._gm_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_gm_window)
@@ -5917,8 +7325,8 @@ class MainMenuView:
         if key == "人事":
             self.open_roster_window()
             return
-        if key == "GM":
-            cb = self.menu_callbacks.get("GM")
+        if key == self.CLUB_GUIDE_MENU_LABEL or key == "GM":
+            cb = self.menu_callbacks.get(self.CLUB_GUIDE_MENU_LABEL) or self.menu_callbacks.get("GM")
             if cb is not None:
                 cb()
                 return
@@ -6269,39 +7677,150 @@ class MainMenuView:
     def _build_club_supplement(self) -> str:
         money = self._safe_get(self.team, "money", None)
         trust = self._get_owner_trust_text()
-        task_count = len(self._get_tasks())
+        task_count = self._task_status_short()
         if money is not None:
-            return f"補足: 資金 {self._format_money(money)} / オーナー信頼 {trust} / 要対応 {task_count}件"
-        return f"補足: オーナー信頼 {trust} / 要対応 {task_count}件"
+            return f"補足: 資金 {self._format_money(money)} / オーナー信頼 {trust} / やること {task_count}"
+        return f"補足: オーナー信頼 {trust} / やること {task_count}"
 
     # ------------------------------------------------------------------
     # Right column helpers
     # ------------------------------------------------------------------
-    def _get_tasks(self) -> List[str]:
+    def _injured_players_on_user_team(self) -> List[Any]:
+        if self.team is None:
+            return []
+        return [p for p in self._safe_get(self.team, "players", []) if self._is_injured_player(p)]
+
+    def _format_injured_players_priority_line(self, injured: List[Any]) -> str:
+        chunks: List[str] = []
+        for p in injured[:5]:
+            nm = str(self._safe_get(p, "name", "?")).strip() or "?"
+            if len(nm) > 14:
+                nm = nm[:13] + "…"
+            gl = int(self._safe_get(p, "injury_games_left", 0) or 0)
+            chunks.append(f"{nm}（残り約{gl}）")
+        rest = max(0, len(injured) - len(chunks))
+        tail = f"…ほか{rest}名" if rest else ""
+        joined = "、".join(chunks) + tail
+        return (
+            f"[優先] 負傷者{len(injured)}名: {joined} "
+            f"— 試合出場は想定しづらい状態です。左「戦術①」で先発・6th・目標出場／ローテを組み直し、「人事①」でロスターを確認。"
+        )
+
+    def _on_home_injury_detail_click(self) -> None:
+        injured = self._injured_players_on_user_team()
+        if not injured:
+            messagebox.showinfo("負傷者", "現在、負傷中の選手はいません。")
+            return
+        win = tk.Toplevel(self.root)
+        win.title("負傷者の詳細と行動ガイド")
+        win.geometry("520x420")
+        win.minsize(420, 320)
+        win.configure(bg="#15171c")
+        try:
+            win.transient(self.root)
+        except tk.TclError:
+            pass
+
+        header = tk.Label(
+            win,
+            text="いまの状態と推奨アクション",
+            bg="#15171c",
+            fg="#ffd38a",
+            font=("Yu Gothic UI", 11, "bold"),
+            anchor="w",
+        )
+        header.pack(fill="x", padx=12, pady=(12, 6))
+
+        guide = (
+            "【状態】各選手は負傷中（モデル上 injury_games_left > 0）で、試合への登録・出場が制限されやすい状態です。\n\n"
+            "【復帰の目安】「残り約N」はチームの試合が消化されるたびに減っていくカウンタです（現実の日数ではありません）。\n\n"
+            "【推奨アクション】\n"
+            "・戦術メニュー（左「戦術①」）… 先発・6th・ベンチ順と「目標出場時間」を見直し、負傷者に負荷がかからないローテに組み替える。\n"
+            "・人事メニュー（左「人事①」）… ロスター表で選手の状態を確認する。\n"
+            "・チーム戦術の injury_care（ケガ配慮）や交代方針は、戦術メニュー内の各設定画面から調整できます。\n\n"
+            "【選手一覧】\n"
+        )
+        player_lines: List[str] = []
+        for p in injured:
+            nm = str(self._safe_get(p, "name", "?")).strip() or "?"
+            gl = int(self._safe_get(p, "injury_games_left", 0) or 0)
+            pos = str(self._safe_get(p, "position", "") or "").strip()
+            pos_s = f" {pos}" if pos else ""
+            player_lines.append(f"・{nm}{pos_s} … 復帰までおおよそあと {gl}（進行ベース）")
+
+        body = guide + "\n".join(player_lines)
+        tw = scrolledtext.ScrolledText(
+            win,
+            wrap="word",
+            bg="#222834",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            height=16,
+            padx=10,
+            pady=8,
+        )
+        tw.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        tw.insert("1.0", body)
+        tw.configure(state="disabled")
+
+        bf = tk.Frame(win, bg="#15171c")
+        bf.pack(fill="x", padx=12, pady=(0, 12))
+        self._jpn_text_button(bf, "閉じる", win.destroy, side="right")
+
+    def _refresh_menu_injury_badges(self) -> None:
+        buttons = getattr(self, "_menu_buttons", None)
+        if not isinstance(buttons, dict):
+            return
+        injured = bool(self._injured_players_on_user_team())
+        suffix = " ①" if injured else ""
+        for base, btn in buttons.items():
+            try:
+                if base in ("戦術", "人事"):
+                    btn.configure(text=f"{base}{suffix}")
+                else:
+                    btn.configure(text=base)
+            except tk.TclError:
+                pass
+
+    def _get_task_lines(self) -> List[str]:
         if self.external_tasks is not None:
             return list(self.external_tasks)
 
-        tasks: List[str] = []
+        urgent: List[str] = []
+        normal: List[str] = []
 
         count = self._safe_get(self.team, "facility_upgrade_points", None)
-        if isinstance(count, (int, float)) and count > 0:
-            tasks.append(f"施設投資ポイントが {int(count)} 点あります")
+        if isinstance(count, (int, float)) and int(count) > 0:
+            urgent.append(f"[優先] 施設投資ポイント {int(count)} 点（経営メニューで使用可）")
+
+        injured = self._injured_players_on_user_team()
+        if injured:
+            urgent.append(self._format_injured_players_priority_line(injured))
+
+        sup = getattr(self, "_injury_autorepair_task_supplement", "") or ""
+        if isinstance(sup, str) and sup.strip():
+            normal.append(f"[任意] {sup.strip()}")
 
         fa_targets = self._safe_get(self.team, "fa_shortlist", None)
         if isinstance(fa_targets, list) and fa_targets:
-            tasks.append(f"FA候補が {len(fa_targets)} 件あります")
+            normal.append(
+                f"[任意] FA候補 {len(fa_targets)} 件（ターミナル・人事のトレード／FA 案内から）"
+            )
 
         mission = self._safe_get(self.team, "owner_mission", None)
         if mission:
-            tasks.append(f"オーナーミッション確認: {mission}")
+            normal.append(f"[任意] オーナーミッション: {mission}")
 
-        injured = [p for p in self._safe_get(self.team, "players", []) if self._is_injured_player(p)]
-        if injured:
-            tasks.append(f"負傷者が {len(injured)} 名います")
+        out = urgent + normal
+        if not out:
+            return [self.HOME_TASKS_EMPTY_LINE]
+        return out
 
-        if not tasks:
-            tasks.append("特に緊急案件はありません")
-        return tasks
+    def _get_tasks(self) -> List[str]:
+        """互換: 旧名。ホーム「今やること」行を返す。"""
+        return self._get_task_lines()
 
     def _get_news_items(self) -> List[str]:
         if self.external_news_items is not None:

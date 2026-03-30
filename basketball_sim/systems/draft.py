@@ -5,6 +5,8 @@ from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
 
+from basketball_sim.systems.roster_rules import ensure_contract_roster_nationality_after_force
+
 try:
     from basketball_sim.systems.scout_logic import get_team_scout_report, get_team_visible_draft_score
 except Exception:  # フォールバック安全策
@@ -675,6 +677,8 @@ def conduct_draft(teams: List[Team], draft_pool: List[Player], free_agents: List
             free_agents=free_agents,
             pick_num=pick_num,
         )
+
+        ensure_contract_roster_nationality_after_force(team, free_agents)
 
         label = _get_player_label(selected_player)
         prefix = "[DRAFT-USER]" if getattr(team, "is_user_team", False) else "[DRAFT-CPU]"

@@ -1135,12 +1135,128 @@ class Season:
             reversed_round = [(away, home) for home, away in round_games]
             second_half_rounds.append(reversed_round)
 
-        all_rounds = first_half_rounds + second_half_rounds
+        # カレンダー上「前半は第1循環・後半は第2循環（H/A 反転）」と直列化すると、
+        # シーズン後半にアウェイが偏るなど長期偏りが出やすい。
+        # 各 RR ラウンド i について「第1戦→リターン戦」を近接させつつ、
+        # ラウンド順序はシャッフルして自然なばらつきを残す（土日同一相手・H/A 統一・水曜別相手ロジックは維持）。
+        pair_order = list(range(len(first_half_rounds)))
+        random.shuffle(pair_order)
+        all_rounds: List[List[Tuple[Team, Team]]] = []
+        for i in pair_order:
+            all_rounds.append(first_half_rounds[i])
+            all_rounds.append(second_half_rounds[i])
 
         for round_games in all_rounds:
             random.shuffle(round_games)
 
         return all_rounds
+
+    @staticmethod
+    def _schedule_team_key(team: Optional[Team]) -> int:
+        if team is None:
+            return -1
+        tid = getattr(team, "team_id", None)
+        return int(tid) if tid is not None else id(team)
+
+    @staticmethod
+    def _weekend_opponent_map_from_rr_block(block: List[Tuple[Team, Team]]) -> Dict[int, Team]:
+        m: Dict[int, Team] = {}
+        for h, a in block:
+            if h is None or a is None:
+                continue
+            kh, ka = Season._schedule_team_key(h), Season._schedule_team_key(a)
+            m[kh] = a
+            m[ka] = h
+        return m
+
+    @staticmethod
+    def _midweek_rr_block_distinct_from_weekend(
+        weekend_block: List[Tuple[Team, Team]],
+        midweek_block: List[Tuple[Team, Team]],
+    ) -> bool:
+        wmap = Season._weekend_opponent_map_from_rr_block(weekend_block)
+
+        def sk(t: Team) -> int:
+            return Season._schedule_team_key(t)
+
+        for h, a in midweek_block:
+            if h is None or a is None:
+                continue
+            wo = wmap.get(sk(h))
+            if wo is not None and sk(wo) == sk(a):
+                return False
+        return True
+
+    @staticmethod
+    def _pick_midweek_rr_block(
+        cycle_rounds: List[List[Tuple[Team, Team]]],
+        weekend_idx: int,
+        weekend_block: List[Tuple[Team, Team]],
+        n: int,
+    ) -> Tuple[List[Tuple[Team, Team]], int]:
+        """水曜は別相手: 週末ブロックと異なる組み合わせの RR ラウンドを選ぶ。戻り値 (block, idx_offset)。"""
+        if n <= 1:
+            return (cycle_rounds[0], 1) if n == 1 else ([], 1)
+        first = cycle_rounds[(weekend_idx + 1) % n]
+        for delta in range(1, n + 1):
+            cand = cycle_rounds[(weekend_idx + delta) % n]
+            if Season._midweek_rr_block_distinct_from_weekend(weekend_block, cand):
+                return cand, delta
+        return first, 1
+
+    @staticmethod
+    def collect_league_week_matchups(
+        cycle_rounds: List[List[Tuple[Team, Team]]],
+        cursor: int,
+        games_per_team: int,
+        has_midweek: bool,
+    ) -> Tuple[List[Tuple[Team, Team]], int]:
+        """
+        1 シミュラウンド分のリーグ対戦カード（全 division 共通ロジック）。
+        ・2 試合週: 土日で同一相手かつ H/A 統一（RR の向きをそのまま 2 連戦）。水曜リーグ無し。
+        ・3 試合週かつ has_midweek: 週末は上と同じ（同一相手・同一 H/A の 2 戦）＋別 RR 1 ラウンドを 1 戦（水曜・別相手）。
+        ・それ以外: 従来どおり RR ラウンドを積む（フォールバック）。
+        戻り値: (対戦リスト, サイクル上の消費ラウンド数)
+        """
+        n = len(cycle_rounds)
+        out: List[Tuple[Team, Team]] = []
+        if n == 0 or games_per_team <= 0:
+            return out, 0
+
+        idx = cursor % n
+
+        if games_per_team == 2:
+            block = cycle_rounds[idx]
+            for h, a in block:
+                if h is None or a is None:
+                    continue
+                out.append((h, a))
+                out.append((h, a))
+            return out, 1
+
+        if games_per_team == 3 and has_midweek:
+            block_a = cycle_rounds[idx]
+            block_b, delta = Season._pick_midweek_rr_block(cycle_rounds, idx, block_a, n)
+            for h, a in block_a:
+                if h is None or a is None:
+                    continue
+                out.append((h, a))
+                out.append((h, a))
+            for h, a in block_b:
+                if h is None or a is None:
+                    continue
+                out.append((h, a))
+            return out, 1 + delta
+
+        adv = 0
+        for _ in range(games_per_team):
+            i = (cursor + adv) % n
+            for h, a in cycle_rounds[i]:
+                if h is None or a is None:
+                    continue
+                out.append((h, a))
+            adv += 1
+        return out, adv
 
     def _prepare_regular_season_schedule(self) -> List[List[Tuple[Team, Team]]]:
         total_rounds = max(ROUND_CONFIG.keys()) if ROUND_CONFIG else 0
@@ -1148,7 +1264,7 @@ class Season:
             return []
 
         # ROUND_CONFIG の league_games_per_team を実際の日程へ反映する。
-        # 1ラウンド内で複数試合を実施することで、想定試合数（60試合/年）を満たす。
+        # 2 試合週は同一相手の連戦かつ H/A 統一、3 試合＋水曜は週末同様＋水曜で別相手×1（表示・シミュの正本）。
         per_level_cycle_rounds: Dict[int, List[List[Tuple[Team, Team]]]] = {}
         per_level_cycle_cursor: Dict[int, int] = {}
 
@@ -1161,6 +1277,7 @@ class Season:
         for round_no in range(1, total_rounds + 1):
             cfg = ROUND_CONFIG.get(round_no, {})
             games_per_team = int(cfg.get("league_games_per_team", 0) or 0)
+            has_midweek = bool(cfg.get("has_midweek_league", False))
             combined_round: List[Tuple[Team, Team]] = []
 
             for level in [1, 2, 3]:
@@ -1168,12 +1285,16 @@ class Season:
                 if not cycle_rounds or games_per_team <= 0:
                     continue
 
-                for _ in range(games_per_team):
-                    idx = per_level_cycle_cursor[level] % len(cycle_rounds)
-                    combined_round.extend(cycle_rounds[idx])
-                    per_level_cycle_cursor[level] += 1
+                idx = per_level_cycle_cursor[level]
+                chunk, advance = Season.collect_league_week_matchups(
+                    cycle_rounds,
+                    idx,
+                    games_per_team,
+                    has_midweek,
+                )
+                combined_round.extend(chunk)
+                per_level_cycle_cursor[level] = idx + advance
 
-            random.shuffle(combined_round)
             schedule_by_round.append(combined_round)
 
         return schedule_by_round
@@ -2776,18 +2897,28 @@ class Season:
     ) -> List[Team]:
         if needed <= 0:
             return []
+
+        def _team_key(team: Team) -> int:
+            tid = getattr(team, "team_id", None)
+            return int(tid) if tid is not None else id(team)
+
         div_result = playoff_results.get(division_level, {})
         promoted: List[Team] = []
-        eligible = set(standings)
+        promoted_keys: set = set()
+        eligible_keys = {_team_key(t) for t in standings}
         champ = div_result.get("champion")
         ru = div_result.get("runner_up")
-        if champ is not None and champ in eligible:
+        if champ is not None and _team_key(champ) in eligible_keys:
             promoted.append(champ)
-        if ru is not None and ru not in promoted and ru in eligible:
+            promoted_keys.add(_team_key(champ))
+        if ru is not None and _team_key(ru) in eligible_keys and _team_key(ru) not in promoted_keys:
             promoted.append(ru)
+            promoted_keys.add(_team_key(ru))
         for t in standings:
-            if t not in promoted:
+            k = _team_key(t)
+            if k not in promoted_keys:
                 promoted.append(t)
+                promoted_keys.add(k)
             if len(promoted) >= needed:
                 break
         return promoted[:needed]
@@ -2814,17 +2945,28 @@ class Season:
         d1_floor_violators = self._teams_below_payroll_floor(leagues, 1)
         d2_floor_violators = self._teams_below_payroll_floor(leagues, 2)
 
-        d1_must_down = set(d1_standings[-2:] if len(d1_standings) >= 2 else []) | set(d1_floor_violators)
-        d1_relegated = [t for t in d1_standings if t in d1_must_down]
+        def _team_key(team) -> int:
+            tid = getattr(team, "team_id", None)
+            return int(tid) if tid is not None else id(team)
 
-        d2_must_down = set(d2_standings[-2:] if len(d2_standings) >= 2 else []) | set(d2_floor_violators)
-        d2_relegated = [t for t in d2_standings if t in d2_must_down]
+        def _key_set(team_list) -> set:
+            return {_team_key(t) for t in (team_list or [])}
+
+        d1_must_down_keys = _key_set(d1_standings[-2:] if len(d1_standings) >= 2 else []) | _key_set(
+            d1_floor_violators
+        )
+        d1_relegated = [t for t in d1_standings if _team_key(t) in d1_must_down_keys]
+
+        d2_must_down_keys = _key_set(d2_standings[-2:] if len(d2_standings) >= 2 else []) | _key_set(
+            d2_floor_violators
+        )
+        d2_relegated = [t for t in d2_standings if _team_key(t) in d2_must_down_keys]
 
         n_d1_down = len(d1_relegated)
         n_d2_down = len(d2_relegated)
 
-        d2_relegated_set = set(d2_relegated)
-        eligible_d2 = [t for t in d2_standings if t not in d2_relegated_set]
+        d2_relegated_keys = _key_set(d2_relegated)
+        eligible_d2 = [t for t in d2_standings if _team_key(t) not in d2_relegated_keys]
         d2_promoted = self._promotion_candidates_from_division(
             playoff_results, eligible_d2, 2, n_d1_down
         )

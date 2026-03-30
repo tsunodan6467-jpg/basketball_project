@@ -1,5 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Mapping
+
+from basketball_sim.systems.competition_rules import league_contract_active_rule
+from basketball_sim.systems.japan_regulation import count_regulation_slots, player_regulation_bucket_from_rule
+
 from .player import Player
 
 
@@ -928,7 +932,9 @@ class Team:
         players を渡した場合は、その対象集合だけを数える。
         """
         target_players = self.players if players is None else players
-        return sum(1 for player in target_players if getattr(player, "is_foreign_player", None) and player.is_foreign_player())
+        rule = league_contract_active_rule()
+        foreign, _special = count_regulation_slots(target_players, rule)
+        return int(foreign)
 
     def count_asia_naturalized_players(self, players: Optional[List[Player]] = None) -> int:
         """
@@ -936,7 +942,9 @@ class Team:
         players を渡した場合は、その対象集合だけを数える。
         """
         target_players = self.players if players is None else players
-        return sum(1 for player in target_players if getattr(player, "is_asia_or_naturalized_player", None) and player.is_asia_or_naturalized_player())
+        rule = league_contract_active_rule()
+        _foreign, special = count_regulation_slots(target_players, rule)
+        return int(special)
 
     def get_nationality_slot_summary(self, players: Optional[List[Player]] = None) -> dict:
         """
@@ -944,8 +952,8 @@ class Team:
         roster と active/lineup の両方で再利用しやすい共通API。
         """
         target_players = self.players if players is None else players
-        foreign_count = self.count_foreign_players(target_players)
-        asia_nat_count = self.count_asia_naturalized_players(target_players)
+        rule = league_contract_active_rule()
+        foreign_count, asia_nat_count = count_regulation_slots(target_players, rule)
         total_count = len(target_players)
         domestic_count = max(0, total_count - foreign_count - asia_nat_count)
         return {
@@ -967,14 +975,14 @@ class Team:
         デフォルトは登録枠想定（外国籍3、Asia/帰化1）。
         """
         target_players = list(self.players if players is None else players)
-        summary = self.get_nationality_slot_summary(target_players)
+        rule = league_contract_active_rule()
+        foreign_c, special_c = count_regulation_slots(target_players, rule)
+        bucket = player_regulation_bucket_from_rule(player, rule)
 
-        if getattr(player, "is_foreign_player", None) and player.is_foreign_player():
-            return summary["foreign"] < int(foreign_limit)
-
-        if getattr(player, "is_asia_or_naturalized_player", None) and player.is_asia_or_naturalized_player():
-            return summary["asia_or_naturalized"] < int(asia_nat_limit)
-
+        if bucket == "foreign":
+            return foreign_c < int(foreign_limit)
+        if bucket == "special":
+            return special_c < int(asia_nat_limit)
         return True
 
     def add_player(self, player: Player, *, force: bool = False):

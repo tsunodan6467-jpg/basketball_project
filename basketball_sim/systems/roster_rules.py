@@ -82,3 +82,31 @@ def is_contract_roster_valid(team: Team) -> bool:
     if summary["asia_or_naturalized"] > LEAGUE_ROSTER_ASIA_NATURALIZED_CAP:
         return False
     return True
+
+
+def ensure_contract_roster_nationality_after_force(team: Team, free_agents: List[Player]) -> None:
+    """
+    add_player(..., force=True) 等で国籍枠が崩れた場合、最低OVRの非アイコンをFAへ出して整える。
+    既存の人数トリムとは別経路で、最大24回まで。
+    """
+    guard = 0
+    while not is_contract_roster_valid(team) and guard < 24:
+        guard += 1
+        roster = list(getattr(team, "players", []) or [])
+        candidates = [
+            p
+            for p in roster
+            if not bool(getattr(p, "icon_locked", False))
+            and str(getattr(p, "acquisition_type", "") or "") != "youth"
+        ]
+        if not candidates:
+            break
+        release = min(
+            candidates,
+            key=lambda p: (int(getattr(p, "ovr", 0) or 0), int(getattr(p, "age", 99) or 99)),
+        )
+        team.remove_player(release)
+        release.contract_years_left = 0
+        if int(getattr(release, "salary", 0) or 0) <= 0:
+            release.salary = max(int(getattr(release, "ovr", 0) or 0) * 10_000, 300_000)
+        free_agents.append(release)

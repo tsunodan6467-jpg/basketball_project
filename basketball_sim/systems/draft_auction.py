@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
@@ -255,6 +255,10 @@ def _add_player_to_team_and_trim(team: Team, player: Player, free_agents: List[P
         release.salary = max(int(getattr(release, "ovr", 0) or 0) * 10_000, 300_000)
     free_agents.append(release)
 
+    from basketball_sim.systems.roster_rules import ensure_contract_roster_nationality_after_force
+
+    ensure_contract_roster_nationality_after_force(team, free_agents)
+
 
 def _ai_choose_target(team: Team, candidates: List[DraftCandidateMeta], used_ids: set[int]) -> Optional[DraftCandidateMeta]:
     if not candidates:
@@ -337,6 +341,9 @@ def conduct_auction_draft(
     draft_pool: List[Player],
     free_agents: Optional[List[Player]] = None,
     cap: int = CAP_DEFAULT,
+    *,
+    ui_prompt_target: Optional[Callable[[Team, str, List[DraftCandidateMeta], int], Optional[int]]] = None,
+    ui_prompt_bid: Optional[Callable[[Team, DraftCandidateMeta, int, int, int], int]] = None,
 ):
     """
     正本: docs/DRAFT_AUCTION_SYSTEM.md
@@ -344,6 +351,9 @@ def conduct_auction_draft(
     - 一本釣り（単独指名）は最低額（下位救済Cで割引）
     - 競合は sealed-bid（1発入札）
     - 最大2人（枠A: T1/T2, 枠B: T3）
+
+    ui_prompt_target / ui_prompt_bid:
+        Tk 等 GUI からオフを実行するときに指定。未指定時は input()（CLI）。
     """
     if free_agents is None:
         free_agents = []
@@ -403,33 +413,36 @@ def conduct_auction_draft(
                 print(f"\n--- Slot {slot} Target Selection | {team.name} ---")
                 print("狙う選手を選んでください。0 を入力すると「今回は取らない」。")
                 display = [m for m in cand if id(m.player) not in used_player_ids][:12]
-                for i, m in enumerate(display, 1):
-                    p = m.player
-                    pot = str(getattr(p, "potential", "C"))
-                    label = str(getattr(p, "draft_profile_label", "") or "")
-                    label_text = f" | {label}" if label else ""
-                    from basketball_sim.systems.scout_logic import get_visible_prospect_badge_for_team
+                if ui_prompt_target is not None:
+                    targets[id(team)] = ui_prompt_target(team, slot, display, cap)
+                else:
+                    for i, m in enumerate(display, 1):
+                        p = m.player
+                        pot = str(getattr(p, "potential", "C"))
+                        label = str(getattr(p, "draft_profile_label", "") or "")
+                        label_text = f" | {label}" if label else ""
+                        from basketball_sim.systems.scout_logic import get_visible_prospect_badge_for_team
 
-                    badge = get_visible_prospect_badge_for_team(team, p)
-                    grade_text = f" [{badge}]" if badge else ""
-                    print(
-                        f"{i:>2}. {p.name:<16} {getattr(p,'position','-'):<2} "
-                        f"OVR:{getattr(p,'ovr',0):<2} Pot:{pot} | "
-                        f"{TIER_CONFIGS[m.tier].name}{grade_text} | min:{m.min_price:,}{label_text}"
-                    )
-                while True:
-                    raw = input("番号: ").strip()
-                    if raw == "0":
-                        targets[id(team)] = None
-                        break
-                    try:
-                        idx = int(raw) - 1
-                        if 0 <= idx < len(display):
-                            targets[id(team)] = id(display[idx].player)
+                        badge = get_visible_prospect_badge_for_team(team, p)
+                        grade_text = f" [{badge}]" if badge else ""
+                        print(
+                            f"{i:>2}. {p.name:<16} {getattr(p,'position','-'):<2} "
+                            f"OVR:{getattr(p,'ovr',0):<2} Pot:{pot} | "
+                            f"{TIER_CONFIGS[m.tier].name}{grade_text} | min:{m.min_price:,}{label_text}"
+                        )
+                    while True:
+                        raw = input("番号: ").strip()
+                        if raw == "0":
+                            targets[id(team)] = None
                             break
-                    except ValueError:
-                        pass
-                    print("正しい番号を入力してください。")
+                        try:
+                            idx = int(raw) - 1
+                            if 0 <= idx < len(display):
+                                targets[id(team)] = id(display[idx].player)
+                                break
+                        except ValueError:
+                            pass
+                        print("正しい番号を入力してください。")
             else:
                 pick = _ai_choose_target(team, cand, used_player_ids)
                 targets[id(team)] = None if pick is None else id(pick.player)
@@ -507,17 +520,20 @@ def conduct_auction_draft(
                     print(f"RB 残高: {remaining:,}/{base_budget:,}")
                     print("※ 一発入札（sealed-bid）。勝っても負けても入札内容は公開してOK。")
                     print(f"最低落札額（基準）: {meta.min_price:,}")
-                    while True:
-                        raw = input("入札額（円）: ").strip().replace(",", "")
-                        try:
-                            amount = int(raw)
-                            if amount < meta.min_price:
-                                print("最低落札額以上を入力してください。")
-                                continue
-                            bids[id(team)] = amount
-                            break
-                        except ValueError:
-                            print("数字を入力してください。")
+                    if ui_prompt_bid is not None:
+                        bids[id(team)] = ui_prompt_bid(team, meta, cap, remaining, base_budget)
+                    else:
+                        while True:
+                            raw = input("入札額（円）: ").strip().replace(",", "")
+                            try:
+                                amount = int(raw)
+                                if amount < meta.min_price:
+                                    print("最低落札額以上を入力してください。")
+                                    continue
+                                bids[id(team)] = amount
+                                break
+                            except ValueError:
+                                print("数字を入力してください。")
                 else:
                     bids[id(team)] = _ai_bid_amount(team, meta, cap)
 

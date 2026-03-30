@@ -174,12 +174,11 @@ def get_team_fa_signing_limit(
     """
     FA契約に使える簡易上限。
 
-    - cap未満: soft cap まで契約可能
-    - cap以上〜soft cap未満: 低額契約のみ許可
-    - soft cap以上: FA契約不可
+    - キャップ未満: 上限まで契約余地あり
+    - キャップちょうど〜超過: ルール上は FA 追加不可（市場側の簡易モデル）
 
-    ソフト上限の数値は salary_cap_budget.get_soft_cap と同一。
-    salary_cap を省略時はチーム所属ディビジョンのハードキャップを使用。
+    上限額は salary_cap_budget.get_soft_cap（＝リーグ年俸上限 12 億・get_hard_cap と同一）と同一。
+    salary_cap を省略時はチーム所属ディビジョンのリーグ年俸上限を使用。
     """
     ensure_team_fa_market_fields(team)
 
