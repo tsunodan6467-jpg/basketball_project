@@ -46,19 +46,19 @@ ROUND_CONFIG = {
     3:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md1", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD1"},
     4:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
-    5:  {"month": 11, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "通常週"},
+    5:  {"month": 11, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週（水曜）"},
     6:  {"month": 11, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md2", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD2"},
     7:  {"month": 11, "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": "window_1", "is_break_week": True,  "notes": "代表ウィーク①"},
     8:  {"month": 11, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
-    9:  {"month": 12, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "通常週"},
+    9:  {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週（水曜）"},
     10: {"month": 12, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md3", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD3"},
     11: {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
     12: {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
     13: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week1", "national_team_window": None,       "is_break_week": True,  "notes": "天皇杯集中週①"},
     14: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week2", "national_team_window": None,       "is_break_week": True,  "notes": "天皇杯集中週②"},
-    15: {"month": 1,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ再開"},
+    15: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "1月第3週・オールスター週（リーグ休み）"},
     16: {"month": 1,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md4", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD4"},
 
     17: {"month": 2,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
@@ -71,16 +71,17 @@ ROUND_CONFIG = {
     23: {"month": 3,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": "knockout",  "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "EASL決勝大会週"},
     24: {"month": 3,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ終盤"},
 
-    25: {"month": 4,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "通常週"},
+    25: {"month": 4,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週（水曜）"},
     26: {"month": 4,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
-    27: {"month": 4,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "通常週"},
+    27: {"month": 4,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週（水曜）"},
     28: {"month": 4,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
-    29: {"month": 5,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ最終盤"},
-    30: {"month": 5,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "レギュラー最終週"},
+    29: {"month": 5,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "5月第1週・レギュラー最終（水曜）"},
+    30: {"month": 5,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "5月第2週・ディビジョンPO 準々決勝"},
 
-    31: {"month": 5,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "CS / PO"},
-    32: {"month": 5,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "CS決勝 / 昇降格"},
+    31: {"month": 5,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "5月第3週・ディビジョンPO 準決勝"},
+    32: {"month": 5,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "5月第4週・ディビジョンPO 決勝"},
+    33: {"month": 6,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "6月第1週・オフシーズン開始"},
 }
 
 NATIONAL_TEAM_CYCLE = {
@@ -220,6 +221,9 @@ class Season:
         }
         self.acl_stage_logs = {}
         self.acl_played = False
+
+        # ディビジョンPO結果（シーズン終了時に確定）。表示側の参照用。
+        self.division_playoff_results = {}
 
 
     def _build_round_config(self) -> Dict[int, dict]:
@@ -819,7 +823,9 @@ class Season:
             else:
                 mapping[round_no] = stage
         if "final" not in mapping.values():
-            mapping[29] = "final"
+            # ノックアウト由来の final が無い場合の保険（総ラウンド数変更に追従）
+            anchor = max(1, min(int(self.total_rounds), 29))
+            mapping[anchor] = "final"
         return dict(sorted(mapping.items()))
 
     def _get_round_easl_stage(self, round_number: int) -> Optional[str]:
@@ -1135,15 +1141,16 @@ class Season:
             reversed_round = [(away, home) for home, away in round_games]
             second_half_rounds.append(reversed_round)
 
-        # カレンダー上「前半は第1循環・後半は第2循環（H/A 反転）」と直列化すると、
-        # シーズン後半にアウェイが偏るなど長期偏りが出やすい。
-        # 各 RR ラウンド i について「第1戦→リターン戦」を近接させつつ、
-        # ラウンド順序はシャッフルして自然なばらつきを残す（土日同一相手・H/A 統一・水曜別相手ロジックは維持）。
+        # 第1循環をすべて先に、第2循環（H/A 反転）を後半にまとめる。
+        # 近接インデックスで「同一無向ペアの第1戦→リターン戦」が続くと、
+        # 連続リーグ週の土日ブロックが同一カード4連戦になるため避ける（週またぎ4連戦禁止）。
+        # ラウンド順序はシャッフルして自然なばらつきを残す。
         pair_order = list(range(len(first_half_rounds)))
         random.shuffle(pair_order)
         all_rounds: List[List[Tuple[Team, Team]]] = []
         for i in pair_order:
             all_rounds.append(first_half_rounds[i])
+        for i in pair_order:
             all_rounds.append(second_half_rounds[i])
 
         for round_games in all_rounds:
@@ -1196,13 +1203,21 @@ class Season:
     ) -> Tuple[List[Tuple[Team, Team]], int]:
         """水曜は別相手: 週末ブロックと異なる組み合わせの RR ラウンドを選ぶ。戻り値 (block, idx_offset)。"""
         if n <= 1:
-            return (cycle_rounds[0], 1) if n == 1 else ([], 1)
-        first = cycle_rounds[(weekend_idx + 1) % n]
+            raise RuntimeError(
+                "Midweek RR block requires at least 2 cycle rounds to differ from weekend opponents."
+            )
+        # カーソルがちょうど n/2 進むと、次リーグ週の週末が「同一無向ペアのリターン戦」になり
+        # 週またぎの同一カード4連戦になる（前半7＋後半7の直列化と組み合わせ）。
+        half_step = n // 2
         for delta in range(1, n + 1):
+            if half_step > 0 and (1 + delta) % n == half_step % n:
+                continue
             cand = cycle_rounds[(weekend_idx + delta) % n]
             if Season._midweek_rr_block_distinct_from_weekend(weekend_block, cand):
                 return cand, delta
-        return first, 1
+        raise RuntimeError(
+            "No RR round found for midweek that is distinct from weekend opponents for all teams."
+        )
 
     @staticmethod
     def collect_league_week_matchups(
@@ -2696,6 +2711,7 @@ class Season:
         self._calculate_and_print_awards_by_division()
 
         playoff_results = self._simulate_all_playoffs()
+        self.division_playoff_results = dict(playoff_results or {})
         self._record_playoff_results(playoff_results)
         self._process_promotion_relegation(self.leagues, playoff_results)
 

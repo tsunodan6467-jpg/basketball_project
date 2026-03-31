@@ -105,14 +105,14 @@ def test_three_game_week_total_match_count() -> None:
     assert len(chunk) == 12  # 週末 8 + 水曜 4
 
 
-def test_double_rr_interleaves_home_and_away_legs_per_round() -> None:
-    """各 RR ラウンドの第1戦とリターン戦がサイクル上で隣接し、対戦カード集合が一致する。"""
+def test_double_rr_no_consecutive_same_pairing_set() -> None:
+    """第1循環→第2循環の直列化により、隣接 RR インデックスで無向ペア集合が重複しない。"""
     teams = _fake_teams(8)
     s = Season.__new__(Season)
     cycle = Season._build_double_round_robin_rounds(s, teams)
     assert len(cycle) == 14  # 7 ラウンド ×（第1戦 + リターン）
-    for k in range(7):
-        a = _undirected_pair_ids(cycle[2 * k])
-        b = _undirected_pair_ids(cycle[2 * k + 1])
-        assert a == b
-        assert len(a) == 4
+    for k in range(13):
+        a = _undirected_pair_ids(cycle[k])
+        b = _undirected_pair_ids(cycle[k + 1])
+        assert len(a) == 4 and len(b) == 4
+        assert a != b
