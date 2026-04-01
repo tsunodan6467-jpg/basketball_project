@@ -56,6 +56,11 @@ def _safe_cli_stdout_text(text: str) -> str:
     return text.replace("\u2014", "-").replace("\u2013", "-").replace("\u2212", "-")
 
 
+# 仮経営バランス第2弾: オフ締めの modeled 収益が実ペイロール規模に追従していないため、
+# 年俸に連動する「集中配分・放映権（仮）」のみ収入側に上乗せする（本実装で置換予定）。
+TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE = 0.98
+
+
 def assign_team_strategies(teams: List[Team]):
     """
     各チームに次季戦術を割り当てる。
@@ -3371,6 +3376,11 @@ class Offseason:
             wins = self._get_team_wins(team)
             revenue, revenue_breakdown = self._calculate_team_revenue(team)
             expense, payroll, facility_maintenance, expense_breakdown = self._calculate_team_expenses(team)
+
+            central_share = int(max(0, payroll) * float(TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE))
+            revenue = int(revenue + central_share)
+            revenue_breakdown = dict(revenue_breakdown)
+            revenue_breakdown["provisional_central_distribution"] = central_share
 
             league_level = int(getattr(team, "league_level", 3))
             base_budget = {1: 7_900_000, 2: 5_450_000, 3: 3_650_000}.get(league_level, 3_650_000)
