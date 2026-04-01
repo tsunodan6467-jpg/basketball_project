@@ -84,14 +84,14 @@ def test_three_game_week_weekend_same_opponent_midweek_different() -> None:
         assert sorted(counts.values()) == [1, 2]
 
 
-def test_three_game_week_weekend_ha_unified_before_midweek() -> None:
+def test_three_game_week_midweek_then_weekend_blocks() -> None:
     teams = _fake_teams(8)
     s = Season.__new__(Season)
     cycle = Season._build_double_round_robin_rounds(s, teams)
     chunk, _ = Season.collect_league_week_matchups(cycle, 0, 3, True)
-    # 週末 8 試合 → 水曜 4 試合
-    weekend, mid = chunk[:8], chunk[8:]
-    assert len(weekend) == 8 and len(mid) == 4
+    # 水曜 4 試合 → 週末 8 試合（シミュ・イベント並びの正本）
+    mid, weekend = chunk[:4], chunk[4:]
+    assert len(mid) == 4 and len(weekend) == 8
     for t in teams:
         assert _ha_roles_for_team(t, weekend) == ["H", "H"] or _ha_roles_for_team(t, weekend) == ["A", "A"]
         assert len(_ha_roles_for_team(t, mid)) == 1
@@ -102,7 +102,7 @@ def test_three_game_week_total_match_count() -> None:
     s = Season.__new__(Season)
     cycle = Season._build_double_round_robin_rounds(s, teams)
     chunk, _ = Season.collect_league_week_matchups(cycle, 0, 3, True)
-    assert len(chunk) == 12  # 週末 8 + 水曜 4
+    assert len(chunk) == 12  # 水曜 4 + 週末 8
 
 
 def test_double_rr_no_consecutive_same_pairing_set() -> None:

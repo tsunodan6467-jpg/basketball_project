@@ -209,6 +209,39 @@ def test_upcoming_league_filter_excludes_national_placeholder():
     assert not any(x["competition_type"] == "national_team_window" for x in rows)
 
 
+class _SeasonAllStarPlaceholder:
+    """オールスター週で SeasonEvent が空のケース（日程「すべて」補完）。"""
+
+    def __init__(self) -> None:
+        self.current_round = 14
+        self.total_rounds = 16
+        self.season_finished = False
+
+    def get_events_for_round(self, r: int):
+        return []
+
+    def _get_round_config(self, r: int):
+        if int(r) == 15:
+            return {
+                "month": 1,
+                "league_games_per_team": 0,
+                "is_break_week": True,
+                "notes": "1月第3週・オールスター週（リーグ休み）",
+            }
+        return {"month": 1, "league_games_per_team": 2, "is_break_week": False, "notes": ""}
+
+
+def test_upcoming_adds_all_star_placeholder():
+    s = _SeasonAllStarPlaceholder()
+    u = _T(1, "User")
+    rows = upcoming_rows_for_user_team(s, u, league_only=False)
+    as_rows = [x for x in rows if x["competition_type"] == "all_star_break"]
+    assert len(as_rows) == 1
+    assert as_rows[0]["round"] == 15
+    assert as_rows[0]["competition_display"] == "オールスター"
+    assert is_schedule_row_display_supplement(as_rows[0])
+
+
 def test_detail_text_marks_display_supplement():
     row = {
         "round": 7,

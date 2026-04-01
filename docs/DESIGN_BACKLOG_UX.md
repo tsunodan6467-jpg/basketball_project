@@ -269,7 +269,7 @@
 
 ## 22. 日程「すべて」・カップ／代表の表示補完（2026-03）
 
-- **実施**: 全日本カップ・東アジアカップに続き、**代表ウィンドウ**（`national_team_window`）を `schedule_display.upcoming_rows_for_user_team` で補完。補完行は `is_schedule_row_display_supplement` / 詳細パネル注記で **SeasonEvent に無い行** と明示。`competition_display` に `national_team_window` を追加。次ラウンド説明・日程ウィンドウ脚注を1行更新。
+- **実施**: 全日本カップ・東アジアトップリーグに続き、**代表ウィンドウ**（`national_team_window`）を `schedule_display.upcoming_rows_for_user_team` で補完。補完行は `is_schedule_row_display_supplement` / 詳細パネル注記で **SeasonEvent に無い行** と明示。`competition_display` に `national_team_window` を追加。次ラウンド説明・日程ウィンドウ脚注を1行更新。
 - **表示補完で済む（当面）**: 上記3種＋文言。日本リーグのみフィルタでは補完を出さない（従来どおり）。
 - **正本側の別イテレーション**: ディビジョン PO 等を `SeasonEvent` 化、ACL／インターコンチのシーズン内表示の載せ方。詳細は `docs/SCHEDULE_MENU_SPEC_V1.md` §0.4。
 

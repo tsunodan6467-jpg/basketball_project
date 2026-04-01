@@ -99,6 +99,7 @@ def milestone_row_kind(row: Dict[str, Any]) -> str:
         "EASL",
         "ACL",
         "東アジアトップリーグ",
+        "オールアジアトーナメント",
         "アジアクラブ選手権",
         "アジアカップ",
         "世界一決定戦",

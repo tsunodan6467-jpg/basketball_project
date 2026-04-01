@@ -107,15 +107,23 @@ from basketball_sim.systems.merchandise_management import (
 from basketball_sim.systems.competition_display import competition_display_name
 from basketball_sim.systems import japan_regulation_display as jp_reg_display
 from basketball_sim.systems.schedule_display import (
+    build_division_playoff_main_next_lines,
+    build_emperor_cup_main_next_lines,
     count_user_games_in_sim_round,
     detail_text_for_upcoming_row,
+    division_playoff_pending_note_lines,
+    division_playoff_results_prominent_lines,
+    emperor_cup_log_digest_lines,
+    main_top_bar_progress_label,
+    schedule_month_week_label,
     next_advance_display_hints,
     format_season_event_matchup_line,
     information_panel_schedule_lines,
     next_round_schedule_lines,
-    past_league_result_rows,
-    round_month_label,
+    past_league_and_emperor_result_rows,
     upcoming_rows_for_user_team,
+    user_team_division_playoff_projection_lines,
+    user_team_division_playoff_result_parts,
 )
 from basketball_sim.systems.information_display import (
     build_information_news_lines,
@@ -857,15 +865,17 @@ class MainMenuView:
     def _game_progress_summary(self) -> str:
         if self.season is None:
             return "—"
-        if bool(self._safe_get(self.season, "season_finished", False)):
-            sn = int(self._safe_get(self.season, "season_no", 1) or 1)
-            return f"{sn}年目・レギュラー終了（オフ／次年度へ）"
+        sn = int(self._safe_get(self.season, "season_no", 1) or 1)
         cr = int(self._safe_get(self.season, "current_round", 0) or 0)
         tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
-        sn = int(self._safe_get(self.season, "season_no", 1) or 1)
-        nxt = cr + 1
-        month = round_month_label(self.season, nxt) if tr > 0 and nxt <= tr else "—"
-        return f"{sn}年目・消化ラウンド {cr}/{tr}（次 ~{month}）"
+        fin = bool(self._safe_get(self.season, "season_finished", False))
+        return main_top_bar_progress_label(
+            self.season,
+            season_year=sn,
+            current_round=cr,
+            total_rounds=tr,
+            season_finished=fin,
+        )
 
     @staticmethod
     def _is_home_tasks_empty_line(line: str) -> bool:
@@ -1069,7 +1079,8 @@ class MainMenuView:
             progress_hint, _ = next_advance_display_hints(self.season, self.team)
         if season_finished:
             fin_msg = (
-                "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます"
+                "レギュラーシーズン終了。ディビジョンPOは内部で処理済みです。"
+                "『情報』『日程』で結果確認後、『オフシーズンを実行』で契約・ドラフト等を進めます"
                 "（数分かかる場合があります）。"
             )
             if self.advance_primary_ui_fn is not None:
@@ -1142,8 +1153,30 @@ class MainMenuView:
     # ------------------------------------------------------------------
     def _build_next_game_info(self) -> List[str]:
         _, panel_hint = next_advance_display_hints(self.season, self.team)
+        sn = int(self._safe_get(self.season, "season_no", 1) or 1)
+        if self.season is not None and self.team is not None:
+            cup_lines = build_emperor_cup_main_next_lines(
+                self.season, self.team, season_year=sn
+            )
+            if cup_lines is not None:
+                out = list(cup_lines)
+                while len(out) < 5:
+                    out.append("")
+                out.append(panel_hint or "")
+                return out[:6]
+
         next_game = self._find_next_game()
         if next_game is None:
+            if self.season is not None and self.team is not None:
+                po_lines = build_division_playoff_main_next_lines(
+                    self.season, self.team, season_year=sn
+                )
+                if po_lines is not None:
+                    out = list(po_lines)
+                    while len(out) < 5:
+                        out.append("")
+                    out.append(panel_hint or "")
+                    return out[:6]
             return [
                 "次の試合情報なし",
                 "リーグ日程（SeasonEvent）も参照できませんでした",
@@ -1164,18 +1197,22 @@ class MainMenuView:
             self._safe_get(next_game, "section", None),
             "-",
         )
-        hint = self._safe_get(next_game, "schedule_date_hint", None)
-        if hint:
-            game_date = str(hint)
+        nxt_round = self._safe_get(next_game, "sim_round", None)
+        if nxt_round is not None and self.season is not None:
+            game_date = schedule_month_week_label(self.season, int(nxt_round))
         else:
-            game_date = self._format_date(
-                self._first_non_empty(
-                    self._safe_get(next_game, "date", None),
-                    self._safe_get(next_game, "game_date", None),
-                    self._safe_get(next_game, "scheduled_date", None),
-                    self._get_current_date(),
+            hint = self._safe_get(next_game, "schedule_date_hint", None)
+            if hint:
+                game_date = str(hint)
+            else:
+                game_date = self._format_date(
+                    self._first_non_empty(
+                        self._safe_get(next_game, "date", None),
+                        self._safe_get(next_game, "game_date", None),
+                        self._safe_get(next_game, "scheduled_date", None),
+                        self._get_current_date(),
+                    )
                 )
-            )
 
         home_team = self._resolve_team_name(self._safe_get(next_game, "home_team", None))
         away_team = self._resolve_team_name(self._safe_get(next_game, "away_team", None))
@@ -4880,7 +4917,7 @@ class MainMenuView:
         bottom.pack(fill="x", pady=(12, 0))
         tk.Label(
             bottom,
-            text="読み取り専用です。一覧は主に日本リーグの SeasonEvent 由来です。「すべて」では全日本カップ・東アジアカップ・代表ウィンドウ等を表示補完しています（行を選ぶと詳細に注記あり）。過去結果は上が新しい順。",
+            text="読み取り専用です。一覧は主に日本リーグの SeasonEvent 由来です。「すべて」では全日本カップ・東アジアトップリーグ・代表ウィンドウ等を表示補完しています（行を選ぶと詳細に注記あり）。過去結果は上が新しい順。",
             bg="#1d2129",
             fg="#9aa3af",
             anchor="w",
@@ -5031,7 +5068,7 @@ class MainMenuView:
                     tags=(str(i),),
                 )
 
-        past = past_league_result_rows(self.season, self.team)
+        past = past_league_and_emperor_result_rows(self.season, self.team)
         self._schedule_past_rows = past
 
         pt = getattr(self, "_schedule_past_tree", None)
@@ -5254,7 +5291,9 @@ class MainMenuView:
 
     def _build_information_schedule_lines(self) -> List[str]:
         try:
-            return information_panel_schedule_lines(self.season, max_events=7)
+            return information_panel_schedule_lines(
+                self.season, max_events=7, user_team=self.team
+            )
         except Exception:
             return ["日程表示の生成に失敗しました", "—"]
 
@@ -5277,6 +5316,12 @@ class MainMenuView:
             f"{competition_display_name('emperor_cup')}: "
             f"{'開催中' if emperor_enabled else '未開催'} / 現在段階: {emperor_stage} / 優勝: {emperor_champion}"
         )
+        cup_digest = emperor_cup_log_digest_lines(
+            self.season, limit=12, user_team=self.team
+        )
+        if cup_digest:
+            lines.append("全日本カップ・試合ログ（抜粋）:")
+            lines.extend(cup_digest)
 
         easl_enabled = bool(self._safe_get(self.season, "easl_enabled", False))
         easl_logs = self._safe_get(self.season, "easl_stage_logs", {}) or {}
@@ -5299,6 +5344,14 @@ class MainMenuView:
             f"{competition_display_name('asia_cl')}: "
             f"{'開催中' if acl_enabled else '未開催'} / 現在段階: {acl_stage} / 優勝: {acl_champion}"
         )
+
+        lines.append(f"{competition_display_name('playoff')}:")
+        lines.extend(division_playoff_pending_note_lines(self.season))
+        lines.extend(user_team_division_playoff_projection_lines(self.season, self.team))
+        lines.extend(division_playoff_results_prominent_lines(self.season))
+        if self.team is not None:
+            lbl, detail = user_team_division_playoff_result_parts(self.season, self.team)
+            lines.append(f"【自クラブ】ディビジョンPO: {lbl} — {detail}")
 
         competitions = self._safe_get(self.season, "competitions", {}) or {}
         if isinstance(competitions, dict) and competitions:
@@ -6030,6 +6083,7 @@ class MainMenuView:
                 "EASL",
                 "ACL",
                 "東アジアトップリーグ",
+                "オールアジアトーナメント",
                 "アジアクラブ選手権",
                 "アジアカップ",
                 "世界一決定戦",
@@ -7525,13 +7579,14 @@ class MainMenuView:
             if user_name not in (hn, an):
                 continue
             ct = str(getattr(ev, "competition_type", "") or "regular_season")
-            hint = round_month_label(self.season, nxt)
+            cal = schedule_month_week_label(self.season, nxt)
             return {
                 "home_team": ht,
                 "away_team": at,
                 "round_name": f"ラウンド{nxt}",
                 "game_type": competition_display_name(ct),
-                "schedule_date_hint": hint,
+                "schedule_date_hint": cal,
+                "sim_round": nxt,
             }
         return None
 

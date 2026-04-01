@@ -1,7 +1,7 @@
 """
 大会の内部キー（competition_type 等）→ 本作の固定表示名。
 
-正本: docs/SCHEDULE_MENU_SPEC_V1.md §1
+正本: docs/SCHEDULE_MENU_SPEC_V1.md §1（表示名は同 doc と整合）
 GUI・日程表示はここ経由で統一し、シミュ本体の識別子は変更しない。
 """
 
@@ -13,8 +13,8 @@ from typing import Any, Literal, Optional
 _COMPETITION_TYPE_LABEL_JA: dict[str, str] = {
     "regular_season": "日本リーグ",
     "emperor_cup": "全日本カップ",
-    "easl": "東アジアカップ",
-    "asia_cl": "アジアカップ",
+    "easl": "東アジアトップリーグ",
+    "asia_cl": "オールアジアトーナメント",
     "intercontinental": "世界一決定戦",
     "playoff": "ディビジョンPO",
     "final_boss": "スペシャルマッチ",

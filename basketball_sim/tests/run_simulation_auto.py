@@ -115,6 +115,7 @@ def _print_international_milestones(user_team: Any, limit: int = 30) -> None:
         "EASL",
         "東アジアトップリーグ",
         "ACL",
+        "オールアジアトーナメント",
         "アジアクラブ選手権",
         "intercontinental",
         "final boss",

@@ -9,8 +9,8 @@ from basketball_sim.systems.competition_display import (
 def test_known_types():
     assert competition_display_name("regular_season") == "日本リーグ"
     assert competition_display_name("emperor_cup") == "全日本カップ"
-    assert competition_display_name("easl") == "東アジアカップ"
-    assert competition_display_name("asia_cl") == "アジアカップ"
+    assert competition_display_name("easl") == "東アジアトップリーグ"
+    assert competition_display_name("asia_cl") == "オールアジアトーナメント"
     assert competition_display_name("intercontinental") == "世界一決定戦"
 
 

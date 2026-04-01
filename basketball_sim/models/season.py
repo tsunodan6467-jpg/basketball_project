@@ -41,34 +41,34 @@ class SeasonEvent:
 
 
 ROUND_CONFIG = {
-    1:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ開幕週"},
+    1:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ開幕週（土日2試合のみ・水曜なし）"},
     2:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
-    3:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md1", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD1"},
+    3:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md1", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "東アジアトップリーグ MD1"},
     4:  {"month": 10, "league_games_per_team": 2, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
     5:  {"month": 11, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週（水曜）"},
-    6:  {"month": 11, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md2", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD2"},
+    6:  {"month": 11, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md2", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "東アジアトップリーグ MD2"},
     7:  {"month": 11, "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": "window_1", "is_break_week": True,  "notes": "代表ウィーク①"},
     8:  {"month": 11, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
     9:  {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週（水曜）"},
-    10: {"month": 12, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md3", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD3"},
+    10: {"month": 12, "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md3", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "東アジアトップリーグ MD3"},
     11: {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
     12: {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
     13: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week1", "national_team_window": None,       "is_break_week": True,  "notes": "天皇杯集中週①"},
     14: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week2", "national_team_window": None,       "is_break_week": True,  "notes": "天皇杯集中週②"},
     15: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "1月第3週・オールスター週（リーグ休み）"},
-    16: {"month": 1,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md4", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD4"},
+    16: {"month": 1,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md4", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "東アジアトップリーグ MD4"},
 
     17: {"month": 2,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
-    18: {"month": 2,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md5", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD5"},
-    19: {"month": 2,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md6", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "EASL MD6"},
+    18: {"month": 2,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md5", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "東アジアトップリーグ MD5"},
+    19: {"month": 2,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md6", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "東アジアトップリーグ MD6"},
     20: {"month": 2,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": "window_2", "is_break_week": True,  "notes": "代表ウィーク②"},
 
     21: {"month": 3,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ終盤"},
     22: {"month": 3,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ終盤"},
-    23: {"month": 3,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": "knockout",  "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "EASL決勝大会週"},
+    23: {"month": 3,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": "knockout",  "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "東アジアトップリーグ 決勝大会週"},
     24: {"month": 3,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "リーグ終盤"},
 
     25: {"month": 4,  "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週（水曜）"},
@@ -898,7 +898,7 @@ class Season:
             ),
             Competition(
                 competition_id="asia_cl",
-                name="アジアクラブ選手権",
+                name="オールアジアトーナメント",
                 competition_type="asia_cl",
                 season_phase="continental_postseason",
                 format_type="tournament",
@@ -931,29 +931,65 @@ class Season:
 
     def _build_season_events_from_regular_season(self) -> List[SeasonEvent]:
         events: List[SeasonEvent] = []
+        spans_by_round = getattr(self, "_regular_round_division_spans", None) or []
 
         for round_idx, round_games in enumerate(self.schedule_by_round, start=1):
             week = round_idx
-            day_of_week = "Sat"
+            cfg = ROUND_CONFIG.get(round_idx, {})
+            gpt = int(cfg.get("league_games_per_team", 0) or 0)
+            has_mw = bool(cfg.get("has_midweek_league", False))
+            if round_idx == 1:
+                has_mw = False
+                if gpt > 0:
+                    gpt = 2
 
-            for game_idx, (home_team, away_team) in enumerate(round_games, start=1):
-                event_id = f"regular_season_r{round_idx}_g{game_idx}"
-                events.append(
-                    SeasonEvent(
-                        event_id=event_id,
-                        week=week,
-                        day_of_week=day_of_week,
-                        event_type="game",
-                        competition_id="regular_season",
-                        competition_type="regular_season",
-                        stage="regular_season",
-                        home_team=home_team,
-                        away_team=away_team,
-                        round_number=round_idx,
-                        is_playoff=False,
-                        label=f"R{round_idx} {home_team.name} vs {away_team.name}",
+            spans = spans_by_round[round_idx - 1] if round_idx - 1 < len(spans_by_round) else []
+            game_idx = 0
+
+            if not spans:
+                for home_team, away_team in round_games:
+                    game_idx += 1
+                    event_id = f"regular_season_r{round_idx}_g{game_idx}"
+                    events.append(
+                        SeasonEvent(
+                            event_id=event_id,
+                            week=week,
+                            day_of_week="Sat",
+                            event_type="game",
+                            competition_id="regular_season",
+                            competition_type="regular_season",
+                            stage="regular_season",
+                            home_team=home_team,
+                            away_team=away_team,
+                            round_number=round_idx,
+                            is_playoff=False,
+                            label=f"R{round_idx} {home_team.name} vs {away_team.name}",
+                        )
                     )
-                )
+                continue
+
+            for start, end in spans:
+                chunk = round_games[start:end]
+                dows = Season._regular_chunk_day_of_weeks(gpt, has_mw, chunk)
+                for (home_team, away_team), day_of_week in zip(chunk, dows):
+                    game_idx += 1
+                    event_id = f"regular_season_r{round_idx}_g{game_idx}"
+                    events.append(
+                        SeasonEvent(
+                            event_id=event_id,
+                            week=week,
+                            day_of_week=day_of_week,
+                            event_type="game",
+                            competition_id="regular_season",
+                            competition_type="regular_season",
+                            stage="regular_season",
+                            home_team=home_team,
+                            away_team=away_team,
+                            round_number=round_idx,
+                            is_playoff=False,
+                            label=f"R{round_idx} {home_team.name} vs {away_team.name}",
+                        )
+                    )
 
         return events
 
@@ -992,16 +1028,16 @@ class Season:
             "emperor_cup_champion": "天皇杯優勝",
             "emperor_cup_runner_up": "天皇杯準優勝",
             "emperor_cup_semifinalist": "天皇杯ベスト4",
-            "easl_participant": "EASL出場",
-            "easl_group_winner": "EASLグループ首位通過",
-            "easl_semifinalist": "EASLベスト4",
-            "easl_champion": "EASL優勝",
-            "easl_runner_up": "EASL準優勝",
-            "acl_qualified_from_easl": "アジアクラブ選手権出場権獲得",
-            "acl_participant": "アジアクラブ選手権出場",
-            "acl_semifinalist": "アジアクラブ選手権ベスト4",
-            "acl_champion": "アジアクラブ選手権優勝",
-            "acl_runner_up": "アジアクラブ選手権準優勝",
+            "easl_participant": "東アジアトップリーグ出場",
+            "easl_group_winner": "東アジアトップリーググループ首位通過",
+            "easl_semifinalist": "東アジアトップリーグベスト4",
+            "easl_champion": "東アジアトップリーグ優勝",
+            "easl_runner_up": "東アジアトップリーグ準優勝",
+            "acl_qualified_from_easl": "オールアジアトーナメント出場権獲得（東アジアトップリーグ経由）",
+            "acl_participant": "オールアジアトーナメント出場",
+            "acl_semifinalist": "オールアジアトーナメントベスト4",
+            "acl_champion": "オールアジアトーナメント優勝",
+            "acl_runner_up": "オールアジアトーナメント準優勝",
         }
 
         detail = ""
@@ -1141,17 +1177,21 @@ class Season:
             reversed_round = [(away, home) for home, away in round_games]
             second_half_rounds.append(reversed_round)
 
-        # 第1循環をすべて先に、第2循環（H/A 反転）を後半にまとめる。
-        # 近接インデックスで「同一無向ペアの第1戦→リターン戦」が続くと、
-        # 連続リーグ週の土日ブロックが同一カード4連戦になるため避ける（週またぎ4連戦禁止）。
-        # ラウンド順序はシャッフルして自然なばらつきを残す。
+        # 第1循環と第2循環（H/A 反転）を「前半だけ→後半だけ」の順にすると、
+        # カーソルが長期間第1循環側に偏り、後半で一括反転して H/A が帯状に偏りやすい（特にシーズン序盤のRNG状態）。
+        # 一方で、同一無向ペアの第1戦とリターン戦をサイクル上で隣接させると週またぎ4連戦になる。
+        # そのため第1/第2循環をオフセット付きで交互に並べ、隣接インデックスの無向ペアは常に異なるようにする。
         pair_order = list(range(len(first_half_rounds)))
         random.shuffle(pair_order)
+        n_pairs = len(first_half_rounds)
+        interleave_offset = 3
+        if n_pairs > 0 and n_pairs % 2 == 0 and math.gcd(interleave_offset, n_pairs) != 1:
+            interleave_offset = 3 if math.gcd(3, n_pairs) == 1 else 1
         all_rounds: List[List[Tuple[Team, Team]]] = []
-        for i in pair_order:
-            all_rounds.append(first_half_rounds[i])
-        for i in pair_order:
-            all_rounds.append(second_half_rounds[i])
+        for t in range(n_pairs):
+            all_rounds.append(first_half_rounds[pair_order[t]])
+            j = (t + interleave_offset) % n_pairs
+            all_rounds.append(second_half_rounds[pair_order[j]])
 
         for round_games in all_rounds:
             random.shuffle(round_games)
@@ -1220,6 +1260,47 @@ class Season:
         )
 
     @staticmethod
+    def _same_regular_matchup(
+        x: Tuple[Optional[Team], Optional[Team]],
+        y: Tuple[Optional[Team], Optional[Team]],
+    ) -> bool:
+        if x == y:
+            return True
+        xh, xa = x
+        yh, ya = y
+        if xh is None or xa is None or yh is None or ya is None:
+            return False
+        return (
+            Season._schedule_team_key(xh) == Season._schedule_team_key(yh)
+            and Season._schedule_team_key(xa) == Season._schedule_team_key(ya)
+        )
+
+    @staticmethod
+    def _regular_weekend_block_start_index(chunk: List[Tuple[Team, Team]]) -> int:
+        for i in range(len(chunk) - 1):
+            if Season._same_regular_matchup(chunk[i], chunk[i + 1]):
+                return i
+        return len(chunk)
+
+    @staticmethod
+    def _regular_chunk_day_of_weeks(
+        games_per_team: int, has_midweek: bool, chunk: List[Tuple[Team, Team]]
+    ) -> List[str]:
+        if games_per_team == 3 and has_midweek:
+            ws = Season._regular_weekend_block_start_index(chunk)
+            out: List[str] = []
+            for j in range(len(chunk)):
+                if j < ws:
+                    out.append("Wed")
+                else:
+                    wji = j - ws
+                    out.append("Sat" if (wji % 2) == 0 else "Sun")
+            return out
+        if games_per_team == 2:
+            return ["Sat" if (j % 2) == 0 else "Sun" for j in range(len(chunk))]
+        return ["Sat"] * len(chunk)
+
+    @staticmethod
     def collect_league_week_matchups(
         cycle_rounds: List[List[Tuple[Team, Team]]],
         cursor: int,
@@ -1229,7 +1310,8 @@ class Season:
         """
         1 シミュラウンド分のリーグ対戦カード（全 division 共通ロジック）。
         ・2 試合週: 土日で同一相手かつ H/A 統一（RR の向きをそのまま 2 連戦）。水曜リーグ無し。
-        ・3 試合週かつ has_midweek: 週末は上と同じ（同一相手・同一 H/A の 2 戦）＋別 RR 1 ラウンドを 1 戦（水曜・別相手）。
+        ・3 試合週かつ has_midweek: 水曜ブロック（別 RR・各チーム 1 試合・別相手）を先に並べ、その後に週末ブロック（同一相手・同一 H/A の 2 連戦×4 対戦）。
+          シミュ・game_results・SeasonEvent の並びが「水→土日」と一致するようにする（表示の正本）。
         ・それ以外: 従来どおり RR ラウンドを積む（フォールバック）。
         戻り値: (対戦リスト, サイクル上の消費ラウンド数)
         """
@@ -1252,14 +1334,14 @@ class Season:
         if games_per_team == 3 and has_midweek:
             block_a = cycle_rounds[idx]
             block_b, delta = Season._pick_midweek_rr_block(cycle_rounds, idx, block_a, n)
+            for h, a in block_b:
+                if h is None or a is None:
+                    continue
+                out.append((h, a))
             for h, a in block_a:
                 if h is None or a is None:
                     continue
                 out.append((h, a))
-                out.append((h, a))
-            for h, a in block_b:
-                if h is None or a is None:
-                    continue
                 out.append((h, a))
             return out, 1 + delta
 
@@ -1289,11 +1371,18 @@ class Season:
             per_level_cycle_cursor[level] = 0
 
         schedule_by_round: List[List[Tuple[Team, Team]]] = []
+        division_spans: List[List[Tuple[int, int]]] = []
         for round_no in range(1, total_rounds + 1):
             cfg = ROUND_CONFIG.get(round_no, {})
             games_per_team = int(cfg.get("league_games_per_team", 0) or 0)
             has_midweek = bool(cfg.get("has_midweek_league", False))
+            # 開幕ラウンドは常に土日2試合のみ（水曜リーグなし）。ROUND_CONFIG と二重に固定。
+            if round_no == 1:
+                has_midweek = False
+                if games_per_team > 0:
+                    games_per_team = 2
             combined_round: List[Tuple[Team, Team]] = []
+            round_spans: List[Tuple[int, int]] = []
 
             for level in [1, 2, 3]:
                 cycle_rounds = per_level_cycle_rounds[level]
@@ -1307,11 +1396,15 @@ class Season:
                     games_per_team,
                     has_midweek,
                 )
+                start = len(combined_round)
                 combined_round.extend(chunk)
+                round_spans.append((start, len(combined_round)))
                 per_level_cycle_cursor[level] = idx + advance
 
             schedule_by_round.append(combined_round)
+            division_spans.append(round_spans)
 
+        self._regular_round_division_spans = division_spans
         return schedule_by_round
 
     # =========================
@@ -1700,7 +1793,7 @@ class Season:
         d1_teams = list(self.leagues.get(1, []))
         selected: List[Team] = []
 
-        print("\n[EASL国内出場チーム選定]")
+        print("\n[東アジアトップリーグ 国内出場チーム選定]")
         if getattr(self, "season_no", 1) <= 1:
             scored = []
             for team in d1_teams:
@@ -2060,7 +2153,7 @@ class Season:
         return rows
 
     def _print_easl_group_tables(self):
-        print("\n[EASL Group Standings]")
+        print("\n[東アジアトップリーグ グループ順位]")
         for group_name in ["A", "B", "C"]:
             print(f"\nGroup {group_name}")
             rows = self._get_easl_group_standings(group_name)
@@ -2117,12 +2210,12 @@ class Season:
         if not lines:
             return
 
-        print(f"\n[EASL {stage} Results]")
+        print(f"\n[東アジアトップリーグ {stage} 結果]")
         for line in lines:
             print(line)
 
     def _print_easl_summary(self):
-        print("\n--- EASL Summary ---")
+        print("\n--- 東アジアトップリーグ 概況 ---")
 
         stage_order = [
             "group_md1", "group_md2", "group_md3",
@@ -2143,7 +2236,7 @@ class Season:
         runner_up = self.easl_results.get("runner_up")
         semifinalists = self.easl_results.get("semifinalists", [])
 
-        print("\n[EASL Final Result]")
+        print("\n[東アジアトップリーグ 最終結果]")
         if champion is not None:
             print(f"Champion : {self._get_easl_team_name(champion)}")
         if runner_up is not None:
@@ -2154,7 +2247,7 @@ class Season:
                 print(f"- {self._get_easl_team_name(team)}")
 
         if self.easl_acl_qualifiers:
-            print("\n[アジアクラブ選手権出場権（東アジアトップリーグ）]")
+            print("\n[オールアジアトーナメント出場権（東アジアトップリーグ）]")
             for i, team in enumerate(self.easl_acl_qualifiers, 1):
                 print(f"{i}. {self._get_easl_team_name(team)}")
 
@@ -2194,7 +2287,7 @@ class Season:
         if stage is None or stage in self.easl_played_stages:
             return
 
-        print("\n--- EASL ---")
+        print("\n--- 東アジアトップリーグ ---")
         print(f"Stage: {stage}")
 
         stage_lines = []
@@ -2202,7 +2295,10 @@ class Season:
         if stage.startswith("group_md"):
             pairings = self.easl_matchdays.get(stage, [])
             for home_team, away_team in pairings:
-                print(f"[EASL-MATCH] competition_type=easl | stage={stage} | {self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}")
+                print(
+                    f"[東アジアトップリーグ] stage={stage} | "
+                    f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
+                )
                 winner, home_score, away_score = self._simulate_competition_match(home_team, away_team, "easl")
                 loser = away_team if winner == home_team else home_team
 
@@ -2239,7 +2335,10 @@ class Season:
             losers = []
 
             for home_team, away_team in self.easl_semifinal_pairs:
-                print(f"[EASL-MATCH] competition_type=easl | stage={stage} | {self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}")
+                print(
+                    f"[東アジアトップリーグ] stage={stage} | "
+                    f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
+                )
                 winner, home_score, away_score = self._simulate_competition_match(home_team, away_team, "easl")
                 loser = away_team if winner == home_team else home_team
                 winners.append(winner)
@@ -2266,7 +2365,10 @@ class Season:
         elif stage == "final":
             if len(self.easl_current_finalists) >= 2:
                 home_team, away_team = self.easl_current_finalists[0], self.easl_current_finalists[1]
-                print(f"[EASL-MATCH] competition_type=easl | stage={stage} | {self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}")
+                print(
+                    f"[東アジアトップリーグ] stage={stage} | "
+                    f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
+                )
                 winner, home_score, away_score = self._simulate_competition_match(home_team, away_team, "easl")
                 runner_up = away_team if winner == home_team else home_team
 
@@ -2280,8 +2382,8 @@ class Season:
                     )
                 )
 
-                print(f"EASL Champion: {self._get_easl_team_name(winner)}")
-                print(f"EASL Runner-up: {self._get_easl_team_name(runner_up)}")
+                print(f"東アジアトップリーグ 優勝: {self._get_easl_team_name(winner)}")
+                print(f"東アジアトップリーグ 準優勝: {self._get_easl_team_name(runner_up)}")
 
                 self.easl_top2_payloads = [
                     self._build_easl_top2_payload(winner, "easl_champion"),
@@ -2291,7 +2393,7 @@ class Season:
                 self._broadcast_easl_top2_payloads()
 
                 if self.easl_acl_qualifiers:
-                    print("[アジアクラブ選手権出場チーム]")
+                    print("[オールアジアトーナメント出場チーム]")
                     for i, team in enumerate(self.easl_acl_qualifiers, 1):
                         print(f" {i}. {self._get_easl_team_name(team)}")
 
@@ -2394,12 +2496,12 @@ class Season:
         if not lines:
             return
 
-        print(f"\n[アジアクラブ選手権 {stage} 結果]")
+        print(f"\n[オールアジアトーナメント {stage} 結果]")
         for line in lines:
             print(line)
 
     def _print_acl_summary(self):
-        print("\n--- アジアクラブ選手権 Summary ---")
+        print("\n--- オールアジアトーナメント 概況 ---")
 
         stage_order = ["quarterfinal", "semifinal", "final"]
         for stage in stage_order:
@@ -2414,7 +2516,7 @@ class Season:
         runner_up = self.acl_results.get("runner_up")
         semifinalists = self.acl_results.get("semifinalists", [])
 
-        print("\n[アジアクラブ選手権 最終結果]")
+        print("\n[オールアジアトーナメント 最終結果]")
         if champion is not None:
             print(f"Champion : {self._get_acl_team_name(champion)}")
         if runner_up is not None:
@@ -2430,7 +2532,7 @@ class Season:
         if len(self.easl_acl_qualifiers) < 2:
             return
 
-        print("\n=== アジアクラブ選手権 ===")
+        print("\n=== オールアジアトーナメント ===")
 
         domestic_teams = self.get_acl_qualifiers_from_easl()[:2]
         foreign_teams = self._generate_acl_foreign_teams()
@@ -2445,7 +2547,7 @@ class Season:
                 result_type="acl_participant"
             )
 
-        print("\nアジアクラブ選手権出場チーム:")
+        print("\nオールアジアトーナメント出場チーム:")
         for i, team in enumerate(participants, 1):
             print(f"{i}. {self._get_acl_team_name(team)}")
 
@@ -2466,7 +2568,7 @@ class Season:
             (china2, oce1),
         ]
 
-        print("\n--- アジアクラブ選手権 準々決勝 ---")
+        print("\n--- オールアジアトーナメント 準々決勝 ---")
         qf_lines = []
         qf_winners = []
         qf_losers = []
@@ -2490,7 +2592,7 @@ class Season:
             (qf_winners[2], qf_winners[3]),
         ]
 
-        print("\n--- アジアクラブ選手権 準決勝 ---")
+        print("\n--- オールアジアトーナメント 準決勝 ---")
         sf_lines = []
         sf_winners = []
         sf_losers = []
@@ -2519,7 +2621,7 @@ class Season:
         self._store_acl_stage_log("semifinal", sf_lines)
         self._print_acl_stage_summary("semifinal")
 
-        print("\n--- アジアクラブ選手権 決勝 ---")
+        print("\n--- オールアジアトーナメント 決勝 ---")
         final_lines = []
 
         home_team, away_team = sf_winners[0], sf_winners[1]
@@ -2551,7 +2653,7 @@ class Season:
         self._store_acl_stage_log("final", final_lines)
         self._print_acl_stage_summary("final")
 
-        print("\n[アジアクラブ選手権 最終結果]")
+        print("\n[オールアジアトーナメント 最終結果]")
         print(f"Champion: {self._get_acl_team_name(winner)}")
         print(f"Runner-up: {self._get_acl_team_name(runner_up)}")
 
@@ -2695,9 +2797,9 @@ class Season:
 
         if self.easl_results["champion"] is not None:
             print("\n--- 東アジアトップリーグ 結果 ---")
-            print(f"Champion: {self._get_easl_team_name(self.easl_results['champion'])}")
+            print(f"優勝: {self._get_easl_team_name(self.easl_results['champion'])}")
             if self.easl_results["runner_up"] is not None:
-                print(f"Runner-up: {self._get_easl_team_name(self.easl_results['runner_up'])}")
+                print(f"準優勝: {self._get_easl_team_name(self.easl_results['runner_up'])}")
             self._print_easl_summary()
 
         if self.emperor_cup_results["champion"] is not None:
@@ -2801,11 +2903,11 @@ class Season:
         if self.easl_enabled:
             played = sorted(list(self.easl_played_stages))
             easl_status = ", ".join(played) if played else "未開催"
-            print(f"EASL進行: {easl_status}")
+            print(f"東アジアトップリーグ進行: {easl_status}")
 
             if self.easl_acl_qualifiers:
                 names = ", ".join(self._get_easl_team_name(t) for t in self.easl_acl_qualifiers)
-                print(f"アジアクラブ選手権出場権(東アジアトップリーグ): {names}")
+                print(f"オールアジアトーナメント出場権（東アジアトップリーグ経由）: {names}")
 
         if self.emperor_cup_enabled:
             played = sorted(list(self.emperor_cup_played_stages))
@@ -2816,9 +2918,9 @@ class Season:
             if self.acl_played:
                 champion = self.acl_results.get("champion")
                 champion_name = self._get_acl_team_name(champion) if champion is not None else "TBD"
-                print(f"アジアクラブ選手権進行: 完了 / Champion: {champion_name}")
+                print(f"オールアジアトーナメント進行: 完了 / 優勝: {champion_name}")
             else:
-                print("アジアクラブ選手権進行: 未開催")
+                print("オールアジアトーナメント進行: 未開催")
 
     def get_standings(self, teams: List[Team]) -> List[Team]:
         return sorted(
