@@ -416,33 +416,37 @@ def conduct_auction_draft(
                 if ui_prompt_target is not None:
                     targets[id(team)] = ui_prompt_target(team, slot, display, cap)
                 else:
-                    for i, m in enumerate(display, 1):
-                        p = m.player
-                        pot = str(getattr(p, "potential", "C"))
-                        label = str(getattr(p, "draft_profile_label", "") or "")
-                        label_text = f" | {label}" if label else ""
-                        from basketball_sim.systems.scout_logic import get_visible_prospect_badge_for_team
+                    if not display:
+                        print("（このスロットで指名できる候補がありません。スキップします。）")
+                        targets[id(team)] = None
+                    else:
+                        for i, m in enumerate(display, 1):
+                            p = m.player
+                            pot = str(getattr(p, "potential", "C"))
+                            label = str(getattr(p, "draft_profile_label", "") or "")
+                            label_text = f" | {label}" if label else ""
+                            from basketball_sim.systems.scout_logic import get_visible_prospect_badge_for_team
 
-                        badge = get_visible_prospect_badge_for_team(team, p)
-                        grade_text = f" [{badge}]" if badge else ""
-                        print(
-                            f"{i:>2}. {p.name:<16} {getattr(p,'position','-'):<2} "
-                            f"OVR:{getattr(p,'ovr',0):<2} Pot:{pot} | "
-                            f"{TIER_CONFIGS[m.tier].name}{grade_text} | min:{m.min_price:,}{label_text}"
-                        )
-                    while True:
-                        raw = input("番号: ").strip()
-                        if raw == "0":
-                            targets[id(team)] = None
-                            break
-                        try:
-                            idx = int(raw) - 1
-                            if 0 <= idx < len(display):
-                                targets[id(team)] = id(display[idx].player)
+                            badge = get_visible_prospect_badge_for_team(team, p)
+                            grade_text = f" [{badge}]" if badge else ""
+                            print(
+                                f"{i:>2}. {p.name:<16} {getattr(p,'position','-'):<2} "
+                                f"OVR:{getattr(p,'ovr',0):<2} Pot:{pot} | "
+                                f"{TIER_CONFIGS[m.tier].name}{grade_text} | min:{m.min_price:,}{label_text}"
+                            )
+                        while True:
+                            raw = input("番号（0=今回は取らない、カンマ可）: ").strip()
+                            if raw == "0":
+                                targets[id(team)] = None
                                 break
-                        except ValueError:
-                            pass
-                        print("正しい番号を入力してください。")
+                            try:
+                                idx = int(raw.replace(",", "").replace(" ", "")) - 1
+                                if 0 <= idx < len(display):
+                                    targets[id(team)] = id(display[idx].player)
+                                    break
+                            except ValueError:
+                                pass
+                            print(f"1〜{len(display)} の番号、または 0 を入力してください。")
             else:
                 pick = _ai_choose_target(team, cand, used_player_ids)
                 targets[id(team)] = None if pick is None else id(pick.player)

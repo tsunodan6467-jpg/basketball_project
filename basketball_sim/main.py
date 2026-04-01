@@ -1439,27 +1439,49 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
         count=n_in,
     )
 
-    max_cash = int(getattr(user_team, "money", 0) or 0)
+    max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
     while True:
+        raw = input(
+            f"現金移転（自分→相手, 0〜{max_cash:,} 円 / 0=送金なし / b=中止）: "
+        ).strip()
+        if raw.lower() in ("b", "q", "back"):
+            print("トレード提案を中止しました。")
+            return
+        cleaned = raw.replace(",", "").replace(" ", "")
         try:
-            cash = int(input(f"現金移転（自分→相手, 0〜{max_cash}）: ").strip() or 0)
+            cash = int(cleaned or 0)
         except ValueError:
             print("整数で入力してください。")
             continue
-        if 0 <= cash <= max_cash:
-            break
-        print("上限を超えています。")
+        if cash < 0:
+            print("0以上の整数を入力してください。")
+            continue
+        if cash > max_cash:
+            print(f"上限を超えています。（現在の上限: {max_cash:,} 円）")
+            continue
+        break
 
-    max_rb = int(getattr(user_team, "rookie_budget_remaining", 0) or 0)
+    max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
     while True:
+        raw = input(
+            f"RB移転（自分→相手, 0〜{max_rb:,} / 0=移転なし / b=中止）: "
+        ).strip()
+        if raw.lower() in ("b", "q", "back"):
+            print("トレード提案を中止しました。")
+            return
+        cleaned = raw.replace(",", "").replace(" ", "")
         try:
-            rb = int(input(f"RB移転（自分→相手, 0〜{max_rb}）: ").strip() or 0)
+            rb = int(cleaned or 0)
         except ValueError:
             print("整数で入力してください。")
             continue
-        if 0 <= rb <= max_rb:
-            break
-        print("上限を超えています。")
+        if rb < 0:
+            print("0以上の整数を入力してください。")
+            continue
+        if rb > max_rb:
+            print(f"上限を超えています。（現在の上限: {max_rb:,}）")
+            continue
+        break
 
     offer = MultiTradeOffer(
         team_a_gives_players=user_gives,

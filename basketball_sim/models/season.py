@@ -56,8 +56,8 @@ ROUND_CONFIG = {
     11: {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
     12: {"month": 12, "league_games_per_team": 3, "has_midweek_league": True,  "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "圧縮週"},
 
-    13: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week1", "national_team_window": None,       "is_break_week": True,  "notes": "天皇杯集中週①"},
-    14: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week2", "national_team_window": None,       "is_break_week": True,  "notes": "天皇杯集中週②"},
+    13: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week1", "national_team_window": None,       "is_break_week": True,  "notes": "全日本カップ集中週①"},
+    14: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": "emperor_cup_week2", "national_team_window": None,       "is_break_week": True,  "notes": "全日本カップ集中週②"},
     15: {"month": 1,  "league_games_per_team": 0, "has_midweek_league": False, "easl_event": None,        "cup_event": None,                "national_team_window": None,       "is_break_week": True,  "notes": "1月第3週・オールスター週（リーグ休み）"},
     16: {"month": 1,  "league_games_per_team": 2, "has_midweek_league": False, "easl_event": "group_md4", "cup_event": None,                "national_team_window": None,       "is_break_week": False, "notes": "東アジアトップリーグ MD4"},
 
@@ -1025,9 +1025,9 @@ class Season:
             "relegated": "降格",
             "division_playoff_champion": "ディビジョン優勝",
             "division_playoff_runner_up": "ディビジョン準優勝",
-            "emperor_cup_champion": "天皇杯優勝",
-            "emperor_cup_runner_up": "天皇杯準優勝",
-            "emperor_cup_semifinalist": "天皇杯ベスト4",
+            "emperor_cup_champion": "全日本カップ優勝",
+            "emperor_cup_runner_up": "全日本カップ準優勝",
+            "emperor_cup_semifinalist": "全日本カップベスト4",
             "easl_participant": "東アジアトップリーグ出場",
             "easl_group_winner": "東アジアトップリーググループ首位通過",
             "easl_semifinalist": "東アジアトップリーグベスト4",
@@ -2912,7 +2912,7 @@ class Season:
         if self.emperor_cup_enabled:
             played = sorted(list(self.emperor_cup_played_stages))
             cup_status = ", ".join(played) if played else "未開催"
-            print(f"天皇杯進行: {cup_status}")
+            print(f"全日本カップ進行: {cup_status}")
 
         if self.acl_enabled:
             if self.acl_played:

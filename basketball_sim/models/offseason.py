@@ -49,6 +49,13 @@ except Exception:
     maintain_minimum_fa_pool = None
 
 
+def _safe_cli_stdout_text(text: str) -> str:
+    """Windows cp932 コンソールで print 時に落ちないよう、非互換のダッシュ類を置換する。"""
+    if not text:
+        return text
+    return text.replace("\u2014", "-").replace("\u2013", "-").replace("\u2212", "-")
+
+
 def assign_team_strategies(teams: List[Team]):
     """
     各チームに次季戦術を割り当てる。
@@ -3339,7 +3346,7 @@ class Offseason:
                     except Exception:
                         report_text = ""
                     if report_text:
-                        print(report_text)
+                        print(_safe_cli_stdout_text(report_text))
 
     def _process_team_finances(self):
         print("\n[Finance Settlement]")
@@ -3465,4 +3472,4 @@ class Offseason:
                     except Exception:
                         report_text = ""
                     if report_text:
-                        print(report_text)
+                        print(_safe_cli_stdout_text(report_text))

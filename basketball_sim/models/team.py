@@ -904,7 +904,7 @@ class Team:
                     td = 0
                 lines.append(
                     f"  - {row.get('title', '-')}: {state}（信頼 {td:+}）"
-                    f" — {row.get('progress_text', '')}"
+                    f" - {row.get('progress_text', '')}"
                 )
             lines.append("")
 
