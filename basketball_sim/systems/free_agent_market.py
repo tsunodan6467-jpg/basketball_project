@@ -40,7 +40,7 @@ def ensure_team_fa_market_fields(team: Team) -> None:
     Team側の最低限の安全補完。
     """
     if not hasattr(team, "money") or team.money is None:
-        team.money = 5000000
+        team.money = 2_000_000_000
 
     if not hasattr(team, "players") or team.players is None:
         team.players = []

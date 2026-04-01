@@ -91,6 +91,12 @@ NATIONAL_TEAM_CYCLE = {
     4: {"window_1": "friendly",        "window_2": "friendly",        "summer": "olympics"},
 }
 
+TEMP_ROUND_OPERATING_INCOME_BY_LEVEL = {
+    1: 8_000_000,
+    2: 6_000_000,
+    3: 5_000_000,
+}
+
 
 class Season:
     """
@@ -2680,6 +2686,29 @@ class Season:
         for line in logs:
             print(line)
 
+    def _apply_temporary_round_operating_income(self, round_number: int) -> None:
+        """
+        仮バランス調整: ラウンド進行ごとに最低限の営業収入を加算する。
+        本収支ロジック（オフシーズン締め）を壊さないため、単純加算のみ。
+        """
+        if not self.all_teams:
+            return
+
+        for team in self.all_teams:
+            level = int(getattr(team, "league_level", 3) or 3)
+            income = int(TEMP_ROUND_OPERATING_INCOME_BY_LEVEL.get(level, 5_000_000))
+            team.money = int(getattr(team, "money", 0) or 0) + income
+
+        # CLI の可読性を崩さないよう、ユーザークラブ分だけ短く表示
+        user_team = next((t for t in self.all_teams if bool(getattr(t, "is_user_team", False))), None)
+        if user_team is not None:
+            lv = int(getattr(user_team, "league_level", 3) or 3)
+            added = int(TEMP_ROUND_OPERATING_INCOME_BY_LEVEL.get(lv, 5_000_000))
+            print(
+                f"[経営] ラウンド{round_number}: 仮営業収入 +{added:,}円 "
+                f"({user_team.name} 所持金 {int(getattr(user_team, 'money', 0)):,}円)"
+            )
+
     # =========================
     # Simulation
     # =========================
@@ -2742,6 +2771,8 @@ class Season:
 
         if self._should_play_emperor_cup_this_round(round_number):
             self._play_emperor_cup_round(round_number)
+
+        self._apply_temporary_round_operating_income(round_number)
 
         self.total_points += round_points
         self.game_count += round_game_count

@@ -38,7 +38,8 @@ class Team:
 
     popularity: int = 50
     market_size: float = 1.0
-    money: int = 5000000
+    # 仮バランス調整: 経営即死を避けるための初期運転資金（後で本設計へ差し替え想定）
+    money: int = 2_000_000_000
 
     fan_base: int = 5000
     season_ticket_base: int = 2500

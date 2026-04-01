@@ -58,6 +58,8 @@ from basketball_sim.systems.gm_ui_constants import (
     USAGE_POLICY_OPTIONS,
 )
 
+TEMP_INITIAL_TEAM_MONEY = 2_000_000_000
+
 try:
     from basketball_sim.systems.main_menu_view import launch_main_menu
 except Exception as exc:
@@ -171,7 +173,7 @@ def apply_user_team_to_league(teams, team_name, home_city, market_size):
     target_team.market_size = market_size
     target_team.is_user_team = True
     target_team.popularity = 45
-    target_team.money = 5000000
+    target_team.money = TEMP_INITIAL_TEAM_MONEY
 
     print_separator("プレイヤーチーム登録")
     print(f"{old_name} → {target_team.name} に置き換えました")
@@ -755,7 +757,7 @@ def assign_fictional_teams_and_rival(teams, user_team, remaining_players, free_a
     rival_team.home_city = "さいたま"
     rival_team.market_size = 1.10
     rival_team.popularity = 52
-    rival_team.money = 6500000
+    rival_team.money = TEMP_INITIAL_TEAM_MONEY
     rival_team.is_rival_team = True
     rival_team.coach_style = "development"
 
