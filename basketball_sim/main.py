@@ -3043,14 +3043,18 @@ def run_steam_diag() -> int:
     Steamworks パートナー側の App 作成前でも実行できる（未接続ならその旨が出るだけ）。
     """
     from basketball_sim.integrations.steamworks_bridge import (
+        steam_init_diagnostics_lines,
         steam_is_subscribed,
         steam_loaded_dll_path,
         steam_native_loaded,
         try_init_steam,
     )
 
+    print("steam_diag (詳細):")
+    for line in steam_init_diagnostics_lines():
+        print(f"  {line}")
+    print("steam_diag (要約):")
     ok = try_init_steam()
-    print("steam_diag:")
     print(f"  try_init_steam: {ok}")
     print(f"  steam_native_loaded: {steam_native_loaded()}")
     print(f"  steam_loaded_dll_path: {steam_loaded_dll_path()}")

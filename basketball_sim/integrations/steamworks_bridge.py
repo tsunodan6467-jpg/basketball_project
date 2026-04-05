@@ -105,18 +105,86 @@ def _steam_dll_candidate_files() -> List[Path]:
     return out
 
 
-def _bind_core_exports(dll: ctypes.CDLL) -> Optional[tuple[Callable[..., bool], Callable[[], None], Callable[[], None]]]:
+def _steam_dll_seems_to_contain_init_symbol(path: Path) -> bool:
+    """PE 内に export 名として期待される文字列があるか（取り違え DLL の簡易検査）。"""
     try:
-        init_fn = dll.SteamAPI_Init
-        init_fn.argtypes = []
-        init_fn.restype = ctypes.c_bool
-        shutdown_fn = dll.SteamAPI_Shutdown
-        shutdown_fn.argtypes = []
-        shutdown_fn.restype = None
-        run_fn = dll.SteamAPI_RunCallbacks
-        run_fn.argtypes = []
-        run_fn.restype = None
+        return b"SteamAPI_Init" in path.read_bytes()
+    except OSError:
+        return False
+
+
+def _load_steam_windows_dll(resolved: str) -> ctypes.CDLL:
+    """
+    Windows で steam_api64.dll を読み込む。
+
+    Python 3.8+ では依存 DLL の探索に exe 横ディレクトリが含まれないことがあるため、
+    読み込み前に add_dll_directory を試す。
+    """
+    parent = str(Path(resolved).resolve().parent)
+    add_fn = getattr(os, "add_dll_directory", None)
+    if callable(add_fn):
+        add_fn(parent)
+    return ctypes.CDLL(resolved)
+
+
+def _get_proc_address(dll: ctypes.CDLL, name: str) -> Optional[int]:
+    """Windows: GetProcAddress で export アドレスを取得（ctypes の属性解決が失敗するときのフォールバック）。"""
+    if platform.system() != "Windows":
+        return None
+    handle = getattr(dll, "_handle", None)
+    if handle is None:
+        return None
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    gpa = k32.GetProcAddress
+    gpa.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+    gpa.restype = ctypes.c_void_p
+    proc = gpa(ctypes.c_void_p(handle), name.encode("ascii"))
+    if not proc:
+        return None
+    return int(proc)
+
+
+def _bind_cdecl_fn(dll: ctypes.CDLL, name: str, restype: Any) -> Optional[Callable[..., Any]]:
+    """属性または GetProcAddress + CFUNCTYPE で C 宣言どおりの関数を得る。"""
+    try:
+        fn = getattr(dll, name)
     except AttributeError:
+        addr = _get_proc_address(dll, name)
+        if addr is None:
+            return None
+        fn = ctypes.CFUNCTYPE(restype)(addr)
+    fn.argtypes = []
+    fn.restype = restype
+    return fn
+
+
+def _missing_steam_core_exports(dll: Any) -> List[str]:
+    """ctypes が解決できないコア API 名（診断用）。"""
+    missing: List[str] = []
+    for n in ("SteamAPI_Init", "SteamAPI_Shutdown", "SteamAPI_RunCallbacks"):
+        try:
+            getattr(dll, n)
+        except AttributeError:
+            if isinstance(dll, ctypes.CDLL) and _get_proc_address(dll, n) is not None:
+                continue
+            missing.append(n)
+    return missing
+
+
+def _bind_core_exports(dll: Any) -> Optional[tuple[Callable[..., bool], Callable[[], None], Callable[[], None]]]:
+    if not isinstance(dll, ctypes.CDLL):
+        return None
+    init_fn = _bind_cdecl_fn(dll, "SteamAPI_Init", ctypes.c_bool)
+    if init_fn is None:
+        LOG.debug("Steam: SteamAPI_Init が解決できません（属性・GetProcAddress とも失敗）")
+        return None
+    shutdown_fn = _bind_cdecl_fn(dll, "SteamAPI_Shutdown", None)
+    if shutdown_fn is None:
+        LOG.debug("Steam: SteamAPI_Shutdown が解決できません")
+        return None
+    run_fn = _bind_cdecl_fn(dll, "SteamAPI_RunCallbacks", None)
+    if run_fn is None:
+        LOG.debug("Steam: SteamAPI_RunCallbacks が解決できません")
         return None
     return (init_fn, shutdown_fn, run_fn)
 
@@ -174,7 +242,7 @@ def _try_native_init() -> bool:
             continue
         resolved = str(path.resolve())
         try:
-            dll = ctypes.CDLL(resolved)
+            dll = _load_steam_windows_dll(resolved)
         except OSError as exc:
             LOG.debug("Steam: DLL を読み込めませんでした %s (%s)", path, exc)
             continue
@@ -214,6 +282,116 @@ def _try_native_init() -> bool:
         LOG.info("Steam: ネイティブ API 初期化 OK (%s)", path)
         return True
     return False
+
+
+def steam_init_diagnostics_lines() -> List[str]:
+    """
+    --steam-diag 用: try_init_steam が False のときの切り分け（開発者向け）。
+
+    steam_loaded_dll_path が None でも「DLL 未検出」と「SteamAPI_Init が false」は別原因になり得るため、
+    候補パスごとに短い理由を返す。
+    """
+    lines: List[str] = []
+    if platform.system() != "Windows":
+        lines.append("platform: Windows 以外のためネイティブ Steam DLL は対象外です。")
+        return lines
+    if _truthy_env("BASKETBALL_SIM_DISABLE_STEAM"):
+        lines.append("環境変数 BASKETBALL_SIM_DISABLE_STEAM が有効のため Steam 初期化をスキップしています。")
+        return lines
+
+    appid_path = _find_steam_appid_txt()
+    if appid_path is not None:
+        lines.append(f"steam_appid.txt: {appid_path}")
+    else:
+        lines.append("steam_appid.txt: （見つかりません。exe と同じフォルダ、またはカレントに配置）")
+
+    if getattr(sys, "frozen", False) and getattr(sys, "executable", None):
+        lines.append(f"実行ファイル: {sys.executable}")
+    env_dll = os.environ.get("BASKETBALL_SIM_STEAM_DLL", "").strip()
+    if env_dll:
+        lines.append(f"BASKETBALL_SIM_STEAM_DLL: {env_dll}")
+
+    lines.append(f"Python プロセス: {platform.architecture()[0]}（steam_api64.dll は 64bit 用。ここが 32bit だと DLL は使えません）")
+    lines.append("DLL 候補:")
+    seen: set[str] = set()
+    for path in _steam_dll_candidate_files():
+        key = str(path.resolve()) if path.is_file() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        if not path.is_file():
+            lines.append(f"  なし: {path}")
+            continue
+
+        resolved = str(path.resolve())
+        lines.append(f"  あり: {resolved}")
+        looks_like_steam = _steam_dll_seems_to_contain_init_symbol(Path(resolved))
+        lines.append(f"    → ファイル内に 'SteamAPI_Init' 文字列: {looks_like_steam}")
+        if not looks_like_steam:
+            lines.append(
+                "    → 本物の redistributable_bin\\win64\\steam_api64.dll ではない可能性が高いです。"
+                " SDK zip を開き直し、検索で見つかった複数候補があれば win64 配下だけを使ってください。"
+            )
+        try:
+            dll = _load_steam_windows_dll(resolved)
+        except OSError as exc:
+            lines.append(f"    → CDLL 失敗: {exc}")
+            continue
+
+        hmod = getattr(dll, "_handle", None)
+        lines.append(f"    → LoadLibrary ハンドル: {hmod!r}")
+        for sym in ("SteamAPI_Init", "SteamAPI_Shutdown", "SteamAPI_RunCallbacks"):
+            try:
+                g = getattr(dll, sym)
+                get_ok = callable(g)
+            except AttributeError:
+                get_ok = False
+            gpa = _get_proc_address(dll, sym) if hmod is not None else None
+            lines.append(
+                f"    → {sym}: getattr={'OK' if get_ok else 'NG'}, "
+                f"GetProcAddress={'0x%x' % gpa if gpa else 'NULL'}"
+            )
+
+        bound = _bind_core_exports(dll)
+        if bound is None:
+            miss = _missing_steam_core_exports(dll)
+            if miss:
+                lines.append(
+                    "    → 未解決の export: "
+                    + ", ".join(miss)
+                    + "（上の GetProcAddress がすべて NULL なら DLL が本物でないか、32bit Python 等のアーキ不一致）"
+                )
+            else:
+                lines.append(
+                    "    → export は見えるのにバインド失敗（ctypes の型設定で例外の可能性。ログを確認）"
+                )
+            continue
+
+        init_fn, shutdown_fn, _run_fn = bound
+        try:
+            ok = bool(init_fn())
+        except OSError as exc:
+            lines.append(f"    → SteamAPI_Init OSError: {exc}")
+            continue
+        except Exception as exc:
+            lines.append(f"    → SteamAPI_Init 例外: {exc}")
+            continue
+
+        lines.append(f"    → SteamAPI_Init 戻り値: {ok}")
+        if ok:
+            try:
+                shutdown_fn()
+            except Exception as exc:
+                lines.append(f"    → 診断後 Shutdown で例外: {exc}")
+            else:
+                lines.append("    → （診断のため Init 成功後に Shutdown 済み。続けて本初期化を試します）")
+        else:
+            lines.append(
+                "    → false のときは: Steam クライアント未起動・未ログイン・"
+                "steam_appid.txt の App ID 誤り・このアカウントがアプリにアクセスできない等を疑う"
+            )
+    return lines
 
 
 def steam_loaded_dll_path() -> Optional[str]:
