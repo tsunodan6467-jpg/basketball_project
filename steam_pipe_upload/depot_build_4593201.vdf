@@ -3,6 +3,7 @@
 	"DepotID" "4593201"
 	"FileMapping"
 	{
-		"." "."
+		"LocalPath" "*"
+		"DepotPath" "."
 	}
 }
