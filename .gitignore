@@ -1,6 +1,9 @@
 # PyInstaller / ビルド成果物
 /build/
 /dist/
+
+# SteamCMD が app_build の BuildOutput に吐く中間ファイル
+/steam_upload_output/
 *.spec.bak
 
 # Python

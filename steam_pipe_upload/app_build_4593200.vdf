@@ -1,0 +1,12 @@
+"AppBuild"
+{
+	"AppID" "4593200"
+	"Desc" "Internal test build"
+	"Preview" "0"
+	"ContentRoot" "C:/Users/tsuno/Desktop/basketball_project/steam_upload_content"
+	"BuildOutput" "C:/Users/tsuno/Desktop/basketball_project/steam_upload_output"
+	"Depots"
+	{
+		"4593201" "depot_build_4593201.vdf"
+	}
+}
