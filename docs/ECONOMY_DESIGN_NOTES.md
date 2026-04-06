@@ -11,6 +11,7 @@
 | **メニュー・会計のたたき台** | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` |
 | **正本外 `money` 変動の分類・方針** | `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
 | **シーズン中収益モデル（ラウンド仮収入の置換骨子）** | `docs/SEASON_REVENUE_MODEL_NOTES.md` |
+| **シーズン中収益の内訳キー・正本化ロードマップ** | `docs/INSEASON_REVENUE_KEY_POLICY.md` |
 
 **更新**: 経済の**構造合意**が変わったときだけ更新する。実装済み度の列挙は現状分析書へ。タスクの全体キューは実装計画書へ。
 
@@ -278,3 +279,4 @@
 - 2026-04-06: 初版（経営本実装の設計論点整理）。
 - 2026-04-06: `SEASON_REVENUE_MODEL_NOTES.md` を参照表に追加。§7 候補 C は同書への委譲を明記。
 - 2026-04-06: シーズン中ラウンド加算の名称を `INSEASON_*` / `_apply_inseason_league_distribution_round` に更新（§1 表）。
+- 2026-04-06: `INSEASON_REVENUE_KEY_POLICY.md` を参照表に追加（内訳キー `inseason_league_distribution_round`、当面 B／将来 A）。

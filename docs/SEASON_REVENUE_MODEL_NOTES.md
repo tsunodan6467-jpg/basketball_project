@@ -11,6 +11,7 @@
 | フェーズ・優先度 | `docs/IMPLEMENTATION_PLAN_MASTER.md` §2.4 等 |
 | 経営の理想・納得感 | `docs/IDEAL_GAME_DESIGN_MASTER.md` §7 |
 | 会計の第1正本・内訳思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
+| 内訳キー名・当面 B／将来 A | `docs/INSEASON_REVENUE_KEY_POLICY.md` |
 
 **コード上の事実（2026-04-06 更新）**: `simulate_next_round` 内で試合・杯処理等の後、**全 `all_teams` に対し** `team.money +=`（額は `league_level` 別の **`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`**。旧名 `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL` は同一 dict の別名）。`Season._apply_inseason_league_distribution_round` が担当。`finance_history` / `record_financial_result` は**経由しない**。CLI は「シーズン中収益（リーグ分配・放映等）」表示。
 
@@ -62,6 +63,8 @@
    - 細かい対戦カードまでは **v1 では必須にしない**。
 
 **粒度**: **ラウンド単位**（現行フックと同じ）。試合シミュの直後に載せる現在位置は、「試合結果の次にキャッシュが動く」リズムと合わせやすい。
+
+**内訳キー（docs 固定）**: 第 1 項（いまの 1 本の加算）に対応する正キーは **`inseason_league_distribution_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。コードへの未載入は別タスク。
 
 **オフ締めとの関係**: シーズン中は **「レギュラー帯のキャッシュイン」**として説明し、**年俸の大きな塊・集中配分**は引き続きオフの物語に寄せる（**0.98 の再設計は本書スコープ外**。二重に「同じ収入」を語らないよう、将来オフ側を触るときは **本メモと `ECONOMY_DESIGN_NOTES` を突き合わせる**）。
 
@@ -116,10 +119,10 @@
 
 | 項目 | 内容 |
 |------|------|
-| **目的** | `inseason_*` 等の**内訳キー名**と「当面 B／将来 A」の位置づけを `ECONOMY_NON_LEDGER_MONEY_POLICY.md` または本メモに**1 表で固定**し、`ECONOMY_DESIGN_NOTES` §7 候補 A/C と矛盾しないようにする。 |
-| **触る範囲** | `docs/` のみ。 |
-| **触らない範囲** | ゲームコード。 |
-| **完了条件** | 実装者が**キー名を迷わず**使える。レビューで二重計上リスクが指摘されない。 |
+| **目的** | `inseason_*` キーと B/A を文書固定。**実装済み（2026-04-06）**: `docs/INSEASON_REVENUE_KEY_POLICY.md`。 |
+| **触る範囲** | （完了）`docs/` のみ。 |
+| **触らない範囲** | — |
+| **完了条件** | 同書 §3・§4 を正とする。次は **タスク 1（構造へのキー載せ）** へ。 |
 
 ---
 
@@ -135,3 +138,4 @@
 
 - 2026-04-06: 初版。
 - 2026-04-06: §7 タスク 1 の最小実装反映（`season.py` 定数名・メソッド名・CLI 文言）。§1・冒頭の事実記述を同期。
+- 2026-04-06: `INSEASON_REVENUE_KEY_POLICY.md` を参照表に追加。§3 に内訳キー 1 行。§7 タスク 2 完了反映。
