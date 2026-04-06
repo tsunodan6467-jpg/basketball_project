@@ -297,6 +297,9 @@ def sign_free_agent(team: Team, player: Player) -> None:
     """
     FA契約を反映。
     日本独自ルールの最終ガードもここで行う。
+
+    年俸相当の `money` 即時減算は行わない（R1 / 締めのみ方式）。
+    年俸コストはオフ `_process_team_finances` の payroll → `record_financial_result` に一元化する。
     """
     ensure_team_fa_market_fields(team)
     ensure_fa_market_fields(player)
@@ -322,8 +325,6 @@ def sign_free_agent(team: Team, player: Player) -> None:
         player.acquisition_type = "free_agent"
     if hasattr(player, "acquisition_note"):
         player.acquisition_note = f"signed_by_{getattr(team, 'name', 'unknown_team')}"
-
-    team.money = max(0, int(getattr(team, "money", 0)) - salary)
 
     if hasattr(team, "add_player"):
         team.add_player(player)

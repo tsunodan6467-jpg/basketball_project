@@ -629,7 +629,7 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
 
                 _record_player_fa_career(candidate, team, contract_years)
 
-                team.money -= offer
+                # 年俸の money 即時減算は行わない（R1 / 締めのみ方式）。payroll はオフ締めで集計。
 
                 team_signings[team.team_id] += 1
                 signed_players.add(candidate.player_id)

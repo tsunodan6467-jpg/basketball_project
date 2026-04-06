@@ -2,6 +2,7 @@
 
 **調査日**: 2026-04-06（リポジトリ現状の静的調査）  
 **R1 検証追記**: 2026-04-06（§7）  
+**R1 実装対応**: 2026-04-06（締めのみ方式・§2 / §4 / §7 更新）  
 **文書の性質**: **調査報告**。コード変更・仕様決定・理想像の正本ではない。
 
 | 参照 | 文書 |
@@ -73,8 +74,8 @@
 | シーズン進行順序 | `season.py` | `simulate_next_round` | （上記＋間接） | — | 1 ラウンドのオーケストレーション | 仮収入 → `current_round` 加算 → `run_cpu_management_after_round` | CPU は施設/PR/グッズで間接的に money が動きうる |
 | 新規・CLI 初期化 | `main.py` | ユーザーチーム/ライバル設定（該当箇所） | `target_team.money`, `rival_team.money` | 代入 `TEMP_INITIAL_TEAM_MONEY` | セッション開始時の資金 | 正本履歴とは別 | 定数は `main.TEMP_INITIAL_TEAM_MONEY` |
 | FA 補完 | `free_agent_market.py` | `ensure_team_fa_market_fields` | `team.money` | 欠損時に `2_000_000_000` 代入 | セーブ互換・欠損ガード | 履歴なし | 本番 `Team` デフォルトも 20 億（`team.py`）と同額 |
-| FA 署名（市場） | `free_agent_market.py` | `sign_free_agent` | `team.money` | `max(0, money - salary)` | 推定年俸を**即時に現金から減算** | **`record_financial_result` 未使用** | 年俸の会計上の扱い（前払/按分）は別論点 |
-| FA（オフ交渉ループ） | `free_agency.py` | `conduct_free_agency` 内 | `team.money` | `-= offer` | CPU/一括 FA 交渉での契約成立時 | **`record_financial_result` 未使用** | `sign_free_agent` と**別経路** |
+| FA 署名（市場） | `free_agent_market.py` | `sign_free_agent` | （年俸の `money` 即時減算**なし**） | — | 年俸はオフ締め payroll → `record`（R1 / 締めのみ） | 正本は `_process_team_finances` 経由 | 2026-04-06 以前は `max(0, money - salary)` あり |
+| FA（オフ交渉ループ） | `free_agency.py` | `conduct_free_agency` 内 | （同上） | — | 同上 | 同上 | 2026-04-06 以前は `-= offer` あり |
 | トレード現金 | `trade_logic.py` | `TradeEngine.execute_multi_trade` | `team_a.money`, `team_b.money` | 現金ネットの移転（`-cash` / `+cash`） | トレード条件の現金 | **`record_financial_result` 未使用** | rookie_budget は別フィールド |
 | 広報施策 | `pr_campaign_management.py` | `_commit_pr_campaign_core` | `team.money` | 減算（コスト） | 施策コスト | **履歴に載らない**（`management` にログ） | コメントに「局所的な money」と明記 |
 | グッズ開発進行 | `merchandise_management.py` | `_advance_merchandise_phase_core` | `team.money` | 減算（開発費） | フェーズ進行コスト | **履歴に載らない**（コメントで money のみ減算と明記） | オフの merchandise 内訳加算は別（コメント参照・本監査では深掘り未） |
@@ -114,7 +115,7 @@
 
 - **`Season._apply_temporary_round_operating_income`**: 仮調整。`finance_history` なし。
 - **`pr_campaign_management` / `merchandise_management`**: `money` のみ減算、コメントで明記。`management` 系ログは別。
-- **トレード現金 / FA 署名時の即時減算・加算**: `record_financial_result` 外。
+- **トレード現金**: `record_financial_result` 外。**FA 年俸の即時減算**は廃止（締めのみ・正本側で payroll）。
 - **オフ杯・洲际・FINAL BOSS の賞金加算**: `record_financial_result` 外。
 
 ### 仮調整
@@ -133,7 +134,7 @@
 
 | ID | 内容 | 根拠（事実） | 断定 |
 |----|------|----------------|------|
-| R1 | **同じオフサイクルで、FA 即時減算とオフ締めペイロールが同一の年俸額を money に二重に効かせうる** | `conduct_free_agency` で `money -= offer` の直後に `_process_team_finances` が `payroll=sum(salary)` を expense に載せて `record_financial_result` する（`offseason.py` 550→554 行付近）。`sign_free_agent` も `money -= salary` で **record 外**。 | **§7 検証済み**（**二重効きあり**／現金ベースの年俸 S で見た場合） |
+| R1 | ~~同上~~ **2026-04-06 対応**: FA 成立時の年俸即時 `money` 減算を除去し、**締めのみ**（payroll → `record`）に統一 | 旧: `conduct_free_agency` の `money -= offer` と `_process_team_finances` の payroll 重複。現: 即時減算なし（`free_agency.py` / `free_agent_market.py`）。 | **解消済み**（§7 履歴・`ECONOMY_DESIGN_NOTES` §1） |
 | R2 | **`finance_history` に載らない支出・収入が累積**し、レポートと `money` の説明がプレイヤーに伝わりにくい | PR・グッズ・杯賞金・トレード現金・仮ラウンド収入 | 表示設計の課題 |
 | R3 | **`record_financial_result` 失敗時フォールバック**が、内訳検証をすり抜けうる | `offseason` の `except` 分岐 | 例外経路のテスト要 |
 | R4 | **オフ杯賞金が `record_financial_result` を通らない** | `_apply_*_rewards` は `money` のみ加算 | 年次レポートの「収入」に含まれるかプレイヤー認識とズレうる |
@@ -157,7 +158,7 @@
 ### 本実装で優先して整えるべき境界（提案・断定ではなく次設計の入力）
 
 1. **`money` を変える全経路の列挙**（本書を正としてメンテ）と、**`record_financial_result` への統合可否**の判断。  
-2. **シーズン中の「現金」と「オフ締めのペイロール会計」の二重性（R1）** — **§7 参照（検証済み・二重効きあり）**  
+2. **シーズン中の「現金」と「オフ締めのペイロール会計」の二重性（R1）** — **§7 参照（旧挙動は検証済み・2026-04-06 に締めのみ方式で解消）**  
 3. **正本外支出**を、§0.3 の内訳スナップショットに載せるか、週次レジャーに載せるか。
 
 ---
@@ -166,7 +167,7 @@
 
 ### T1: R1 の検証（シミュレーション or 単体シナリオ）
 
-- **状態**: **完了**（§7、`tests/test_economy_r1_fa_payroll_trace.py`）。
+- **状態**: **完了**（§7、検証＋**締めのみ実装**、`basketball_sim/tests/test_economy_r1_fa_payroll_trace.py`）。
 
 ### T2: `record_financial_result` 失敗フォールバックのテスト
 
@@ -187,49 +188,47 @@
 ## 7. 検証結果（R1）
 
 **検証日**: 2026-04-06  
-**本番ロジック**: 変更なし（読解・代数・回帰テストのみ）。
+**実装対応日**: 2026-04-06 — FA 年俸の `money` 即時減算を廃止（`ECONOMY_DESIGN_NOTES` §1、§2 本表、`basketball_sim/tests/test_economy_r1_fa_payroll_trace.py`）。
+
+### 検証（旧挙動・2026-04-06 以前）
+
+以下は **対応前のコード** に対する検証記録である。
 
 ### 検証方法
 
 1. **呼び出し順序の静的確認**: `Offseason.run` 内で `conduct_free_agency` が `_process_team_finances` **より前**（`offseason.py` 550 行付近 → 554 行付近）。  
 2. **ペイロール定義の確認**: `_calculate_team_expenses` で `payroll = sum(salary for players)`（3193 行付近）。FA 成立後は新選手が `team.players` に含まれるため、**その年俸がペイロール合計に入る**。  
-3. **即時減算の確認**: `conduct_free_agency` 成立時 `team.money -= offer`（`free_agency.py` 632 行付近）。`offer` は契約の年俸として `candidate.salary` に設定される。  
+3. **即時減算の確認（旧）**: `conduct_free_agency` 成立時 `team.money -= offer`（当時 `free_agency.py`）。`offer` は契約の年俸として `candidate.salary` に設定される。  
 4. **正本側**: `record_financial_result` は `money += revenue - expense`（`team.py`）。`expense` に上記 `payroll` が含まれる。  
 5. **代数テスト**: `tests/test_economy_r1_fa_payroll_trace.py` — 「先に S を引いてから同じ `expense_total` で `record`」と「`record` のみ」の差が **ちょうど S** であることを assert。
 
 ### 検証シナリオ（要点）
 
 - **オフ FA 経路**: 同一オフ内で (1) `money -= S` (2) 締めで `expense` にペイロール（S 含む）→ `record`。  
-- **シーズン中 FA**（`sign_free_agent`）: `money -= salary`（`free_agent_market.py` 326 行付近）。シーズン終了後の同じ `_process_team_finances` で **ロスター全員の年俸合算**がペイロールになるため、**按分なし**の前提では **同様に S が expense 側にも載る**（シーズン途中加入でもコード上は通年額が1回分として合算される）。**未確認**: 実際のプレイで「加入ラウンド」による按分は実装されていない（コード上は通年 sum のみ）。
+- **シーズン中 FA**（`sign_free_agent`、旧）: `money -= salary` があった。現状は即時減算なし。シーズン終了後の `_process_team_finances` で **ロスター全員の年俸合算**がペイロールに載る。**未確認**: 加入ラウンドによる按分は未実装（通年 sum のみ）。
 
 ### 観察した金額の流れ（オフ FA・1 選手・年俸 S のみに注目）
 
 | 段階 | money（イメージ） | 根拠 |
 |------|-------------------|------|
-| 締め直前（FA後） | M − S | `conduct_free_agency` |
+| 締め直前（FA後・旧） | M − S | 当時の `conduct_free_agency` の `money -= offer` |
 | `record` 後 | M − S + (R − E) | E の内訳に payroll が含み、その payroll に S が含まれる |
 
 
 **単一路径との比較**: `record` のみ（事前の `money -= S` なし）なら M + (R − E)。差は **−S**。よって **年俸 S が「現金からの即時減算」と「expense 内ペイロール」の両方に現れ、現金残高の意味では S を二回効かせたのと同型**。
 
-### 判定（R1）
+### 判定（R1・旧挙動）
 
-- **二重計上あり**（**現金残高 `money` の動き**に限って言えば、同一の年俸額 S が、即時減算と `record` の支出の両方に効く構造）。  
-- **注**: これは「会計上の意図的な前払い＋発生主義の二段表示」などの**仕様コメントはコード上に見当たらない**（未確認: doc 別箇所にあれば追記）。  
-- **一部重複ではなく、同一 S の二重押し下げ**（上記代数）。
+- **二重計上あり**（対応前）: 同一 S が即時減算と `record` の expense の両方に効いていた。
 
-### プレイヤー視点
+### 対応後の状態（2026-04-06）
 
-- **説明可能性**: 現状コードだけでは「なぜ二回引かれるのか」の**一貫したゲーム内説明は読み取れない**（リスク候補としては **将来直した方がよい経済因果のねじれ**）。  
-- **修正の方向性（本メモでは決定しない）**: 例) 署名時の `money` 減算を廃止してペイロールは締めのみ／署名時は `record` に寄せる／ペイロールを按分する／即時減算を「ボーナス」行として expense と二重にならないよう分離、等。**別タスクで設計判断**。
+- **締めのみ方式**: FA 成立時に年俸ぶんの `money` を減算せず、**オフ締めの payroll 合算のみ**が `record_financial_result` の支出に載る。現金残高の意味での **R1 二重効きは解消**。
+- **プレイヤー視点**: 年俸の現金反映は「締めの収支」に寄せられる（按分・契約金は未導入）。
 
-### 次に切り出せる修正タスク候補（1 件）
+### 次に切り出せるタスク候補（経済因果の残論点）
 
-- **タスク名**: FA 即時 `money` 減算とオフ `payroll` の二重効きの解消方針の決定と実装  
-- **目的**: R1 で示した二重効きを、意図した経済モデルに合わせて **1 系統に寄せる**  
-- **触る範囲（案）**: `free_agency.py` / `free_agent_market.py` / `offseason._calculate_team_expenses` / `record_financial_result` 呼び出しのいずれか（設計確定後）  
-- **触らない範囲**: 本タスク確定まで経済定数のチューニングのみ  
-- **完了条件**: 同じシナリオで「即時減算＋締め」の結果が、採用モデルと整合し、回帰テストで固定される  
+- 按分・契約金・正本外の `money` 更新の整理（`ECONOMY_DESIGN_NOTES`・本書 §4 の他 ID）。  
 
 ---
 
@@ -245,3 +244,4 @@
 
 - 2026-04-06: 初版（静的 grep・読解に基づく監査）。
 - 2026-04-06: §7 追加 — R1 検証（T1 完了）、§4 R1 更新、§6 T1 完了記載。
+- 2026-04-06: R1 **実装** — FA 即時減算廃止、§2 表・§3・§4 R1・§7 に対応後状態を追記。
