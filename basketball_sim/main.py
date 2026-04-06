@@ -1214,6 +1214,7 @@ def print_trade_team_list(all_teams, user_team):
             f"L:{getattr(team, 'regular_losses', 0):<2}"
         )
 
+    sys.stdout.flush()
     return teams
 
 
@@ -1246,6 +1247,7 @@ def print_tradeable_players(team, title):
             f"Salary:{getattr(p, 'salary', 0):,}円"
         )
 
+    sys.stdout.flush()
     return players
 
 
@@ -1254,7 +1256,10 @@ def choose_trade_team(all_teams, user_team):
     if not teams:
         return None
 
+    print("トレード相手となるクラブの番号を入力してください。")
+    sys.stdout.flush()
     while True:
+        sys.stdout.flush()
         choice = input("番号: ").strip()
         try:
             idx = int(choice) - 1
@@ -1270,6 +1275,7 @@ def choose_player_from_list(players, prompt):
         return None
 
     while True:
+        sys.stdout.flush()
         choice = input(prompt).strip()
         try:
             idx = int(choice) - 1
@@ -1288,6 +1294,7 @@ def choose_players_from_list(players, prompt, count):
         return []
 
     while True:
+        sys.stdout.flush()
         raw = input(prompt).strip()
         if not raw:
             print("入力が空です。")
@@ -1338,14 +1345,18 @@ def propose_trade(all_teams, user_team, season=None):
     ai_players = print_tradeable_players(ai_team, f"{ai_team.name} のトレード候補")
     if not ai_players:
         return
-    ai_player = choose_player_from_list(ai_players, "相手から欲しい選手の番号: ")
+    print("\n[1/2] 相手から獲得したい選手の番号（上の一覧）")
+    sys.stdout.flush()
+    ai_player = choose_player_from_list(ai_players, "  番号: ")
     if ai_player is None:
         return
 
     user_players = print_tradeable_players(user_team, "自チームの放出候補")
     if not user_players:
         return
-    user_player = choose_player_from_list(user_players, "放出する選手の番号: ")
+    print("\n[2/2] 自チームから放出する選手の番号（上の一覧）")
+    sys.stdout.flush()
+    user_player = choose_player_from_list(user_players, "  番号: ")
     if user_player is None:
         return
 
@@ -1369,7 +1380,10 @@ def propose_trade(all_teams, user_team, season=None):
         print(f"AIが拒否しました: {reason}")
         return
 
-    confirm = input("このトレードを成立させますか？ (y/n): ").strip().lower()
+    print("このトレードを成立させますか？")
+    print("  (y/n)  y=成立 / n=中止")
+    sys.stdout.flush()
+    confirm = input("入力: ").strip().lower()
     if confirm != "y":
         print("トレードを中止しました。")
         return
@@ -1408,14 +1422,26 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
     if not user_players:
         return
 
-    print("人数ルール: 自分が出す人数 と 自分が受け取る人数 は 1〜3で、差は最大1")
+    print("人数ルール: 自分が出す人数 と 自分が受け取る人数 は 1〜3 で、差は最大 1 です。")
+    sys.stdout.flush()
+
     while True:
+        print("\n[STEP 1/6] 自分が出す人数（1〜3）")
+        sys.stdout.flush()
         try:
-            n_out = int(input("自分が出す人数(1-3): ").strip())
-            n_in = int(input("自分が受け取る人数(1-3): ").strip())
+            n_out = int(input("  入力: ").strip())
         except ValueError:
             print("数字を正しく入力してください。")
             continue
+
+        print("\n[STEP 2/6] 自分が受け取る人数（1〜3）")
+        sys.stdout.flush()
+        try:
+            n_in = int(input("  入力: ").strip())
+        except ValueError:
+            print("数字を正しく入力してください。")
+            continue
+
         if not (1 <= n_out <= 3 and 1 <= n_in <= 3):
             print("人数は 1〜3 の範囲で入力してください。")
             continue
@@ -1430,22 +1456,29 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
             continue
         break
 
+    print(f"\n[STEP 3/6] 放出する選手（自チームから {n_out} 名）")
+    print(f"  上の自チーム一覧の番号を {n_out} 個、カンマ区切りで入力（例: 1,3）")
+    sys.stdout.flush()
     user_gives = choose_players_from_list(
         user_players,
-        prompt=f"放出する選手番号を {n_out} 個（例: 1,3）: ",
+        prompt="  番号: ",
         count=n_out,
     )
+    print(f"\n[STEP 4/6] 獲得したい選手（相手から {n_in} 名）")
+    print(f"  上の相手チーム一覧の番号を {n_in} 個、カンマ区切りで入力（例: 1,3）")
+    sys.stdout.flush()
     ai_receives = choose_players_from_list(
         ai_players,
-        prompt=f"獲得したい選手番号を {n_in} 個（例: 1,3）: ",
+        prompt="  番号: ",
         count=n_in,
     )
 
     max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
+    print("\n[STEP 5/6] 現金移転（自分→相手）")
+    print(f"  0〜{max_cash:,} 円 / 0=送金なし / b=中止")
+    sys.stdout.flush()
     while True:
-        raw = input(
-            f"現金移転（自分→相手, 0〜{max_cash:,} 円 / 0=送金なし / b=中止）: "
-        ).strip()
+        raw = input("  入力: ").strip()
         if raw.lower() in ("b", "q", "back"):
             print("トレード提案を中止しました。")
             return
@@ -1464,10 +1497,11 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
         break
 
     max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
+    print("\n[STEP 6/6] RB移転（自分→相手）")
+    print(f"  0〜{max_rb:,} / 0=移転なし / b=中止")
+    sys.stdout.flush()
     while True:
-        raw = input(
-            f"RB移転（自分→相手, 0〜{max_rb:,} / 0=移転なし / b=中止）: "
-        ).strip()
+        raw = input("  入力: ").strip()
         if raw.lower() in ("b", "q", "back"):
             print("トレード提案を中止しました。")
             return
@@ -1510,7 +1544,10 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
         print(f"AIが拒否しました: {reason}")
         return
 
-    confirm = input("このトレードを成立させますか？ (y/n): ").strip().lower()
+    print("このトレードを成立させますか？")
+    print("  (y/n)  y=成立 / n=中止")
+    sys.stdout.flush()
+    confirm = input("入力: ").strip().lower()
     if confirm != "y":
         print("トレードを中止しました。")
         return

@@ -1,4 +1,5 @@
 import random
+import sys
 from typing import Any, Callable, List, Optional, Dict
 
 from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
@@ -1753,9 +1754,13 @@ class Offseason:
         default = default.lower().strip()
         suffix = "[Y/n]" if default == "y" else "[y/N]"
 
+        print(f"{message}")
+        print(f"  {suffix}  y=はい / n=いいえ （空Enter=デフォルト）")
+        sys.stdout.flush()
+
         while True:
             try:
-                raw = input(f"{message} {suffix}: ").strip().lower()
+                raw = input("入力: ").strip().lower()
             except EOFError:
                 # 非対話実行（テスト/自動進行）では入力が取得できないことがある
                 raw = default
@@ -1807,6 +1812,7 @@ class Offseason:
             )
             return False
 
+        sys.stdout.flush()
         return self._prompt_yes_no(
             f"{player.name} にこの条件で再契約オファーを出しますか？",
             default="y"
