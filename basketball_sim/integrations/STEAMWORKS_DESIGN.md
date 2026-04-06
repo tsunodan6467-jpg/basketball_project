@@ -103,6 +103,8 @@ BasketballGM.exe --steam-diag
 
 **将来（App ID 発行後）**に `steam_api64.dll` を同階層へ置き、Steam クライアント起動状態で実行すると、`try_init_steam: True` になり得る。`steam_loaded_dll_path` が埋まれば「DLL を正しく見つけて読めている」証拠になる。
 
+**運用メモとの役割分担**: パートナー作業の進捗・再開状況・実測ログの時系列は **`docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md`** に集約する。本節は「こういう条件ならこういう出力になりうる」という**型**を示す。ロードマップ上の一行要約は **`docs/PRODUCT_ROADMAP_AND_VISION.md`** Phase 0 を正とする。
+
 **メモ**: チェックリスト本体はリポジトリ外（Valve のパートナーサイト）の作業であり、コード変更では代替できない。手順が固まったら、チェックリストの文言を実際の画面に合わせて更新する。
 
 ## 実装方式の選択（推奨順）
