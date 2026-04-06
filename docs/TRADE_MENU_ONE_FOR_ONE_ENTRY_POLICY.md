@@ -10,7 +10,7 @@
 | フェーズ・優先度 | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
 | CLI の位置づけ（補足） | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §4 |
 
-**コード上の事実（調査時点）**: `run_trade_menu`（`basketball_sim/main.py`）は **1 / 2 / 3** のみ。`2` は **`propose_multi_trade` のみ**呼び出す。`propose_trade` は **`main.py` に定義があるが、他 `.py` からの呼び出しは見当たらない**（静的検索・2026-04-06 時点）ため、**通常の CLI トレードメニューからは到達しない**。`propose_trade` 先頭には「選手のみ・現金・RB は multi」案内があり、multi 側見出しは `トレード提案（複数人数＋現金＋RB）` と一致する文言で誘導している。
+**コード上の事実（2026-04-06 更新）**: `run_trade_menu` は **1〜4**（一覧 / 1対1 / multi / 戻る）。**2** で `propose_trade`、**3** で `propose_multi_trade`。ロック時は **2・3** とも multi 従来どおりガード。`propose_trade` 先頭案内は multi 見出し「トレード提案（複数人数＋現金＋RB）」と用語整合。
 
 ---
 
@@ -26,9 +26,9 @@
 
 | 項目 | 内容 |
 |------|------|
-| **`run_trade_menu`** | 見出し「トレードメニュー」。**1**＝相手一覧、`print_trade_team_list`。**2**＝「トレード提案」表示だが実体は **`propose_multi_trade` のみ**（`free_agents` を渡す）。**3**＝戻る。シーズン中ロック時はメッセージ表示の上で分岐は同様。 |
-| **`propose_trade` の位置** | `main.py` 内に**実装あり**。`run_trade_menu` からは**未接続**。他モジュールからの呼び出しは**上記時点の検索では未検出**（再リリース前に `rg propose_trade` で再確認推奨）。 |
-| **実プレイで見えるもの** | メニュー「2」→ **multi 専用**（6 STEP・現金・RB）。**1対1の短い [1/2][2/2] フローと `propose_trade` 内案内文は、通常プレイでは表示されない**。 |
+| **`run_trade_menu`** | **1**＝相手一覧。**2**＝`propose_trade`（1対1）。**3**＝`propose_multi_trade`（`free_agents` 付き）。**4**＝戻る。ロック時は **2・3** でメッセージ後 `continue`。 |
+| **`propose_trade` の位置** | `run_trade_menu` の **2** から到達。 |
+| **実プレイで見えるもの** | **2** で 1対1（案内文・[1/2][2/2]）。**3** で multi（6 STEP・現金・RB）。 |
 | **住み分け（方針）** | **1対1＝選手のみ**（評価も現金・RB なし）。**multi＝複数人数＋現金＋RB**。`ONE_FOR_ONE_TRADE_CASH_POLICY.md` の当面推奨（案 A）と整合。 |
 
 ---
@@ -88,7 +88,7 @@
 | **目的** | 実プレイから **`propose_trade` に到達**し、既存の選手のみフローと案内文を活かす。 |
 | **触る範囲** | `main.py` の `run_trade_menu`（`print` 行・`input` 分岐・`locked` 時の振る舞い）。必要ならメニュー文言のみ。 |
 | **触らない範囲** | `propose_trade` / `propose_multi_trade` の**ロジック本体**、トレード評価、`trade_logic`、GUI。 |
-| **完了条件** | メニューから 1対1 を選ぶと **従来どおり 1対1 が完走**し、`python -m basketball_sim --smoke` が通る。番号・文言は本メモの推奨に沿っている（差分があれば本メモの改訂履歴に記す）。 |
+| **完了条件** | メニューから 1対1 を選ぶと **従来どおり 1対1 が完走**し、`python -m basketball_sim --smoke` が通る。番号・文言は本メモの推奨に沿っている（差分があれば本メモの改訂履歴に記す）。**実装済み（2026-04-06）**: メニュー **2**＝1対1、**3**＝multi、**4**＝戻る。 |
 
 ### タスク 2（代替）: 案 B のサブメニュー化
 
@@ -112,3 +112,4 @@
 **改訂履歴**
 
 - 2026-04-06: 初版。
+- 2026-04-06: §6 タスク 1 実装反映 — `run_trade_menu` に 1対1（2）・multi（3）・戻る（4）を確定。§1・冒頭の事実記述を同期。

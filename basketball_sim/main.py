@@ -1581,8 +1581,9 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
         if locked:
             print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
         print("1. 相手チーム一覧を見る")
-        print("2. トレード提案")
-        print("3. 戻る")
+        print("2. 選手のみのトレード（1対1）")
+        print("3. トレード提案（複数人数＋現金＋RB）")
+        print("4. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -1592,8 +1593,13 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
             if locked:
                 print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
                 continue
-            propose_multi_trade(all_teams, user_team, free_agents, season=season)
+            propose_trade(all_teams, user_team, season=season)
         elif choice == "3":
+            if locked:
+                print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
+                continue
+            propose_multi_trade(all_teams, user_team, free_agents, season=season)
+        elif choice == "4":
             return
         else:
             print("正しい番号を入力してください。")
