@@ -18,11 +18,16 @@ Phase 0 を一段落する前に、次を **はい／いいえ／後回し** で
 4. **クラウドを採用する場合**、衝突時の挙動・オフライン・クォータ・セーブ形式バージョンとの整合を **§3 のどの選択肢（A/B/C）に寄せるか** を決め、移行テストの範囲をメモする。
 5. **方針変更後**、ストア説明・FAQ・ゲーム内クレジット／プライバシー表記のうち、**ユーザー向けに直すもののリスト**をチェックし、パートナー画面と同じタイミングで更新する。
 
+**決定記録（2026-04-05）** — チェックリスト 1・2 をプロジェクト方針として確定（詳細は `docs/PHASE0_COMPLETION_TEMPLATE.md` の前提表）。
+
+1. **クラウドセーブ v1**: **いいえ**。初回 Steam 正式リリース（v1）では **Steam Remote Storage／ハイブリッドは採用しない**。ローカルセーブのみ。ストア／README で「セーブは PC ローカル」と明記する作業は **§5・テンプレ §5** のチェックリストが正本。
+2. **Rich Presence v1**: **いいえ**。v1 では **未実装のまま**（フレンド向けプレイ状態表示は入れない）。v2 以降で要否を再検討する。
+
 **記入用テンプレート**: チェックリスト **3** と **5** を具体化した自分用メモは、リポジトリの **`docs/PHASE0_COMPLETION_TEMPLATE.md`** に用意してある（Phase 0 の「完了」宣言の区切りに使う）。
 
 ## 現状
 
-- **Windows** で `steam_api64.dll` / `steam_api.dll` が実行ファイルまたはカレント付近にあり、`SteamAPI_Init` が成功した場合は **ctypes 実接続**（`SteamAPI_RunCallbacks` / `Shutdown` 含む）。失敗・DLL なし・非 Windows は **False で継続**（クラッシュしない）。ネイティブ接続時は `ISteamUserStats` が取れれば **`unlock_achievement` から SetAchievement/StoreStats**。
+- **Windows** で `steam_api64.dll` / `steam_api.dll` が実行ファイルまたはカレント付近にあり、`SteamAPI_Init` または **`SteamAPI_InitFlat`**（新 SDK では `Init` がヘッダー内インラインのため DLL に export されないことがある）が成功した場合は **ctypes 実接続**（`SteamAPI_RunCallbacks` / `Shutdown` 含む）。失敗・DLL なし・非 Windows は **False で継続**（クラッシュしない）。ネイティブ接続時は `ISteamUserStats` が取れれば **`unlock_achievement` から SetAchievement/StoreStats**。
 - 環境変数: `BASKETBALL_SIM_DISABLE_STEAM` / `BASKETBALL_SIM_FAKE_STEAM` / `BASKETBALL_SIM_STEAM_APPID` / `BASKETBALL_SIM_STEAM_DLL` / `BASKETBALL_SIM_REQUIRE_STEAM_LICENSE` / `BASKETBALL_SIM_STEAM_LICENSE_STRICT`（モジュール先頭コメント参照）。
 - `main.simulate()` 冒頭で `try_init_steam()` の直後に `enforce_steam_license(settings)`。`--smoke` 経路では呼ばない。
 - **ライセンス必須**（`settings.json` の `steam_require_license: true` または `BASKETBALL_SIM_REQUIRE_STEAM_LICENSE=1`）: ネイティブ接続で `ISteamApps::BIsSubscribed` が **false** なら終了（exit 3）。API が呼べないときは既定では警告のみ続行; `BASKETBALL_SIM_STEAM_LICENSE_STRICT=1` で exit 4。Steam 未接続で必須なら exit 2、フェイク初期化のみ（ネイティブなし）で必須なら exit 5。`BASKETBALL_SIM_FAKE_STEAM` 中はチェックしない。
@@ -37,7 +42,7 @@ Phase 0 を一段落する前に、次を **はい／いいえ／後回し** で
 
 | もの | 配置の目安 |
 |------|------------|
-| `steam_api64.dll`（および SDK が要求する同梱物） | **実行ファイルと同じディレクトリ**（PyInstaller `dist` 出力側）。SDK の再配布条件に従い、**許可されたバイナリのみ**同梱する。 |
+| `steam_api64.dll`（および SDK が要求する同梱物） | **実行ファイルと同じディレクトリ**（PyInstaller `dist` 出力側）。**SDK zip の `redistributable_bin\win64`** など、Valve が許可したパスのバイナリのみを使う（他フォルダの同名 DLL と取り違えない）。 |
 | `steam_appid.txt` | **開発時のみ**（Steam ドキュメントの推奨）。中身は **App ID 1行**。本番 Steam ビルドでは通常不要だが、ローカルテストでは exe 横またはカレントに置く。 |
 | App ID | Steamworks パートナーで発行した**自アプリの数値 ID**。スペースウォーピング用の共有 ID（例: 480）は**本番リリースに使わない**。 |
 
@@ -103,8 +108,8 @@ BasketballGM.exe --steam-diag
 ## 実装方式の選択（推奨順）
 
 1. **C API + `ctypes`（最小）**  
-   - `SteamAPI_Init` / `SteamAPI_Shutdown` / `SteamAPI_RunCallbacks` などを DLL から直接呼ぶ。  
-   - 依存パッケージを増やさない。シグネチャ・呼び出し規約の取り違えでクラッシュしやすいので、**まず Init/Shutdown/RunCallbacks だけ**で通す。
+   - `SteamAPI_Shutdown` / `SteamAPI_RunCallbacks` は DLL から直接呼ぶ。初期化は **`SteamAPI_Init` が export されていればそれを使い、無い場合は `SteamAPI_InitFlat`**（`steam_api.h` の動的ロード向け API）にフォールバックする。  
+   - 依存パッケージを増やさない。シグネチャ・呼び出し規約の取り違えでクラッシュしやすいので、**まず初期化／Shutdown／RunCallbacks だけ**で通す。
 
 2. **サードパーティの Python ラッパー**  
    - 導入は速いが、メンテ状況・ライセンス・64bit 対応を確認する。長期は公式 C API 理解が必要になることが多い。
