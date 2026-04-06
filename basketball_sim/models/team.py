@@ -11,6 +11,7 @@ OWNER_TRUST_MAX_NEGATIVE_DELTA_PER_SEASON = -15
 
 # `docs/INSEASON_REVENUE_KEY_POLICY.md` §3（正本非経由のラウンド追跡用）
 INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY = "inseason_league_distribution_round"
+INSEASON_MATCHDAY_ESTIMATE_ROUND_KEY = "inseason_matchday_estimate_round"
 
 
 @dataclass
@@ -406,6 +407,20 @@ class Team:
         key = INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY
         rn = int(round_number)
         amt = int(amount)
+        log = self.inseason_cash_round_log
+        for e in log:
+            if e.get("key") == key and int(e.get("round_number", -9_999_999)) == rn:
+                return
+        log.append({"key": key, "amount": amt, "round_number": rn})
+
+    def record_inseason_matchday_estimate_round(self, *, round_number: int, amount: int) -> None:
+        """主場・門前概算（第 2 キー）。`money` 加算と同額を `inseason_cash_round_log` に残す（正本外）。金額 0 は呼び出し側で弾く想定。"""
+        self._ensure_history_fields()
+        key = INSEASON_MATCHDAY_ESTIMATE_ROUND_KEY
+        rn = int(round_number)
+        amt = int(amount)
+        if amt <= 0:
+            return
         log = self.inseason_cash_round_log
         for e in log:
             if e.get("key") == key and int(e.get("round_number", -9_999_999)) == rn:

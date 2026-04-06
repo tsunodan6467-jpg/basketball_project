@@ -14,7 +14,7 @@
 | 内訳キー名・当面 B／将来 A | `docs/INSEASON_REVENUE_KEY_POLICY.md` |
 | 主場概算のホーム試合数の数え方 | `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` |
 
-**コード上の事実（2026-04-06 更新）**: `simulate_next_round` 内で試合・杯処理等の後、**全 `all_teams` に対し** `team.money +=`（額は `league_level` 別の **`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`**。旧名 `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL` は同一 dict の別名）。`Season._apply_inseason_league_distribution_round` が担当。`finance_history` / `record_financial_result` は**経由しない**。CLI は「シーズン中収益（リーグ分配・放映等）」表示。
+**コード上の事実（2026-04-06 更新）**: `simulate_next_round` 内で試合・杯処理等の後、**全 `all_teams` に対し** (1) **`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`** で `_apply_inseason_league_distribution_round`、(2) ホーム数×**`INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME`** で `_apply_inseason_matchday_estimate_round`。いずれも `inseason_cash_round_log` に別キーで追記（第 2 は 0 円時ログなし）。`finance_history` / `record_financial_result` は**経由しない**。CLI は分配・主場の 2 行表示。
 
 ---
 
@@ -65,7 +65,7 @@
 
 **粒度**: **ラウンド単位**（現行フックと同じ）。試合シミュの直後に載せる現在位置は、「試合結果の次にキャッシュが動く」リズムと合わせやすい。
 
-**内訳キー（docs 固定）**: 第 1 項に対応する正キーは **`inseason_league_distribution_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。**実装**: `Team.inseason_cash_round_log` に `amount`・`round_number` とともに記録（正本外）。
+**内訳キー（docs 固定）**: 第 1 項 **`inseason_league_distribution_round`**、第 2 項 **`inseason_matchday_estimate_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。**実装**: `Team.inseason_cash_round_log` に別エントリで記録（正本外）。
 
 **オフ締めとの関係**: シーズン中は **「レギュラー帯のキャッシュイン」**として説明し、**年俸の大きな塊・集中配分**は引き続きオフの物語に寄せる（**0.98 の再設計は本書スコープ外**。二重に「同じ収入」を語らないよう、将来オフ側を触るときは **本メモと `ECONOMY_DESIGN_NOTES` を突き合わせる**）。
 
@@ -143,3 +143,4 @@
 - 2026-04-06: `Team.inseason_cash_round_log` 実装を §3 に反映（`INSEASON_REVENUE_KEY_POLICY` §6 タスク 1）。
 - 2026-04-06: 経営 GUI でログ一覧表示。§5 表示行に追記。
 - 2026-04-06: `INSEASON_MATCHDAY_ESTIMATE_POLICY.md` を参照表に追加。§3 第 2 項に数え方の正本参照。
+- 2026-04-06: 第 2 キー最小実装をコード事実・§3 に反映。

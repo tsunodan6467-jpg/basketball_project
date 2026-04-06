@@ -13,7 +13,7 @@
 | フェーズ | `docs/IMPLEMENTATION_PLAN_MASTER.md` §2.4 |
 | 主場概算の「ホーム数」の数え方 | `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` |
 
-**コード上の事実（2026-04-06 更新）**: `Season._apply_inseason_league_distribution_round` が全チームの `money` を更新し、同額を **`Team.inseason_cash_round_log`** に `key` **`inseason_league_distribution_round`** で追記（`record_financial_result` は**未使用**）。
+**コード上の事実（2026-04-06 更新）**: `Season._apply_inseason_league_distribution_round` が第 1 キー、`Season._apply_inseason_matchday_estimate_round` が第 2 キーで各々 `money` 更新＋**同額**を **`Team.inseason_cash_round_log`** に追記（`record_financial_result` は**未使用**）。第 2 はホーム 0 のラウンドではログ行を増やさない。
 
 ---
 
@@ -31,8 +31,8 @@
 |------|------|
 | **直前の実装で変わったこと** | ラベル・定数名・メソッド名を **「リーグ分配・放映等のラウンド按分」** に寄せた（`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL` 等）。プレイヤー向け CLI は **「シーズン中収益（リーグ分配・放映等）」**。 |
 | **まだ未正本化なこと** | **毎ラウンド**の加算は `finance_history` / `record_financial_result` **に載せていない**。年次レポートの `breakdown_revenue` にも **未登場**。 |
-| **機械可読な追跡** | 各 `Team.inseason_cash_round_log` に **`inseason_league_distribution_round` / amount / round_number**（**正本外・当面 B**）。 |
-| **GUI（一覧）** | **経営メニュー**内・**財務サマリー**の「シーズン中収益（本シーズン・記録）」（`main_menu_view.py`／`finance_report_display.format_inseason_cash_round_log_lines`）。JSON 出口の全面設計は別タスク。 |
+| **機械可読な追跡** | 各 `Team.inseason_cash_round_log` に **第 1 キー** `inseason_league_distribution_round` および **第 2 キー** `inseason_matchday_estimate_round`（いずれも amount / round_number、**正本外・当面 B**）。 |
+| **GUI（一覧）** | **経営メニュー**内・**財務サマリー**の「シーズン中収益（本シーズン・記録）」（`main_menu_view.py`／`finance_report_display.format_inseason_cash_round_log_lines`・ラベル「リーグ分配等」「主場・門前概算」）。JSON 出口の全面設計は別タスク。 |
 | **プレイヤーへの説明** | **ラウンド進行直後の 1 行**が主。財務レポート本体には未合流。 |
 
 ---
@@ -49,7 +49,7 @@
 | **`inseason_round_revenue`** | ラウンド粒度が名前から読める。 | **中身が不明**（チケットなのか分配なのか判別不能）。 | **弱い** | 接頭辞だけ共通にして下位キーを増やす手はあるが、**第 1 項の主キーとしては曖昧**。 |
 | **`inseason_league_media_central_round`**（例） | 意味を列挙で固定できる。 | **長い**、キー変更コストが高い。 | **良い** | 細分化時に**名前が破綻**しやすい。 |
 
-**補足候補（第 2 項・将来用・今回はコード未使用）**: `inseason_matchday_estimate_round` — 主場レギュラー試合数に比例した門前・協賛の概算用（`SEASON_REVENUE_MODEL_NOTES.md` §3 の「従」）。
+**第 2 キー（実装済み・最小）**: `inseason_matchday_estimate_round` — 主場レギュラー試合数×仮単価の門前・協賛概算（`SEASON_REVENUE_MODEL_NOTES.md` §3 の「従」）。`Season._apply_inseason_matchday_estimate_round`。
 
 ---
 
@@ -59,11 +59,11 @@
 
 | 項目 | 推奨 |
 |------|------|
-| **v1 で正とする内訳キー（1 キー）** | **`inseason_league_distribution_round`** |
+| **第 1 キー（主）** | **`inseason_league_distribution_round`** |
 | **意味（固定文）** | **そのラウンドに入る「リーグ・リーグ運営に由来する収入の按分」**。**放映権相当・中央営業（リーグ単位で配られる部分）を含み**、現行コードの `INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL` 1 本に対応する。 |
-| **1 キーか 2 キーか（当面）** | **当面は 1 キー**で足りる。金額はコード側 1 式のまま。 |
-| **将来 2 層に分ける前提** | 主場概算を足すときは **第 2 キー** `inseason_matchday_estimate_round` を**追加**し、**第 1 キーは分割しない**（分配塊と門前塊の二重にならないよう）。放映だけ切り出す必要が出たら **その時点で** `inseason_league_distribution_round` を分割する案を再評価（**未確定**）。 |
-| **運用名と拡張名** | **JSON・内訳 dict では snake_case の上記キー**。**プレイヤー向け表示**は既存 CLI 文「シーズン中収益（リーグ分配・放映等）」を正とし、詳細画面では「内訳キー → 短い日本語ラベル」の対応表を別タスクで足す。 |
+| **1 キーか 2 キーか（当面）** | **2 キー**（第 1＝分配按分、第 2＝主場概算）。第 2 は `INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME` の仮単価。 |
+| **2 層の線引き** | **第 1 キーは分割しない**。主場塊は **第 2 キー**のみ。放映だけ切り出す必要が出たら **その時点で** `inseason_league_distribution_round` を分割する案を再評価（**未確定**）。 |
+| **運用名と拡張名** | **JSON・内訳 dict では snake_case**。**プレイヤー向け**: CLI は分配・主場の別行、財務サマリー一覧は「リーグ分配等」「主場・門前概算」（`finance_report_display`）。 |
 
 ---
 
@@ -108,9 +108,10 @@
 |------|------|
 | **前提** | **ホーム数の定義**は `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` §4（実装前に本書と整合すること）。 |
 | **目的** | `SEASON_REVENUE_MODEL_NOTES.md` §3 の第 2 項を、**別キー**で実装する。 |
-| **触る範囲** | `season.py`、イベントカウント、CLI 1 行、本書 §3 の「将来」注記の更新。 |
-| **触らない範囲** | 正本化、人気・施設係数の本格導入。 |
-| **完了条件** | 第 1 キーと**二重に同じ物語を数えない**。テストでホーム 0/1 の差が再現可能。 |
+| **状態** | **最小実装済み（2026-04-06）**: `_apply_inseason_matchday_estimate_round`、`record_inseason_matchday_estimate_round`、GUI ラベル「主場・門前概算」、pytest。 |
+| **触った範囲** | `season.py`、`team.py`、`finance_report_display.py`、テスト。 |
+| **触らない範囲** | 正本化、人気・施設係数の本格導入、カップ・国際の件数算入。 |
+| **完了条件** | 第 1 キーと**別エントリ**・別物語。ホーム 0 では第 2 ログなし。 |
 
 ---
 
@@ -128,3 +129,4 @@
 - 2026-04-06: §6 タスク 1 最小実装反映 — `Team.inseason_cash_round_log`。§0・§1 事実記述を同期。
 - 2026-04-06: 経営 GUI 財務サマリーに一覧表示（`format_inseason_cash_round_log_lines`）。§1 を同期。
 - 2026-04-06: 主場数の数え方メモ `INSEASON_MATCHDAY_ESTIMATE_POLICY.md` を追加。§0 参照表・§6 タスク 2 に前提行。
+- 2026-04-06: 第 2 キー `inseason_matchday_estimate_round` 最小実装。§2・§3・§6 タスク 2 を同期。

@@ -15,6 +15,7 @@ DEFAULT_INSEASON_CASH_LOG_DISPLAY_LIMIT = 40
 # Team.inseason_cash_round_log の key → GUI 表示ラベル（内部キーはユーザーにそのまま出さない）
 INSEASON_CASH_KEY_LABELS_JA: Dict[str, str] = {
     "inseason_league_distribution_round": "リーグ分配等",
+    "inseason_matchday_estimate_round": "主場・門前概算",
 }
 
 REV_LABELS_JA: Dict[str, str] = {

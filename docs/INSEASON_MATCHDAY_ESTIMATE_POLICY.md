@@ -105,10 +105,11 @@
 
 | 項目 | 内容 |
 |------|------|
-| **目的** | タスク 1 の件数に **別キー**で `inseason_cash_round_log`（または合意した追跡先）へ載せ、`money` 加算が **第 1 キーと二重にならない**範囲で行う（金額式は最小・別コミット可）。 |
-| **触る範囲** | `season.py`（`_apply_inseason_league_distribution_round` 近傍または直後の明確な 1 ブロック）、`team.py`（記録メソッド）、CLI 1 行・既存ログ表示の**キー対応**、テスト。 |
+| **目的** | タスク 1 の件数に **別キー**で `inseason_cash_round_log` へ載せ、`money` 加算が **第 1 キーと二重にならない**範囲で行う。 |
+| **状態** | **最小実装済み（2026-04-06）**: `_apply_inseason_matchday_estimate_round`、`INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME`、`record_inseason_matchday_estimate_round`、GUI ラベル、pytest。 |
+| **触った範囲** | `season.py`、`team.py`、`finance_report_display.py`、テスト。 |
 | **触らない範囲** | 正本 `finance_history` への合流、スケジュール生成の再設計、杯・EASL を件数に含める拡張（**本書 §4 変更まで行わない**）。 |
-| **完了条件** | 同一ラウンドで **第 1 キーと第 2 キーが別エントリ**、ホーム 0 / 1 で第 2 だけが変わる（係数固定のとき）ことをテストで再現。 |
+| **完了条件** | 同一ラウンドで **第 1 キーと第 2 キーが別エントリ**、ホーム 0 では第 2 ログなし。 |
 
 ---
 
@@ -124,3 +125,4 @@
 
 - 2026-04-06: 初版。主場数の推奨定義（案 A）と代表戦の概念分離を固定。
 - 2026-04-06: `Season.get_regular_season_home_game_count_for_round` と pytest 追加。§5・§6 タスク 1 を同期。
+- 2026-04-06: タスク 2 最小実装（`money`＋ログ＋GUI ラベル）。§6 を同期。

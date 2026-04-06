@@ -92,8 +92,8 @@ NATIONAL_TEAM_CYCLE = {
 }
 
 # シーズン中・ラウンドごとの「リーグ分配・放映・中央営業」の按分（円/ラウンド）。
-# 旧 TEMP_ROUND_OPERATING_INCOME_BY_LEVEL と同額。将来ここに主場門前概算を足す場合は
-# get_events_for_round で regular_season のホーム数を数えて別項を加算する。
+# 旧 TEMP_ROUND_OPERATING_INCOME_BY_LEVEL と同額。主場門前概算は第 2 キー
+# `inseason_matchday_estimate_round` で別加算（`INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME`）。
 INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL = {
     1: 8_000_000,
     2: 6_000_000,
@@ -101,6 +101,10 @@ INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL = {
 }
 
 TEMP_ROUND_OPERATING_INCOME_BY_LEVEL = INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL
+
+# 国内リーグ公式戦ホーム 1 試合あたりの門前・協賛概算（円）。第 2 キー用・仮調整。
+# `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` §4 の件数 × 本単価。
+INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME = 250_000
 
 
 class Season:
@@ -2713,7 +2717,7 @@ class Season:
         """
         シーズン中キャッシュ: リーグ分配・放映権相当・中央営業のラウンド分を `money` に加算する。
         `league_level`（1〜3 部）で規模差。オフ締め・`record_financial_result` は経由しない。
-        主場試合に応じた門前・協賛概算は将来 `get_events_for_round` ベースでここに足せる。
+        主場門前概算は `_apply_inseason_matchday_estimate_round`（第 2 キー）。
         """
         if not self.all_teams:
             return
@@ -2733,6 +2737,35 @@ class Season:
                 f"[経営] ラウンド{round_number}: シーズン中収益（リーグ分配・放映等） +{added:,}円 "
                 f"({user_team.name} 所持金 {int(getattr(user_team, 'money', 0)):,}円)"
             )
+
+    def _apply_inseason_matchday_estimate_round(self, round_number: int) -> None:
+        """
+        シーズン中キャッシュ（第 2 キー）: 国内リーグ公式戦ホーム数に比例した門前・協賛概算。
+        `get_regular_season_home_game_count_for_round` × `INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME`。
+        金額 0 のチームはログに追記しない（`docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md`）。
+        """
+        if not self.all_teams:
+            return
+
+        unit = int(INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME)
+        user_team = next((t for t in self.all_teams if bool(getattr(t, "is_user_team", False))), None)
+
+        for team in self.all_teams:
+            n_home = int(self.get_regular_season_home_game_count_for_round(team, round_number))
+            income = n_home * unit
+            if income <= 0:
+                continue
+            team.money = int(getattr(team, "money", 0) or 0) + income
+            team.record_inseason_matchday_estimate_round(round_number=round_number, amount=income)
+
+        if user_team is not None:
+            n_user = int(self.get_regular_season_home_game_count_for_round(user_team, round_number))
+            added_md = n_user * unit
+            if added_md > 0:
+                print(
+                    f"[経営] ラウンド{round_number}: シーズン中収益（主場・門前概算） +{added_md:,}円 "
+                    f"({user_team.name} 所持金 {int(getattr(user_team, 'money', 0)):,}円)"
+                )
 
     # =========================
     # Simulation
@@ -2798,6 +2831,7 @@ class Season:
             self._play_emperor_cup_round(round_number)
 
         self._apply_inseason_league_distribution_round(round_number)
+        self._apply_inseason_matchday_estimate_round(round_number)
 
         self.total_points += round_points
         self.game_count += round_game_count

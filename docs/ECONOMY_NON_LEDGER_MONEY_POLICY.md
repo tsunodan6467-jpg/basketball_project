@@ -40,6 +40,7 @@
 | **FINAL BOSS 報酬** | `_apply_final_boss_rewards` → 同上 | イベント結果に応じた加算 | **高** |
 | **トレード現金** | `trade_logic.TradeEngine.execute_multi_trade` | トレード条件としての現金の授受 | **高**（編成の大きな選択） |
 | **シーズン中収益（リーグ分配・放映等）** | `Season._apply_inseason_league_distribution_round` / `Team.inseason_cash_round_log` | ラウンドごとの `money` 加算＋**同額ログ**（キー `inseason_league_distribution_round`）。**正本非経由**。詳細は `INSEASON_REVENUE_KEY_POLICY.md` | **中**（CLI＋ログ。**当面 B**） |
+| **シーズン中収益（主場・門前概算）** | `Season._apply_inseason_matchday_estimate_round` / 同上ログ（キー `inseason_matchday_estimate_round`） | リーグ公式戦ホーム数×仮単価。金額 0 のラウンドは**ログ行を増やさない**。**正本非経由** | **中**（CLI＋GUI 財務サマリー一覧。**当面 B**） |
 | **セッション初期所持金** | `main.py`（`TEMP_INITIAL_TEAM_MONEY` 等） | 新規・CLI 開始時の `money` 代入 | 開始時点の**前提表示**として重要。以降の変動とは性質が異なる |
 | **FA 市場用 money 欠損ガード** | `free_agent_market.ensure_team_fa_market_fields` | 欠損時のデフォルト代入 | **低**（異常データ向け。通常プレイでは表に出したくない） |
 | **オフ締めループ先頭の欠損ガード** | `offseason._process_team_finances` | 極端な欠損データの保険 | **低**（同上） |
@@ -71,7 +72,7 @@
 | 洲际杯報酬 | 同上 | 高 | **A（実装済み・所属クラブ）** | 同上 | 同上 |
 | FINAL BOSS 報酬 | 同上 | 高 | **A（実装済み・所属クラブ）** | 同上 | クリア/失敗で額は別内訳行（同一キーで金額のみ変化） |
 | トレード現金 | `execute_multi_trade` | 高 | **方針は `TRADE_CASH_ACCOUNTING_POLICY.md`（推奨: トレード履歴を説明の正の中心）** | 旧: A 寄せも検討。**2026-04-06**: 取引イベントの性格を優先し、年次正本への機械的合流は必須としない | 実装・表の詳細同期は別タスク（同ポリシー §6 タスク3） |
-| シーズン中収益（リーグ分配・放映等） | `Season._apply_inseason_league_distribution_round` → `Team.inseason_cash_round_log` | 中 | **B（当面：`record` 非経由。追跡は `inseason_cash_round_log`）／将来 A** | キー **`inseason_league_distribution_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。**主場門前概算は未接続**（同書 §6 タスク 2） | 正本化は **週次・二段整合・オフとの二重防止**が揃ってから（同書 §4） |
+| シーズン中収益（リーグ分配・主場概算） | `_apply_inseason_league_distribution_round` および `_apply_inseason_matchday_estimate_round` → `Team.inseason_cash_round_log` | 中 | **B（当面：`record` 非経由。追跡は `inseason_cash_round_log`）／将来 A** | キー **`inseason_league_distribution_round`** と **`inseason_matchday_estimate_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。単価は `INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME`（仮） | 正本化は **週次・二段整合・オフとの二重防止**が揃ってから（同書 §4） |
 | PR 施策コスト | `_commit_pr_campaign_core`、`management` にログ | 高 | **B**（当面）／長期は A に寄せうる | 頻度が高く、すべてを年次正本の行にするとノイズになりうる。既存ログを**説明の正**にしやすい | `money` とログの**金額一致**を保つ。将来、週次レジャー → 締め正本へ載せるなら §0.3 の整合ルールに従う |
 | グッズ開発進行コスト | `_advance_merchandise_phase_core` | 中〜高 | **B** | 工程単位の支出は「施策・開発履歴」で追う方が分かりやすい場合がある。オフの merchandise 内訳との関係は監査コメント参照（深掘りは別タスク） | 売上・正本 revenue との接続は仕様書に「未接続」記載あり。コストだけ先に A に上げると収支バランスの見え方が変わるため**要検討** |
 | セッション初期所持金 | `main.py` 代入 | 開始時 | **（分類の外）** | 会計の「取引」ではなく初期状態 | 表示・チュートリアルで明示すれば足りる |
@@ -161,3 +162,4 @@
 - 2026-04-06: シーズン中ラウンド加算を「リーグ分配・放映等」に改名（`Season._apply_inseason_league_distribution_round`）— §1・§3・§4。
 - 2026-04-06: `INSEASON_REVENUE_KEY_POLICY.md` を参照表に追加。§3 シーズン中収益行を B／将来 A と内訳キー参照に更新。
 - 2026-04-06: `Team.inseason_cash_round_log` を §3 に反映（追跡用・正本外）。
+- 2026-04-06: 第 2 キー `inseason_matchday_estimate_round` を §1・§3 に反映。

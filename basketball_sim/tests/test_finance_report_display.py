@@ -1,6 +1,10 @@
 """財務レポート表示・record_financial_result の内訳整合。"""
 
-from basketball_sim.models.team import INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY, Team
+from basketball_sim.models.team import (
+    INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY,
+    INSEASON_MATCHDAY_ESTIMATE_ROUND_KEY,
+    Team,
+)
 from basketball_sim.systems.finance_report_display import (
     breakdown_matches_total,
     format_finance_report_detail_lines,
@@ -73,6 +77,22 @@ def test_format_inseason_cash_round_log_lines_shows_round_and_amount():
     assert "R12" in text
     assert "リーグ分配等" in text
     assert "8,000,000" in text
+
+
+def test_format_inseason_cash_round_log_lines_shows_matchday_label():
+    t = Team(team_id=1, name="T", league_level=1)
+    t._ensure_history_fields()
+    t.inseason_cash_round_log = [
+        {
+            "key": INSEASON_MATCHDAY_ESTIMATE_ROUND_KEY,
+            "amount": 500_000,
+            "round_number": 12,
+        }
+    ]
+    text = "\n".join(format_inseason_cash_round_log_lines(t))
+    assert "R12" in text
+    assert "主場・門前概算" in text
+    assert "500,000" in text
 
 
 def test_format_finance_report_detail_lines_with_snapshot():
