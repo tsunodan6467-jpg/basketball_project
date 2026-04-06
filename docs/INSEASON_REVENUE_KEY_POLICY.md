@@ -11,6 +11,7 @@
 | 経路の事実 | `docs/ECONOMY_MONEY_FLOW_AUDIT.md` §2 |
 | 内訳・正本の思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
 | フェーズ | `docs/IMPLEMENTATION_PLAN_MASTER.md` §2.4 |
+| 主場概算の「ホーム数」の数え方 | `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` |
 
 **コード上の事実（2026-04-06 更新）**: `Season._apply_inseason_league_distribution_round` が全チームの `money` を更新し、同額を **`Team.inseason_cash_round_log`** に `key` **`inseason_league_distribution_round`** で追記（`record_financial_result` は**未使用**）。
 
@@ -105,6 +106,7 @@
 
 | 項目 | 内容 |
 |------|------|
+| **前提** | **ホーム数の定義**は `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` §4（実装前に本書と整合すること）。 |
 | **目的** | `SEASON_REVENUE_MODEL_NOTES.md` §3 の第 2 項を、**別キー**で実装する。 |
 | **触る範囲** | `season.py`、イベントカウント、CLI 1 行、本書 §3 の「将来」注記の更新。 |
 | **触らない範囲** | 正本化、人気・施設係数の本格導入。 |
@@ -125,3 +127,4 @@
 - 2026-04-06: 初版。
 - 2026-04-06: §6 タスク 1 最小実装反映 — `Team.inseason_cash_round_log`。§0・§1 事実記述を同期。
 - 2026-04-06: 経営 GUI 財務サマリーに一覧表示（`format_inseason_cash_round_log_lines`）。§1 を同期。
+- 2026-04-06: 主場数の数え方メモ `INSEASON_MATCHDAY_ESTIMATE_POLICY.md` を追加。§0 参照表・§6 タスク 2 に前提行。

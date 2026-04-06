@@ -12,6 +12,7 @@
 | **正本外 `money` 変動の分類・方針** | `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
 | **シーズン中収益モデル（ラウンド仮収入の置換骨子）** | `docs/SEASON_REVENUE_MODEL_NOTES.md` |
 | **シーズン中収益の内訳キー・正本化ロードマップ** | `docs/INSEASON_REVENUE_KEY_POLICY.md` |
+| **主場概算のホーム試合数の数え方** | `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` |
 
 **更新**: 経済の**構造合意**が変わったときだけ更新する。実装済み度の列挙は現状分析書へ。タスクの全体キューは実装計画書へ。
 

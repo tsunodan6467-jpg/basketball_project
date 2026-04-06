@@ -12,6 +12,7 @@
 | 経営の理想・納得感 | `docs/IDEAL_GAME_DESIGN_MASTER.md` §7 |
 | 会計の第1正本・内訳思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
 | 内訳キー名・当面 B／将来 A | `docs/INSEASON_REVENUE_KEY_POLICY.md` |
+| 主場概算のホーム試合数の数え方 | `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` |
 
 **コード上の事実（2026-04-06 更新）**: `simulate_next_round` 内で試合・杯処理等の後、**全 `all_teams` に対し** `team.money +=`（額は `league_level` 別の **`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`**。旧名 `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL` は同一 dict の別名）。`Season._apply_inseason_league_distribution_round` が担当。`finance_history` / `record_financial_result` は**経由しない**。CLI は「シーズン中収益（リーグ分配・放映等）」表示。
 
@@ -59,7 +60,7 @@
    - これは **「毎ラウンド入る安定キャッシュ」**の物語を与える。
 
 2. **従（オプション・v1 は単純でよい）** — **「主場開催に応じた門前・協賛の概算」**  
-   - **そのラウンドでホームのレギュラー試合が何試合あるか**（既存スケジュールから数えられるなら）だけで**比例**させる程度に留める案を第一候補とする。  
+   - **そのラウンドでホームのレギュラー試合が何試合あるか**（既存スケジュールから数えられるなら）だけで**比例**させる程度に留める案を第一候補とする。**「ホームのレギュラー」の定義**は実装前に `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` §4 を正とする。  
    - 細かい対戦カードまでは **v1 では必須にしない**。
 
 **粒度**: **ラウンド単位**（現行フックと同じ）。試合シミュの直後に載せる現在位置は、「試合結果の次にキャッシュが動く」リズムと合わせやすい。
@@ -141,3 +142,4 @@
 - 2026-04-06: `INSEASON_REVENUE_KEY_POLICY.md` を参照表に追加。§3 に内訳キー 1 行。§7 タスク 2 完了反映。
 - 2026-04-06: `Team.inseason_cash_round_log` 実装を §3 に反映（`INSEASON_REVENUE_KEY_POLICY` §6 タスク 1）。
 - 2026-04-06: 経営 GUI でログ一覧表示。§5 表示行に追記。
+- 2026-04-06: `INSEASON_MATCHDAY_ESTIMATE_POLICY.md` を参照表に追加。§3 第 2 項に数え方の正本参照。
