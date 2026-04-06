@@ -9,8 +9,8 @@
 
 | 項目 | メモ |
 |------|------|
-| 記入日 | （例: 20__-__-__） |
-| App ID（本番） | （取得後に記入） |
+| 記入日 | 2026-04-05（SteamPipe・実績テストまで反映） |
+| App ID（本番） | 4593200 |
 | チェックリスト 1（クラウド v1） | はい / いいえ / 後回し → （決定日: ） |
 | チェックリスト 2（Rich Presence v1） | はい / いいえ / 後回し → （決定日: ） |
 
@@ -20,19 +20,21 @@
 
 次をすべて満たしたとき、**このプロジェクトでは「Phase 0 の Steam 技術・配布の足場は完了」**とする（`.cursorrules` の Phase 0 と整合させる）。
 
+**2026-04-05 追記**: `[x]` は**確認済み**、`[ ]` は**未了**。ここまででも **Phase 0 全体の「完了宣言」には未達**（セーブ文言・ストア・クラウド/Rich Presence 決定など残りあり）。
+
 ### 配布・ビルド
 
-- [ ] Windows 向け **`BasketballGM.exe`**（PyInstaller）が **Steam 用コンテンツルート**に配置できる
-- [ ] **`steam_api64.dll`**（SDK が許可する再配布物のみ）を exe と同階層に置ける運用が確定している
-- [ ] **SteamPipe** でビルドをアップロードし、**デフォルトブランチ**に載せられることを確認した
-- [ ] 起動オプション・作業ディレクトリが **`BasketballGM.exe`** と一致している（`STEAMWORKS_DESIGN.md` の整合表）
+- [x] Windows 向け **`BasketballGM.exe`**（PyInstaller）が **Steam 用コンテンツルート**に配置できる
+- [x] **`steam_api64.dll`**（SDK が許可する再配布物のみ）を exe と同階層に置ける運用が確定している
+- [x] **SteamPipe** でビルドをアップロードし、**デフォルトブランチ**に載せられることを確認した（**default に Build をライブ設定**すること）
+- [x] 起動オプション・作業ディレクトリが **`BasketballGM.exe`** と一致している（`STEAMWORKS_DESIGN.md` の整合表）。Steam クライアントの**起動オプションは空**で確認済み
 
 ### Steamworks ランタイム
 
-- [ ] **`SteamAPI_Init` / `Shutdown` / `SteamAPI_RunCallbacks`** が安定（tkinter では `pump_steam_callbacks` が動いている）
-- [ ] **ライセンス**: `BIsSubscribed` 相当で未購入時の挙動が仕様どおり（`settings.json` の `steam_require_license` と環境変数の整理済み）
-- [ ] **実績**: 少なくとも 1 つ、`unlock_achievement` から StoreStats まで通ることを実機で確認
-- [ ] **`--steam-diag`** が期待どおり（DLL あり・Steam 起動時の値が説明と一致）
+- [x] **`SteamAPI_Init` / `Shutdown` / `SteamAPI_RunCallbacks`** が安定（tkinter では `pump_steam_callbacks` が動いている）。**新 SDK では `SteamAPI_InitFlat` フォールバック**（`steamworks_bridge`）
+- [ ] **ライセンス**: `BIsSubscribed` 相当で未購入時の挙動が仕様どおり（`settings.json` の `steam_require_license` と環境変数の整理済み）※診断・通常接続は確認済み、**強制終了ポリシーの実機テストは別途**
+- [x] **実績**: 少なくとも 1 つ、`unlock_achievement` から StoreStats まで通ることを実機で確認（`ACH_PHASE0_TEST`。**`RequestCurrentStats` 後に SetAchievement**）
+- [x] **`--steam-diag`** が期待どおり（DLL あり・Steam 起動時の値が説明と一致）
 
 ### セーブ・設定（v1 方針に合わせてチェック）
 

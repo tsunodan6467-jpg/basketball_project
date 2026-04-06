@@ -14,7 +14,7 @@
 **全体の流れ**  
 基盤完成 → 試合リアリティ強化 → GM モード・経営 → UI・演出 → 公開準備 → Steam 販売
 
-**コードベース**: `basketball_sim/` 配下（Python 約 34 ファイル規模）。**最終ロードマップ照合日: 2026-04-01**（以前の「2025-03-26」表記は本書で置換）。
+**コードベース**: `basketball_sim/` 配下（Python 約 34 ファイル規模）。**最終ロードマップ照合日: 2026-04-05**（以前の「2025-03-26」表記は本書で置換）。
 
 ---
 
@@ -27,7 +27,7 @@
 - **転生**: △ — `offseason` の `_retire_and_reincarnate` 等。
 - **GM・経済**: △ — contract_logic、オーナーミッション・財務の一部、トレード/ドラフト/FA/スカウトは実装。UI は読み取り専用が多く、プレイヤー操作の経営は未接続が多い。
 - **UI**: △ — tkinter 主画面・観戦は試験実装。**製品目標はメイン操作の全面 GUI**（CLI 併用は移行途中）。`settings.json` の window / fullscreen、`key_bindings.close_subwindow`（既定 `<Escape>`）。**最終形は GUI 内で年度・シーズン完結**。
-- **Steam 向け**: △ — セーブ/ロード（pickle・format_version・移行フック等）、初回**ローカルセーブのみ**、Rich Presence v1 未、オーバーレイはコードから無効化せずトラブル時は Steam プロパティでオフ案内（`STEAMWORKS_DESIGN` §5）、EULA/プライバシーはストア主・ゲーム内同意 UI は未（§6）、PyInstaller・Inno・`--smoke`・GHA・`steamworks_bridge` 等。詳細は `basketball_sim/integrations/STEAMWORKS_DESIGN.md`。
+- **Steam 向け**: △ — セーブ/ロード（pickle・format_version・移行フック等）、初回**ローカルセーブのみ**、Rich Presence v1 未、オーバーレイはコードから無効化せずトラブル時は Steam プロパティでオフ案内（`STEAMWORKS_DESIGN` §5）、EULA/プライバシーはストア主・ゲーム内同意 UI は未（§6）、PyInstaller・Inno・`--smoke`・GHA・`steamworks_bridge` 等。**2026-04-05 時点**: SteamPipe ビルドを **default にライブ設定**しクライアントからインストール・起動確認、デポから **`steam_appid.txt` 除外**の運用、実績 **`ACH_PHASE0_TEST`** を実機解除（`RequestCurrentStats`＋`SetAchievement`）。アップロード用 VDF は `steam_pipe_upload/`。詳細は `basketball_sim/integrations/STEAMWORKS_DESIGN.md`。
 
 ---
 
@@ -100,8 +100,7 @@
 - **配布**: 単一 exe＋Inno＋署名（可能なら）。`--smoke`・SHA256・README。
 - **Steamworks**: 初回は **ライセンス・実績・ローカルセーブ** を核。**クラウドセーブ・Rich Presence** の要否は Phase 0 末期に決定（`STEAMWORKS_DESIGN.md` と整合）。
 - **Steamworks 審査・身分確認（運用）**  
-  **現状（ユーザー確認）: 審査はまだ終わっていない。完了したらユーザーが報告し、本節と `.cursorrules` を更新する。**  
-  それまではステータスを **未完了／対応中** として扱う。報告時は「ステータス・直近更新日・次アクション」を含める。
+  **現状（2026-04-05 更新）**: パートナーで **App 4593200・デポ・SteamPipe ビルド・実績**まで運用確認済み（ユーザー作業）。**税務・本人確認は通過済み**（ユーザー報告）。**ストアページの一般公開・最終の「発売」審査**など、商品として外に出す段階の残タスクは別途フォローする。変化があれば本節を更新する。
 - **設定**: 解像度・ウィンドウ・キーはゲーム内変更を目標。Steam オーバーレイ等との衝突に配慮。
 - **CLI**: `--smoke`・テスト・開発用。**製品プレイの前提ではない**。
 
