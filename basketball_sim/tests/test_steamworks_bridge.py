@@ -21,6 +21,8 @@ def reset_steam_module_state(monkeypatch: pytest.MonkeyPatch):
 def test_try_init_stub_returns_false(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("BASKETBALL_SIM_DISABLE_STEAM", raising=False)
     monkeypatch.delenv("BASKETBALL_SIM_FAKE_STEAM", raising=False)
+    # リポジトリ直下に steam_api64.dll がある開発環境でも「DLL なし」と同じ結果にする
+    monkeypatch.setattr(sw, "_steam_dll_candidate_files", lambda: [])
     assert sw.try_init_steam() is False
     assert sw.is_steam_initialized() is False
 
@@ -127,7 +129,7 @@ def test_unlock_achievement_false_empty_name() -> None:
 def test_unlock_achievement_fake_steam(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("BASKETBALL_SIM_FAKE_STEAM", "1")
     assert sw.try_init_steam() is True
-    assert sw.unlock_achievement("ACH_ANY") is True
+    assert sw.unlock_achievement("ACH_PHASE0_TEST") is True
 
 
 def test_unlock_achievement_rejects_unregistered_when_registry_set(

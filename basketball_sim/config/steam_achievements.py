@@ -11,9 +11,6 @@ Steamworks 実績の API 名（Steam パートナー画面の Achievement → AP
 
 from __future__ import annotations
 
-# 例（ダッシュボード未作成時は空のまま）:
-# STEAM_ACHIEVEMENT_API_NAMES: frozenset[str] = frozenset({
-#     "ACH_FIRST_SEASON",
-#     "ACH_PROMOTION",
-# })
-STEAM_ACHIEVEMENT_API_NAMES: frozenset[str] = frozenset()
+STEAM_ACHIEVEMENT_API_NAMES: frozenset[str] = frozenset({
+    "ACH_PHASE0_TEST",
+})
