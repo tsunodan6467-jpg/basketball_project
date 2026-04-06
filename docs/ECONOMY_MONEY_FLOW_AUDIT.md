@@ -10,6 +10,7 @@
 |------|------|
 | 経営本実装の論点・置換順 | `docs/ECONOMY_DESIGN_NOTES.md` |
 | **正本外 `money` の扱い方針（整理）** | `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
+| **トレード現金の会計・表示方針** | `docs/TRADE_CASH_ACCOUNTING_POLICY.md` |
 | 会計の第1正本・内訳の思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
 | 現状の事実ラベル | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.8 |
 | フェーズ上の位置づけ | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
@@ -248,3 +249,4 @@
 - 2026-04-06: §7 追加 — R1 検証（T1 完了）、§4 R1 更新、§6 T1 完了記載。
 - 2026-04-06: R1 **実装** — FA 即時減算廃止、§2 表・§3・§4 R1・§7 に対応後状態を追記。
 - 2026-04-06: **大会賞金の正本合流**（リーグ所属）— §2 表3行、§3、R2・R4、§5 本文。
+- 2026-04-06: `TRADE_CASH_ACCOUNTING_POLICY.md` 参照を §0 表に追加（トレード現金は別紙で方針整理）。
