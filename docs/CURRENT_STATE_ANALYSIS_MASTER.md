@@ -185,11 +185,11 @@
 
 | 区分 | 内容 |
 |------|------|
-| 実装済み | `steamworks_bridge.py`（DLL ロード・`try_init_steam`・実績 API 経路・環境変数）、`main.py` の `try_init_steam` / `enforce_steam_license` / `--steam-diag`、`config/steam_achievements.py`、テスト `test_steamworks_bridge.py`。実績 `RequestCurrentStats` 順序修正等は git に記録（`85876c0` 等）。 |
-| 暫定 | **未確認**: 開発者マシン以外・ストアビルド以外での挙動。 |
+| 実装済み | `steamworks_bridge.py`（DLL ロード・`try_init_steam`・実績 API 経路・環境変数）、`main.py` の `try_init_steam` / `enforce_steam_license` / `--steam-diag`、`config/steam_achievements.py`、テスト `test_steamworks_bridge.py`。実績 `RequestCurrentStats` 順序修正等は git に記録（`85876c0` 等）。**doc（2026-04-06 同期）**: `docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md`・`docs/PRODUCT_ROADMAP_AND_VISION.md`・`basketball_sim/integrations/STEAMWORKS_DESIGN.md` の **Steam/Phase 0 記述は主要正本間で整合**（旧「2026-03-27 身分確認待ち」前提のズレは解消）。**プロジェクト上の記述**: Steamworks 作業は**再開済み**；条件が揃った環境では **`--steam-diag` 等で Steam API 初期化成功ログ**（例: `try_init_steam: True`）が取れるところまで確認（`PRODUCT`・`STEAMWORKS_STATUS` と整合）。 |
+| 暫定 | **未確認**: 開発者マシン以外・ストアビルド以外での挙動の**網羅**。 |
 | 未実装 | Rich Presence（設計上 v1 未）、クラウドセーブ（同上）。 |
-| 未確認 | **パートナー画面の現在の審査・公開状態**（リポジトリ外）。**`docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md`（最終更新 2026-03-27）と `docs/PRODUCT_ROADMAP_AND_VISION.md`（2026-04-05 記述）で Steam 手続きの記述が異なる**。運用の真偽は **パートナー画面の確認**が必要。`PRODUCT` には SteamPipe・実績実機解除等の**ユーザー作業済み**記載あり。 |
-| 主要ファイル | `basketball_sim/integrations/steamworks_bridge.py`, `basketball_sim/integrations/STEAMWORKS_DESIGN.md`, `docs/PRODUCT_ROADMAP_AND_VISION.md`, `installer/README.md`（存在する場合） |
+| 未確認 | **パートナー画面**における**現在の**審査・**ストア一般公開**・**発売審査**・税務/本人確認の**表示**（リポジトリ外。**過去の通過報告と「いまの画面」は別**）。**全環境**での `--steam-diag` 結果の統一は **未確認**（DLL・クライアント・App ID 条件による）。 |
+| 主要ファイル | `basketball_sim/integrations/steamworks_bridge.py`, `basketball_sim/integrations/STEAMWORKS_DESIGN.md`, `docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md`, `docs/PRODUCT_ROADMAP_AND_VISION.md`, `installer/README.md`（存在する場合） |
 
 ### 5.13 エンジン（Godot 等）
 
@@ -253,7 +253,7 @@
 - `docs/PRODUCT_ROADMAP_AND_VISION.md` — Phase・ドメイン正本。
 - `docs/AI_WORKFLOW_RULES.md` — 実装手順正本。
 - `docs/CHATGPT_NEW_CHAT_HANDOFF_FOR_CURSOR_SYNC.md` — 三者同期用ブリッジ。
-- `docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md` — Steam 手続きメモ（**日付が古い可能性**あり。`PRODUCT` と突合せ要）。
+- `docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md` — Steam 手続き・再開メモ（**2026-04-06 本文同期**。詳細は本メモ、`PRODUCT` はロードマップ要約）。
 - 仕様分散: `SCHEDULE_MENU_SPEC_V1.md`, `OFFSEASON_WEEK_MODEL.md`, `DRAFT_AUCTION_SYSTEM.md`, `STEAMWORKS_DESIGN.md` 等。
 
 ---
@@ -266,7 +266,7 @@
 
 - Phase 0 の残（クラッシュログ・設定・配布パイプラインの継続、`PRODUCT` Phase 0 一覧）。
 - **GUI 主操作への寄せ**と **CLI 依存の縮小**（`PRODUCT`・引き継ぎ doc）。
-- **Steam 手続きドキュメントの日付・状態の同期**（`STEAMWORKS_STATUS_AND_RESUME_MEMO.md` vs `PRODUCT`）。
+- **Steamworks の対外状態の実務確認**（パートナー画面で**都度**確認: ストア一般公開・発売審査・表示上の必須タスク等。**断定はリポジトリ単体では不可**）。Steam **主要 docs の相互同期**は **2026-04-06 完了**（`STEAMWORKS_STATUS`・`PRODUCT`・`STEAMWORKS_DESIGN`）。
 
 ### 8.2 中優先
 
@@ -325,8 +325,8 @@ Steam 診断: 上記 `--steam-diag`。**成功/失敗は環境依存**（DLL・S
 ## 12. 現時点の総評
 
 - **土台**: シーズン/オフ/試合/セーブ/最小テストは **リポジトリ上で一貫して厚い**（`PRODUCT` の △〜◎ 記述と整合）。
-- **ボトルネック**: **製品としての GUI 一本化**・**経済の本実装**・**Steam 手続きと doc の同期**が、doc と会話の両方で繰り返し現れる。
-- **次に取り組むべきテーマ**（複数候補の事実整理）: Phase 0 残の潰し込み、`STEAMWORKS_STATUS` と `PRODUCT` の整合、GUI 経路の欠け埋め。**1つに絞る必要は本書ではない**（`.cursorrules` の「次の一手」は会話単位の運用）。
+- **ボトルネック**: **製品としての GUI 一本化**・**経済の本実装**・**Steam のパートナー上の対外状態の確認と Phase 0 残の実務**が、doc と会話の両方で繰り返し現れる。
+- **次に取り組むべきテーマ**（複数候補の事実整理）: Phase 0 残の潰し込み、**パートナー画面に基づく Steam 対外状態の更新**（必要なら `STEAMWORKS_STATUS` / `PRODUCT` を追記）、GUI 経路の欠け埋め。**1つに絞る必要は本書ではない**（`.cursorrules` の「次の一手」は会話単位の運用）。
 
 ---
 
@@ -341,3 +341,4 @@ Steam 診断: 上記 `--steam-diag`。**成功/失敗は環境依存**（DLL・S
 **改訂履歴**
 
 - 第1版: 2026-04-06 初版作成。
+- 2026-04-06: §5.12・§8（Steam）ほか、Steam docs 同期後の整合（§7.4・§12 の関連1行）。
