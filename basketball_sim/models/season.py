@@ -91,11 +91,16 @@ NATIONAL_TEAM_CYCLE = {
     4: {"window_1": "friendly",        "window_2": "friendly",        "summer": "olympics"},
 }
 
-TEMP_ROUND_OPERATING_INCOME_BY_LEVEL = {
+# シーズン中・ラウンドごとの「リーグ分配・放映・中央営業」の按分（円/ラウンド）。
+# 旧 TEMP_ROUND_OPERATING_INCOME_BY_LEVEL と同額。将来ここに主場門前概算を足す場合は
+# get_events_for_round で regular_season のホーム数を数えて別項を加算する。
+INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL = {
     1: 8_000_000,
     2: 6_000_000,
     3: 5_000_000,
 }
+
+TEMP_ROUND_OPERATING_INCOME_BY_LEVEL = INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL
 
 
 class Season:
@@ -2686,26 +2691,27 @@ class Season:
         for line in logs:
             print(line)
 
-    def _apply_temporary_round_operating_income(self, round_number: int) -> None:
+    def _apply_inseason_league_distribution_round(self, round_number: int) -> None:
         """
-        仮バランス調整: ラウンド進行ごとに最低限の営業収入を加算する。
-        本収支ロジック（オフシーズン締め）を壊さないため、単純加算のみ。
+        シーズン中キャッシュ: リーグ分配・放映権相当・中央営業のラウンド分を `money` に加算する。
+        `league_level`（1〜3 部）で規模差。オフ締め・`record_financial_result` は経由しない。
+        主場試合に応じた門前・協賛概算は将来 `get_events_for_round` ベースでここに足せる。
         """
         if not self.all_teams:
             return
 
+        default_yen = int(INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL.get(3, 5_000_000))
         for team in self.all_teams:
             level = int(getattr(team, "league_level", 3) or 3)
-            income = int(TEMP_ROUND_OPERATING_INCOME_BY_LEVEL.get(level, 5_000_000))
+            income = int(INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL.get(level, default_yen))
             team.money = int(getattr(team, "money", 0) or 0) + income
 
-        # CLI の可読性を崩さないよう、ユーザークラブ分だけ短く表示
         user_team = next((t for t in self.all_teams if bool(getattr(t, "is_user_team", False))), None)
         if user_team is not None:
             lv = int(getattr(user_team, "league_level", 3) or 3)
-            added = int(TEMP_ROUND_OPERATING_INCOME_BY_LEVEL.get(lv, 5_000_000))
+            added = int(INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL.get(lv, default_yen))
             print(
-                f"[経営] ラウンド{round_number}: 仮営業収入 +{added:,}円 "
+                f"[経営] ラウンド{round_number}: シーズン中収益（リーグ分配・放映等） +{added:,}円 "
                 f"({user_team.name} 所持金 {int(getattr(user_team, 'money', 0)):,}円)"
             )
 
@@ -2772,7 +2778,7 @@ class Season:
         if self._should_play_emperor_cup_this_round(round_number):
             self._play_emperor_cup_round(round_number)
 
-        self._apply_temporary_round_operating_income(round_number)
+        self._apply_inseason_league_distribution_round(round_number)
 
         self.total_points += round_points
         self.game_count += round_game_count

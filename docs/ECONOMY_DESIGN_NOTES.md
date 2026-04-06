@@ -44,7 +44,7 @@
 | 名称（便宜上） | 場所（代表） | コメント上の意図 |
 |----------------|--------------|------------------|
 | 初期資金 20 億円 | `Team.money` デフォルト、`main.TEMP_INITIAL_TEAM_MONEY` | 経営即死回避・本設計へ差し替え想定 |
-| ラウンド仮営業収入 | `season.TEMP_ROUND_OPERATING_INCOME_BY_LEVEL`、`_apply_temporary_round_operating_income` | シーズン中の最低限キャッシュ注入。正本収支を壊さないよう **単純加算** |
+| シーズン中収益（リーグ分配・放映等） | `season.INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`（別名 `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL`）、`_apply_inseason_league_distribution_round` | ラウンドごとのキャッシュ注入。正本収支を壊さないよう **単純加算**（`record` 非経由） |
 | オフ締めの集中配分（仮） | `offseason.TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE`（0.98×ペイロールを収入加算） | modeled 収益が実ペイロール規模に追従していないことの**上乗せ**。本実装で置換予定 |
 
 ### 何が「遊べる状態」を支えているか
@@ -277,3 +277,4 @@
 
 - 2026-04-06: 初版（経営本実装の設計論点整理）。
 - 2026-04-06: `SEASON_REVENUE_MODEL_NOTES.md` を参照表に追加。§7 候補 C は同書への委譲を明記。
+- 2026-04-06: シーズン中ラウンド加算の名称を `INSEASON_*` / `_apply_inseason_league_distribution_round` に更新（§1 表）。

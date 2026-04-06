@@ -1,7 +1,7 @@
 # 国内バスケGM開発 シーズン中収益モデル設計メモ
 
 **作成日**: 2026-04-06  
-**文書の性質**: **設計整理メモ**。`TEMP_ROUND_OPERATING_INCOME_BY_LEVEL` と `Season._apply_temporary_round_operating_income` が担っている**ラウンド仮営業収入**を、将来どのような**説明可能なシーズン中収益**へ置き換えるかの**構造**を決める。数値チューニング表・コード正本ではない。
+**文書の性質**: **設計整理メモ**。シーズン中ラウンド加算（**`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`** / `_apply_inseason_league_distribution_round`、旧称ラウンド仮営業収入）を、**主場概算や正本連携を含む正式モデル**へどう拡張するかの**構造**を決める。数値チューニング表・コード正本ではない。
 
 | 参照 | 文書 |
 |------|------|
@@ -12,7 +12,7 @@
 | 経営の理想・納得感 | `docs/IDEAL_GAME_DESIGN_MASTER.md` §7 |
 | 会計の第1正本・内訳思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
 
-**コード上の事実（調査時点）**: `simulate_next_round` 内で試合・杯処理等の後、**全 `all_teams` に対し** `team.money +=`（額は `league_level` 別の `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL`）。`finance_history` / `record_financial_result` は**経由しない**。ユーザークラブ向けに CLI 1 行表示あり（「仮営業収入」表現）。
+**コード上の事実（2026-04-06 更新）**: `simulate_next_round` 内で試合・杯処理等の後、**全 `all_teams` に対し** `team.money +=`（額は `league_level` 別の **`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`**。旧名 `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL` は同一 dict の別名）。`Season._apply_inseason_league_distribution_round` が担当。`finance_history` / `record_financial_result` は**経由しない**。CLI は「シーズン中収益（リーグ分配・放映等）」表示。
 
 ---
 
@@ -28,10 +28,10 @@
 
 | 項目 | 内容 |
 |------|------|
-| **どこで入るか** | `Season._apply_temporary_round_operating_income`（`simulate_next_round` の後半、CPU 裏経営の**前**）。 |
-| **性格** | **仮バランス用のキャッシュ注入**（コメント上も同旨）。`ECONOMY_DESIGN_NOTES.md` の **TEMP_* は因果ではなくノブ**に近い、と整合。 |
-| **塞いでいるもの** | シーズン中の **modeled 収益不足**による現金枯渇を、**ディビジョン別固定額×ラウンド**で緩和する「橋」。 |
-| **プレイヤーから見た不透明さ** | 表記は「仮営業収入」。**当ラウンドの試合内容・主客・人気・施設と結びつかない**ため、「なぜこのタイミングでこの金額か」の**物語が弱い**。年次正本にも載らないため、**財務レポートだけでは追いにくい**（`ECONOMY_NON_LEDGER_MONEY_POLICY.md` §4 と同趣旨）。 |
+| **どこで入るか** | `Season._apply_inseason_league_distribution_round`（`simulate_next_round` の後半、CPU 裏経営の**前**）。 |
+| **性格** | **リーグ分配・放映等のラウンド按分**として説明可能なラベルに更新（2026-04-06）。金額オーダー・`league_level` 差は従来踏襲。`record` 非経由は**未変更**。 |
+| **塞いでいるもの** | シーズン中の **modeled 収益不足**による現金枯渇を、**ディビジョン別固定額×ラウンド**で緩和。 |
+| **プレイヤーから見た残りの隙** | **主場試合数・人気・施設とは未連携**（v1 最小置換）。年次正本に載らない点は従来どおり。 |
 
 ---
 
@@ -107,7 +107,7 @@
 
 | 項目 | 内容 |
 |------|------|
-| **目的** | `_apply_temporary_round_operating_income` を、**§3 の物語に沿った関数**に差し替え（額は当面 **現行オーダーを維持**しつつ、**内訳の構造だけ**先に載せる選択肢も可）。 |
+| **目的** | `_apply_inseason_league_distribution_round` への置換・CLI 正式名（**実装済み 2026-04-06**）。次は主場概算や内訳キー。 |
 | **触る範囲** | `season.py`（当該関数・定数・必要なら `round` 内ホーム試合カウント）、CLI 表示文字列、監査メモ 1 行。 |
 | **触らない範囲** | オフ締め本体、`record_financial_result` の契約変更（別合意まで）、施設・広報の新ロジック本実装。 |
 | **完了条件** | プレイヤーが**一文で増減理由を理解できる**表示。`--smoke`・既存 pytest が通る。監査メモの当該行が**事実と一致**。 |
@@ -134,3 +134,4 @@
 **改訂履歴**
 
 - 2026-04-06: 初版。
+- 2026-04-06: §7 タスク 1 の最小実装反映（`season.py` 定数名・メソッド名・CLI 文言）。§1・冒頭の事実記述を同期。
