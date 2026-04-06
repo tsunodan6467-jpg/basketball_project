@@ -9,6 +9,7 @@
 | **作品としての経営の意味** | `docs/IDEAL_GAME_DESIGN_MASTER.md` §7 等 |
 | **フェーズ・優先度** | `docs/IMPLEMENTATION_PLAN_MASTER.md`（Phase B・経営は設計先行） |
 | **メニュー・会計のたたき台** | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` |
+| **正本外 `money` 変動の分類・方針** | `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
 
 **更新**: 経済の**構造合意**が変わったときだけ更新する。実装済み度の列挙は現状分析書へ。タスクの全体キューは実装計画書へ。
 

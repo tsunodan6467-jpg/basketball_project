@@ -8,6 +8,7 @@
 | 参照 | 文書 |
 |------|------|
 | 経営本実装の論点・置換順 | `docs/ECONOMY_DESIGN_NOTES.md` |
+| **正本外 `money` の扱い方針（整理）** | `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
 | 会計の第1正本・内訳の思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
 | 現状の事実ラベル | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.8 |
 | フェーズ上の位置づけ | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
@@ -135,7 +136,7 @@
 | ID | 内容 | 根拠（事実） | 断定 |
 |----|------|----------------|------|
 | R1 | ~~同上~~ **2026-04-06 対応**: FA 成立時の年俸即時 `money` 減算を除去し、**締めのみ**（payroll → `record`）に統一 | 旧: `conduct_free_agency` の `money -= offer` と `_process_team_finances` の payroll 重複。現: 即時減算なし（`free_agency.py` / `free_agent_market.py`）。 | **解消済み**（§7 履歴・`ECONOMY_DESIGN_NOTES` §1） |
-| R2 | **`finance_history` に載らない支出・収入が累積**し、レポートと `money` の説明がプレイヤーに伝わりにくい | PR・グッズ・杯賞金・トレード現金・仮ラウンド収入 | 表示設計の課題 |
+| R2 | **`finance_history` に載らない支出・収入が累積**し、レポートと `money` の説明がプレイヤーに伝わりにくい | PR・グッズ・杯賞金・トレード現金・仮ラウンド収入 | 表示設計の課題。**方針整理**: `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
 | R3 | **`record_financial_result` 失敗時フォールバック**が、内訳検証をすり抜けうる | `offseason` の `except` 分岐 | 例外経路のテスト要 |
 | R4 | **オフ杯賞金が `record_financial_result` を通らない** | `_apply_*_rewards` は `money` のみ加算 | 年次レポートの「収入」に含まれるかプレイヤー認識とズレうる |
 | R5 | **責任主体の分散**: シーズン中は `Season`、オフは `Offseason`、人事は `trade_logic` / FA、施策は各 `systems` | ファイル横断 | 変更時の回帰範囲が広い |
