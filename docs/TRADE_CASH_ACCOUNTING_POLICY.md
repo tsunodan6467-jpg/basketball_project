@@ -104,10 +104,10 @@
 
 | 項目 | 内容 |
 |------|------|
-| **目的** | `note` 文字列依存を減らし、相手・金額・方向・（任意）シーズン/ラウンドを**機械可読**にする。 |
-| **触る範囲** | `trade_logic.py`、`Team` の永続フィールド案、`docs/` の短い補足。 |
-| **触らない範囲** | `record_financial_result` のシグネチャ変更、GUI 全面改修。 |
-| **完了条件** | 1 本以上の pytest で、成立トレード後に構造化ログから金額が復元できる。 |
+| **状態** | **一段完了（2026-04-06・最小）** — `add_history_transaction(..., trade_cash_delta=…)` と `execute_multi_trade` の現金行。テスト: `basketball_sim/tests/test_trade_cash_structured_log.py`。 |
+| **残タスク** | シーズン/ラウンド付与、JSON 出口専用配列、GUI は別タスク。 |
+| **触った範囲** | `team.py`、`trade_logic.py`（多人数トレードの現金行のみ）。 |
+| **フィールド** | `trade_cash_delta`（当チーム視点の増減）、`trade_counterparty_team_id`、`trade_counterparty_name`。`note` は従来どおり残す。 |
 
 ### タスク 2: 財務表示への「サマリまたは導線」追加（任意・案 C）
 
@@ -140,3 +140,4 @@
 **改訂履歴**
 
 - 2026-04-06: 初版（R2 タスク2 設計整理）。
+- 2026-04-06: タスク1 最小実装反映 — `history_transactions` への `trade_cash_delta` 等（§6）。

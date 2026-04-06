@@ -716,7 +716,14 @@ class TradeSystem:
             for p in gives_a:
                 team_a.add_history_transaction("trade", p, note=f"Traded to {team_b.name}")
             if cash > 0:
-                team_a.add_history_transaction("trade", None, note=f"Cash+{cash:,}円 to {team_b.name}")
+                team_a.add_history_transaction(
+                    "trade",
+                    None,
+                    note=f"Cash+{cash:,}円 to {team_b.name}",
+                    trade_cash_delta=-cash,
+                    trade_counterparty_team_id=getattr(team_b, "team_id", None),
+                    trade_counterparty_name=str(getattr(team_b, "name", "") or ""),
+                )
             if rb > 0:
                 team_a.add_history_transaction("trade", None, note=f"RB+{rb:,}円 to {team_b.name}")
 
@@ -726,7 +733,14 @@ class TradeSystem:
             for p in gives_b:
                 team_b.add_history_transaction("trade", p, note=f"Traded to {team_a.name}")
             if cash > 0:
-                team_b.add_history_transaction("trade", None, note=f"Cash-{cash:,}円 received from {team_a.name}")
+                team_b.add_history_transaction(
+                    "trade",
+                    None,
+                    note=f"Cash-{cash:,}円 received from {team_a.name}",
+                    trade_cash_delta=cash,
+                    trade_counterparty_team_id=getattr(team_a, "team_id", None),
+                    trade_counterparty_name=str(getattr(team_a, "name", "") or ""),
+                )
             if rb > 0:
                 team_b.add_history_transaction("trade", None, note=f"RB-{rb:,}円 received from {team_a.name}")
 

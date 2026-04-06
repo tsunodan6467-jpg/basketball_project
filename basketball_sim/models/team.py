@@ -1039,14 +1039,34 @@ class Team:
         if player_id in self.bench_order:
             self.bench_order = [pid for pid in self.bench_order if pid != player_id]
 
-    def add_history_transaction(self, transaction_type: str, player: Optional[Player] = None, note: str = ""):
+    def add_history_transaction(
+        self,
+        transaction_type: str,
+        player: Optional[Player] = None,
+        note: str = "",
+        *,
+        trade_cash_delta: Optional[int] = None,
+        trade_counterparty_team_id: Optional[int] = None,
+        trade_counterparty_name: str = "",
+    ):
+        """
+        history_transactions に1件追加。トレード現金は trade_cash_delta 等で機械可読に残せる
+        （`TRADE_CASH_ACCOUNTING_POLICY.md`）。未指定時は従来どおり note のみ。
+        trade_cash_delta: 当チーム視点の現金増減（支払いは負、受取は正）。
+        """
         self._ensure_history_fields()
-        self.history_transactions.append({
+        row: Dict[str, Any] = {
             "transaction_type": transaction_type,
             "player_id": getattr(player, "player_id", None) if player is not None else None,
             "player_name": getattr(player, "name", "") if player is not None else "",
             "note": note,
-        })
+        }
+        if trade_cash_delta is not None:
+            row["trade_cash_delta"] = int(trade_cash_delta)
+            tid = trade_counterparty_team_id
+            row["trade_counterparty_team_id"] = int(tid) if tid is not None else None
+            row["trade_counterparty_name"] = str(trade_counterparty_name or "")
+        self.history_transactions.append(row)
 
     def add_history_award(self, award_type: str, note: str = ""):
         self._ensure_history_fields()
