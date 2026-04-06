@@ -10,6 +10,12 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 DEFAULT_FINANCE_HISTORY_DISPLAY_LIMIT = 5
+DEFAULT_INSEASON_CASH_LOG_DISPLAY_LIMIT = 40
+
+# Team.inseason_cash_round_log の key → GUI 表示ラベル（内部キーはユーザーにそのまま出さない）
+INSEASON_CASH_KEY_LABELS_JA: Dict[str, str] = {
+    "inseason_league_distribution_round": "リーグ分配等",
+}
 
 REV_LABELS_JA: Dict[str, str] = {
     "gate": "チケット・興行",
@@ -118,6 +124,66 @@ def format_finance_report_detail_lines(
     lines.append("  来季の数値見込みは週次会計導入後に表示予定です。")
 
     return lines
+
+
+def format_inseason_cash_round_log_lines(
+    team: Any,
+    *,
+    max_entries: int = DEFAULT_INSEASON_CASH_LOG_DISPLAY_LIMIT,
+) -> List[str]:
+    """
+    経営ウィンドウ「シーズン中収益（記録）」用。
+    `finance_history` / 正本とは別リスト（`INSEASON_REVENUE_KEY_POLICY.md`）。
+    """
+    getter = getattr(team, "_ensure_history_fields", None)
+    if callable(getter):
+        try:
+            getter()
+        except Exception:
+            pass
+
+    raw = getattr(team, "inseason_cash_round_log", None)
+    if not isinstance(raw, list) or not raw:
+        return [
+            "まだ記録はありません。",
+            "（シーズンを進めると、ラウンドごとにここへ追記されます）",
+        ]
+
+    rows: List[Dict[str, Any]] = []
+    for e in raw:
+        if not isinstance(e, dict):
+            continue
+        try:
+            rn = int(e.get("round_number", -1))
+            amt = int(e.get("amount", 0))
+        except (TypeError, ValueError):
+            continue
+        if rn < 0:
+            continue
+        k = str(e.get("key", "") or "")
+        rows.append({"round_number": rn, "amount": amt, "key": k})
+
+    if not rows:
+        return [
+            "まだ記録はありません。",
+            "（シーズンを進めると、ラウンドごとにここへ追記されます）",
+        ]
+
+    rows.sort(key=lambda r: (int(r["round_number"]), int(r["amount"])))
+    lim = max(1, int(max_entries))
+    tail = rows[-lim:]
+    if len(rows) > lim:
+        header = f"直近 {lim} 件（古い順・全 {len(rows)} 件中）"
+    else:
+        header = "記録一覧（古い順）"
+
+    out: List[str] = [header, ""]
+    for r in tail:
+        label = INSEASON_CASH_KEY_LABELS_JA.get(str(r["key"]), "その他")
+        out.append(f"R{int(r['round_number'])}  {label}  +{int(r['amount']):,}円")
+    out.append("")
+    out.append("※年次の財務レポート（前季収支）とは別枠です。")
+    return out
 
 
 def _latest_breakdown_entry(history: List[Any]) -> Optional[dict]:

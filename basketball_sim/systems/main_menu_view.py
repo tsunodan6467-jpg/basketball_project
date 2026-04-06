@@ -1919,6 +1919,34 @@ class MainMenuView:
         self._finance_cap_text.pack(fill="both", expand=False, pady=(0, 4))
         self._finance_cap_text.configure(state="disabled")
 
+        ttk.Separator(fin_sum_inner, orient="horizontal").pack(fill="x", pady=(14, 8))
+        ttk.Label(
+            fin_sum_inner,
+            text="シーズン中収益（本シーズン・記録）",
+            style="SectionTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            fin_sum_inner,
+            text="ラウンドごとのリーグ分配等の入金メモ（所持金には反映済み。年次の財務正本・詳細レポートとは別枠）。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 6))
+        self._finance_inseason_log_text = scrolledtext.ScrolledText(
+            fin_sum_inner,
+            height=8,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self._finance_inseason_log_text.pack(fill="both", expand=False, pady=(0, 4))
+        self._finance_inseason_log_text.configure(state="disabled")
+
         fac_content = self._resolve_content_parent(self.facility_panel)
         ttk.Label(
             fac_content,
@@ -2295,6 +2323,7 @@ class MainMenuView:
             self._merch_dummy_text = None
             self._merch_hist_text = None
             self._finance_scroll_canvas = None
+            self._finance_inseason_log_text = None
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -2630,6 +2659,25 @@ class MainMenuView:
                 cap_tw.delete("1.0", tk.END)
                 cap_tw.insert("1.0", cap_body)
                 cap_tw.configure(state="disabled")
+            except tk.TclError:
+                pass
+
+        in_tw = getattr(self, "_finance_inseason_log_text", None)
+        if in_tw is not None:
+            if self.team is None:
+                in_body = (
+                    "（チーム未接続）\n"
+                    "シーズン中の記録は、チーム接続後にここに表示されます。"
+                )
+            else:
+                from basketball_sim.systems.finance_report_display import format_inseason_cash_round_log_lines
+
+                in_body = "\n".join(format_inseason_cash_round_log_lines(self.team))
+            try:
+                in_tw.configure(state="normal")
+                in_tw.delete("1.0", tk.END)
+                in_tw.insert("1.0", in_body)
+                in_tw.configure(state="disabled")
             except tk.TclError:
                 pass
 

@@ -30,7 +30,8 @@
 |------|------|
 | **直前の実装で変わったこと** | ラベル・定数名・メソッド名を **「リーグ分配・放映等のラウンド按分」** に寄せた（`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL` 等）。プレイヤー向け CLI は **「シーズン中収益（リーグ分配・放映等）」**。 |
 | **まだ未正本化なこと** | **毎ラウンド**の加算は `finance_history` / `record_financial_result` **に載せていない**。年次レポートの `breakdown_revenue` にも **未登場**。 |
-| **機械可読な追跡** | 各 `Team.inseason_cash_round_log` に **`inseason_league_distribution_round` / amount / round_number**（**正本外・当面 B**）。GUI・JSON 出口の全面設計は別タスク。 |
+| **機械可読な追跡** | 各 `Team.inseason_cash_round_log` に **`inseason_league_distribution_round` / amount / round_number**（**正本外・当面 B**）。 |
+| **GUI（一覧）** | **経営メニュー**内・**財務サマリー**の「シーズン中収益（本シーズン・記録）」（`main_menu_view.py`／`finance_report_display.format_inseason_cash_round_log_lines`）。JSON 出口の全面設計は別タスク。 |
 | **プレイヤーへの説明** | **ラウンド進行直後の 1 行**が主。財務レポート本体には未合流。 |
 
 ---
@@ -123,3 +124,4 @@
 
 - 2026-04-06: 初版。
 - 2026-04-06: §6 タスク 1 最小実装反映 — `Team.inseason_cash_round_log`。§0・§1 事実記述を同期。
+- 2026-04-06: 経営 GUI 財務サマリーに一覧表示（`format_inseason_cash_round_log_lines`）。§1 を同期。

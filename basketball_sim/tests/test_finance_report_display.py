@@ -1,9 +1,10 @@
 """財務レポート表示・record_financial_result の内訳整合。"""
 
-from basketball_sim.models.team import Team
+from basketball_sim.models.team import INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY, Team
 from basketball_sim.systems.finance_report_display import (
     breakdown_matches_total,
     format_finance_report_detail_lines,
+    format_inseason_cash_round_log_lines,
     normalize_breakdown_dict,
 )
 
@@ -48,6 +49,30 @@ def test_record_financial_result_drops_mismatched_breakdown():
     last = t.finance_history[-1]
     assert "breakdown_revenue" not in last
     assert last["breakdown_expense"] == {"b": 50}
+
+
+def test_format_inseason_cash_round_log_lines_empty():
+    t = Team(team_id=1, name="T", league_level=1)
+    t._ensure_history_fields()
+    t.inseason_cash_round_log.clear()
+    lines = format_inseason_cash_round_log_lines(t)
+    assert "まだ記録はありません" in "\n".join(lines)
+
+
+def test_format_inseason_cash_round_log_lines_shows_round_and_amount():
+    t = Team(team_id=1, name="T", league_level=1)
+    t._ensure_history_fields()
+    t.inseason_cash_round_log = [
+        {
+            "key": INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY,
+            "amount": 8_000_000,
+            "round_number": 12,
+        }
+    ]
+    text = "\n".join(format_inseason_cash_round_log_lines(t))
+    assert "R12" in text
+    assert "リーグ分配等" in text
+    assert "8,000,000" in text
 
 
 def test_format_finance_report_detail_lines_with_snapshot():
