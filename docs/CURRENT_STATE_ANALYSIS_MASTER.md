@@ -150,6 +150,7 @@
 | 未実装 | doc 上「操作は GUI でクリック完結」等の完全達成は **未** の記述が残る（`PRODUCT` Phase 3）。 |
 | 未確認 | 経済バランスの長期納得感。 |
 | 主要ファイル | `basketball_sim/models/offseason.py`, `basketball_sim/models/season.py`, `basketball_sim/models/team.py`, `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` |
+| 補足 | PR・グッズの `money` は `management` 履歴が説明の正（財務画面との分担は `docs/PR_MERCH_MONEY_VISIBILITY_POLICY.md`、2026-04-06）。 |
 
 ### 5.9 情報表示 / UI
 

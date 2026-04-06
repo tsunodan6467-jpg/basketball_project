@@ -13,6 +13,7 @@
 | **トレード現金の会計・表示方針** | `docs/TRADE_CASH_ACCOUNTING_POLICY.md` |
 | **シーズン中正式収益の構造（仮収入の置換骨子）** | `docs/SEASON_REVENUE_MODEL_NOTES.md` |
 | **シーズン中収益の内訳キー名・当面 B／将来 A** | `docs/INSEASON_REVENUE_KEY_POLICY.md` |
+| **PR・グッズ money の見せ方（表示の正）** | `docs/PR_MERCH_MONEY_VISIBILITY_POLICY.md` |
 
 **前提**: R1 は解消済み（FA 年俸の即時 `money` 減算なし、年俸はオフ締め payroll → 正本）。  
 **更新**: 2026-04-06 — **国内リーグ所属クラブ**の杯・洲际・FINAL BOSS 賞金は、オフ締め `revenue` / `breakdown_revenue` に合流し正本履歴に載る（外部招待のみ従来の `money` 直接）。
@@ -73,8 +74,8 @@
 | FINAL BOSS 報酬 | 同上 | 高 | **A（実装済み・所属クラブ）** | 同上 | クリア/失敗で額は別内訳行（同一キーで金額のみ変化） |
 | トレード現金 | `execute_multi_trade` | 高 | **方針は `TRADE_CASH_ACCOUNTING_POLICY.md`（推奨: トレード履歴を説明の正の中心）** | 旧: A 寄せも検討。**2026-04-06**: 取引イベントの性格を優先し、年次正本への機械的合流は必須としない | 実装・表の詳細同期は別タスク（同ポリシー §6 タスク3） |
 | シーズン中収益（リーグ分配・主場概算） | `_apply_inseason_league_distribution_round` および `_apply_inseason_matchday_estimate_round` → `Team.inseason_cash_round_log` | 中 | **B（当面：`record` 非経由。追跡は `inseason_cash_round_log`）／将来 A** | キー **`inseason_league_distribution_round`** と **`inseason_matchday_estimate_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。単価は `INSEASON_MATCHDAY_ESTIMATE_ROUND_YEN_PER_HOME_GAME`（仮） | 正本化は **週次・二段整合・オフとの二重防止**が揃ってから（同書 §4） |
-| PR 施策コスト | `_commit_pr_campaign_core`、`management` にログ | 高 | **B**（当面）／長期は A に寄せうる | 頻度が高く、すべてを年次正本の行にするとノイズになりうる。既存ログを**説明の正**にしやすい | `money` とログの**金額一致**を保つ。将来、週次レジャー → 締め正本へ載せるなら §0.3 の整合ルールに従う |
-| グッズ開発進行コスト | `_advance_merchandise_phase_core` | 中〜高 | **B** | 工程単位の支出は「施策・開発履歴」で追う方が分かりやすい場合がある。オフの merchandise 内訳との関係は監査コメント参照（深掘りは別タスク） | 売上・正本 revenue との接続は仕様書に「未接続」記載あり。コストだけ先に A に上げると収支バランスの見え方が変わるため**要検討** |
+| PR 施策コスト | `_commit_pr_campaign_core`、`management` にログ | 高 | **B**（当面）／長期は A に寄せうる | 頻度が高く、すべてを年次正本の行にするとノイズになりうる。既存ログを**説明の正**にしやすい（**財務画面との役割分担**は `PR_MERCH_MONEY_VISIBILITY_POLICY.md`） | `money` とログの**金額一致**を保つ。将来、週次レジャー → 締め正本へ載せるなら §0.3 の整合ルールに従う |
+| グッズ開発進行コスト | `_advance_merchandise_phase_core` | 中〜高 | **B** | 工程単位の支出は「施策・開発履歴」で追う方が分かりやすい場合がある。オフの merchandise 内訳との関係は監査コメント参照（深掘りは別タスク）。**表示の正**は `PR_MERCH_MONEY_VISIBILITY_POLICY.md` | 売上・正本 revenue との接続は仕様書に「未接続」記載あり。コストだけ先に A に上げると収支バランスの見え方が変わるため**要検討** |
 | セッション初期所持金 | `main.py` 代入 | 開始時 | **（分類の外）** | 会計の「取引」ではなく初期状態 | 表示・チュートリアルで明示すれば足りる |
 | FA / オフの欠損ガード | `ensure_team_fa_market_fields`、締めループ先頭 | 低 | **C** | 救済用。プレイヤー向け説明よりデータ健全性 | ログに出しすぎない。JSON 化時は「補正フラグ」程度でよい可能性 |
 | 外部仮想チーム初期 money | `offseason` チーム生成 | 対象外 | **C（スコープ外）** | リーグ経営の正本外 | 国内クラブの出口と混ぜない |
@@ -163,3 +164,4 @@
 - 2026-04-06: `INSEASON_REVENUE_KEY_POLICY.md` を参照表に追加。§3 シーズン中収益行を B／将来 A と内訳キー参照に更新。
 - 2026-04-06: `Team.inseason_cash_round_log` を §3 に反映（追跡用・正本外）。
 - 2026-04-06: 第 2 キー `inseason_matchday_estimate_round` を §1・§3 に反映。
+- 2026-04-06: `PR_MERCH_MONEY_VISIBILITY_POLICY.md` を参照表・§3 に追加。

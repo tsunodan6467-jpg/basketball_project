@@ -9,6 +9,7 @@
 **シーズン中収益の `Team.inseason_cash_round_log`**: 2026-04-06（§2 行。`record_financial_result` 非経由）  
 **主場概算（第 2 キー前提の数え方メモ）**: 2026-04-06（`docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md`）  
 **主場数カウント・第 2 キー**: 2026-04-06（`get_regular_season_home_game_count_for_round`、`_apply_inseason_matchday_estimate_round`）  
+**PR・グッズ money 可視化方針**: 2026-04-06（`docs/PR_MERCH_MONEY_VISIBILITY_POLICY.md`・実装は別タスク）  
 **文書の性質**: **調査報告**。コード変更・仕様決定・理想像の正本ではない。
 
 | 参照 | 文書 |
@@ -21,6 +22,7 @@
 | フェーズ上の位置づけ | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
 | シーズン中収益の内訳キー・B/A 方針 | `docs/INSEASON_REVENUE_KEY_POLICY.md` |
 | 主場概算のホーム試合数の数え方（第 2 キー実装前提） | `docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` |
+| PR・グッズ money の表示方針 | `docs/PR_MERCH_MONEY_VISIBILITY_POLICY.md` |
 
 **更新**: `basketball_sim` 側の money 更新経路が変わったら、本書を**事実ベースで**更新する。推測で穴埋めしない。
 
