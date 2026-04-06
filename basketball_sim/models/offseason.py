@@ -61,6 +61,11 @@ def _safe_cli_stdout_text(text: str) -> str:
 # 年俸に連動する「集中配分・放映権（仮）」のみ収入側に上乗せする（本実装で置換予定）。
 TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE = 0.98
 
+# 締め revenue 内訳キー（大会賞金系 → record_financial_result / finance_history）
+OFFSEASON_REV_BREAKDOWN_ASIA_CUP = "offseason_asia_cup_prize"
+OFFSEASON_REV_BREAKDOWN_INTERCONTINENTAL = "intercontinental_cup_prize"
+OFFSEASON_REV_BREAKDOWN_FINAL_BOSS = "final_boss_prize"
+
 
 def assign_team_strategies(teams: List[Team]):
     """
@@ -492,6 +497,8 @@ class Offseason:
         for team in self.teams:
             if hasattr(team, "reset_rookie_budget"):
                 team.reset_rookie_budget()
+            team.offseason_competition_revenue_pending = 0
+            team.offseason_competition_revenue_breakdown = {}
 
         self._off_phase(2)
         self._run_offseason_asia_cup()
@@ -875,9 +882,32 @@ class Offseason:
                     club_history_text=f"{self.offseason_cup_name} ベスト4",
                 )
 
+    def _is_league_team_instance(self, team: Team) -> bool:
+        """国際杯の参加者がリーグ `self.teams` と同一インスタンスか（外部招待のみの Team は False）。"""
+        return any(t is team for t in self.teams)
+
+    def _apply_competition_cash_prize(self, team: Team, amount: int, breakdown_key: str) -> None:
+        """
+        リーグ所属クラブ: 賞金は money に直接足さず、オフ締めで revenue / 正本に合流。
+        外部招待チーム: 従来どおり money のみ更新（正本処理の対象外）。
+        """
+        amount = int(amount)
+        if amount <= 0:
+            return
+        if self._is_league_team_instance(team):
+            cur = int(getattr(team, "offseason_competition_revenue_pending", 0) or 0)
+            team.offseason_competition_revenue_pending = cur + amount
+            bd_raw = getattr(team, "offseason_competition_revenue_breakdown", None)
+            bd: Dict[str, int] = dict(bd_raw) if isinstance(bd_raw, dict) else {}
+            k = str(breakdown_key)
+            bd[k] = int(bd.get(k, 0) or 0) + amount
+            team.offseason_competition_revenue_breakdown = bd
+        else:
+            team.money = int(getattr(team, "money", 0) + amount)
+
     def _apply_offseason_asia_cup_rewards(self, champion: Team, runner_up: Team):
-        champion.money = int(getattr(champion, "money", 0) + 3000000)
-        runner_up.money = int(getattr(runner_up, "money", 0) + 1500000)
+        self._apply_competition_cash_prize(champion, 3_000_000, OFFSEASON_REV_BREAKDOWN_ASIA_CUP)
+        self._apply_competition_cash_prize(runner_up, 1_500_000, OFFSEASON_REV_BREAKDOWN_ASIA_CUP)
         champion.popularity = min(100, int(getattr(champion, "popularity", 50) + 4))
         runner_up.popularity = min(100, int(getattr(runner_up, "popularity", 50) + 2))
 
@@ -1072,8 +1102,8 @@ class Offseason:
                 )
 
     def _apply_intercontinental_cup_rewards(self, champion: Team, runner_up: Team):
-        champion.money = int(getattr(champion, "money", 0) + 5000000)
-        runner_up.money = int(getattr(runner_up, "money", 0) + 2500000)
+        self._apply_competition_cash_prize(champion, 5_000_000, OFFSEASON_REV_BREAKDOWN_INTERCONTINENTAL)
+        self._apply_competition_cash_prize(runner_up, 2_500_000, OFFSEASON_REV_BREAKDOWN_INTERCONTINENTAL)
         champion.popularity = min(100, int(getattr(champion, "popularity", 50) + 6))
         runner_up.popularity = min(100, int(getattr(runner_up, "popularity", 50) + 3))
 
@@ -1218,10 +1248,10 @@ class Offseason:
 
     def _apply_final_boss_rewards(self, challenger: Team, cleared: bool):
         if cleared:
-            challenger.money = int(getattr(challenger, "money", 0) + 10000000)
+            self._apply_competition_cash_prize(challenger, 10_000_000, OFFSEASON_REV_BREAKDOWN_FINAL_BOSS)
             challenger.popularity = min(100, int(getattr(challenger, "popularity", 50) + 10))
         else:
-            challenger.money = int(getattr(challenger, "money", 0) + 1000000)
+            self._apply_competition_cash_prize(challenger, 1_000_000, OFFSEASON_REV_BREAKDOWN_FINAL_BOSS)
             challenger.popularity = min(100, int(getattr(challenger, "popularity", 50) + 2))
 
     def _run_final_boss_match(self):
@@ -3387,6 +3417,27 @@ class Offseason:
             revenue = int(revenue + central_share)
             revenue_breakdown = dict(revenue_breakdown)
             revenue_breakdown["provisional_central_distribution"] = central_share
+
+            pending_cup = int(getattr(team, "offseason_competition_revenue_pending", 0) or 0)
+            if pending_cup > 0:
+                revenue = int(revenue + pending_cup)
+                pending_bd = getattr(team, "offseason_competition_revenue_breakdown", None)
+                if isinstance(pending_bd, dict) and pending_bd:
+                    bd_sum = sum(int(v) for v in pending_bd.values())
+                    if bd_sum == pending_cup:
+                        for k, v in pending_bd.items():
+                            kk = str(k)
+                            revenue_breakdown[kk] = int(revenue_breakdown.get(kk, 0) or 0) + int(v)
+                    else:
+                        revenue_breakdown["offseason_competition_prizes"] = int(
+                            revenue_breakdown.get("offseason_competition_prizes", 0) or 0
+                        ) + pending_cup
+                else:
+                    revenue_breakdown["offseason_competition_prizes"] = int(
+                        revenue_breakdown.get("offseason_competition_prizes", 0) or 0
+                    ) + pending_cup
+                team.offseason_competition_revenue_pending = 0
+                team.offseason_competition_revenue_breakdown = {}
 
             league_level = int(getattr(team, "league_level", 3))
             base_budget = {1: 7_900_000, 2: 5_450_000, 3: 3_650_000}.get(league_level, 3_650_000)

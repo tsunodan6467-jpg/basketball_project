@@ -3,6 +3,7 @@
 **調査日**: 2026-04-06（リポジトリ現状の静的調査）  
 **R1 検証追記**: 2026-04-06（§7）  
 **R1 実装対応**: 2026-04-06（締めのみ方式・§2 / §4 / §7 更新）  
+**大会賞金の正本合流**: 2026-04-06（リーグ所属クラブ・§2 / §3 / R4）  
 **文書の性質**: **調査報告**。コード変更・仕様決定・理想像の正本ではない。
 
 | 参照 | 文書 |
@@ -80,9 +81,9 @@
 | トレード現金 | `trade_logic.py` | `TradeEngine.execute_multi_trade` | `team_a.money`, `team_b.money` | 現金ネットの移転（`-cash` / `+cash`） | トレード条件の現金 | **`record_financial_result` 未使用** | rookie_budget は別フィールド |
 | 広報施策 | `pr_campaign_management.py` | `_commit_pr_campaign_core` | `team.money` | 減算（コスト） | 施策コスト | **履歴に載らない**（`management` にログ） | コメントに「局所的な money」と明記 |
 | グッズ開発進行 | `merchandise_management.py` | `_advance_merchandise_phase_core` | `team.money` | 減算（開発費） | フェーズ進行コスト | **履歴に載らない**（コメントで money のみ減算と明記） | オフの merchandise 内訳加算は別（コメント参照・本監査では深掘り未） |
-| オフ大会報酬（国内クラブ） | `offseason.py` | `_apply_offseason_asia_cup_rewards` | 優勝・準優勝の `money` | 加算（固定額） | オフシーズン杯の賞金 | **`record_financial_result` 未使用** | `finance_history` 非連動 |
-| オフ大会報酬（洲际等） | `offseason.py` | `_apply_intercontinental_cup_rewards` | 同上 | 加算 | 同上 | 同上 | 同上 |
-| FINAL BOSS 報酬 | `offseason.py` | `_apply_final_boss_rewards` | `challenger.money` | 加算（クリア/失敗で額不同） | イベント報酬 | 同上 | 同上 |
+| オフ大会報酬（国内クラブ） | `offseason.py` | `_apply_offseason_asia_cup_rewards` → `Team.offseason_competition_revenue_pending` → `_process_team_finances` | リーグ所属 `Team` の賞金 | 締めまで仮積み→`revenue` / `breakdown_revenue` に合流→`record_financial_result` | オフシーズン杯の賞金 | **締め時に正本へ**（内訳キー `offseason_asia_cup_prize`） | **外部招待チーム**は `self.teams` 外のため従来どおり `money` 直接加算 |
+| オフ大会報酬（洲际等） | `offseason.py` | `_apply_intercontinental_cup_rewards` → 同上 | 同上 | 同上 | 同上 | **締め時に正本へ**（`intercontinental_cup_prize`） | 同上 |
+| FINAL BOSS 報酬 | `offseason.py` | `_apply_final_boss_rewards` → 同上 | 挑戦クラブ（ユーザークラブ想定） | 同上 | イベント報酬 | **締め時に正本へ**（`final_boss_prize`） | 同上 |
 | 外部仮想チーム | `offseason.py` | `_create_external_asia_cup_team`, `_create_final_boss_team` | 生成 `Team.money` | 代入（800万 / 999999999 等） | プレイ用チームの初期値 | リーグ正本の財務とは別枠 | 国内リーグ `Team` のキャッシュフローとは別目的 |
 | 欠損ガード | `offseason.py` | `_process_team_finances` ループ先頭 | `team.money` | `hasattr` なし時 `10_000_000` 代入 | 極端な欠損データの保険 | その後 `record_financial_result` で締め | |
 
@@ -117,7 +118,7 @@
 - **`Season._apply_temporary_round_operating_income`**: 仮調整。`finance_history` なし。
 - **`pr_campaign_management` / `merchandise_management`**: `money` のみ減算、コメントで明記。`management` 系ログは別。
 - **トレード現金**: `record_financial_result` 外。**FA 年俸の即時減算**は廃止（締めのみ・正本側で payroll）。
-- **オフ杯・洲际・FINAL BOSS の賞金加算**: `record_financial_result` 外。
+- **オフ杯・洲际・FINAL BOSS の賞金**: **リーグ所属クラブ**は締めで `record_financial_result` に合流。**外部招待**のみ `money` 直接（正本対象外）。
 
 ### 仮調整
 
@@ -136,9 +137,9 @@
 | ID | 内容 | 根拠（事実） | 断定 |
 |----|------|----------------|------|
 | R1 | ~~同上~~ **2026-04-06 対応**: FA 成立時の年俸即時 `money` 減算を除去し、**締めのみ**（payroll → `record`）に統一 | 旧: `conduct_free_agency` の `money -= offer` と `_process_team_finances` の payroll 重複。現: 即時減算なし（`free_agency.py` / `free_agent_market.py`）。 | **解消済み**（§7 履歴・`ECONOMY_DESIGN_NOTES` §1） |
-| R2 | **`finance_history` に載らない支出・収入が累積**し、レポートと `money` の説明がプレイヤーに伝わりにくい | PR・グッズ・杯賞金・トレード現金・仮ラウンド収入 | 表示設計の課題。**方針整理**: `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
+| R2 | **`finance_history` に載らない支出・収入が累積**し、レポートと `money` の説明がプレイヤーに伝わりにくい | PR・グッズ・トレード現金・仮ラウンド収入（**所属クラブの杯系賞金は 2026-04-06 正本合流**） | 表示設計の課題。**方針整理**: `docs/ECONOMY_NON_LEDGER_MONEY_POLICY.md` |
 | R3 | **`record_financial_result` 失敗時フォールバック**が、内訳検証をすり抜けうる | `offseason` の `except` 分岐 | 例外経路のテスト要 |
-| R4 | **オフ杯賞金が `record_financial_result` を通らない** | `_apply_*_rewards` は `money` のみ加算 | 年次レポートの「収入」に含まれるかプレイヤー認識とズレうる |
+| R4 | **オフ杯賞金と正本** | **2026-04-06**: リーグ所属は締め `record` 合流で**主に解消**。外部招待のみ `money` 直接のまま | 外部枠はレポート対象外でよいが、列挙時は区別が必要 |
 | R5 | **責任主体の分散**: シーズン中は `Season`、オフは `Offseason`、人事は `trade_logic` / FA、施策は各 `systems` | ファイル横断 | 変更時の回帰範囲が広い |
 | R6 | **JSON 出口・外部可視化**時、正本外変動が列挙漏れしうる | 散在する直接更新 | 将来タスクのリスク候補 |
 
@@ -153,7 +154,7 @@
 
 ### まだ正本と呼びきれない理由
 
-- **`money` が同メソッドを経由せず動く経路**が複数ある（仮収入、トレード、FA、施策、杯賞金等）。
+- **`money` が同メソッドを経由せず動く経路**が複数ある（仮収入、トレード、施策、FA 補完、**外部杯招待**の賞金等）。
 - **`finance_history` と `money` の差分**が、プレイヤー説明として常に説けるわけではない（R2）。
 
 ### 本実装で優先して整えるべき境界（提案・断定ではなく次設計の入力）
@@ -246,3 +247,4 @@
 - 2026-04-06: 初版（静的 grep・読解に基づく監査）。
 - 2026-04-06: §7 追加 — R1 検証（T1 完了）、§4 R1 更新、§6 T1 完了記載。
 - 2026-04-06: R1 **実装** — FA 即時減算廃止、§2 表・§3・§4 R1・§7 に対応後状態を追記。
+- 2026-04-06: **大会賞金の正本合流**（リーグ所属）— §2 表3行、§3、R2・R4、§5 本文。

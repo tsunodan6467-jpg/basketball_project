@@ -63,6 +63,9 @@ class Team:
     expense_last_season: int = 0
     cashflow_last_season: int = 0
     finance_history: List[dict] = field(default_factory=list)
+    # オフ内の国際大会賞金等を、締めの record_financial_result に合流させるための仮積み（外部チームは即時 money のまま）
+    offseason_competition_revenue_pending: int = 0
+    offseason_competition_revenue_breakdown: Dict[str, int] = field(default_factory=dict)
 
     scout_level: int = 50
     scout_focus: str = "balanced"

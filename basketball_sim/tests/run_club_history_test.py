@@ -157,6 +157,10 @@ def _simulate_one_offseason(all_teams, free_agents, season_no: int) -> None:
         offseason.summer_national_event_enabled = False
         offseason.final_boss_force_test_mode = False
 
+        for team in all_teams:
+            team.offseason_competition_revenue_pending = 0
+            team.offseason_competition_revenue_breakdown = {}
+
         # run() を丸ごと回すと重いので、国際大会部分だけ安全に実行する
         offseason.offseason_cup_result = {}
         offseason.offseason_cup_log = []
@@ -243,6 +247,9 @@ def _simulate_one_offseason(all_teams, free_agents, season_no: int) -> None:
                     )
                 except Exception:
                     pass
+
+        # 大会賞金は締めで正本合流。run() 未実行のため仮積みをここで解消する。
+        offseason._process_team_finances()
 
 
 def _build_team_candidate(team) -> dict:

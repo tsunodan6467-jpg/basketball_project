@@ -312,6 +312,10 @@ def main() -> None:
             except Exception:
                 pass
 
+        # 国際大会賞金は締めで正本に合流する。ここでは run() 全体を回さないため、
+        # 仮積み pending を解消するために締めのみ実行する。
+        offseason._process_team_finances()
+
     print("[AUTO_SIM] offseason_done")
     _print_summary(user_team)
     _print_international_milestones(user_team, limit=30)
