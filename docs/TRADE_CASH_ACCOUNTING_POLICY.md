@@ -11,6 +11,7 @@
 | 第1正本の思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
 | フェーズ | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
 | **1対1の現金・評価・CLI 住み分け** | `docs/ONE_FOR_ONE_TRADE_CASH_POLICY.md` |
+| **CLI で 1対1 をメニューに載せる導線** | `docs/TRADE_MENU_ONE_FOR_ONE_ENTRY_POLICY.md` |
 
 **前提**: 大会賞金（リーグ所属クラブ）はオフ締めの `revenue` / `breakdown_revenue` に合流済み（`ECONOMY_MONEY_FLOW_AUDIT.md`）。トレード現金は性質が異なるため、本メモで別途整理する。
 
@@ -144,3 +145,4 @@
 - 2026-04-06: タスク1 最小実装反映 — `history_transactions` への `trade_cash_delta` 等（§6）。
 - 2026-04-06: 1対1 `execute_one_for_one_trade` に `cash_a_to_b` と同構造ログを揃えた（§6 触った範囲）。
 - 2026-04-06: `ONE_FOR_ONE_TRADE_CASH_POLICY.md` を参照表に追加（評価・CLI は同書）。
+- 2026-04-06: `TRADE_MENU_ONE_FOR_ONE_ENTRY_POLICY.md` を参照表に追加（メニュー導線は同書）。

@@ -8,6 +8,7 @@
 | トレード現金の会計・ログ方針 | `docs/TRADE_CASH_ACCOUNTING_POLICY.md` |
 | money 経路の事実 | `docs/ECONOMY_MONEY_FLOW_AUDIT.md` |
 | フェーズ・優先度 | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
+| CLI トレードメニューで 1対1 をどう載せるか | `docs/TRADE_MENU_ONE_FOR_ONE_ENTRY_POLICY.md` |
 
 **コード上の事実（調査時点）**: `execute_one_for_one_trade` は `cash_a_to_b` を**キーワードで受け取れる**が、`evaluate_one_for_one_trade` / `should_ai_accept_trade` は**現金を見ていない**。CLI `propose_trade` は現金入力なし・実行も `cash_a_to_b` 未指定。multi は `evaluate_multi_trade_for_team` 内で `_calc_cash_rb_score` により現金・RB をスコアに反映。
 
@@ -111,3 +112,4 @@
 
 - 2026-04-06: 初版。
 - 2026-04-06: §6 タスク 1（案内文言）を `propose_trade` に反映。
+- 2026-04-06: `TRADE_MENU_ONE_FOR_ONE_ENTRY_POLICY.md` を参照表に追加（メニュー導線は同書）。
