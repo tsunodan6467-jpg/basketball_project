@@ -1342,6 +1342,12 @@ def propose_trade(all_teams, user_team, season=None):
     if ai_team is None:
         return
 
+    print(
+        "※ この画面は選手のみの 1 対 1 です。"
+        " 現金・RB を伴うトレードは「トレード提案（複数人数＋現金＋RB）」の導線を使ってください。"
+    )
+    sys.stdout.flush()
+
     ai_players = print_tradeable_players(ai_team, f"{ai_team.name} のトレード候補")
     if not ai_players:
         return
