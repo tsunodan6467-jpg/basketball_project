@@ -79,7 +79,7 @@
 | FA 補完 | `free_agent_market.py` | `ensure_team_fa_market_fields` | `team.money` | 欠損時に `2_000_000_000` 代入 | セーブ互換・欠損ガード | 履歴なし | 本番 `Team` デフォルトも 20 億（`team.py`）と同額 |
 | FA 署名（市場） | `free_agent_market.py` | `sign_free_agent` | （年俸の `money` 即時減算**なし**） | — | 年俸はオフ締め payroll → `record`（R1 / 締めのみ） | 正本は `_process_team_finances` 経由 | 2026-04-06 以前は `max(0, money - salary)` あり |
 | FA（オフ交渉ループ） | `free_agency.py` | `conduct_free_agency` 内 | （同上） | — | 同上 | 同上 | 2026-04-06 以前は `-= offer` あり |
-| トレード現金 | `trade_logic.py` | `TradeSystem.execute_multi_trade` | `team_a.money`, `team_b.money` | 現金ネットの移転（`-cash` / `+cash`） | トレード条件の現金 | **`record_financial_result` 未使用** | 現金あり時、`Team.history_transactions` に `trade_cash_delta` / `trade_counterparty_*` を追加（2026-04-06）。rookie_budget は別フィールド |
+| トレード現金 | `trade_logic.py` | `TradeSystem.execute_multi_trade` / `execute_one_for_one_trade`（`cash_a_to_b`） | `team_a.money`, `team_b.money` | 現金ネットの移転（`-cash` / `+cash`） | トレード条件の現金 | **`record_financial_result` 未使用** | 現金あり時、`history_transactions` に `trade_cash_delta` / `trade_counterparty_*`。rookie_budget は multi のみ |
 | 広報施策 | `pr_campaign_management.py` | `_commit_pr_campaign_core` | `team.money` | 減算（コスト） | 施策コスト | **履歴に載らない**（`management` にログ） | コメントに「局所的な money」と明記 |
 | グッズ開発進行 | `merchandise_management.py` | `_advance_merchandise_phase_core` | `team.money` | 減算（開発費） | フェーズ進行コスト | **履歴に載らない**（コメントで money のみ減算と明記） | オフの merchandise 内訳加算は別（コメント参照・本監査では深掘り未） |
 | オフ大会報酬（国内クラブ） | `offseason.py` | `_apply_offseason_asia_cup_rewards` → `Team.offseason_competition_revenue_pending` → `_process_team_finances` | リーグ所属 `Team` の賞金 | 締めまで仮積み→`revenue` / `breakdown_revenue` に合流→`record_financial_result` | オフシーズン杯の賞金 | **締め時に正本へ**（内訳キー `offseason_asia_cup_prize`） | **外部招待チーム**は `self.teams` 外のため従来どおり `money` 直接加算 |
@@ -251,3 +251,4 @@
 - 2026-04-06: **大会賞金の正本合流**（リーグ所属）— §2 表3行、§3、R2・R4、§5 本文。
 - 2026-04-06: `TRADE_CASH_ACCOUNTING_POLICY.md` 参照を §0 表に追加（トレード現金は別紙で方針整理）。
 - 2026-04-06: トレード現金の構造化ログ（`history_transactions` キー）— §2 トレード行・改訂履歴。
+- 2026-04-06: 1対1 `execute_one_for_one_trade` の現金も同ログに統一 — §2 トレード行。

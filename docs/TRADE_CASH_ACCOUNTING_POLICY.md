@@ -106,7 +106,7 @@
 |------|------|
 | **状態** | **一段完了（2026-04-06・最小）** — `add_history_transaction(..., trade_cash_delta=…)` と `execute_multi_trade` の現金行。テスト: `basketball_sim/tests/test_trade_cash_structured_log.py`。 |
 | **残タスク** | シーズン/ラウンド付与、JSON 出口専用配列、GUI は別タスク。 |
-| **触った範囲** | `team.py`、`trade_logic.py`（多人数トレードの現金行のみ）。 |
+| **触った範囲** | `team.py`、`trade_logic.py`（`execute_multi_trade` および **`execute_one_for_one_trade` の現金行**。`cash_a_to_b` はキーワードのみ・既定0）。 |
 | **フィールド** | `trade_cash_delta`（当チーム視点の増減）、`trade_counterparty_team_id`、`trade_counterparty_name`。`note` は従来どおり残す。 |
 
 ### タスク 2: 財務表示への「サマリまたは導線」追加（任意・案 C）
@@ -141,3 +141,4 @@
 
 - 2026-04-06: 初版（R2 タスク2 設計整理）。
 - 2026-04-06: タスク1 最小実装反映 — `history_transactions` への `trade_cash_delta` 等（§6）。
+- 2026-04-06: 1対1 `execute_one_for_one_trade` に `cash_a_to_b` と同構造ログを揃えた（§6 触った範囲）。

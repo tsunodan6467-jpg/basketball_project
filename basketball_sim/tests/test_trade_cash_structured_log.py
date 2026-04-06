@@ -105,3 +105,46 @@ def test_structured_cash_readable_without_parsing_note():
             break
     else:
         raise AssertionError("expected structured cash row on team_a")
+
+
+def test_one_for_one_with_cash_matches_multi_trade_structured_fields():
+    """1対1 execute 経路でも multi と同じ trade_cash_* が付く。"""
+    pa = _jp_player(94001, "O_A", 1)
+    pb = _jp_player(94002, "O_B", 2)
+    team_a = Team(team_id=1, name="OneA", league_level=3, money=60_000_000, players=[pa])
+    team_b = Team(team_id=2, name="OneB", league_level=3, money=60_000_000, players=[pb])
+    cash_amt = 2_250_000
+    assert TradeSystem().execute_one_for_one_trade(
+        team_a, team_b, pa, pb, cash_a_to_b=cash_amt
+    )
+    assert len(_cash_rows(team_a)) == 1
+    assert len(_cash_rows(team_b)) == 1
+    assert _cash_rows(team_a)[0]["trade_cash_delta"] == -cash_amt
+    assert _cash_rows(team_a)[0]["trade_counterparty_team_id"] == 2
+    assert _cash_rows(team_a)[0]["trade_counterparty_name"] == "OneB"
+    assert _cash_rows(team_b)[0]["trade_cash_delta"] == cash_amt
+    assert _cash_rows(team_b)[0]["trade_counterparty_team_id"] == 1
+    assert _cash_rows(team_b)[0]["trade_counterparty_name"] == "OneA"
+    assert team_a.money == 60_000_000 - cash_amt
+    assert team_b.money == 60_000_000 + cash_amt
+
+
+def test_one_for_one_zero_cash_has_no_trade_cash_delta_rows():
+    pa = _jp_player(95001, "Z_A", 1)
+    pb = _jp_player(95002, "Z_B", 2)
+    team_a = Team(team_id=1, name="ZA", league_level=3, money=40_000_000, players=[pa])
+    team_b = Team(team_id=2, name="ZB", league_level=3, money=40_000_000, players=[pb])
+    assert TradeSystem().execute_one_for_one_trade(team_a, team_b, pa, pb)
+    assert _cash_rows(team_a) == []
+    assert _cash_rows(team_b) == []
+
+
+def test_one_for_one_insufficient_cash_returns_false():
+    pa = _jp_player(96001, "I_A", 1)
+    pb = _jp_player(96002, "I_B", 2)
+    team_a = Team(team_id=1, name="IA", league_level=3, money=100_000, players=[pa])
+    team_b = Team(team_id=2, name="IB", league_level=3, money=40_000_000, players=[pb])
+    ok = TradeSystem().execute_one_for_one_trade(team_a, team_b, pa, pb, cash_a_to_b=500_000)
+    assert not ok
+    assert pa in team_a.players
+    assert pb in team_b.players

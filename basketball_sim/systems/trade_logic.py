@@ -287,8 +287,16 @@ class TradeSystem:
         team_a: Team,
         team_b: Team,
         player_a: Player,
-        player_b: Player
+        player_b: Player,
+        *,
+        cash_a_to_b: int = 0,
     ) -> bool:
+        cash = int(cash_a_to_b or 0)
+        if cash < 0:
+            return False
+        if cash > int(getattr(team_a, "money", 0) or 0):
+            return False
+
         if player_a not in getattr(team_a, "players", []):
             return False
         if player_b not in getattr(team_b, "players", []):
@@ -305,13 +313,35 @@ class TradeSystem:
         team_a.add_player(player_b)
         team_b.add_player(player_a)
 
+        if cash > 0:
+            team_a.money = int(getattr(team_a, "money", 0) or 0) - cash
+            team_b.money = int(getattr(team_b, "money", 0) or 0) + cash
+
         if hasattr(team_a, "add_history_transaction"):
             team_a.add_history_transaction("trade", player_b, note=f"Acquired from {team_b.name}")
             team_a.add_history_transaction("trade", player_a, note=f"Traded to {team_b.name}")
+            if cash > 0:
+                team_a.add_history_transaction(
+                    "trade",
+                    None,
+                    note=f"Cash+{cash:,}円 to {team_b.name}",
+                    trade_cash_delta=-cash,
+                    trade_counterparty_team_id=getattr(team_b, "team_id", None),
+                    trade_counterparty_name=str(getattr(team_b, "name", "") or ""),
+                )
 
         if hasattr(team_b, "add_history_transaction"):
             team_b.add_history_transaction("trade", player_a, note=f"Acquired from {team_a.name}")
             team_b.add_history_transaction("trade", player_b, note=f"Traded to {team_a.name}")
+            if cash > 0:
+                team_b.add_history_transaction(
+                    "trade",
+                    None,
+                    note=f"Cash-{cash:,}円 received from {team_a.name}",
+                    trade_cash_delta=cash,
+                    trade_counterparty_team_id=getattr(team_a, "team_id", None),
+                    trade_counterparty_name=str(getattr(team_a, "name", "") or ""),
+                )
 
         return True
 
