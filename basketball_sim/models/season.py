@@ -1016,6 +1016,24 @@ class Season:
     def get_events_for_round(self, round_number: int) -> List[SeasonEvent]:
         return self.events_by_round.get(round_number, [])
 
+    def get_regular_season_home_game_count_for_round(self, team: Team, round_number: int) -> int:
+        """
+        当該ラウンドにおける、チームの国内リーグ公式戦ホーム試合数。
+        `get_events_for_round` のうち `competition_type == "regular_season"` かつ
+        `home_team is team` の件数（`docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md` §4）。
+        """
+        if team is None:
+            return 0
+        n = 0
+        for event in self.get_events_for_round(round_number):
+            if event.event_type != "game":
+                continue
+            if event.competition_type != "regular_season":
+                continue
+            if event.home_team is team:
+                n += 1
+        return n
+
     def _set_phase(self, new_phase: str):
         self.phase = new_phase
 

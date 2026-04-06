@@ -7,7 +7,8 @@
 **シーズン中ラウンド加算の名称整理**: 2026-04-06（§2 行・§3 脚注。`Season._apply_inseason_league_distribution_round`）  
 **シーズン中収益の内訳キー方針**: 2026-04-06（`INSEASON_REVENUE_KEY_POLICY.md`、§0 参照表・§2 行備考）  
 **シーズン中収益の `Team.inseason_cash_round_log`**: 2026-04-06（§2 行。`record_financial_result` 非経由）  
-**主場概算（第 2 キー前提の数え方メモ）**: 2026-04-06（`docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md`。実装は未着手）  
+**主場概算（第 2 キー前提の数え方メモ）**: 2026-04-06（`docs/INSEASON_MATCHDAY_ESTIMATE_POLICY.md`）  
+**主場数カウント API**: 2026-04-06（`Season.get_regular_season_home_game_count_for_round`。`money` / 第 2 キー未接続）  
 **文書の性質**: **調査報告**。コード変更・仕様決定・理想像の正本ではない。
 
 | 参照 | 文書 |
