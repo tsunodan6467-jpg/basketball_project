@@ -9,6 +9,9 @@ from .player import Player
 OWNER_TRUST_MILD_DEFICIT_THRESHOLD = 20_000_000
 OWNER_TRUST_MAX_NEGATIVE_DELTA_PER_SEASON = -15
 
+# `docs/INSEASON_REVENUE_KEY_POLICY.md` §3（正本非経由のラウンド追跡用）
+INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY = "inseason_league_distribution_round"
+
 
 @dataclass
 class Team:
@@ -63,6 +66,8 @@ class Team:
     expense_last_season: int = 0
     cashflow_last_season: int = 0
     finance_history: List[dict] = field(default_factory=list)
+    # シーズン中の非正本キャッシュイン（当面 B）。`record_financial_result` とは別リスト。
+    inseason_cash_round_log: List[dict] = field(default_factory=list)
     # オフ内の国際大会賞金等を、締めの record_financial_result に合流させるための仮積み（外部チームは即時 money のまま）
     offseason_competition_revenue_pending: int = 0
     offseason_competition_revenue_breakdown: Dict[str, int] = field(default_factory=dict)
@@ -358,6 +363,11 @@ class Team:
         if not hasattr(self, "finance_history") or self.finance_history is None:
             self.finance_history = []
 
+        if not hasattr(self, "inseason_cash_round_log") or self.inseason_cash_round_log is None:
+            self.inseason_cash_round_log = []
+        elif not isinstance(self.inseason_cash_round_log, list):
+            self.inseason_cash_round_log = []
+
         if not hasattr(self, "team_tactics") or self.team_tactics is None:
             self.team_tactics = {}
         elif not isinstance(self.team_tactics, dict):
@@ -389,6 +399,18 @@ class Team:
 
     def spend_rookie_budget(self, amount: int):
         self.rookie_budget_remaining = int(self.rookie_budget_remaining - max(0, int(amount)))
+
+    def record_inseason_league_distribution_round(self, *, round_number: int, amount: int) -> None:
+        """`money` に足したシーズン中収益と同額・同キーを `inseason_cash_round_log` に残す（正本外）。"""
+        self._ensure_history_fields()
+        key = INSEASON_LEAGUE_DISTRIBUTION_ROUND_KEY
+        rn = int(round_number)
+        amt = int(amount)
+        log = self.inseason_cash_round_log
+        for e in log:
+            if e.get("key") == key and int(e.get("round_number", -9_999_999)) == rn:
+                return
+        log.append({"key": key, "amount": amt, "round_number": rn})
 
     def get_financial_profile(self) -> dict:
         self._ensure_history_fields()

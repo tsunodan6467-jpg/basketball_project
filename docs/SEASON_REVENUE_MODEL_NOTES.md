@@ -64,7 +64,7 @@
 
 **粒度**: **ラウンド単位**（現行フックと同じ）。試合シミュの直後に載せる現在位置は、「試合結果の次にキャッシュが動く」リズムと合わせやすい。
 
-**内訳キー（docs 固定）**: 第 1 項（いまの 1 本の加算）に対応する正キーは **`inseason_league_distribution_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。コードへの未載入は別タスク。
+**内訳キー（docs 固定）**: 第 1 項に対応する正キーは **`inseason_league_distribution_round`**（`INSEASON_REVENUE_KEY_POLICY.md` §3）。**実装**: `Team.inseason_cash_round_log` に `amount`・`round_number` とともに記録（正本外）。
 
 **オフ締めとの関係**: シーズン中は **「レギュラー帯のキャッシュイン」**として説明し、**年俸の大きな塊・集中配分**は引き続きオフの物語に寄せる（**0.98 の再設計は本書スコープ外**。二重に「同じ収入」を語らないよう、将来オフ側を触るときは **本メモと `ECONOMY_DESIGN_NOTES` を突き合わせる**）。
 
@@ -122,7 +122,7 @@
 | **目的** | `inseason_*` キーと B/A を文書固定。**実装済み（2026-04-06）**: `docs/INSEASON_REVENUE_KEY_POLICY.md`。 |
 | **触る範囲** | （完了）`docs/` のみ。 |
 | **触らない範囲** | — |
-| **完了条件** | 同書 §3・§4 を正とする。次は **タスク 1（構造へのキー載せ）** へ。 |
+| **完了条件** | 同書 §3・§4 を正とする。ログ実装は `INSEASON_REVENUE_KEY_POLICY` §6 タスク 1（済）。次は主場概算等。 |
 
 ---
 
@@ -139,3 +139,4 @@
 - 2026-04-06: 初版。
 - 2026-04-06: §7 タスク 1 の最小実装反映（`season.py` 定数名・メソッド名・CLI 文言）。§1・冒頭の事実記述を同期。
 - 2026-04-06: `INSEASON_REVENUE_KEY_POLICY.md` を参照表に追加。§3 に内訳キー 1 行。§7 タスク 2 完了反映。
+- 2026-04-06: `Team.inseason_cash_round_log` 実装を §3 に反映（`INSEASON_REVENUE_KEY_POLICY` §6 タスク 1）。

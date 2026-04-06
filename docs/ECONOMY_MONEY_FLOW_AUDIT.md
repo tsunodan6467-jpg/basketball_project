@@ -6,6 +6,7 @@
 **大会賞金の正本合流**: 2026-04-06（リーグ所属クラブ・§2 / §3 / R4）  
 **シーズン中ラウンド加算の名称整理**: 2026-04-06（§2 行・§3 脚注。`Season._apply_inseason_league_distribution_round`）  
 **シーズン中収益の内訳キー方針**: 2026-04-06（`INSEASON_REVENUE_KEY_POLICY.md`、§0 参照表・§2 行備考）  
+**シーズン中収益の `Team.inseason_cash_round_log`**: 2026-04-06（§2 行。`record_financial_result` 非経由）  
 **文書の性質**: **調査報告**。コード変更・仕様決定・理想像の正本ではない。
 
 | 参照 | 文書 |
@@ -76,7 +77,7 @@
 | オフ締め | `offseason.py` | `Offseason._process_team_finances` | 同上（通常は `record_financial_result` 経由） | 主に `record_financial_result(...)` 呼び出し | 年次の収支・ペイロール・維持費等を計算し締める | **正本更新の主呼び出し元**（`season._process_finances` コメントと整合） | `TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE` で収入側を補正したうえで記録 |
 | オフ締め・フォールバック | `offseason.py` | 同上（`try/except` 内） | `money`, `revenue_last_season` 等, `finance_history` | `record_financial_result` 失敗時は **手動で** `finance_history.append` + `money += cashflow` + スカラー更新 | 例外時の継続 | 正本と**同じ数値意図**だが、`record_financial_result` の内訳検証を**バイパス**しうる | リスク候補（§4） |
 | 施設投資 | `facility_investment.py` | `commit_facility_upgrade` | `money`（他に Lv・人気等） | `record_financial_result(revenue=0, expense=cost, …)` | 投資コストを支出として記録 | **正本経由** | CPU 経由でも同関数 |
-| シーズン中（非正本） | `season.py` | `Season._apply_inseason_league_distribution_round` | 全 `all_teams` の `money` | ラウンドごと加算（`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`、`league_level` 別。旧名 `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL` は同一 dict の別名） | **リーグ分配・放映等のラウンド分**（CLI で「シーズン中収益」と表示） | **`finance_history` には載らない** | `simulate_next_round` の試合処理・CPU 裏経営の**前**に実行。内訳キー **`inseason_league_distribution_round`** は docs 固定（`INSEASON_REVENUE_KEY_POLICY.md`）、**現時点コード未使用** |
+| シーズン中（非正本） | `season.py` / `team.py` | `Season._apply_inseason_league_distribution_round` → `Team.record_inseason_league_distribution_round` | 全 `all_teams` の `money` ＋各 `Team.inseason_cash_round_log` | ラウンドごと加算（`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL`、`league_level` 別。旧名 `TEMP_ROUND_OPERATING_INCOME_BY_LEVEL` は同一 dict の別名）。ログは **`{key: inseason_league_distribution_round, amount, round_number}`** | **リーグ分配・放映等のラウンド分**（CLI で「シーズン中収益」と表示） | **`finance_history` には載らない**（`inseason_cash_round_log` は正本外の追跡用リスト） | `simulate_next_round` の試合処理・CPU 裏経営の**前**に実行。キー名は `INSEASON_REVENUE_KEY_POLICY.md` §3 |
 | シーズン進行順序 | `season.py` | `simulate_next_round` | （上記＋間接） | — | 1 ラウンドのオーケストレーション | 仮収入 → `current_round` 加算 → `run_cpu_management_after_round` | CPU は施設/PR/グッズで間接的に money が動きうる |
 | 新規・CLI 初期化 | `main.py` | ユーザーチーム/ライバル設定（該当箇所） | `target_team.money`, `rival_team.money` | 代入 `TEMP_INITIAL_TEAM_MONEY` | セッション開始時の資金 | 正本履歴とは別 | 定数は `main.TEMP_INITIAL_TEAM_MONEY` |
 | FA 補完 | `free_agent_market.py` | `ensure_team_fa_market_fields` | `team.money` | 欠損時に `2_000_000_000` 代入 | セーブ互換・欠損ガード | 履歴なし | 本番 `Team` デフォルトも 20 億（`team.py`）と同額 |

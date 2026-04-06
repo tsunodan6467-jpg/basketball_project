@@ -2705,6 +2705,7 @@ class Season:
             level = int(getattr(team, "league_level", 3) or 3)
             income = int(INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL.get(level, default_yen))
             team.money = int(getattr(team, "money", 0) or 0) + income
+            team.record_inseason_league_distribution_round(round_number=round_number, amount=income)
 
         user_team = next((t for t in self.all_teams if bool(getattr(t, "is_user_team", False))), None)
         if user_team is not None:

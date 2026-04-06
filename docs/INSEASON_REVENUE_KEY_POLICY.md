@@ -12,14 +12,14 @@
 | 内訳・正本の思想 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md` §0.3 |
 | フェーズ | `docs/IMPLEMENTATION_PLAN_MASTER.md` §2.4 |
 
-**コード上の事実（調査時点）**: `Season._apply_inseason_league_distribution_round` が全チームの `money` を更新。`record_financial_result` は**未使用**。本書のキー名は**実装タスクでフィールドに載せるまで**コードには現れない。
+**コード上の事実（2026-04-06 更新）**: `Season._apply_inseason_league_distribution_round` が全チームの `money` を更新し、同額を **`Team.inseason_cash_round_log`** に `key` **`inseason_league_distribution_round`** で追記（`record_financial_result` は**未使用**）。
 
 ---
 
 ## 0. この文書の使い方
 
 - **目的**: 「シーズン中のこの加算」を **`inseason_*` のどのキーで呼ぶか**、**いつ正本に載せるか**を一文書で固定し、実装・他 doc の表記ぶれを防ぐ。
-- **docs 固定のみ**: 本コミットでは `.py` を変更しない。キーを実際に `breakdown_revenue` 等へ書くのは別タスク。
+- **本書と実装**: キー名・B/A の**合意**は本書が正。`breakdown_revenue` や `finance_history` への載せ替えは別タスク。
 - **役割分担**: 収益モデルの**因果の物語**は `SEASON_REVENUE_MODEL_NOTES.md`。**正本外の総分類**は `ECONOMY_NON_LEDGER_MONEY_POLICY.md`。本書は**キー命名と B/A ロードマップ**に特化する。
 
 ---
@@ -29,8 +29,9 @@
 | 項目 | 内容 |
 |------|------|
 | **直前の実装で変わったこと** | ラベル・定数名・メソッド名を **「リーグ分配・放映等のラウンド按分」** に寄せた（`INSEASON_LEAGUE_DISTRIBUTION_ROUND_YEN_BY_LEVEL` 等）。プレイヤー向け CLI は **「シーズン中収益（リーグ分配・放映等）」**。 |
-| **まだ未正本化なこと** | **毎ラウンド**の加算は `finance_history` / `record_financial_result` **に載せていない**。年次レポートの `breakdown_revenue` にも **未登場**（キーも未使用）。 |
-| **プレイヤーへの説明** | **ラウンド進行直後の 1 行**が主。**財務レポートだけ**では系列が追いにくいリスクは残る（`ECONOMY_NON_LEDGER_MONEY_POLICY.md` §4 と同趣旨）。 |
+| **まだ未正本化なこと** | **毎ラウンド**の加算は `finance_history` / `record_financial_result` **に載せていない**。年次レポートの `breakdown_revenue` にも **未登場**。 |
+| **機械可読な追跡** | 各 `Team.inseason_cash_round_log` に **`inseason_league_distribution_round` / amount / round_number**（**正本外・当面 B**）。GUI・JSON 出口の全面設計は別タスク。 |
+| **プレイヤーへの説明** | **ラウンド進行直後の 1 行**が主。財務レポート本体には未合流。 |
 
 ---
 
@@ -93,10 +94,11 @@
 
 | 項目 | 内容 |
 |------|------|
-| **目的** | `money` 加算と**同額・同キー**で、プレイヤーが**一覧追跡**できる永続フィールド（またはログ）を追加する。 |
-| **触る範囲** | `season.py` / `Team` または `management` ネスト、表示 1 箇所、テスト、監査メモ。 |
-| **触らない範囲** | `record_financial_result` の契約変更（タスク内で合意がなければ）、オフ 0.98。 |
-| **完了条件** | 保存データに **§3 キー**が載り、金額が `money` 差分と整合。smoke 通過。 |
+| **目的** | `money` 加算と**同額・同キー**で追跡可能にする。 |
+| **状態** | **最小実装済み（2026-04-06）**: `Team.inseason_cash_round_log` ＋ `record_inseason_league_distribution_round`、pytest `test_inseason_cash_round_log.py`。 |
+| **触った範囲** | `team.py`、`season.py`、テスト、監査メモ。 |
+| **次段** | GUI 一覧・週次レジャーへの昇格・`record` 合流は**別タスク**（本タスクの「触らない」範囲のまま）。 |
+| **完了条件** | ログ 1 件＝`money` 加算 1 回と一致、ラウンド単位で二重なし。 |
 
 ### タスク 2: `inseason_matchday_estimate_round` の加算（主場試合数ベース）
 
@@ -120,3 +122,4 @@
 **改訂履歴**
 
 - 2026-04-06: 初版。
+- 2026-04-06: §6 タスク 1 最小実装反映 — `Team.inseason_cash_round_log`。§0・§1 事実記述を同期。
