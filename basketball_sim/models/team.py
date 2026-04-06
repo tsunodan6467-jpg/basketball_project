@@ -6,6 +6,9 @@ from basketball_sim.systems.japan_regulation import count_regulation_slots, play
 
 from .player import Player
 
+OWNER_TRUST_MILD_DEFICIT_THRESHOLD = 20_000_000
+OWNER_TRUST_MAX_NEGATIVE_DELTA_PER_SEASON = -15
+
 
 @dataclass
 class Team:
@@ -783,6 +786,15 @@ class Team:
                 progress_text = "評価対象外"
 
             trust_delta = int(mission.get("reward_trust", 0) if success else mission.get("penalty_trust", 0))
+            if not success and target_type == "cashflow_at_least":
+                shortfall = int(target_value) - cashflow
+                if shortfall <= OWNER_TRUST_MILD_DEFICIT_THRESHOLD:
+                    # 軽微な赤字（または目標との差が小さいケース）は減点を緩める。
+                    trust_delta = max(trust_delta, -2)
+
+            # 単年での急落を防ぐガードレール（ミッション失敗を無効化しない範囲）。
+            if trust_delta_total + trust_delta < OWNER_TRUST_MAX_NEGATIVE_DELTA_PER_SEASON:
+                trust_delta = OWNER_TRUST_MAX_NEGATIVE_DELTA_PER_SEASON - trust_delta_total
             trust_delta_total += trust_delta
 
             result_row = {
