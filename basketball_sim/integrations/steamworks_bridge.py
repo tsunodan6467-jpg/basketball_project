@@ -22,7 +22,7 @@ Steam リリース時:
 - 開発時は実行ファイルと同じフォルダに steam_appid.txt（App ID のみ1行）を置くのが一般的。
 
 ネイティブ DLL:
-- Windows かつ上記 DLL が見つかり SteamAPI_Init が成功したときのみ実接続。失敗時は従来どおり False で継続。
+- Windows かつ上記 DLL が見つかり SteamAPI_Init または SteamAPI_InitFlat が成功したときのみ実接続。失敗時は従来どおり False で継続。
 - メインループ（tkinter）では pump_steam_callbacks を定期的に呼ぶ必要がある（MainMenuView が担当）。
 
 設計の整理（API 優先度・クラウド要否・コールバック方針）:
@@ -37,6 +37,7 @@ import logging
 import os
 import platform
 import sys
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -50,6 +51,7 @@ _steam_dll: Optional[ctypes.CDLL] = None
 _steam_dll_path: Optional[str] = None
 _steam_apps_ptr: Optional[int] = None
 _steam_user_stats_ptr: Optional[int] = None
+_user_stats_prepared: bool = False
 
 _STEAM_ACHIEVEMENT_NAME_MAX_LEN = 128
 
@@ -158,25 +160,72 @@ def _bind_cdecl_fn(dll: ctypes.CDLL, name: str, restype: Any) -> Optional[Callab
     return fn
 
 
+def _symbol_resolvable(dll: ctypes.CDLL, name: str) -> bool:
+    try:
+        getattr(dll, name)
+        return True
+    except AttributeError:
+        return _get_proc_address(dll, name) is not None
+
+
 def _missing_steam_core_exports(dll: Any) -> List[str]:
     """ctypes が解決できないコア API 名（診断用）。"""
+    if not isinstance(dll, ctypes.CDLL):
+        return ["(not CDLL)"]
     missing: List[str] = []
-    for n in ("SteamAPI_Init", "SteamAPI_Shutdown", "SteamAPI_RunCallbacks"):
-        try:
-            getattr(dll, n)
-        except AttributeError:
-            if isinstance(dll, ctypes.CDLL) and _get_proc_address(dll, n) is not None:
-                continue
+    if not (
+        _symbol_resolvable(dll, "SteamAPI_Init")
+        or _symbol_resolvable(dll, "SteamAPI_InitFlat")
+    ):
+        missing.append("SteamAPI_Init または SteamAPI_InitFlat")
+    for n in ("SteamAPI_Shutdown", "SteamAPI_RunCallbacks"):
+        if not _symbol_resolvable(dll, n):
             missing.append(n)
     return missing
+
+
+def _bind_steam_init(dll: ctypes.CDLL) -> Optional[Callable[[], bool]]:
+    """
+    SteamAPI_Init() は新しい SDK ではヘッダー内インラインのため DLL に export されない。
+    動的ロードでは SteamAPI_InitFlat(SteamErrMsg*) を使う（partner ドキュメント / steam_api.h 参照）。
+    """
+    init_legacy = _bind_cdecl_fn(dll, "SteamAPI_Init", ctypes.c_bool)
+    if init_legacy is not None:
+
+        def _call() -> bool:
+            return bool(init_legacy())
+
+        return _call
+
+    init_flat: Optional[Any] = None
+    try:
+        cand = getattr(dll, "SteamAPI_InitFlat")
+        if callable(cand):
+            init_flat = cand
+    except AttributeError:
+        pass
+    if init_flat is None:
+        addr = _get_proc_address(dll, "SteamAPI_InitFlat")
+        if addr is None:
+            LOG.debug("Steam: SteamAPI_Init / SteamAPI_InitFlat のどちらも解決できません")
+            return None
+        init_flat = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p)(addr)
+    init_flat.argtypes = [ctypes.c_void_p]
+    init_flat.restype = ctypes.c_int
+
+    def _call_flat() -> bool:
+        # ESteamAPIInitResult: k_ESteamAPIInitResult_OK == 0（steam_api.h）
+        return int(init_flat(None)) == 0
+
+    LOG.info("Steam: SteamAPI_Init は未 export のため SteamAPI_InitFlat を使用します（新 SDK 想定）")
+    return _call_flat
 
 
 def _bind_core_exports(dll: Any) -> Optional[tuple[Callable[..., bool], Callable[[], None], Callable[[], None]]]:
     if not isinstance(dll, ctypes.CDLL):
         return None
-    init_fn = _bind_cdecl_fn(dll, "SteamAPI_Init", ctypes.c_bool)
+    init_fn = _bind_steam_init(dll)
     if init_fn is None:
-        LOG.debug("Steam: SteamAPI_Init が解決できません（属性・GetProcAddress とも失敗）")
         return None
     shutdown_fn = _bind_cdecl_fn(dll, "SteamAPI_Shutdown", None)
     if shutdown_fn is None:
@@ -209,6 +258,47 @@ def _try_get_isteam_apps(dll: ctypes.CDLL) -> Optional[int]:
     return None
 
 
+def _prepare_user_stats_for_achievements(dll: ctypes.CDLL, user_stats_ptr: int) -> None:
+    """
+    SetAchievement の前に RequestCurrentStats を送り、RunCallbacks で応答を処理する。
+    Steamworks では未リクエストのまま SetAchievement すると false になり得る。
+    """
+    global _user_stats_prepared
+    if _user_stats_prepared:
+        return
+    try:
+        req_fn = getattr(dll, "SteamAPI_ISteamUserStats_RequestCurrentStats")
+    except AttributeError:
+        addr = _get_proc_address(dll, "SteamAPI_ISteamUserStats_RequestCurrentStats")
+        if addr is None:
+            LOG.debug("Steam: RequestCurrentStats が解決できません")
+            _user_stats_prepared = True
+            return
+        req_fn = ctypes.CFUNCTYPE(ctypes.c_bool, ctypes.c_void_p)(addr)
+    req_fn.argtypes = [ctypes.c_void_p]
+    req_fn.restype = ctypes.c_bool
+    try:
+        sent = bool(req_fn(ctypes.c_void_p(user_stats_ptr)))
+    except Exception as exc:
+        LOG.debug("Steam: RequestCurrentStats: %s", exc)
+        _user_stats_prepared = True
+        return
+    LOG.debug("Steam: RequestCurrentStats -> %s", sent)
+    run_fn = _bind_cdecl_fn(dll, "SteamAPI_RunCallbacks", None)
+    if run_fn is None:
+        _user_stats_prepared = True
+        return
+    deadline = time.monotonic() + 4.0
+    while time.monotonic() < deadline:
+        try:
+            run_fn()
+        except Exception as exc:
+            LOG.debug("Steam: RunCallbacks (stats prep): %s", exc)
+            break
+        time.sleep(0.05)
+    _user_stats_prepared = True
+
+
 def _try_get_isteam_user_stats(dll: ctypes.CDLL) -> Optional[int]:
     """SteamAPI_SteamUserStats_vNNN から ISteamUserStats* を取得。"""
     for v in range(50, 7, -1):
@@ -230,7 +320,7 @@ def _try_get_isteam_user_stats(dll: ctypes.CDLL) -> Optional[int]:
 
 
 def _try_native_init() -> bool:
-    """DLL が利用可能なら SteamAPI_Init まで試す。成功時のみ True。"""
+    """DLL が利用可能なら SteamAPI_Init または SteamAPI_InitFlat まで試す。成功時のみ True。"""
     global _steam_dll, _steam_dll_path, _initialized, _steam_apps_ptr, _steam_user_stats_ptr
 
     if platform.system() != "Windows":
@@ -254,14 +344,14 @@ def _try_native_init() -> bool:
         try:
             ok = bool(init_fn())
         except OSError as exc:
-            LOG.info("Steam: SteamAPI_Init が OSError: %s (%s)", path, exc)
+            LOG.info("Steam: Steam 初期化が OSError: %s (%s)", path, exc)
             continue
         except Exception as exc:
-            LOG.warning("Steam: SteamAPI_Init が例外終了: %s (%s)", path, exc)
+            LOG.warning("Steam: Steam 初期化が例外終了: %s (%s)", path, exc)
             continue
         if not ok:
             LOG.info(
-                "Steam: SteamAPI_Init が false（クライアント未起動・App ID 不一致など）: %s",
+                "Steam: Steam 初期化が失敗（クライアント未起動・App ID 不一致など）: %s",
                 path,
             )
             continue
@@ -341,7 +431,12 @@ def steam_init_diagnostics_lines() -> List[str]:
 
         hmod = getattr(dll, "_handle", None)
         lines.append(f"    → LoadLibrary ハンドル: {hmod!r}")
-        for sym in ("SteamAPI_Init", "SteamAPI_Shutdown", "SteamAPI_RunCallbacks"):
+        for sym in (
+            "SteamAPI_Init",
+            "SteamAPI_InitFlat",
+            "SteamAPI_Shutdown",
+            "SteamAPI_RunCallbacks",
+        ):
             try:
                 g = getattr(dll, sym)
                 get_ok = callable(g)
@@ -372,20 +467,23 @@ def steam_init_diagnostics_lines() -> List[str]:
         try:
             ok = bool(init_fn())
         except OSError as exc:
-            lines.append(f"    → SteamAPI_Init OSError: {exc}")
+            lines.append(f"    → Steam 初期化（Init / InitFlat）OSError: {exc}")
             continue
         except Exception as exc:
-            lines.append(f"    → SteamAPI_Init 例外: {exc}")
+            lines.append(f"    → Steam 初期化（Init / InitFlat）例外: {exc}")
             continue
 
-        lines.append(f"    → SteamAPI_Init 戻り値: {ok}")
+        lines.append(
+            f"    → Steam 初期化（Init または InitFlat）成功: {ok}"
+            "（新 SDK では InitFlat のみ export されることがあります）"
+        )
         if ok:
             try:
                 shutdown_fn()
             except Exception as exc:
                 lines.append(f"    → 診断後 Shutdown で例外: {exc}")
             else:
-                lines.append("    → （診断のため Init 成功後に Shutdown 済み。続けて本初期化を試します）")
+                lines.append("    → （診断のため初期化成功後に Shutdown 済み。続けて本初期化を試します）")
         else:
             lines.append(
                 "    → false のときは: Steam クライアント未起動・未ログイン・"
@@ -426,6 +524,7 @@ def steam_is_subscribed() -> Optional[bool]:
 def unlock_achievement(api_name: str) -> bool:
     """
     ISteamUserStats::SetAchievement（成功時は可能なら StoreStats）。
+    初回は内部で RequestCurrentStats ＋ RunCallbacks を短時間回す（Steam 要件）。
 
     - ネイティブ未接続: False（クラッシュしない）。
     - BASKETBALL_SIM_FAKE_STEAM: DEBUG ログのうえ True（分岐テスト用）。
@@ -461,6 +560,8 @@ def unlock_achievement(api_name: str) -> bool:
         LOG.debug("Steam: unlock_achievement: ISteamUserStats なし")
         return False
 
+    _prepare_user_stats_for_achievements(dll, _steam_user_stats_ptr)
+
     try:
         set_fn = dll.SteamAPI_ISteamUserStats_SetAchievement
     except AttributeError:
@@ -478,6 +579,11 @@ def unlock_achievement(api_name: str) -> bool:
         LOG.debug("Steam: SetAchievement: %s", exc)
         return False
     if not ok:
+        LOG.info(
+            "Steam: SetAchievement が false: %s（実績未公開・API 名不一致・"
+            "RequestCurrentStats 未完了の可能性）",
+            name,
+        )
         return False
     try:
         store_fn = dll.SteamAPI_ISteamUserStats_StoreStats
@@ -559,6 +665,7 @@ def shutdown_steam() -> None:
     フェイク初期化のみの場合はフラグのみオフ。
     """
     global _initialized, _steam_dll, _steam_dll_path, _steam_apps_ptr, _steam_user_stats_ptr
+    global _user_stats_prepared
     dll = _steam_dll
     if dll is not None:
         try:
@@ -569,6 +676,7 @@ def shutdown_steam() -> None:
     _steam_dll_path = None
     _steam_apps_ptr = None
     _steam_user_stats_ptr = None
+    _user_stats_prepared = False
     _initialized = False
 
 
@@ -578,7 +686,7 @@ def try_init_steam() -> bool:
 
     - 未統合の環境では False（クラッシュしない）。
     - BASKETBALL_SIM_FAKE_STEAM で True を返せる（テスト用）。
-    - Windows で steam_api64.dll 等があり SteamAPI_Init が成功すれば True。
+    - Windows で steam_api64.dll 等があり SteamAPI_Init または SteamAPI_InitFlat が成功すれば True。
     """
     global _initialized, _app_id_hint
 

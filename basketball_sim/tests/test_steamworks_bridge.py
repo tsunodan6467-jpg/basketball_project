@@ -15,6 +15,7 @@ def reset_steam_module_state(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(sw, "_steam_dll", None, raising=False)
     monkeypatch.setattr(sw, "_steam_apps_ptr", None, raising=False)
     monkeypatch.setattr(sw, "_steam_user_stats_ptr", None, raising=False)
+    monkeypatch.setattr(sw, "_user_stats_prepared", False, raising=False)
     yield
 
 
