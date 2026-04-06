@@ -11,6 +11,7 @@
 | **現状ラベル** | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.8 |
 | **フェーズ・優先度** | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
 | **トレード現金の会計・表示方針** | `docs/TRADE_CASH_ACCOUNTING_POLICY.md` |
+| **シーズン中正式収益の構造（仮収入の置換骨子）** | `docs/SEASON_REVENUE_MODEL_NOTES.md` |
 
 **前提**: R1 は解消済み（FA 年俸の即時 `money` 減算なし、年俸はオフ締め payroll → 正本）。  
 **更新**: 2026-04-06 — **国内リーグ所属クラブ**の杯・洲际・FINAL BOSS 賞金は、オフ締め `revenue` / `breakdown_revenue` に合流し正本履歴に載る（外部招待のみ従来の `money` 直接）。
@@ -155,3 +156,4 @@
 - 2026-04-06: 初版（R2 設計整理、`ECONOMY_MONEY_FLOW_AUDIT` ベース）。
 - 2026-04-06: 大会賞金の正本合流（所属クラブ）を反映 — §1・§3・§4・§6 タスク1。
 - 2026-04-06: `TRADE_CASH_ACCOUNTING_POLICY.md` 参照追加、§3 トレード行を同ポリシーに合わせて更新。
+- 2026-04-06: `SEASON_REVENUE_MODEL_NOTES.md` を参照表に追加（ラウンド仮収入の置換骨子）。
