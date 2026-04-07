@@ -1,11 +1,14 @@
 from typing import List, Optional, Tuple
 import random
 
-from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
+from basketball_sim.config.game_constants import (
+    GENERATOR_INITIAL_SALARY_BASE_PER_OVR,
+    PLAYER_SALARY_BASE_PER_OVR,
+)
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.season_transaction_rules import cpu_inseason_fa_allowed_for_simulated_round
-from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.contract_logic import MIN_SALARY_DEFAULT, get_team_payroll
 from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap, league_level_for_team
 
 
@@ -14,6 +17,14 @@ FA_SOFT_CAP_MIN_ROOM = 8_000_000
 
 # オフ手動FA専用: `estimate_fa_market_value` をベースにした下限（CPU本格FA・estimate 係数本体は不変更）
 MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER = 1.35
+
+# 旧 estimate の ovr*12000 加算補正を、開幕ロスター単価へ載せ替えるときのスケール除数
+_ESTIMATE_FA_LEGACY_OVR_COEFF = 12000
+
+
+def _scale_fa_estimate_bonus(old_bonus: int) -> int:
+    """旧 `ovr*12000` ベース時代の円加算を、GENERATOR_INITIAL_SALARY_BASE_PER_OVR 比で整数スケールする。"""
+    return int(old_bonus * GENERATOR_INITIAL_SALARY_BASE_PER_OVR // _ESTIMATE_FA_LEGACY_OVR_COEFF)
 
 
 def ensure_fa_market_fields(player: Player) -> None:
@@ -68,8 +79,10 @@ def normalize_free_agents(free_agents: List[Player]) -> List[Player]:
 
 def estimate_fa_market_value(player: Player) -> int:
     """
-    FA市場でのざっくり年俸目安。
-    将来は契約ロジックと統合できるように単独関数化。
+    FA市場でのざっくり年俸目安（インシーズンFAの表示＝`sign_free_agent` 未指定時の契約額の単一ソース）。
+
+    第1弾: 開幕ロスターと同じ `GENERATOR_INITIAL_SALARY_BASE_PER_OVR` オーダーへ寄せる。
+    旧 `ovr*12000` 核に載っていた potential / 年齢 / FA待機の加算は、同じ比率で円額スケールする。
     """
     ensure_fa_market_fields(player)
 
@@ -78,32 +91,34 @@ def estimate_fa_market_value(player: Player) -> int:
     potential = str(getattr(player, "potential", "C")).upper()
     fa_wait = int(getattr(player, "fa_years_waiting", 0))
 
-    base = max(ovr * 12000, 400000)
+    raw_linear = int(ovr) * int(GENERATOR_INITIAL_SALARY_BASE_PER_OVR)
+    legacy_floor = _scale_fa_estimate_bonus(400_000)
+    base = max(raw_linear, legacy_floor)
 
     potential_bonus_map = {
-        "S": 250000,
-        "A": 180000,
-        "B": 100000,
+        "S": 250_000,
+        "A": 180_000,
+        "B": 100_000,
         "C": 0,
-        "D": -80000,
+        "D": -80_000,
     }
-    base += potential_bonus_map.get(potential, 0)
+    base += _scale_fa_estimate_bonus(potential_bonus_map.get(potential, 0))
 
     if age <= 23:
-        base += 120000
+        base += _scale_fa_estimate_bonus(120_000)
     elif age >= 35:
-        base -= 220000
+        base -= _scale_fa_estimate_bonus(220_000)
     elif age >= 32:
-        base -= 120000
+        base -= _scale_fa_estimate_bonus(120_000)
 
     if fa_wait >= 1:
-        base -= 80000
+        base -= _scale_fa_estimate_bonus(80_000)
     if fa_wait >= 2:
-        base -= 120000
+        base -= _scale_fa_estimate_bonus(120_000)
     if fa_wait >= 3:
-        base -= 150000
+        base -= _scale_fa_estimate_bonus(150_000)
 
-    return max(300000, int(base))
+    return max(int(MIN_SALARY_DEFAULT), int(base))
 
 
 
