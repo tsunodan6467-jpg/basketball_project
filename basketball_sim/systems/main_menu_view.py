@@ -276,6 +276,12 @@ class MainMenuView:
             font=("Yu Gothic UI", 11, "bold"),
             padding=(12, 10),
         )
+        # 主画面右下デバッグ用（長文が右ペイン幅で切れないよう Menu よりやや詰める）
+        self.style.configure(
+            "DebugSkip.TButton",
+            font=("Yu Gothic UI", 10, "bold"),
+            padding=(10, 9),
+        )
         self.style.configure(
             "Primary.TButton",
             font=("Yu Gothic UI", 12, "bold"),
@@ -449,7 +455,8 @@ class MainMenuView:
 
         advance_wrap = ttk.Frame(right_col, style="Panel.TFrame", padding=(12, 10))
         advance_wrap.grid(row=2, column=0, sticky="nsew")
-        advance_wrap.columnconfigure(0, weight=1)
+        # 右ペインが極端に狭いと ttk ボタン文言が切れるため、進行ブロックの最小幅だけ確保
+        advance_wrap.columnconfigure(0, weight=1, minsize=288)
         advance_wrap.rowconfigure(0, weight=0)
         advance_wrap.rowconfigure(1, weight=1)
         advance_wrap.rowconfigure(2, weight=0)
@@ -499,7 +506,7 @@ class MainMenuView:
             self.debug_skip_button = ttk.Button(
                 advance_wrap,
                 text="デバッグ: オフシーズンまで飛ばす",
-                style="Menu.TButton",
+                style="DebugSkip.TButton",
                 command=debug_skip_cb,
             )
             self.debug_skip_button.grid(row=3, column=0, sticky="ew", pady=(8, 0))
