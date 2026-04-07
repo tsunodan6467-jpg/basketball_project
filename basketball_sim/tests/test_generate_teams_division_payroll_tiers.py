@@ -7,6 +7,13 @@ from basketball_sim.systems.contract_logic import get_team_payroll
 from basketball_sim.systems.generator import generate_teams
 
 
+def _roster_tier_sort_key(p):
+    ovr = int(getattr(p, "ovr", 0))
+    pid = getattr(p, "player_id", None)
+    tid = int(pid) if isinstance(pid, int) else 0
+    return (-ovr, tid)
+
+
 def test_generate_teams_division_mean_payroll_ordering():
     """複数 seed でディビジョン平均が D1 > D2 > D3。正の差は緩めに検証。"""
     for seed in (0, 42, 99, 20260329):
@@ -29,7 +36,7 @@ def test_generate_teams_salary_rank_mostly_follows_ovr_seed42():
     teams = generate_teams()
     t0 = teams[0]
     assert int(getattr(t0, "league_level", 0)) == 1
-    roster = sorted(getattr(t0, "players", []), key=lambda p: int(getattr(p, "ovr", 0)), reverse=True)
+    roster = sorted(getattr(t0, "players", []), key=_roster_tier_sort_key)
     assert len(roster) == 13
     salaries_by_ovr = [int(getattr(p, "salary", 0)) for p in roster]
     assert salaries_by_ovr[0] >= salaries_by_ovr[-1]
@@ -37,3 +44,15 @@ def test_generate_teams_salary_rank_mostly_follows_ovr_seed42():
     top5_min = min(salaries_by_ovr[:5])
     bottom_min = min(salaries_by_ovr[8:])
     assert top5_min >= bottom_min
+
+
+def test_generate_teams_tier_top5_min_ge_bot3_max_seed42():
+    """第2弾: OVR層の上位5の最小が下位3の最大以上（全チーム・seed42）。"""
+    random.seed(42)
+    teams = generate_teams()
+    for t in teams:
+        roster = sorted(getattr(t, "players", []), key=_roster_tier_sort_key)
+        assert len(roster) == 13
+        s = [int(getattr(p, "salary", 0)) for p in roster]
+        assert min(s[:5]) >= max(s[10:13])
+        assert sum(s) == get_team_payroll(t)

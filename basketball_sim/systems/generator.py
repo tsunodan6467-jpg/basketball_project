@@ -48,42 +48,45 @@ def _initial_roster_target_team_payroll(league_level: int) -> int:
     return random.randint(480_000_000, 580_000_000)
 
 
-def _rebalance_team_initial_salaries_to_target(players: list[Player], target_total: int) -> None:
-    """
-    素年俸（calculate_initial_salary）の相対比を保ちつつ、チーム合計が target_total になるよう整数配分する。
-    最大剰余法で総額一致 → 下限適用後に総額を再調整。generate_teams 専用。
-    """
-    n = len(players)
-    if n == 0 or target_total <= 0:
-        return
+def _stable_player_tier_sort_key(player: Player) -> tuple[int, int]:
+    """開幕年俸層分け用: OVR 降順、同率は player_id 昇順（安定タイブレーク）。"""
+    ovr = int(getattr(player, "ovr", 0))
+    pid = getattr(player, "player_id", None)
+    tid = int(pid) if isinstance(pid, int) else 0
+    return (-ovr, tid)
 
-    floor = int(MIN_SALARY_DEFAULT)
-    min_sum = floor * n
-    if target_total < min_sum:
-        target_total = min_sum
 
-    raw = [max(1, int(getattr(p, "salary", 0) or 0)) for p in players]
+def _tier_budgets_top_mid_bot_58_32_10(total: int) -> tuple[int, int, int]:
+    """総額 total を 58% / 32% / 10% に整数分割（合計ぴったり）。"""
+    b_top = (total * 58) // 100
+    b_mid = (total * 32) // 100
+    b_bot = total - b_top - b_mid
+    return b_top, b_mid, b_bot
+
+
+def _allocate_budget_proportionally(weights: list[int], target: int, floor: int) -> list[int]:
+    """
+    weights の相対比で target を整数配分。最大剰余法 → 下限 → 総額一致まで高額側で調整。
+    """
+    n = len(weights)
+    if n == 0:
+        return []
+    if target <= 0:
+        return [floor] * n
+
+    raw = [max(1, int(w)) for w in weights]
     weight_sum = sum(raw)
-    if weight_sum <= 0:
-        base = target_total // n
-        rem = target_total % n
-        for i, p in enumerate(players):
-            p.salary = base + (1 if i < rem else 0)
-        return
-
-    exact = [raw[i] / weight_sum * target_total for i in range(n)]
+    exact = [raw[i] / weight_sum * target for i in range(n)]
     alloc = [int(x) for x in exact]
-    remainder = target_total - sum(alloc)
+    rem = target - sum(alloc)
     order = sorted(range(n), key=lambda i: exact[i] - alloc[i], reverse=True)
-    for k in range(remainder):
+    for k in range(rem):
         alloc[order[k]] += 1
 
     alloc = [max(floor, a) for a in alloc]
-    diff = target_total - sum(alloc)
+    diff = target - sum(alloc)
     if diff == 0:
-        for i, p in enumerate(players):
-            p.salary = int(alloc[i])
-        return
+        return alloc
 
     if diff > 0:
         by_high = sorted(range(n), key=lambda i: alloc[i], reverse=True)
@@ -97,7 +100,7 @@ def _rebalance_team_initial_salaries_to_target(players: list[Player], target_tot
         by_high = sorted(range(n), key=lambda i: alloc[i], reverse=True)
         i = 0
         guard = 0
-        while need > 0 and guard < n * (target_total + 1):
+        while need > 0 and guard < n * (target + 1):
             j = by_high[i % n]
             if alloc[j] > floor:
                 alloc[j] -= 1
@@ -105,8 +108,50 @@ def _rebalance_team_initial_salaries_to_target(players: list[Player], target_tot
             i += 1
             guard += 1
 
-    for i, p in enumerate(players):
-        p.salary = int(alloc[i])
+    return alloc
+
+
+def _rebalance_team_initial_salaries_to_target(players: list[Player], target_total: int) -> None:
+    """
+    チーム合計を target_total に固定したまま年俸を配分する。generate_teams 専用。
+
+    第2弾: OVR 降順で上位5 / 中位5 / 下位3 に分け、層予算 58% / 32% / 10% を層内素年俸比例で配る。
+    13人以外のロスターは従来どおり一括比例（退避経路）。
+    """
+    n = len(players)
+    if n == 0 or target_total <= 0:
+        return
+
+    floor = int(MIN_SALARY_DEFAULT)
+    min_sum = floor * n
+    if target_total < min_sum:
+        target_total = min_sum
+
+    if n != 13:
+        raw = [max(1, int(getattr(p, "salary", 0) or 0)) for p in players]
+        weight_sum = sum(raw)
+        if weight_sum <= 0:
+            base = target_total // n
+            rem = target_total % n
+            for i, p in enumerate(players):
+                p.salary = base + (1 if i < rem else 0)
+            return
+        alloc = _allocate_budget_proportionally(raw, target_total, floor)
+        for i, p in enumerate(players):
+            p.salary = int(alloc[i])
+        return
+
+    sorted_p = sorted(players, key=_stable_player_tier_sort_key)
+    raws = [max(1, int(getattr(p, "salary", 0) or 0)) for p in sorted_p]
+
+    b_top, b_mid, b_bot = _tier_budgets_top_mid_bot_58_32_10(target_total)
+    s_top = _allocate_budget_proportionally(raws[0:5], b_top, floor)
+    s_mid = _allocate_budget_proportionally(raws[5:10], b_mid, floor)
+    s_bot = _allocate_budget_proportionally(raws[10:13], b_bot, floor)
+    new_salaries = s_top + s_mid + s_bot
+
+    for p, s in zip(sorted_p, new_salaries):
+        p.salary = int(s)
 
 
 def _assign_extended_attributes(player: Player, pos: str, ovr: int) -> None:
