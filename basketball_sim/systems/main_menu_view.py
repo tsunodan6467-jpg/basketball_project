@@ -4274,7 +4274,7 @@ class MainMenuView:
         ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
 
     def open_development_window(self) -> None:
-        """Open a safe read-only development / growth subwindow."""
+        """強化・育成の閲覧ウィンドウ。最下部ボタンからチーム練習・個別練習を変更可能。"""
         existing = getattr(self, "_development_window", None)
         try:
             if existing is not None and existing.winfo_exists():
@@ -4315,8 +4315,10 @@ class MainMenuView:
             purpose,
             text=(
                 "【強化メニュー】チーム練習・個別練習の方針、スペシャル練習の解放条件、"
-                "選手ごとの育成指標と見立てをまとめて確認する画面です（主に読み取り）。"
-                "変更は下部の「チーム練習を変更」「個別練習を変更」から行えます。"
+                "選手ごとの育成指標と見立てを確認します。上段の3パネルとロスター一覧は閲覧です。"
+                "練習内容の変更だけ、ウィンドウ最下部（直近変更ログの下）の"
+                "「チーム練習を変更」「個別練習を変更」から行えます。"
+                "メイン画面でチーム未接続のときは変更ボタンは使えません。"
             ),
             wraplength=1020,
             font=("Yu Gothic UI", 10),
@@ -4572,7 +4574,8 @@ class MainMenuView:
 
         self.development_hint_intro_var.set(
             "上段パネル: 人数・練習方針・HC/戦術の育成への効き方・スペシャル練習。"
-            "下表: 選手ごとの POT / development / 試合出場 / 年齢帯 / 見立て。"
+            "下表: 選手ごとの POT / development / 試合出場 / 年齢帯 / 見立て（閲覧）。"
+            "練習の編集は、この下の履歴のさらに下にある2ボタンから。"
         )
         self._refresh_development_training_log_widgets()
 
