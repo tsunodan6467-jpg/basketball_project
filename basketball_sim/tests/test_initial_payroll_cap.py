@@ -13,7 +13,7 @@ from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap
 
 
 def test_generate_teams_payroll_under_league_cap_multiple_seeds():
-    """main.py と同様に normalize 後は 0.98×上限以下。生成分は 12 億付近帯を狙う。"""
+    """main.py と同様に normalize 後は 0.98×上限以下。開幕は D1>D2>D3 の平均総年俸段差を持つ。"""
     league_cap = int(get_hard_cap(league_level=1))
     soft = int(get_soft_cap(league_level=1))
     assert league_cap == soft
@@ -25,8 +25,13 @@ def test_generate_teams_payroll_under_league_cap_multiple_seeds():
         payrolls = [get_team_payroll(t) for t in teams]
         assert max(payrolls) <= norm_ceiling, (seed, max(payrolls), norm_ceiling)
         assert max(payrolls) <= league_cap, (seed, max(payrolls), league_cap)
-        assert statistics.median(payrolls) >= 1_000_000_000, (seed, statistics.median(payrolls))
-        assert statistics.mean(payrolls) >= 1_020_000_000, (seed, statistics.mean(payrolls))
+        by_lv = {1: [], 2: [], 3: []}
+        for t in teams:
+            by_lv[int(getattr(t, "league_level", 1))].append(get_team_payroll(t))
+        m1 = statistics.mean(by_lv[1])
+        m2 = statistics.mean(by_lv[2])
+        m3 = statistics.mean(by_lv[3])
+        assert m1 > m2 > m3, (seed, m1, m2, m3)
 
 
 def test_normalize_team_payroll_under_hard_cap_scales_down():

@@ -1,7 +1,9 @@
 import random
+
 from basketball_sim.config.game_constants import GENERATOR_INITIAL_SALARY_BASE_PER_OVR
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.contract_logic import MIN_SALARY_DEFAULT
 
 # 選手IDが重複しないように管理するカウンタ
 _player_id_counter = 1
@@ -31,6 +33,80 @@ def sync_player_id_counter_from_world(teams, free_agents) -> int:
 def calculate_initial_salary(ovr: int) -> int:
     """OVR をもとに generator が付与する初期年俸（開幕ペイロール用。契約希望額は PLAYER_SALARY_BASE_PER_OVR）。"""
     return int(ovr) * GENERATOR_INITIAL_SALARY_BASE_PER_OVR
+
+
+def _initial_roster_target_team_payroll(league_level: int) -> int:
+    """
+    開幕ロスター専用: ディビジョンごとの目標総年俸（円/年）。
+    `generate_teams` のみで使用。D1 > D2 > D3 となる非重複レンジで段差を付ける。
+    """
+    lv = max(1, min(3, int(league_level)))
+    if lv == 1:
+        return random.randint(1_020_000_000, 1_140_000_000)
+    if lv == 2:
+        return random.randint(680_000_000, 780_000_000)
+    return random.randint(480_000_000, 580_000_000)
+
+
+def _rebalance_team_initial_salaries_to_target(players: list[Player], target_total: int) -> None:
+    """
+    素年俸（calculate_initial_salary）の相対比を保ちつつ、チーム合計が target_total になるよう整数配分する。
+    最大剰余法で総額一致 → 下限適用後に総額を再調整。generate_teams 専用。
+    """
+    n = len(players)
+    if n == 0 or target_total <= 0:
+        return
+
+    floor = int(MIN_SALARY_DEFAULT)
+    min_sum = floor * n
+    if target_total < min_sum:
+        target_total = min_sum
+
+    raw = [max(1, int(getattr(p, "salary", 0) or 0)) for p in players]
+    weight_sum = sum(raw)
+    if weight_sum <= 0:
+        base = target_total // n
+        rem = target_total % n
+        for i, p in enumerate(players):
+            p.salary = base + (1 if i < rem else 0)
+        return
+
+    exact = [raw[i] / weight_sum * target_total for i in range(n)]
+    alloc = [int(x) for x in exact]
+    remainder = target_total - sum(alloc)
+    order = sorted(range(n), key=lambda i: exact[i] - alloc[i], reverse=True)
+    for k in range(remainder):
+        alloc[order[k]] += 1
+
+    alloc = [max(floor, a) for a in alloc]
+    diff = target_total - sum(alloc)
+    if diff == 0:
+        for i, p in enumerate(players):
+            p.salary = int(alloc[i])
+        return
+
+    if diff > 0:
+        by_high = sorted(range(n), key=lambda i: alloc[i], reverse=True)
+        i = 0
+        while diff > 0:
+            alloc[by_high[i % n]] += 1
+            diff -= 1
+            i += 1
+    else:
+        need = -diff
+        by_high = sorted(range(n), key=lambda i: alloc[i], reverse=True)
+        i = 0
+        guard = 0
+        while need > 0 and guard < n * (target_total + 1):
+            j = by_high[i % n]
+            if alloc[j] > floor:
+                alloc[j] -= 1
+                need -= 1
+            i += 1
+            guard += 1
+
+    for i, p in enumerate(players):
+        p.salary = int(alloc[i])
 
 
 def _assign_extended_attributes(player: Player, pos: str, ovr: int) -> None:
@@ -871,6 +947,9 @@ def generate_teams() -> list[Team]:
                 p.was_naturalized = p.nationality == "Naturalized"
                 _set_acquisition(p, "normal", "initial_team_roster")
                 team.add_player(p)
+
+            target_pay = _initial_roster_target_team_payroll(team.league_level)
+            _rebalance_team_initial_salaries_to_target(team.players, target_pay)
 
             teams.append(team)
             team_id_counter += 1
