@@ -136,11 +136,11 @@
 
 | 区分 | 内容 |
 |------|------|
-| 実装済み | トレード（`trade_logic.py`, `main.py` CLI）、FA（`free_agent_market.py` 等）、ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。**CLI トレード相手候補**は自チーム以外の **D1/D2/D3 全クラブ**（`main.get_trade_candidate_teams`、2026-04-06）。 |
+| 実装済み | トレード（`trade_logic.py`, `main.py` CLI）、**人事 GUI の選手のみ 1対1**（`main_menu_view.open_roster_window` → `main` 共用ヘルパ・`TradeSystem`、2026-04-06）。FA（`free_agent_market.py` 等）、ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。**CLI / GUI 1対1 共通**の相手候補は自チーム以外の **D1/D2/D3 全クラブ**（`Season.all_teams` 経由で `main.get_trade_candidate_teams`）。 |
 | 暫定 | **未確認**。 |
 | 未実装 | `PRODUCT` は GUI からの同一ガード通過を **残** と記載。 |
 | 未確認 | 全 GUI 経路でのロック整合。 |
-| 主要ファイル | `basketball_sim/main.py`, `basketball_sim/systems/trade_logic.py`, `basketball_sim/systems/season_transaction_rules.py` |
+| 主要ファイル | `basketball_sim/main.py`, `basketball_sim/systems/trade_logic.py`, `basketball_sim/systems/season_transaction_rules.py`, `basketball_sim/systems/main_menu_view.py` |
 
 ### 5.8 経営
 

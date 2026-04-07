@@ -1335,6 +1335,42 @@ def print_trade_evaluation_summary(user_eval, ai_eval):
     print(f"AI側理由       : {', '.join(ai_eval.reasons)}")
 
 
+def format_one_for_one_trade_evaluation_text(user_eval, ai_eval) -> str:
+    """CLI / GUI 共通の評価サマリー（print_trade_evaluation_summary と同内容・改行区切り）。"""
+    return (
+        f"あなた側評価  : {'承認' if user_eval.accepts else '拒否'} | スコア {user_eval.score}\n"
+        f"AI側評価      : {'承認' if ai_eval.accepts else '拒否'} | スコア {ai_eval.score}\n"
+        f"あなた側理由   : {', '.join(user_eval.reasons)}\n"
+        f"AI側理由       : {', '.join(ai_eval.reasons)}"
+    )
+
+
+def one_for_one_trade_evaluate_and_ai_gate(
+    trade_system: TradeSystem,
+    user_team,
+    ai_team,
+    user_send_player,
+    ai_send_player,
+):
+    """
+    1対1トレードの評価と AI 承諾判定（CLI propose_trade と GUI 共用）。
+    戻り値: (user_eval, ai_eval, accepted, reason, detail)
+    """
+    user_eval, ai_eval = trade_system.evaluate_one_for_one_trade(
+        user_team=user_team,
+        ai_team=ai_team,
+        user_send_player=user_send_player,
+        ai_send_player=ai_send_player,
+    )
+    accepted, reason, detail = trade_system.should_ai_accept_trade(
+        user_team=user_team,
+        ai_team=ai_team,
+        user_send_player=user_send_player,
+        ai_send_player=ai_send_player,
+    )
+    return user_eval, ai_eval, accepted, reason, detail
+
+
 def propose_trade(all_teams, user_team, season=None):
     if not inseason_roster_moves_unlocked(season):
         print(INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA)
@@ -1371,20 +1407,14 @@ def propose_trade(all_teams, user_team, season=None):
     if user_player is None:
         return
 
-    user_eval, ai_eval = trade_system.evaluate_one_for_one_trade(
-        user_team=user_team,
-        ai_team=ai_team,
-        user_send_player=user_player,
-        ai_send_player=ai_player
+    user_eval, ai_eval, accepted, reason, detail = one_for_one_trade_evaluate_and_ai_gate(
+        trade_system,
+        user_team,
+        ai_team,
+        user_player,
+        ai_player,
     )
     print_trade_evaluation_summary(user_eval, ai_eval)
-
-    accepted, reason, detail = trade_system.should_ai_accept_trade(
-        user_team=user_team,
-        ai_team=ai_team,
-        user_send_player=user_player,
-        ai_send_player=ai_player
-    )
 
     if not accepted:
         print_separator("トレード結果")

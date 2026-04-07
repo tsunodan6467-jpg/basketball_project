@@ -12,7 +12,7 @@
 | 現状ラベル | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.5・§5.7 |
 | 経営メニュー全体のたたき台 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md`（人事は別ウィンドウ） |
 
-**コード上の事実（静的確認・2026-04-06）**: `main.propose_trade` は `inseason_roster_moves_unlocked` 後、`choose_trade_team` → `get_tradeable_players`（双方）→ `TradeSystem.evaluate_one_for_one_trade` / `should_ai_accept_trade` / `execute_one_for_one_trade`。入力は **相手選手・自チーム選手の番号**と **最終 y/n** のみ（現金・RB なし）。`main_menu_view.open_roster_window` 内に **トレード・FA 案内**テキストがあり、**当面 CLI 正本**と明記。
+**コード上の事実（2026-04-06 更新）**: `main.propose_trade`（CLI）と人事の **「1対1トレード（選手のみ）」**はいずれも `inseason_roster_moves_unlocked` 後に `get_trade_candidate_teams` / `get_tradeable_players` → `one_for_one_trade_evaluate_and_ai_gate`（評価＋AI承諾）→ 確認 → `execute_one_for_one_trade`（現金・RB なし）。GUI は `MainMenuView._all_teams_for_trade_gui` で `Season.all_teams` を優先し CLI と同じ母集団を使う。
 
 ---
 
@@ -29,7 +29,7 @@
 | 論点 | 内容 |
 |------|------|
 | **CLI** | `run_trade_menu` の **2** から `propose_trade`。**選手のみ**。**multi（3）** は複数人＋現金＋RB（`TRADE_MENU_ONE_FOR_ONE_ENTRY_POLICY.md`）。相手候補は **全ディビジョン**（`main.get_trade_candidate_teams`、2026-04-06 修正済み）。 |
-| **GUI** | 人事ウィンドウは **案内＋延長・FA 送り**のみ。トレード**実行は未**。 |
+| **GUI** | 人事ウィンドウに **選手のみ 1対1 トレード**ボタンあり（multi・現金・RB は CLI）。延長・FA 送りは従来どおり。 |
 | **1対1 を先にする理由** | 評価・実行経路が **既に `TradeSystem` に閉じ**ており、GUI は **選択 UI とロック再利用**で足りる。multi は **ステップ数・FA・現金**が増え、初手のリスクが大きい。 |
 
 ---
@@ -120,3 +120,4 @@
 ## 変更履歴
 
 - 2026-04-06: 初版。人事入口・選手のみ・CLI 並存を推奨。
+- 2026-04-06: **実装反映**（別コミット）。`main_menu_view` のウィザード＋`main` 共用ヘルパ。タスク 2（`propose_trade` の更なる抽出＋pytest）は任意のまま。

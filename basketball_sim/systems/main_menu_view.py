@@ -1020,8 +1020,10 @@ class MainMenuView:
         tx = self._roster_transaction_status_text()
         return (
             "【当面の運用】\n"
-            "・トレード／インシーズンFA の標準導線は CLI メニューです。\n"
-            "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、CLI 導線の案内を担当します。\n\n"
+            "・選手のみの 1対1 トレードは、本ウィンドウの「1対1トレード（選手のみ）」からも実行できます"
+            "（インシーズンの可否は CLI のトレードと同一ルール）。\n"
+            "・インシーズンFA・複数人＋現金＋RB の multi トレードなどは CLI メニューが正本です。\n"
+            "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、上記・CLI の案内を担当します。\n\n"
             "【現在の条件】\n"
             f"{sched}"
             f"{lock_line}\n"
@@ -1030,8 +1032,8 @@ class MainMenuView:
             "・ロスター表での閲覧、契約の＋1年延長（条件あり）、契約解除による FA 送り（インシーズンは"
             "トレード／インシーズンFA と同じ期限でロック）。\n\n"
             "【まだターミナル（CLI）で行うこと】\n"
-            "・他チームとのトレード、インシーズンFA の本操作、新規契約交渉などは GUI 未対応です。\n"
-            "・実行はシーズンメニュー「8. GMメニュー」→「10. トレード」が正本です。\n"
+            "・multi（複数人＋現金＋RB）、インシーズンFA の本操作、新規契約交渉などは CLI が正本です。\n"
+            "・上記はシーズンメニュー「8. GMメニュー」→「10. トレード」等から実行します。\n"
             "・期限後は CLI 側でもブロックされます（上記と同じルール）。\n\n"
             "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
         )
@@ -1360,10 +1362,18 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 10))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（当面の標準導線はCLI／この画面は案内と一部操作）",
+            text="トレード・FA（1対1は下のボタン／multi・FA 本操作は CLI 正本）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
+        tf_btn_row = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
+        tf_btn_row.pack(fill="x", anchor="w", pady=(0, 6))
+        self._jpn_text_button(
+            tf_btn_row,
+            "1対1トレード（選手のみ）",
+            self._on_roster_one_for_one_trade,
+            side="left",
+        )
         tf_row = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
         tf_row.pack(fill="both", expand=False)
         tf_row.columnconfigure(0, weight=1)
@@ -1523,6 +1533,278 @@ class MainMenuView:
         finally:
             self._roster_window = None
             self._roster_item_to_player.clear()
+
+    def _all_teams_for_trade_gui(self) -> List[Any]:
+        """
+        CLI の propose_trade に渡す all_teams と同じ母集団を返す。
+        Season.all_teams を最優先し、無ければ leagues 全レベルを併合、最後に _iter_league_teams。
+        """
+        season = getattr(self, "season", None)
+        if season is not None:
+            at = getattr(season, "all_teams", None)
+            if isinstance(at, list) and at:
+                return list(at)
+            leagues = self._safe_get(season, "leagues", None)
+            if isinstance(leagues, dict) and leagues:
+                out: List[Any] = []
+                seen: set[int] = set()
+                for _lvl in sorted(leagues.keys(), key=lambda k: (not isinstance(k, int), k)):
+                    for t in leagues.get(_lvl) or []:
+                        tid = id(t)
+                        if tid in seen:
+                            continue
+                        seen.add(tid)
+                        out.append(t)
+                if out:
+                    return out
+        return list(self._iter_league_teams())
+
+    def _on_roster_one_for_one_trade(self) -> None:
+        """人事ウィンドウから GUI 1対1トレード（選手のみ）。評価・実行は main / TradeSystem の既存経路。"""
+        parent = getattr(self, "_roster_window", None) or self.root
+        if self.team is None:
+            messagebox.showwarning("トレード", "チームが未接続です。", parent=parent)
+            return
+        if not inseason_roster_moves_unlocked(self.season):
+            messagebox.showwarning(
+                "トレード",
+                INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
+                parent=parent,
+            )
+            return
+        all_teams = self._all_teams_for_trade_gui()
+        if not all_teams:
+            messagebox.showwarning(
+                "トレード",
+                "リーグのチーム一覧を取得できませんでした。",
+                parent=parent,
+            )
+            return
+        from basketball_sim import main as bs_main
+
+        candidates = bs_main.get_trade_candidate_teams(all_teams, self.team)
+        if not candidates:
+            messagebox.showinfo(
+                "トレード",
+                "トレード相手となる他クラブがありません。",
+                parent=parent,
+            )
+            return
+        self._run_one_for_one_trade_wizard(parent, candidates)
+
+    def _run_one_for_one_trade_wizard(self, parent: Any, trade_candidate_teams: List[Any]) -> None:
+        from basketball_sim import main as bs_main
+        from basketball_sim.systems.trade_logic import TradeSystem
+
+        user_team = self.team
+        top = tk.Toplevel(parent)
+        top.title("1対1トレード（選手のみ）")
+        top.configure(bg="#15171c")
+        try:
+            top.transient(parent)
+        except Exception:
+            pass
+        top.geometry("520x420")
+        top.minsize(440, 360)
+
+        outer = ttk.Frame(top, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+
+        ttk.Label(
+            outer,
+            text="選手のみの 1 対 1 です。現金・RB を伴うトレードは CLI の multi 導線を使ってください。",
+            wraplength=480,
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 8))
+
+        hint_var = tk.StringVar(value="相手クラブを選び、「次へ」を押してください。")
+        ttk.Label(outer, textvariable=hint_var, wraplength=480).pack(fill="x", pady=(0, 6))
+
+        lb_frame = ttk.Frame(outer, style="Panel.TFrame")
+        lb_frame.pack(fill="both", expand=True, pady=(0, 8))
+        lb_frame.rowconfigure(0, weight=1)
+        lb_frame.columnconfigure(0, weight=1)
+        listbox = tk.Listbox(
+            lb_frame,
+            height=12,
+            bg="#222834",
+            fg="#e8ecf0",
+            selectbackground="#3d4f6f",
+            font=("Yu Gothic UI", 10),
+        )
+        vsb = ttk.Scrollbar(lb_frame, orient="vertical", command=listbox.yview)
+        listbox.configure(yscrollcommand=vsb.set)
+        listbox.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+
+        state: Dict[str, Any] = {
+            "step": 0,
+            "ai_team": None,
+            "ai_player": None,
+            "user_player": None,
+            "items": [],
+            "player_source": [],
+        }
+
+        def refresh_list() -> None:
+            listbox.delete(0, tk.END)
+            state["items"] = []
+            state["player_source"] = []
+            step = int(state["step"])
+            if step == 0:
+                for t in trade_candidate_teams:
+                    ll = int(self._safe_get(t, "league_level", 0) or 0)
+                    w = int(self._safe_get(t, "regular_wins", 0) or 0)
+                    l = int(self._safe_get(t, "regular_losses", 0) or 0)
+                    nm = str(self._safe_get(t, "name", "?"))
+                    listbox.insert(tk.END, f"{nm}  D{ll}  {w}勝{l}敗")
+                    state["items"].append(t)
+            elif step == 1:
+                ai_t = state["ai_team"]
+                players = bs_main.get_tradeable_players(ai_t)
+                state["player_source"] = players
+                for p in players:
+                    listbox.insert(
+                        tk.END,
+                        f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
+                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}",
+                    )
+            elif step == 2:
+                players = bs_main.get_tradeable_players(user_team)
+                state["player_source"] = players
+                for p in players:
+                    listbox.insert(
+                        tk.END,
+                        f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
+                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}",
+                    )
+
+        def do_evaluate_and_finish() -> None:
+            ts = TradeSystem()
+            ut = state["user_player"]
+            ap = state["ai_player"]
+            at = state["ai_team"]
+            user_eval, ai_eval, accepted, reason, _detail = bs_main.one_for_one_trade_evaluate_and_ai_gate(
+                ts,
+                user_team,
+                at,
+                ut,
+                ap,
+            )
+            summary = bs_main.format_one_for_one_trade_evaluation_text(user_eval, ai_eval)
+            messagebox.showinfo("トレード評価", summary, parent=top)
+            if not accepted:
+                messagebox.showinfo(
+                    "トレード",
+                    f"相手クラブが拒否しました。\n{reason}",
+                    parent=top,
+                )
+                top.destroy()
+                return
+            if not messagebox.askyesno(
+                "トレード成立",
+                "この内容でトレードを成立させますか？",
+                parent=top,
+            ):
+                top.destroy()
+                return
+            ok = ts.execute_one_for_one_trade(
+                team_a=user_team,
+                team_b=at,
+                player_a=ut,
+                player_b=ap,
+            )
+            if ok:
+                messagebox.showinfo(
+                    "トレード",
+                    f"成立: {getattr(ut, 'name', '?')} ⇄ {getattr(ap, 'name', '?')}",
+                    parent=top,
+                )
+            else:
+                messagebox.showwarning("トレード", "トレード実行に失敗しました。", parent=top)
+            top.destroy()
+            self._refresh_roster_window()
+            try:
+                self.refresh()
+            except Exception:
+                pass
+
+        next_caption_var = tk.StringVar(value="次へ")
+
+        def on_next() -> None:
+            sel = listbox.curselection()
+            if not sel:
+                messagebox.showinfo("トレード", "一覧から選択してください。", parent=top)
+                return
+            idx = int(sel[0])
+            step = int(state["step"])
+            if step == 0:
+                state["ai_team"] = state["items"][idx]
+                state["step"] = 1
+                an = str(getattr(state["ai_team"], "name", "?"))
+                hint_var.set(f"「{an}」から獲得する選手を選んでください。")
+                next_caption_var.set("次へ")
+                refresh_list()
+                if not state["player_source"]:
+                    messagebox.showinfo(
+                        "トレード",
+                        f"「{an}」にトレード可能な選手がいません。別のクラブを選んでください。",
+                        parent=top,
+                    )
+                    state["step"] = 0
+                    state["ai_team"] = None
+                    hint_var.set("相手クラブを選び、「次へ」を押してください。")
+                    refresh_list()
+                return
+            elif step == 1:
+                ps = state["player_source"]
+                if not ps:
+                    messagebox.showinfo("トレード", "相手チームにトレード可能な選手がいません。", parent=top)
+                    return
+                state["ai_player"] = ps[idx]
+                state["step"] = 2
+                hint_var.set("自チームから放出する選手を選び、「評価する」を押してください。")
+                next_caption_var.set("評価する")
+                refresh_list()
+                if not state["player_source"]:
+                    messagebox.showinfo(
+                        "トレード",
+                        "自チームにトレード可能な選手がいません。",
+                        parent=top,
+                    )
+                    top.destroy()
+                return
+            elif step == 2:
+                ps = state["player_source"]
+                if not ps:
+                    messagebox.showinfo("トレード", "自チームにトレード可能な選手がいません。", parent=top)
+                    return
+                state["user_player"] = ps[idx]
+                do_evaluate_and_finish()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame")
+        btn_row.pack(fill="x")
+
+        def on_cancel() -> None:
+            top.destroy()
+
+        self._jpn_text_button(btn_row, "キャンセル", on_cancel, side="left")
+        next_btn = tk.Button(
+            btn_row,
+            textvariable=next_caption_var,
+            command=on_next,
+            font=("Yu Gothic UI", 10),
+            bg="#2d3d52",
+            fg="#e8ecf0",
+            activebackground="#3d4d62",
+            activeforeground="#e8ecf0",
+            relief="flat",
+            padx=14,
+            pady=6,
+        )
+        next_btn.pack(side="right")
+
+        refresh_list()
 
     def _on_roster_extend_one_year_selected(self) -> None:
         """contract_logic.apply_contract_extension を GUI から1回だけ適用（年俸据え置き）。"""
@@ -1746,9 +2028,9 @@ class MainMenuView:
             "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
             "【今できる操作（人事画面）】閲覧。＋1年延長（年俸据え置き・残年数が 1 年以上かつ"
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
-            "【トレード／インシーズンFA】当面の標準導線は CLI メニューです。"
-            "手順・可否の正本はウィンドウ上部の案内を参照し、"
-            "実行はシーズンメニュー「8. GMメニュー」→「10. トレード」。"
+            "【トレード】選手のみ 1対1 はウィンドウ上部のボタンから。"
+            " multi（現金・RB・複数人）は CLI「8. GMメニュー」→「10. トレード」。"
+            "【インシーズンFA】CLI 正本。可否は上部案内と同一の期限ルール。"
         )
 
         trade_txt = getattr(self, "roster_trade_fa_text", None)
