@@ -13,6 +13,7 @@
 | **GUI 主導線の棚卸し（監査）** | `docs/GUI_MAIN_FLOW_AUDIT.md` |
 | **GUI 1対1トレード入口（設計）** | `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` |
 | **GUI FA / 契約入口（設計）** | `docs/GUI_FA_CONTRACT_ENTRY_POLICY.md` |
+| **GUI インシーズンFA / 契約（設計）** | `docs/GUI_INSEASON_FA_ENTRY_POLICY.md` |
 
 **更新**: 直近タスクが完了したら、本章の「直近タスク」「実行順」「次にやる1件」を更新する。理想像そのものの変更は理想設計書側を先に更新する。
 
@@ -283,3 +284,4 @@
 
 - 第1版: 2026-04-06 初版作成。
 - 2026-04-06: 参照表に `GUI_FA_CONTRACT_ENTRY_POLICY.md` を追加。
+- 2026-04-07: 参照表に `GUI_INSEASON_FA_ENTRY_POLICY.md` を追加。
