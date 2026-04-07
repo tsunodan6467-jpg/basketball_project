@@ -136,7 +136,7 @@
 
 | 区分 | 内容 |
 |------|------|
-| 実装済み | **1対1（選手のみ）トレードは人事 GUI**（`main_menu_view` → `main` 共用ヘルパ・`TradeSystem`、2026-04-06）。**multi トレードは `main.py` CLI**（`trade_logic.py`）。**オフ再契約 y/n は GUI オフ実行中ダイアログ**（`offseason.py`＋`offseason_resign_tk` 注入、2026-04-07）。**インシーズン FA プールからの手動獲得は人事「インシーズンFA（1人）」**（1 名・`sign_free_agent`、2026-04-06）。FA 市場・CPU インシーズン補強（`free_agent_market.py`, `season.py` 等）。ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。1対1 の相手候補は自チーム以外の **D1/D2/D3 全クラブ**（`Season.all_teams` / `main.get_trade_candidate_teams`）。 |
+| 実装済み | **1対1（選手のみ）トレードは人事 GUI**（`main_menu_view` → `main` 共用ヘルパ・`TradeSystem`、2026-04-06）。**multi トレードは `main.py` CLI**（`trade_logic.py`）。**オフ再契約 y/n は GUI オフ実行中ダイアログ**（`offseason.py`＋`offseason_resign_tk` 注入、2026-04-07）。**インシーズン FA プールからの手動獲得は人事「インシーズンFA（1人）」**（1 名・`sign_free_agent`、2026-04-06）。**契約解除（FA送り）**は表で選手選択のうえ **トレード行＋下部の同一ハンドラ**（`_on_roster_release_selected`）。FA 市場・CPU インシーズン補強（`free_agent_market.py`, `season.py` 等）。ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。1対1 の相手候補は自チーム以外の **D1/D2/D3 全クラブ**（`Season.all_teams` / `main.get_trade_candidate_teams`）。 |
 | 暫定 | **未確認**。 |
 | 未実装 | `PRODUCT` は GUI からの同一ガード通過を **残** と記載。**multi** 等の GUI 完結は **未**（FA 手動は **1 名まで**人事 GUI のみ）。 |
 | 未確認 | 全 GUI 経路でのロック整合。 |
@@ -346,3 +346,4 @@ Steam 診断: 上記 `--steam-diag`。**成功/失敗は環境依存**（DLL・S
 - 2026-04-06: §5.12・§8（Steam）ほか、Steam docs 同期後の整合（§7.4・§12 の関連1行）。
 - 2026-04-07: §5.7 人事を、1対1 GUI・multi CLI・FA 手動未実装・オフ再契約 GUI と整合（`GUI_MAIN_FLOW_AUDIT.md` と同旨）。
 - 2026-04-06: §5.7 に人事 **インシーズンFA（1人）**（`sign_free_agent`）を追記。`free_agent_market.py` を主要ファイルに追加。
+- 2026-04-06: §5.7 に **契約解除（FA送り）** の GUI 入口（トレード行＋下部・同一処理）を追記。

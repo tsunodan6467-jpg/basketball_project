@@ -1384,7 +1384,7 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 10))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（1対1・インシーズンFA1人は下／multiはCLI）",
+            text="トレード・FA（表で選手選択 → 解除。1対1／インシーズンFAは横ボタン／multiはCLI）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -1400,6 +1400,13 @@ class MainMenuView:
             tf_btn_row,
             "インシーズンFA（1人）",
             self._on_roster_inseason_fa_one,
+            side="left",
+            padx=(10, 0),
+        )
+        self._jpn_text_button(
+            tf_btn_row,
+            "契約解除（FA送り）",
+            self._on_roster_release_selected,
             side="left",
             padx=(10, 0),
         )
@@ -1543,7 +1550,7 @@ class MainMenuView:
         )
         self._jpn_text_button(
             btn_row,
-            "契約解除（FAへ）",
+            "契約解除（FA送り）",
             self._on_roster_release_selected,
             side="left",
             padx=(8, 0),
@@ -2219,7 +2226,11 @@ class MainMenuView:
                 add_hist("gui_release", player, "GUI人事：契約解除")
             except Exception:
                 pass
-        messagebox.showinfo("人事", f"{name} を FA に送りました。", parent=parent)
+        messagebox.showinfo(
+            "人事",
+            f"{name} を契約解除しました。\nロスターから外れ、FAプールに追加しました。",
+            parent=parent,
+        )
         self._refresh_roster_window()
         try:
             self.refresh()
@@ -2312,7 +2323,8 @@ class MainMenuView:
             "【トレード】選手のみ 1対1 はウィンドウ上部のボタンから。"
             " multi（現金・RB・複数人）は CLI「8. GMメニュー」→「10. トレード」。"
             "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
-            "期限はトレードと同じルールです（上部の案内を参照）。"
+            "期限はトレードと同じルールです（上部の案内を参照）。\n"
+            "【契約解除（FA送り）】表で選手を選び、上部トレード行または下部の同ボタンから実行（最低人数・ロックは上記）。"
         )
 
         trade_txt = getattr(self, "roster_trade_fa_text", None)
