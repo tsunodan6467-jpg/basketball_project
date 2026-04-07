@@ -1192,10 +1192,15 @@ def change_bench_order(user_team):
 
 
 def get_trade_candidate_teams(all_teams, user_team):
-    return [
-        team for team in all_teams
-        if team != user_team and getattr(team, "league_level", 0) == getattr(user_team, "league_level", 0)
-    ]
+    """
+    トレード相手の候補。自チーム以外の全クラブ（D1/D2/D3 混在）。
+    1対1・multi とも `choose_trade_team` → 本関数を経由する。
+    """
+    candidates = [t for t in all_teams if t is not user_team]
+    candidates.sort(
+        key=lambda t: (int(getattr(t, "league_level", 99) or 99), str(getattr(t, "name", "")))
+    )
+    return candidates
 
 
 def print_trade_team_list(all_teams, user_team):
@@ -1203,7 +1208,7 @@ def print_trade_team_list(all_teams, user_team):
     teams = get_trade_candidate_teams(all_teams, user_team)
 
     if not teams:
-        print("同リーグ内にトレード候補チームがありません。")
+        print("トレード候補となる他クラブがありません。")
         return []
 
     for i, team in enumerate(teams, 1):
