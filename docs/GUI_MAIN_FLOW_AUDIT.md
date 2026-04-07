@@ -13,6 +13,7 @@
 | トレード CLI 導線 | `docs/TRADE_MENU_ONE_FOR_ONE_ENTRY_POLICY.md` |
 | 1対1 / multi 現金の整理 | `docs/ONE_FOR_ONE_TRADE_CASH_POLICY.md` |
 | GUI 1対1トレード入口（設計） | `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` |
+| GUI FA / 契約入口（設計） | `docs/GUI_FA_CONTRACT_ENTRY_POLICY.md` |
 
 **コード上の事実（静的確認・2026-04-06）**: 左メニュー `MENU_ITEMS` は **日程 → 人事 → クラブ案内 → 経営 → 強化 → 戦術 → 情報 → 歴史 → システム**。中央に **「次へ進む」**（`advance_button`、シーズン終了時は **「オフシーズンを実行」** 等に切替）と **「次の試合」** パネル等。コメント上 **「編集の正本は人事・戦術・経営・情報」**、人事画面は **トレード／インシーズン FA の標準導線は CLI** と明記。
 
@@ -136,3 +137,4 @@
 - 2026-04-06: タスク 1 の人事 1対1 GUI 最小実装を反映（完了条件に追記）。
 - 2026-04-07: タスク 2 の主画面一文案内を反映（`advance_wrap`・§4 #2 緩和メモ）。
 - 2026-04-07: タスク 3 の日程・情報・歴史ウィンドウ先頭一文案内を反映（§4 #3 緩和メモ）。
+- 2026-04-07: 参照表に `GUI_FA_CONTRACT_ENTRY_POLICY.md` を追加（FA / 契約 GUI 最小導線の設計メモ）。
