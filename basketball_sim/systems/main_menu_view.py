@@ -465,8 +465,7 @@ class MainMenuView:
             font=("Yu Gothic UI", 9),
             wraplength=320,
             padx=2,
-            pady=(0, 6),
-        ).grid(row=0, column=0, sticky="ew")
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 6))
 
         self._advance_hint_text = scrolledtext.ScrolledText(
             advance_wrap,
