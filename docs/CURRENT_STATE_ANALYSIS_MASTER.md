@@ -136,7 +136,7 @@
 
 | 区分 | 内容 |
 |------|------|
-| 実装済み | トレード（`trade_logic.py`, `main.py` CLI）、FA（`free_agent_market.py` 等）、ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。 |
+| 実装済み | トレード（`trade_logic.py`, `main.py` CLI）、FA（`free_agent_market.py` 等）、ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。**CLI トレード相手候補**は自チーム以外の **D1/D2/D3 全クラブ**（`main.get_trade_candidate_teams`、2026-04-06）。 |
 | 暫定 | **未確認**。 |
 | 未実装 | `PRODUCT` は GUI からの同一ガード通過を **残** と記載。 |
 | 未確認 | 全 GUI 経路でのロック整合。 |
