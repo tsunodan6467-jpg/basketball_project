@@ -10,6 +10,7 @@
 | 現状ラベル | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` |
 | 経済・締めと FA | `docs/ECONOMY_DESIGN_NOTES.md`（`money` と payroll の扱い） |
 | 金流の事実 | `docs/ECONOMY_MONEY_FLOW_AUDIT.md` |
+| 年俸モデルをどこまで揃えるか（方針） | `docs/FA_SALARY_MODEL_ALIGNMENT_POLICY.md` |
 
 **静的確認の基準**: `basketball_sim/systems/free_agent_market.py`、`free_agency.py`、`offseason_full_fa_tk.py`、`main_menu_view.py`（インシーズンFAウィザード部）を 2026-04-06 時点で照合。
 
@@ -126,7 +127,7 @@
 
 ### 6.2 次タスク候補（1〜3件）
 
-1. **仕様判断**: 手動FAとオフCPU本格FAで **年俸決定を揃えるか**（estimate 統一 / `_calculate_offer` 統一 / 併記表示のみ等）。**本メモでは決めない**。
+1. **仕様判断**: 手動FAとオフCPU本格FAで **年俸決定を揃えるか**は **`FA_SALARY_MODEL_ALIGNMENT_POLICY.md`** で第1弾スコープを固定。**本監査メモでは決めない**。
 2. **検証**: 実セーブで **具体選手1〜2名**について、GUI 表示・契約後 `salary`・同一オフの `[FA-OFFER]` ログを並べ、**期待との差**を記録する（**再現手順付きメモ**）。
 3. **ドキュメント**: プレイヤー向けに「手動FAの年俸は市場目安アルゴリズム」「CPU本格FAは別計算」と **一文で区別**するか（**別タスク**）。
 
@@ -142,3 +143,4 @@
 ## 変更履歴
 
 - 2026-04-06: 初版。表示＝`estimate_fa_market_value`、手動契約＝同一、オフCPU本格FA＝`_calculate_offer`、インシーズンCPU＝`sign_free_agent` を整理。
+- 2026-04-06: 参照に `FA_SALARY_MODEL_ALIGNMENT_POLICY.md` を追加。§6.2 の「仕様判断」を方針メモへ誘導。
