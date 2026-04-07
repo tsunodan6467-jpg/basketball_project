@@ -450,9 +450,23 @@ class MainMenuView:
         advance_wrap = ttk.Frame(right_col, style="Panel.TFrame", padding=(12, 10))
         advance_wrap.grid(row=2, column=0, sticky="nsew")
         advance_wrap.columnconfigure(0, weight=1)
-        advance_wrap.rowconfigure(0, weight=1)
-        advance_wrap.rowconfigure(1, weight=0)
+        advance_wrap.rowconfigure(0, weight=0)
+        advance_wrap.rowconfigure(1, weight=1)
         advance_wrap.rowconfigure(2, weight=0)
+        advance_wrap.rowconfigure(3, weight=0)
+
+        tk.Label(
+            advance_wrap,
+            text="シーズン進行は下のボタン、人事・経営・戦術・情報などの確認は左メニューから。",
+            bg="#1d2129",
+            fg="#a8b4c8",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=320,
+            padx=2,
+            pady=(0, 6),
+        ).grid(row=0, column=0, sticky="ew")
 
         self._advance_hint_text = scrolledtext.ScrolledText(
             advance_wrap,
@@ -469,7 +483,7 @@ class MainMenuView:
             padx=4,
             pady=4,
         )
-        self._advance_hint_text.grid(row=0, column=0, sticky="nsew", pady=(0, 6))
+        self._advance_hint_text.grid(row=1, column=0, sticky="nsew", pady=(0, 6))
         self._advance_hint_text.configure(state="disabled")
 
         self.advance_button = ttk.Button(
@@ -478,7 +492,7 @@ class MainMenuView:
             style="Primary.TButton",
             command=self._on_advance,
         )
-        self.advance_button.grid(row=1, column=0, sticky="ew")
+        self.advance_button.grid(row=2, column=0, sticky="ew")
 
         debug_skip_cb = self.menu_callbacks.get("DEBUG_SKIP_TO_OFFSEASON")
         self.debug_skip_button: Optional[ttk.Button] = None
@@ -489,7 +503,7 @@ class MainMenuView:
                 style="Menu.TButton",
                 command=debug_skip_cb,
             )
-            self.debug_skip_button.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+            self.debug_skip_button.grid(row=3, column=0, sticky="ew", pady=(8, 0))
 
         # Holders updated by refresh()
         self.top_bar_var = tk.StringVar(value="読み込み中...")
