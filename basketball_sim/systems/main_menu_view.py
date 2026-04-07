@@ -4298,7 +4298,61 @@ class MainMenuView:
         outer = ttk.Frame(window, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
 
-        header = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
+        # 下の変更ボタン行を常に表示するため、先に bottom を side=bottom で確保し、
+        # 上段〜一覧は dev_center 内だけで expand させる（pack 順だけの不具合で下部が画面外に落ちるのを防ぐ）
+        dev_center = ttk.Frame(outer, style="Root.TFrame")
+
+        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
+        self.development_hint_intro_var = tk.StringVar(value="")
+        tk.Label(
+            bottom,
+            textvariable=self.development_hint_intro_var,
+            bg="#1d2129",
+            fg="#d6dbe3",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 10),
+            padx=2,
+            pady=2,
+        ).pack(fill="x", anchor="w")
+        tk.Label(
+            bottom,
+            text="直近変更:",
+            bg="#1d2129",
+            fg="#d6dbe3",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+            padx=2,
+        ).pack(fill="x", anchor="w", pady=(8, 2))
+        self._development_log_frame = tk.Frame(bottom, bg="#1d2129")
+        self._development_log_frame.pack(fill="x", anchor="w")
+
+        action_row = ttk.Frame(bottom, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        action_row.pack(fill="x")
+        ttk.Button(
+            action_row,
+            text="チーム練習を変更",
+            style="Menu.TButton",
+            command=self._open_team_training_editor_window,
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            action_row,
+            text="個別練習を変更",
+            style="Menu.TButton",
+            command=self._open_player_training_editor_window,
+        ).pack(side="left")
+
+        ttk.Button(
+            bottom,
+            text="閉じる",
+            style="Menu.TButton",
+            command=window.destroy,
+        ).pack(anchor="e", pady=(8, 0))
+
+        bottom.pack(side="bottom", fill="x", pady=(12, 0))
+        dev_center.pack(side="top", fill="both", expand=True)
+
+        header = ttk.Frame(dev_center, style="Panel.TFrame", padding=(14, 10))
         header.pack(fill="x", pady=(0, 12))
 
         self.development_header_var = tk.StringVar(value="")
@@ -4309,7 +4363,7 @@ class MainMenuView:
             anchor="w",
         ).pack(fill="x")
 
-        purpose = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
+        purpose = ttk.Frame(dev_center, style="Panel.TFrame", padding=(12, 8))
         purpose.pack(fill="x", pady=(0, 10))
         ttk.Label(
             purpose,
@@ -4325,7 +4379,7 @@ class MainMenuView:
             justify="left",
         ).pack(anchor="w")
 
-        top = ttk.Frame(outer, style="Root.TFrame")
+        top = ttk.Frame(dev_center, style="Root.TFrame")
         top.pack(fill="x", pady=(0, 12))
         top.columnconfigure(0, weight=1)
         top.columnconfigure(1, weight=1)
@@ -4342,7 +4396,7 @@ class MainMenuView:
         self.development_effect_lines = self._make_line_vars(self.development_effect_panel, 6)
         self.development_special_lines = self._make_line_vars(self.development_special_panel, 7)
 
-        table_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=10)
+        table_wrap = ttk.Frame(dev_center, style="Panel.TFrame", padding=10)
         table_wrap.pack(fill="both", expand=True)
         table_wrap.columnconfigure(0, weight=1)
         table_wrap.rowconfigure(1, weight=1)
@@ -4394,55 +4448,6 @@ class MainMenuView:
         self.development_tree.grid(row=1, column=0, sticky="nsew")
         vsb.grid(row=1, column=1, sticky="ns")
         hsb.grid(row=2, column=0, sticky="ew")
-
-        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
-        bottom.pack(fill="x", pady=(12, 0))
-
-        self.development_hint_intro_var = tk.StringVar(value="")
-        tk.Label(
-            bottom,
-            textvariable=self.development_hint_intro_var,
-            bg="#1d2129",
-            fg="#d6dbe3",
-            anchor="w",
-            justify="left",
-            font=("Yu Gothic UI", 10),
-            padx=2,
-            pady=2,
-        ).pack(fill="x", anchor="w")
-        tk.Label(
-            bottom,
-            text="直近変更:",
-            bg="#1d2129",
-            fg="#d6dbe3",
-            anchor="w",
-            font=("Yu Gothic UI", 10, "bold"),
-            padx=2,
-        ).pack(fill="x", anchor="w", pady=(8, 2))
-        self._development_log_frame = tk.Frame(bottom, bg="#1d2129")
-        self._development_log_frame.pack(fill="x", anchor="w")
-
-        action_row = ttk.Frame(bottom, style="Panel.TFrame", padding=(0, 8, 0, 0))
-        action_row.pack(fill="x")
-        ttk.Button(
-            action_row,
-            text="チーム練習を変更",
-            style="Menu.TButton",
-            command=self._open_team_training_editor_window,
-        ).pack(side="left", padx=(0, 8))
-        ttk.Button(
-            action_row,
-            text="個別練習を変更",
-            style="Menu.TButton",
-            command=self._open_player_training_editor_window,
-        ).pack(side="left")
-
-        ttk.Button(
-            bottom,
-            text="閉じる",
-            style="Menu.TButton",
-            command=window.destroy,
-        ).pack(anchor="e", pady=(8, 0))
 
         self._development_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_development_window)
