@@ -10,6 +10,7 @@
 | **Phase・ドメインの長文** | `docs/PRODUCT_ROADMAP_AND_VISION.md` |
 | **作業手順** | `docs/AI_WORKFLOW_RULES.md`、`.cursorrules` |
 | **PR・グッズ money の表示方針（設計のみ）** | `docs/PR_MERCH_MONEY_VISIBILITY_POLICY.md` |
+| **GUI 主導線の棚卸し（監査）** | `docs/GUI_MAIN_FLOW_AUDIT.md` |
 
 **更新**: 直近タスクが完了したら、本章の「直近タスク」「実行順」「次にやる1件」を更新する。理想像そのものの変更は理想設計書側を先に更新する。
 

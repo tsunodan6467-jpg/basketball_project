@@ -120,6 +120,7 @@
 | 未実装 | doc 記載の「GUI 一本化」は**目標**。 |
 | 未確認 | 全ボタン・全サブウィンドウの欠陥の有無。 |
 | 主要ファイル | `basketball_sim/systems/main_menu_view.py`, `docs/SYSTEM_MENU_SPEC_V1.md` 等 |
+| 補足 | GUI 主導線の整理済み／未整理の棚卸しは `docs/GUI_MAIN_FLOW_AUDIT.md`（2026-04-06、監査メモ）。 |
 
 ### 5.6 戦術
 
