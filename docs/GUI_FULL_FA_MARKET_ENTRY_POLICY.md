@@ -11,6 +11,7 @@
 | 現状ラベル | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.7 |
 | 実装順の正本 | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
 | 理想（例示） | `docs/IDEAL_GAME_DESIGN_MASTER.md` |
+| FA年俸「表示」と実契約・CPUの関係（監査） | `docs/FA_SALARY_ESTIMATE_AUDIT.md` |
 
 **コード上の事実（リポジトリ静的確認・2026-04-06、実装追記）**: `Offseason.run` 内で **ドラフト**（`conduct_auction_draft`）→ **`conduct_trades`** → **`conduct_free_agency` 直前**に **`pre_conduct_free_agency_ui_prompt` が設定されている場合のみ** `systems/offseason_full_fa_tk.run_user_offseason_fa_one_pick`（GUI 主画面オフ経路の `main.py` から注入）→ **`conduct_free_agency(self.teams, self.free_agents)`**（フェーズ13付近）。**`conduct_free_agency` 本体**は **全チーム CPU シミュ**のまま。**CLI 直オフ**ではコールバック未注入のため **手動1人UIは出ない**。**オフ再契約**は **`resign_ui_prompt`**。**レギュラー中1人**は人事 **インシーズンFA**（`GUI_INSEASON_FA_ENTRY_POLICY.md`）。
 

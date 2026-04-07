@@ -12,6 +12,7 @@
 | 人事・編成の理想例示 | `docs/IDEAL_GAME_DESIGN_MASTER.md` |
 | トレード最小導線（比較） | `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` |
 | オフ・本格FA市場（本書と別物） | `docs/GUI_FULL_FA_MARKET_ENTRY_POLICY.md` |
+| FA年俸目安の表示と実契約（監査） | `docs/FA_SALARY_ESTIMATE_AUDIT.md` |
 
 **コード上の事実（リポジトリ静的確認・2026-04-07、2026-04-06 GUI 実装反映）**: `main.py` の `run_gm_menu` に **FA プールから選手を選んで契約するメニュー項目はない**。**GUI** では人事ウィンドウ **「インシーズンFA（1人）」** から `season.free_agents` を一覧し **1 名**を `sign_free_agent` で獲得できる（最小・交渉なし）。`sign_free_agent` の呼び出しは **`run_cpu_fa_market_cycle` 内**、**テスト**、**上記 GUI**。シーズンシミュ中は `Season._process_inseason_free_agency` → `run_cpu_fa_market_cycle` で **CPU チーム**が補強しうる。人事 GUI の **契約＋1年**・**解除（FA 送り）**・**1対1トレード**は別経路。
 
@@ -149,3 +150,4 @@
 - 2026-04-07: クラブ案内の「トレード・FA（CLI）」ボタンと `messagebox` 短文を人事案内と整合（別コミット）。
 - 2026-04-06: 人事 **インシーズンFA（1人）** ウィザードを実装（`sign_free_agent`・`precheck_user_fa_sign`・ロックはトレードと同系）。CLI FA 契約メニューは引き続きなし。
 - 2026-04-06: **契約解除（FA送り）** をトレード・FA ボタン行にも配置（既存 `_on_roster_release_selected` のみ流用）。§6 補足に枠確保の説明を追加。
+- 2026-04-06: 参照表に `GUI_FULL_FA_MARKET_ENTRY_POLICY.md` を追加（本格FA市場との混同防止）。
