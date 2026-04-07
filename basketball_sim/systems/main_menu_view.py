@@ -7496,7 +7496,7 @@ class MainMenuView:
         messagebox.showinfo("完了", "スタメンを自動選出に戻しました。", parent=parent)
 
     def _on_gm_cli_trade_fa_hint(self) -> None:
-        """CLI ショートカット。可否ロックは ensure と同一。詳細案内の正本は人事。"""
+        """クラブ案内: トレード／FA の短い案内。可否ロックは ensure と同一。詳細は人事。"""
         w = getattr(self, "_gm_window", None)
         try:
             parent = w if w is not None and w.winfo_exists() else self.root
@@ -7505,10 +7505,11 @@ class MainMenuView:
         if not self.ensure_inseason_roster_moves_allowed(parent):
             return
         messagebox.showinfo(
-            "ターミナルでトレード・FA",
-            "ここは案内・ショートカット用で、トレード／インシーズンFA の実行画面ではありません。\n"
-            "手順の詳細と現在の条件は、左メニュー「人事」ウィンドウ上部の案内を参照してください。\n\n"
-            "実行はシーズンメニュー「8. GMメニュー」→「10. トレード」が正本です。\n"
+            "トレード・FA の案内",
+            "ここは案内用で、編集実行の窓ではありません。\n"
+            "1対1（選手のみ）は左メニュー「人事」から実行できます。\n"
+            "multi（複数人＋現金＋RB）はシーズンメニュー「8. GMメニュー」→「10. トレード」です。\n"
+            "FA プールから手動で契約する操作は現状未対応です。条件・期限は「人事」ウィンドウ上部の案内を参照してください。\n\n"
             "（左メニュー「クラブ案内」は編集窓ではありません。）",
             parent=parent,
         )
@@ -7765,7 +7766,7 @@ class MainMenuView:
         bottom.pack(fill="x", pady=(10, 0))
         ttk.Button(
             bottom,
-            text="トレード・FA（CLI・詳細は人事）",
+            text="トレード・FAの案内（1対1は人事／multiはCLI）",
             style="Menu.TButton",
             command=self._on_gm_cli_trade_fa_hint,
         ).pack(side="left")
@@ -8270,7 +8271,7 @@ class MainMenuView:
         fa_targets = self._safe_get(self.team, "fa_shortlist", None)
         if isinstance(fa_targets, list) and fa_targets:
             normal.append(
-                f"[任意] FA候補 {len(fa_targets)} 件（ターミナル・人事のトレード／FA 案内から）"
+                f"[任意] FA候補 {len(fa_targets)} 件（詳細は左メニュー「人事」のトレード・FA 案内を参照）"
             )
 
         mission = self._safe_get(self.team, "owner_mission", None)
