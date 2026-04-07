@@ -2888,7 +2888,11 @@ def run_main_menu_ui_mode(
             try:
                 off_kw = {}
                 if root is not None:
-                    from basketball_sim.systems import draft_auction_tk, offseason_resign_tk
+                    from basketball_sim.systems import (
+                        draft_auction_tk,
+                        offseason_full_fa_tk,
+                        offseason_resign_tk,
+                    )
 
                     off_kw["draft_ui_prompt_target"] = lambda t, s, d, c: draft_auction_tk.prompt_draft_target(
                         root, t, s, d, c
@@ -2898,6 +2902,14 @@ def run_main_menu_ui_mode(
                     )
                     off_kw["resign_ui_prompt"] = lambda **kw: offseason_resign_tk.prompt_user_resign_offer(
                         root, **kw
+                    )
+                    off_kw["pre_conduct_free_agency_ui_prompt"] = (
+                        lambda teams, free_agents, user_team: offseason_full_fa_tk.run_user_offseason_fa_one_pick(
+                            root,
+                            teams=teams,
+                            free_agents=free_agents,
+                            user_team=user_team,
+                        )
                     )
                 offseason = Offseason(teams, free_agents, **off_kw)
                 offseason.run()

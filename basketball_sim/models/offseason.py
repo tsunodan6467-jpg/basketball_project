@@ -187,12 +187,16 @@ class Offseason:
         draft_ui_prompt_target: Optional[Any] = None,
         draft_ui_prompt_bid: Optional[Any] = None,
         resign_ui_prompt: Optional[Callable[..., Any]] = None,
+        pre_conduct_free_agency_ui_prompt: Optional[Callable[..., Any]] = None,
     ):
         self.teams = teams
         self.free_agents = free_agents
         self._draft_ui_prompt_target: Optional[Callable[..., Any]] = draft_ui_prompt_target
         self._draft_ui_prompt_bid: Optional[Callable[..., Any]] = draft_ui_prompt_bid
         self._resign_ui_prompt: Optional[Callable[..., Any]] = resign_ui_prompt
+        self._pre_conduct_free_agency_ui_prompt: Optional[Callable[..., Any]] = (
+            pre_conduct_free_agency_ui_prompt
+        )
         self.draft_pool: List[Player] = []
         # 来年のドラフト候補（次オフのドラフトで使う）をリーグ状態として保持するための一時バッファ
         self.future_draft_pool: List[Player] = []
@@ -556,6 +560,7 @@ class Offseason:
         conduct_trades(self.teams)
 
         self._off_phase(13)
+        self._maybe_run_pre_conduct_free_agency_ui()
         conduct_free_agency(self.teams, self.free_agents)
         self._off_phase(14)
         self._maintain_free_agent_market()
@@ -1781,6 +1786,19 @@ class Offseason:
             if self._is_user_team(team):
                 return team
         return None
+
+    def _maybe_run_pre_conduct_free_agency_ui(self) -> None:
+        """
+        GUI モード等で注入された場合のみ、`conduct_free_agency` の直前に
+        ユーザーチーム向けの薄い FA 指名 UI を走らせる。CLI では未注入のため no-op。
+        """
+        fn = self._pre_conduct_free_agency_ui_prompt
+        if fn is None:
+            return
+        user_team = self._get_user_team()
+        if user_team is None:
+            return
+        fn(teams=self.teams, free_agents=self.free_agents, user_team=user_team)
 
     def _prompt_yes_no(self, message: str, default: str = "y") -> bool:
         default = default.lower().strip()

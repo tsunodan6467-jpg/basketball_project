@@ -12,7 +12,7 @@
 | 実装順の正本 | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
 | 理想（例示） | `docs/IDEAL_GAME_DESIGN_MASTER.md` |
 
-**コード上の事実（リポジトリ静的確認・2026-04-06）**: `Offseason.run` 内で **ドラフト**（`conduct_auction_draft`）→ **`conduct_trades`** → **`conduct_free_agency(self.teams, self.free_agents)`**（フェーズ13付近）の順。**`conduct_free_agency`** は **全チームを対象にした CPU シミュ**（候補抽出・オファー額計算・`fa_roll_accept_offer` による抽受・ロスター反映）。**標準出力へのログ**はあるが、**ユーザーが候補を選ぶ対話は関数内にない**。ユーザーチームも **他チームと同じループ**に含まれる。**オフ再契約（満了間近への y/n）**は **`_resign_players`**（フェーズ6付近）で **`resign_ui_prompt`** により GUI 化済み。**レギュラー中の FA プール1人獲得**は人事 **「インシーズンFA（1人）」** で **`sign_free_agent`**（`GUI_INSEASON_FA_ENTRY_POLICY.md`）。
+**コード上の事実（リポジトリ静的確認・2026-04-06、実装追記）**: `Offseason.run` 内で **ドラフト**（`conduct_auction_draft`）→ **`conduct_trades`** → **`conduct_free_agency` 直前**に **`pre_conduct_free_agency_ui_prompt` が設定されている場合のみ** `systems/offseason_full_fa_tk.run_user_offseason_fa_one_pick`（GUI 主画面オフ経路の `main.py` から注入）→ **`conduct_free_agency(self.teams, self.free_agents)`**（フェーズ13付近）。**`conduct_free_agency` 本体**は **全チーム CPU シミュ**のまま。**CLI 直オフ**ではコールバック未注入のため **手動1人UIは出ない**。**オフ再契約**は **`resign_ui_prompt`**。**レギュラー中1人**は人事 **インシーズンFA**（`GUI_INSEASON_FA_ENTRY_POLICY.md`）。
 
 ---
 
@@ -124,9 +124,9 @@
 | 項目 | 内容 |
 |------|------|
 | **目的** | オフの本格FAフェーズで、**ユーザーチームが意図的に1人を選べる**（`sign_free_agent`）。 |
-| **触る範囲** | `offseason.py`（`conduct_free_agency` 直前の **任意 UI フック**）、GUI オフ経路の `main.py` / `main_menu_view`（**1ウィザード**または既存の薄い流用）。 |
+| **触る範囲** | **実装済み（2026-04-06）**: `offseason.py` の `pre_conduct_free_agency_ui_prompt` と `_maybe_run_pre_conduct_free_agency_ui`、`main.py` の GUI オフ `Offseason` 生成時の注入、`systems/offseason_full_fa_tk.py`。 |
 | **触らない範囲** | **`conduct_free_agency` 本体**、`fa_roll_accept_offer` の変更、インシーズンFAのロック仕様の無闇な変更。 |
-| **完了条件** | 手動で **スキップ**と **1人獲得**の両方が通る、`--smoke` 通過、**CPU FA 後のシーズン開始**まで既存と同様に進む（回帰確認）。 |
+| **完了条件** | **満たした**: スキップ／1人獲得、`pytest` 最小テスト、`--smoke`、CPU FA 後も従来どおり進む。 |
 
 ### タスク 2（後続）: 手動獲得と CPU FA の重複の整理
 
@@ -150,3 +150,4 @@
 ## 変更履歴
 
 - 2026-04-06: 初版。推奨は **オフフロー内入口**＋**`sign_free_agent` による1人獲得**（`conduct_free_agency` 無改変）。インシーズンFA・再契約と明確に分離。
+- 2026-04-06: **タスク1実装** — `pre_conduct_free_agency_ui_prompt` / `offseason_full_fa_tk` / GUI `main.py` 注入。§7 タスク1を完了扱いに更新。
