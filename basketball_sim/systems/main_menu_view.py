@@ -1015,7 +1015,7 @@ class MainMenuView:
         return "期限切れ（シーズン終了まで不可）"
 
     def _format_hr_trade_fa_guidance_text(self) -> str:
-        """人事ウィンドウ用: トレード／インシーズンFA の正本案内（CLI 手順は main.py と同一）。"""
+        """人事ウィンドウ用: トレード／インシーズンFA 可否の案内（ロックは main.py トレードと同一ルール）。"""
         cr = int(self._safe_get(self.season, "current_round", 0) or 0)
         tr = int(self._safe_get(self.season, "total_rounds", 0) or 0)
         fin = self.season is not None and bool(self._safe_get(self.season, "season_finished", False))
@@ -1042,7 +1042,9 @@ class MainMenuView:
             "【当面の運用】\n"
             "・選手のみの 1対1 トレードは、本ウィンドウの「1対1トレード（選手のみ）」からも実行できます"
             "（インシーズンの可否は CLI のトレードと同一ルール）。\n"
-            "・インシーズンFA・複数人＋現金＋RB の multi トレードなどは CLI メニューが正本です。\n"
+            "・複数人＋現金＋RB の multi トレードは、CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）が正本です。\n"
+            "・FA プールから手動で選手を契約する操作は、現状ターミナルメニューにも GUI にもありません。"
+            "レギュラー中の FA 補強はシーズン進行に連動した自動処理が中心です。\n"
             "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、上記・CLI の案内を担当します。\n"
             "・再契約の確認は、オフシーズン処理の実行中にダイアログで表示されます（GUIモード）。\n\n"
             "【現在の条件】\n"
@@ -1053,9 +1055,8 @@ class MainMenuView:
             "・ロスター表での閲覧、契約の＋1年延長（条件あり）、契約解除による FA 送り（インシーズンは"
             "トレード／インシーズンFA と同じ期限でロック）。\n\n"
             "【まだターミナル（CLI）で行うこと】\n"
-            "・multi（複数人＋現金＋RB）、インシーズンFA の本操作、新規契約交渉などは CLI が正本です。\n"
-            "・上記はシーズンメニュー「8. GMメニュー」→「10. トレード」等から実行します。\n"
-            "・期限後は CLI 側でもブロックされます（上記と同じルール）。\n\n"
+            "・multi（複数人＋現金＋RB）は CLI が正本です（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "・レギュラー中のトレード期限切れ後は、CLI のトレードもブロックされます（上部の可否表示と同じルール）。\n\n"
             "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
         )
 
@@ -1383,7 +1384,7 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 10))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（1対1は下のボタン／multi・FA 本操作は CLI 正本）",
+            text="トレード・FA（1対1は下のボタン／multiはCLI／FAプール手動契約は未対応）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -2060,7 +2061,8 @@ class MainMenuView:
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
             "【トレード】選手のみ 1対1 はウィンドウ上部のボタンから。"
             " multi（現金・RB・複数人）は CLI「8. GMメニュー」→「10. トレード」。"
-            "【インシーズンFA】CLI 正本。可否は上部案内と同一の期限ルール。"
+            "【インシーズンFA】FA プールから手動で契約する操作は現状未対応です。"
+            "期限の表示はトレードと同じルールです（上部の案内を参照）。"
         )
 
         trade_txt = getattr(self, "roster_trade_fa_text", None)
