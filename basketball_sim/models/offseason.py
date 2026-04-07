@@ -27,6 +27,7 @@ try:
         calculate_desired_contract_terms,
         ensure_contract_fields,
         evaluate_resign_offer,
+        get_team_payroll,
         get_team_player_rank,
     )
 except Exception:
@@ -36,6 +37,7 @@ except Exception:
     apply_resign_offer = None
     advance_contract_years = None
     apply_contract_extension = None
+    get_team_payroll = None
     get_team_player_rank = None
 
 try:
@@ -55,6 +57,25 @@ def _safe_cli_stdout_text(text: str) -> str:
     if not text:
         return text
     return text.replace("\u2014", "-").replace("\u2013", "-").replace("\u2212", "-")
+
+
+def _sync_payroll_budget_with_roster_payroll(teams: List[Team]) -> None:
+    """
+    オフFA直前の薄い同期: 各チームの payroll_budget を実ペイロール未満にしない。
+
+    `_process_team_finances` より前に手動FA・CPU FA が走るため、ロスター年俸が動いたあとも
+    payroll_budget が古いと `free_agency._calculate_offer` の room_to_budget が 0 になりうる。
+    第1弾は `max(既存, get_team_payroll)` のみ（docs/OFFSEASON_FA_PAYROLL_BUDGET_SYNC_PLAN_2026-04.md）。
+    """
+    if get_team_payroll is None:
+        return
+    for team in teams or []:
+        try:
+            existing = int(getattr(team, "payroll_budget", 0) or 0)
+        except (TypeError, ValueError):
+            existing = 0
+        roster_payroll = int(get_team_payroll(team))
+        team.payroll_budget = int(max(0, max(existing, roster_payroll)))
 
 
 # 仮経営バランス第2弾: オフ締めの modeled 収益が実ペイロール規模に追従していないため、
@@ -560,7 +581,9 @@ class Offseason:
         conduct_trades(self.teams)
 
         self._off_phase(13)
+        _sync_payroll_budget_with_roster_payroll(self.teams)
         self._maybe_run_pre_conduct_free_agency_ui()
+        _sync_payroll_budget_with_roster_payroll(self.teams)
         conduct_free_agency(self.teams, self.free_agents)
         self._off_phase(14)
         self._maintain_free_agent_market()
