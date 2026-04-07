@@ -12,6 +12,7 @@
 | 経営メニューたたき台 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md`（人事は別ウィンドウ） |
 | トレード最小導線（比較用） | `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` |
 | インシーズンFA・ユーザー経路の整理 | `docs/GUI_INSEASON_FA_ENTRY_POLICY.md` |
+| 本格FA市場（オフ・`conduct_free_agency`）の最小GUI導線 | `docs/GUI_FULL_FA_MARKET_ENTRY_POLICY.md` |
 
 **コード上の事実（静的確認・2026-04-06、2026-04-07 追記）**: 人事 GUI は **契約＋1年延長**・**契約解除（FA 送り）**・**1対1トレード**まで。`offseason.Offseason._resign_players` はユーザーチームに対し **`_user_team_resign_decision`** で再契約オファーの可否を聞く。**GUI 主画面からオフを実行する場合**は `resign_ui_prompt` 注入により **`systems/offseason_resign_tk.prompt_user_resign_offer`（messagebox）** を使用。**CLI 直オフ**・`resign_ui_prompt` 未指定時は従来どおり **`_prompt_yes_no`（標準入力）**。`free_agency.conduct_free_agency` は **CPU 中心のオファー／抽受ループ**（ユーザーが FA 候補を選ぶ対話は関数内にない）。`free_agent_market.sign_free_agent` は **契約反映の核**だが、**対話 CLI メニューからの直接呼び出しは `main.py` の `run_gm_menu` 列挙だけでは未確認**（テスト・CPU 補強経路で利用）。
 
@@ -153,3 +154,4 @@
 - 2026-04-07: **実装反映（別コミット）** — `Offseason(..., resign_ui_prompt=...)` と `offseason_resign_tk`、GUI モード `main.py` から注入。
 - 2026-04-07: 人事ウィンドウのトレード・FA 案内に、再契約ダイアログ（GUI オフ中）の1行を追記。
 - 2026-04-07: 参照表に `GUI_INSEASON_FA_ENTRY_POLICY.md` を追加（レギュラー中FAの事実整理・最小GUIは別メモ）。
+- 2026-04-06: 参照表に `GUI_FULL_FA_MARKET_ENTRY_POLICY.md` を追加（オフ本格FAの入口・第1スコープは別メモ）。

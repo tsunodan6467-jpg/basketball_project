@@ -15,6 +15,7 @@
 | **GUI FA / 契約入口（設計）** | `docs/GUI_FA_CONTRACT_ENTRY_POLICY.md` |
 | **GUI インシーズンFA / 契約（設計）** | `docs/GUI_INSEASON_FA_ENTRY_POLICY.md` |
 | **GUI multi トレード入口（設計・第1弾実装済み）** | `docs/GUI_MULTI_TRADE_ENTRY_POLICY.md` |
+| **GUI 本格FA市場入口（設計・未実装）** | `docs/GUI_FULL_FA_MARKET_ENTRY_POLICY.md` |
 
 **更新**: 直近タスクが完了したら、本章の「直近タスク」「実行順」「次にやる1件」を更新する。理想像そのものの変更は理想設計書側を先に更新する。
 
@@ -288,3 +289,4 @@
 - 2026-04-07: 参照表に `GUI_INSEASON_FA_ENTRY_POLICY.md` を追加。
 - 2026-04-07: §2.4 人事・§3・Phase C のトレード/FA 記述を、1対1 GUI 済・オフ再契約 GUI・multi/FA 手動残と整合。
 - 2026-04-06: §2.4・§3・Phase C の multi を **人事 GUI（現金・RB 含む）** 実装済みに同期。
+- 2026-04-06: 参照表に `GUI_FULL_FA_MARKET_ENTRY_POLICY.md` を追加。
