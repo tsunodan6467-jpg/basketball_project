@@ -2,8 +2,10 @@
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems import free_agency as fa_mod
 from basketball_sim.systems.free_agent_market import (
     estimate_fa_market_value,
+    get_team_fa_signing_limit,
     offseason_manual_fa_offer_and_years,
     sign_free_agent,
 )
@@ -43,6 +45,25 @@ def test_offseason_manual_fa_offer_and_years_positive():
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[])
     fa = _player(88001, ovr=72, salary=4_000_000)
     off, yrs = offseason_manual_fa_offer_and_years(team, fa)
+    assert off > 0
+    assert 1 <= yrs <= 4
+
+
+def test_offseason_manual_fa_fallback_when_payroll_budget_zeroes_calculate_offer():
+    """
+    `payroll_budget` が既存ペイロールに張り付いていると `_calculate_offer` は 0 になりうる。
+    キャップ上まだ契約余地があるときは `min(estimate, room)` にフォールバックする。
+    """
+    roster = _player(101, ovr=60, salary=7_600_000, contract_years_left=1)
+    team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[roster])
+    team.payroll_budget = 7_600_000
+    fa = _player(88009, ovr=72, salary=4_000_000)
+    room = int(get_team_fa_signing_limit(team))
+    assert room > 0
+    assert int(fa_mod._calculate_offer(team, fa)) == 0
+    est = int(estimate_fa_market_value(fa))
+    off, yrs = offseason_manual_fa_offer_and_years(team, fa)
+    assert off == min(est, room)
     assert off > 0
     assert 1 <= yrs <= 4
 

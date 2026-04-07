@@ -430,10 +430,24 @@ def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int
     オフ手動FA（`conduct_free_agency` 直前）専用: CPU 本格FA と同じ
     `free_agency._calculate_offer` / `_determine_contract_years` による年俸・契約年数。
     `conduct_free_agency` 本体は変更しない（同関数を読むだけ）。
+
+    `_calculate_offer` は `Team.payroll_budget`（クラブ目安）でオファー上限を切る。
+    オフFA直前は `_process_team_finances` より前で `payroll_budget` が実ペイロールに対して
+    小さいままのことがあり、`room_to_budget` が 0 となって **全件オファー0** になりうる。
+    その場合でも `get_team_fa_signing_limit` 上まだ契約余地があるときは、
+    **表示＝契約**のため `estimate_fa_market_value` を上限 `room` でクリップした額にフォールバックする
+    （CPU本格FAの式は触らない）。
     """
     from basketball_sim.systems.free_agency import _calculate_offer, _determine_contract_years
 
+    ensure_team_fa_market_fields(team)
+    ensure_fa_market_fields(player)
+
+    room = int(get_team_fa_signing_limit(team))
     offer = int(_calculate_offer(team, player))
+    if offer <= 0 and room > 0:
+        est = int(estimate_fa_market_value(player))
+        offer = min(est, room)
     if offer <= 0:
         return 0, 1
     years = int(_determine_contract_years(player, team, offer))

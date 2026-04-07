@@ -153,3 +153,4 @@
 
 - 2026-04-06: 初版。推奨は **オフフロー内入口**＋**`sign_free_agent` による1人獲得**（`conduct_free_agency` 無改変）。インシーズンFA・再契約と明確に分離。
 - 2026-04-06: **タスク1実装** — `pre_conduct_free_agency_ui_prompt` / `offseason_full_fa_tk` / GUI `main.py` 注入。§7 タスク1を完了扱いに更新。
+- 2026-04-06: オフ手動一覧の年俸・年数が `—` になる回帰を、`offseason_manual_fa_offer_and_years` の上記フォールバックで解消（一覧・確認・契約は同一関数経路のまま）。

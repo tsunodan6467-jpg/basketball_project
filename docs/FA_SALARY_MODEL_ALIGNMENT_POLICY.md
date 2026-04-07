@@ -122,3 +122,4 @@
 
 - 2026-04-06: 初版。第1弾推奨は **オフ手動のみ `_calculate_offer` 系へ**、インシーズンは estimate 維持。
 - 2026-04-06: タスク1 **実装反映**（`offseason_manual_fa_offer_and_years`、`sign_free_agent` / `precheck_user_fa_sign` 拡張、§7 タスク1 完了条件更新）。
+- 2026-04-06: **回帰修正** — オフFA直前は `_process_team_finances` より前で `payroll_budget` が実ペイロールに対して小さいままのことがあり `_calculate_offer` が全件0になりうる。`get_team_fa_signing_limit` に余地があるときだけ `min(estimate, room)` に **オフ手動専用フォールバック**（`conduct_free_agency`・`_calculate_offer` 本体は不変更）。

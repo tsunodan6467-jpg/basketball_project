@@ -146,3 +146,4 @@
 - 2026-04-06: 初版。表示＝`estimate_fa_market_value`、手動契約＝同一、オフCPU本格FA＝`_calculate_offer`、インシーズンCPU＝`sign_free_agent` を整理。
 - 2026-04-06: 参照に `FA_SALARY_MODEL_ALIGNMENT_POLICY.md` を追加。§6.2 の「仕様判断」を方針メモへ誘導。
 - 2026-04-06: **オフ手動FA**を本格FA同型に変更（§2.1・§2 結論・§3）。`sign_free_agent` / `precheck_user_fa_sign` のオプション追記。
+- 2026-04-06: 上記直後の回帰対応 — `_calculate_offer` が0でもキャップ余地がある場合、`offseason_manual_fa_offer_and_years` が `min(estimate_fa_market_value, signing_room)` で **表示＝契約**を維持（CPU本格FAの式は不変更）。
