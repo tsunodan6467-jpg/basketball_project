@@ -13,7 +13,7 @@
 | 現状ラベル | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.5・§5.7 |
 | 実装順・フェーズ | `docs/IMPLEMENTATION_PLAN_MASTER.md` |
 
-**コード上の事実（リポジトリ静的確認・2026-04-06）**: `main.propose_multi_trade` は `inseason_roster_moves_unlocked` 後、**6 STEP**（出す人数・受け取る人数 1〜3・差最大1 → 自軍・相手から選手をカンマ区切りで選択 → **現金（自分→相手）** → **RB（自分→相手）**）→ `TradeSystem.evaluate_multi_trade` / `should_ai_accept_multi_trade` / `execute_multi_trade(..., free_agents=...)`。相手候補は `get_trade_candidate_teams`（**全ディビジョン**、1対1 と同母集団）。**GUI の multi は未実装**（人事は 1対1・解除・インシーズンFA のみ）。
+**コード上の事実（リポジトリ静的確認・2026-04-06）**: `main.propose_multi_trade` は `inseason_roster_moves_unlocked` 後、**6 STEP**（出す人数・受け取る人数 1〜3・差最大1 → 自軍・相手から選手をカンマ区切りで選択 → **現金（自分→相手）** → **RB（自分→相手）**）→ `TradeSystem.evaluate_multi_trade` / `should_ai_accept_multi_trade` / `execute_multi_trade(..., free_agents=...)`。相手候補は `get_trade_candidate_teams`（**全ディビジョン**、1対1 と同母集団）。**GUI**: 人事 **「multi（複数人）」** で **第1弾（選手のみ・現金・RB=0）**（`MainMenuView._run_multi_trade_players_only_wizard`）。人数検証は `main.validate_multi_trade_player_counts`（CLI と共用）。**現金・RB 付き multi は CLI 正本のまま**。
 
 ---
 
@@ -30,7 +30,7 @@
 | 論点 | 内容 |
 |------|------|
 | **CLI でできること** | `run_trade_menu` の **3** → `propose_multi_trade`。複数選手の入替（人数制約あり）、**現金**、**RB**、評価表示、`should_ai_accept_multi_trade`、成立時 `execute_multi_trade`（`free_agents` 必須・ロスター違反時の FA 送り等は `trade_logic` 側）。 |
-| **GUI で未実装なこと** | **multi 全体**。人事案内は「multi は CLI」と明示（`GUI_MAIN_FLOW_AUDIT.md` と整合）。 |
+| **GUI で未実装なこと** | **現金・RB 付き multi**（第1弾は選手のみ。フル multi は CLI）。 |
 | **1対1 GUI との住み分け** | **1対1**＝**選手1対1のみ**（現金・RB なし、`one_for_one_trade_*` / `execute_one_for_one_trade`）。**multi**＝**別 API**（`MultiTradeOffer`、`evaluate_multi_trade`、`execute_multi_trade`）。**混同しない**（ウィンドウタイトル・先頭文で「複数人・現金・RB あり」を明示）。 |
 | **multi がまだ CLI 正本な理由** | STEP が多く、入力検証（人数・上限・カンマ選択）と **free_agents** の受け渡しがあり、**1対1 より実装・テスト負荷が大きい**。先に 1対1 を GUI 化し、**同じロック・相手母集団**を人事に載せる方が安全だった（過去の判断。本メモでは追認）。 |
 
@@ -101,7 +101,7 @@
 
 | 注意 | 内容 |
 |------|------|
-| **既存 CLI ロジック流用** | **推奨**: `propose_multi_trade` の**入力収集以外**を `main.py` に **関数化**し、CLI と GUI の両方から `MultiTradeOffer` を渡して **同一評価〜実行**にする（**未確定**: 関数名・分割粒度は実装タスク）。**最小悪**: GUI だけ `TradeSystem` を直接呼ぶが、**人数制約の複製**に注意。 |
+| **既存 CLI ロジック流用** | 人数ルールは **`validate_multi_trade_player_counts`**（`propose_multi_trade` と共用）。評価〜実行は GUI から **`TradeSystem` + `MultiTradeOffer`** を直接呼ぶ（第1弾）。 |
 | **1対1 との誤解防止** | ウィンドウタイトルに **「multi」**、先頭に **「1対1 ではありません」**は不要だが、**「複数選手。現金・RB は…」**の一文は第1弾で有用。 |
 | **現金・RB を先に入れるか** | 本メモ **§4** は **第1弾は省略推奨**。一気に載せるなら **§4 代替案**に従い **6 STEP 完コピ**。 |
 | **structured cash log** | `execute_multi_trade` 既存の `history_transactions` をそのまま利用（`TRADE_CASH_ACCOUNTING_POLICY.md`）。**GUI 専用の二重会計は作らない**。 |
@@ -112,14 +112,13 @@
 
 ## 7. 次に切り出せる実装タスク候補（2 件以内）
 
-### タスク 1: 人事から multi ウィザード（第1弾・複数人数のみ）
+### タスク 1: 人事から multi ウィザード（第1弾・複数人数のみ）— **実装済み（2026-04-06）**
 
 | 項目 | 内容 |
 |------|------|
 | **目的** | GUI のみで **現金・RB なしの multi** が1回成立する（CLI と同一評価・実行経路）。 |
-| **触る範囲** | `main_menu_view.py`（子 `Toplevel`）、必要なら `main.py`（`MultiTradeOffer` 構築〜実行の **共有ヘルパ**抽出）。 |
-| **触らない範囲** | `trade_logic` の評価式・閾値、1対1 GUI、**現金・RB 入力（第1弾）**。 |
-| **完了条件** | 手動で成立確認、**ロック時はブロック**、`python -m basketball_sim --smoke` 通過、**CLI multi の挙動と矛盾しない**（回帰は既存テスト＋手動）。 |
+| **触った範囲** | `main_menu_view.py`（`_run_multi_trade_players_only_wizard`）、`main.validate_multi_trade_player_counts`・`propose_multi_trade` の人数チェック共用。 |
+| **次段** | タスク 2（現金・RB）。 |
 
 ### タスク 2: multi ウィザードに現金・RB 入力を追加（CLI 同等）
 
@@ -143,3 +142,4 @@
 ## 変更履歴
 
 - 2026-04-06: 初版。GUI multi の入口（人事推奨）、第1弾スコープ（複数人数のみ→現金RBは第2弾）、フロー・注意・タスク2件。
+- 2026-04-06: 第1弾を実装（人事「multi（複数人）」、`validate_multi_trade_player_counts` 追加）。§1・§6・§7 タスク1 を事実に同期。

@@ -1327,6 +1327,17 @@ def choose_players_from_list(players, prompt, count):
         return picked
 
 
+def validate_multi_trade_player_counts(n_out: int, n_in: int) -> Tuple[bool, str]:
+    """
+    multi トレードの出す／受け取る人数チェック（`propose_multi_trade`・GUI と同一ルール）。
+    """
+    if not (1 <= n_out <= 3 and 1 <= n_in <= 3):
+        return False, "人数は 1〜3 の範囲で入力してください。"
+    if abs(n_out - n_in) > 1:
+        return False, "差が大きすぎます（最大1）。"
+    return True, ""
+
+
 def print_trade_evaluation_summary(user_eval, ai_eval):
     print_separator("トレード評価")
     print(f"あなた側評価  : {'承認' if user_eval.accepts else '拒否'} | スコア {user_eval.score}")
@@ -1483,11 +1494,9 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
             print("数字を正しく入力してください。")
             continue
 
-        if not (1 <= n_out <= 3 and 1 <= n_in <= 3):
-            print("人数は 1〜3 の範囲で入力してください。")
-            continue
-        if abs(n_out - n_in) > 1:
-            print("差が大きすぎます（最大1）。")
+        ok_cnt, cnt_msg = validate_multi_trade_player_counts(n_out, n_in)
+        if not ok_cnt:
+            print(cnt_msg)
             continue
         if len(user_players) < n_out:
             print(f"放出候補が足りません（必要: {n_out}, 候補: {len(user_players)}）。")

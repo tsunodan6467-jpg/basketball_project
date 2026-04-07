@@ -1042,7 +1042,8 @@ class MainMenuView:
             "【当面の運用】\n"
             "・選手のみの 1対1 トレードは、本ウィンドウの「1対1トレード（選手のみ）」からも実行できます"
             "（インシーズンの可否は CLI のトレードと同一ルール）。\n"
-            "・複数人＋現金＋RB の multi トレードは、CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）が正本です。\n"
+            "・multi は人事の「multi（複数人）」で選手のみの入替（第1弾・現金・RB なし）が可能。"
+            "複数人＋現金＋RB のフル multi は CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）が正本です。\n"
             "・FA プールからの手動契約は、人事の「インシーズンFA（1人）」で 1 名まで（交渉・金額入力なし）。"
             "レギュラー中の CPU 補強はシーズン進行に連動した自動処理が中心です。\n"
             "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、上記・CLI の案内を担当します。\n"
@@ -1055,7 +1056,7 @@ class MainMenuView:
             "・ロスター表での閲覧、契約の＋1年延長（条件あり）、契約解除による FA 送り（インシーズンは"
             "トレード／インシーズンFA と同じ期限でロック）。\n\n"
             "【まだターミナル（CLI）で行うこと】\n"
-            "・multi（複数人＋現金＋RB）は CLI が正本です（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "・multi は人事で「multi（複数人）」（選手のみ）か、CLI で複数人＋現金＋RB（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
             "・レギュラー中のトレード期限切れ後は、CLI のトレードもブロックされます（上部の可否表示と同じルール）。\n\n"
             "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
         )
@@ -1384,7 +1385,7 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 10))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（表で選手選択 → 解除。1対1／インシーズンFAは横ボタン／multiはCLI）",
+            text="トレード・FA（表で選手選択→解除。1対1／multi（選手のみ）／インシーズンFAは横ボタン。現金・RB付きmultiはCLI）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -1395,6 +1396,13 @@ class MainMenuView:
             "1対1トレード（選手のみ）",
             self._on_roster_one_for_one_trade,
             side="left",
+        )
+        self._jpn_text_button(
+            tf_btn_row,
+            "multi（複数人）",
+            self._on_roster_multi_trade_players_only,
+            side="left",
+            padx=(10, 0),
         )
         self._jpn_text_button(
             tf_btn_row,
@@ -1826,6 +1834,392 @@ class MainMenuView:
                     return
                 state["user_player"] = ps[idx]
                 do_evaluate_and_finish()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame")
+        btn_row.pack(fill="x")
+
+        def on_cancel() -> None:
+            top.destroy()
+
+        self._jpn_text_button(btn_row, "キャンセル", on_cancel, side="left")
+        next_btn = tk.Button(
+            btn_row,
+            textvariable=next_caption_var,
+            command=on_next,
+            font=("Yu Gothic UI", 10),
+            bg="#2d3d52",
+            fg="#e8ecf0",
+            activebackground="#3d4d62",
+            activeforeground="#e8ecf0",
+            relief="flat",
+            padx=14,
+            pady=6,
+        )
+        next_btn.pack(side="right")
+
+        refresh_list()
+
+    def _on_roster_multi_trade_players_only(self) -> None:
+        """人事から multi 第1弾: 複数選手のみ（現金・RB なし）。評価・実行は `TradeSystem` 既存経路。"""
+        parent = getattr(self, "_roster_window", None) or self.root
+        if self.team is None:
+            messagebox.showwarning("トレード", "チームが未接続です。", parent=parent)
+            return
+        if self.season is None:
+            messagebox.showwarning(
+                "トレード",
+                "シーズン未接続のため FA プールを参照できず、multi トレードを実行できません。",
+                parent=parent,
+            )
+            return
+        if not inseason_roster_moves_unlocked(self.season):
+            messagebox.showwarning(
+                "トレード",
+                INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
+                parent=parent,
+            )
+            return
+        fa_list = getattr(self.season, "free_agents", None)
+        if fa_list is None:
+            messagebox.showwarning(
+                "トレード",
+                "FA プールが未初期化のため multi トレードを実行できません。",
+                parent=parent,
+            )
+            return
+        all_teams = self._all_teams_for_trade_gui()
+        if not all_teams:
+            messagebox.showwarning(
+                "トレード",
+                "リーグのチーム一覧を取得できませんでした。",
+                parent=parent,
+            )
+            return
+        from basketball_sim import main as bs_main
+
+        candidates = bs_main.get_trade_candidate_teams(all_teams, self.team)
+        if not candidates:
+            messagebox.showinfo(
+                "トレード",
+                "トレード相手となる他クラブがありません。",
+                parent=parent,
+            )
+            return
+        self._run_multi_trade_players_only_wizard(parent, candidates, fa_list)
+
+    def _run_multi_trade_players_only_wizard(
+        self,
+        parent: Any,
+        trade_candidate_teams: List[Any],
+        free_agents: List[Any],
+    ) -> None:
+        from basketball_sim import main as bs_main
+        from basketball_sim.systems.trade_logic import MultiTradeOffer, TradeSystem
+
+        user_team = self.team
+        top = tk.Toplevel(parent)
+        top.title("multi トレード（複数人・選手のみ）")
+        top.configure(bg="#15171c")
+        try:
+            top.transient(parent)
+        except Exception:
+            pass
+        top.geometry("640x480")
+        top.minsize(520, 400)
+
+        outer = ttk.Frame(top, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+
+        ttk.Label(
+            outer,
+            text=(
+                "複数選手の入替のみです（現金・RB は 0 固定）。"
+                "現金や RB を伴う取引は CLI の「トレード提案（複数人数＋現金＋RB）」を使ってください。"
+            ),
+            wraplength=600,
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 8))
+
+        hint_var = tk.StringVar(value="相手クラブを選び、「次へ」を押してください。")
+        ttk.Label(outer, textvariable=hint_var, wraplength=600).pack(fill="x", pady=(0, 6))
+
+        lb_frame = ttk.Frame(outer, style="Panel.TFrame")
+        lb_frame.pack(fill="both", expand=True, pady=(0, 8))
+        lb_frame.rowconfigure(0, weight=1)
+        lb_frame.columnconfigure(0, weight=1)
+
+        listbox = tk.Listbox(
+            lb_frame,
+            height=14,
+            bg="#222834",
+            fg="#e8ecf0",
+            selectbackground="#3d4f6f",
+            font=("Yu Gothic UI", 10),
+            selectmode=tk.BROWSE,
+        )
+        vsb = ttk.Scrollbar(lb_frame, orient="vertical", command=listbox.yview)
+        listbox.configure(yscrollcommand=vsb.set)
+        listbox.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+
+        count_frame = tk.Frame(lb_frame, bg="#222834")
+        tk.Label(
+            count_frame,
+            text="人数ルール: 自分が出す人数・受け取る人数はそれぞれ 1〜3、差は最大 1（CLI と同一）。",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 9),
+            wraplength=560,
+            justify="left",
+        ).pack(anchor="w", padx=8, pady=(8, 12))
+        row_n = tk.Frame(count_frame, bg="#222834")
+        row_n.pack(fill="x", padx=8, pady=4)
+        tk.Label(row_n, text="自分が出す人数:", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(
+            side="left"
+        )
+        n_out_var = tk.StringVar(value="1")
+        sp_out = tk.Spinbox(
+            row_n,
+            from_=1,
+            to=3,
+            width=4,
+            textvariable=n_out_var,
+            font=("Yu Gothic UI", 10),
+            bg="#2a3140",
+            fg="#e8ecf0",
+            buttonbackground="#3d4f6f",
+        )
+        sp_out.pack(side="left", padx=(8, 24))
+        tk.Label(row_n, text="自分が受け取る人数:", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(
+            side="left"
+        )
+        n_in_var = tk.StringVar(value="1")
+        sp_in = tk.Spinbox(
+            row_n,
+            from_=1,
+            to=3,
+            width=4,
+            textvariable=n_in_var,
+            font=("Yu Gothic UI", 10),
+            bg="#2a3140",
+            fg="#e8ecf0",
+            buttonbackground="#3d4f6f",
+        )
+        sp_in.pack(side="left", padx=(8, 0))
+        count_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        count_frame.grid_remove()
+
+        state: Dict[str, Any] = {
+            "step": 0,
+            "ai_team": None,
+            "n_out": 1,
+            "n_in": 1,
+            "ai_receives": [],
+            "user_gives": [],
+            "items": [],
+            "player_source": [],
+        }
+
+        _trade_nat_ja = {
+            "Japan": "日本",
+            "Foreign": "外国籍",
+            "Asia": "アジア",
+            "Naturalized": "帰化",
+        }
+
+        def _multi_trade_player_line(p: Any) -> str:
+            nat_key = str(getattr(p, "nationality", "Japan") or "Japan")
+            nat_j = _trade_nat_ja.get(nat_key, nat_key)
+            sal = int(getattr(p, "salary", 0) or 0)
+            return (
+                f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
+                f"OVR {int(getattr(p, 'ovr', 0) or 0)}  年齢 {int(getattr(p, 'age', 0) or 0)}  "
+                f"{nat_j}  年俸 {sal:,}円"
+            )
+
+        def set_list_vs_count(show_counts: bool) -> None:
+            if show_counts:
+                listbox.grid_remove()
+                vsb.grid_remove()
+                count_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
+            else:
+                count_frame.grid_remove()
+                listbox.grid(row=0, column=0, sticky="nsew")
+                vsb.grid(row=0, column=1, sticky="ns")
+
+        def refresh_list() -> None:
+            step = int(state["step"])
+            if step == 1:
+                return
+            listbox.delete(0, tk.END)
+            state["items"] = []
+            state["player_source"] = []
+            if step <= 1:
+                listbox.configure(selectmode=tk.BROWSE)
+            else:
+                listbox.configure(selectmode=tk.EXTENDED)
+            if step == 0:
+                for t in trade_candidate_teams:
+                    ll = int(self._safe_get(t, "league_level", 0) or 0)
+                    w = int(self._safe_get(t, "regular_wins", 0) or 0)
+                    lo = int(self._safe_get(t, "regular_losses", 0) or 0)
+                    nm = str(self._safe_get(t, "name", "?"))
+                    listbox.insert(tk.END, f"{nm}  D{ll}  {w}勝{lo}敗")
+                    state["items"].append(t)
+            elif step == 2:
+                ai_t = state["ai_team"]
+                players = bs_main.get_tradeable_players(ai_t)
+                state["player_source"] = players
+                for p in players:
+                    listbox.insert(tk.END, _multi_trade_player_line(p))
+            elif step == 3:
+                players = bs_main.get_tradeable_players(user_team)
+                state["player_source"] = players
+                for p in players:
+                    listbox.insert(tk.END, _multi_trade_player_line(p))
+
+        def pick_multi(required: int) -> Optional[List[Any]]:
+            sel = listbox.curselection()
+            if len(sel) != required:
+                messagebox.showinfo(
+                    "トレード",
+                    f"ちょうど {required} 名を選んでください（Ctrl+クリックで複数選択）。",
+                    parent=top,
+                )
+                return None
+            ps = state["player_source"]
+            return [ps[int(i)] for i in sel]
+
+        def do_evaluate_and_finish_multi() -> None:
+            at = state["ai_team"]
+            user_gives: List[Any] = list(state["user_gives"])
+            ai_receives: List[Any] = list(state["ai_receives"])
+            offer = MultiTradeOffer(
+                team_a_gives_players=user_gives,
+                team_a_receives_players=ai_receives,
+                cash_a_to_b=0,
+                rookie_budget_a_to_b=0,
+            )
+            ts = TradeSystem()
+            user_eval, ai_eval = ts.evaluate_multi_trade(user_team, at, offer)
+            summary = bs_main.format_one_for_one_trade_evaluation_text(user_eval, ai_eval)
+            messagebox.showinfo("トレード評価", summary, parent=top)
+            accepted, reason, _ae2 = ts.should_ai_accept_multi_trade(user_team, at, offer)
+            if not accepted:
+                messagebox.showinfo(
+                    "トレード",
+                    f"相手クラブが拒否しました。\n{reason}",
+                    parent=top,
+                )
+                top.destroy()
+                return
+            if not messagebox.askyesno(
+                "トレード成立",
+                "この内容で multi トレードを成立させますか？",
+                parent=top,
+            ):
+                top.destroy()
+                return
+            ok = ts.execute_multi_trade(
+                team_a=user_team,
+                team_b=at,
+                offer=offer,
+                free_agents=free_agents,
+            )
+            if ok:
+                ug = ", ".join(getattr(p, "name", "?") for p in user_gives)
+                ar = ", ".join(getattr(p, "name", "?") for p in ai_receives)
+                messagebox.showinfo(
+                    "トレード",
+                    f"成立: {ug} を放出 / {ar} を獲得",
+                    parent=top,
+                )
+            else:
+                messagebox.showwarning(
+                    "トレード",
+                    "トレード実行に失敗しました（ロスター・上限・国籍等の制約）。",
+                    parent=top,
+                )
+            top.destroy()
+            self._refresh_roster_window()
+            try:
+                self.refresh()
+            except Exception:
+                pass
+
+        next_caption_var = tk.StringVar(value="次へ")
+
+        def on_next() -> None:
+            step = int(state["step"])
+            if step == 0:
+                sel = listbox.curselection()
+                if not sel:
+                    messagebox.showinfo("トレード", "一覧から選択してください。", parent=top)
+                    return
+                idx = int(sel[0])
+                state["ai_team"] = state["items"][idx]
+                state["step"] = 1
+                an = str(getattr(state["ai_team"], "name", "?"))
+                hint_var.set(f"「{an}」との人数を指定してください。")
+                set_list_vs_count(True)
+                next_caption_var.set("次へ")
+                return
+            if step == 1:
+                try:
+                    n_out = int(str(n_out_var.get()).strip())
+                    n_in = int(str(n_in_var.get()).strip())
+                except ValueError:
+                    messagebox.showinfo("トレード", "人数は 1〜3 の整数で指定してください。", parent=top)
+                    return
+                okc, cmsg = bs_main.validate_multi_trade_player_counts(n_out, n_in)
+                if not okc:
+                    messagebox.showwarning("トレード", cmsg, parent=top)
+                    return
+                user_players = bs_main.get_tradeable_players(user_team)
+                ai_players = bs_main.get_tradeable_players(state["ai_team"])
+                if len(user_players) < n_out:
+                    messagebox.showwarning(
+                        "トレード",
+                        f"放出候補が足りません（必要: {n_out} 名、候補: {len(user_players)} 名）。",
+                        parent=top,
+                    )
+                    return
+                if len(ai_players) < n_in:
+                    messagebox.showwarning(
+                        "トレード",
+                        f"相手のトレード候補が足りません（必要: {n_in} 名、候補: {len(ai_players)} 名）。",
+                        parent=top,
+                    )
+                    return
+                state["n_out"] = n_out
+                state["n_in"] = n_in
+                state["step"] = 2
+                set_list_vs_count(False)
+                hint_var.set(
+                    f"相手から {n_in} 名を、Ctrl+クリックで選んで「次へ」してください。"
+                )
+                next_caption_var.set("次へ")
+                refresh_list()
+                return
+            if step == 2:
+                picked = pick_multi(int(state["n_in"]))
+                if picked is None:
+                    return
+                state["ai_receives"] = picked
+                state["step"] = 3
+                hint_var.set(
+                    f"自チームから {int(state['n_out'])} 名を選び、「評価する」を押してください。"
+                )
+                next_caption_var.set("評価する")
+                refresh_list()
+                return
+            if step == 3:
+                picked = pick_multi(int(state["n_out"]))
+                if picked is None:
+                    return
+                state["user_gives"] = picked
+                do_evaluate_and_finish_multi()
+                return
 
         btn_row = ttk.Frame(outer, style="Panel.TFrame")
         btn_row.pack(fill="x")
@@ -2320,8 +2714,8 @@ class MainMenuView:
             "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
             "【今できる操作（人事画面）】閲覧。＋1年延長（年俸据え置き・残年数が 1 年以上かつ"
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
-            "【トレード】選手のみ 1対1 はウィンドウ上部のボタンから。"
-            " multi（現金・RB・複数人）は CLI「8. GMメニュー」→「10. トレード」。"
+            "【トレード】1対1・multi（複数人・選手のみ）はウィンドウ上部のボタンから。"
+            " multi で現金・RB を伴う取引は CLI「8. GMメニュー」→「10. トレード」。"
             "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
             "期限はトレードと同じルールです（上部の案内を参照）。\n"
             "【契約解除（FA送り）】表で選手を選び、上部トレード行または下部の同ボタンから実行（最低人数・ロックは上記）。"
@@ -6904,7 +7298,7 @@ class MainMenuView:
             "【クラブ案内】編集の正本は人事・戦術・経営・情報の各メニューです。"
             "ここは閲覧・案内・ターミナル（CLI）へのショートカットのみです（実行画面ではありません）。\n\n"
             "【トレード・FA】1対1（選手のみ）は左メニュー「人事」から実行できます。\n"
-            "multi（複数人＋現金＋RB）は CLI が正本です（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "multi（選手のみ）は人事、現金・RB 付きは CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
             "レギュラー中の FA プールからの手動獲得は、人事の「インシーズンFA（1人）」から 1 名まで。"
             "期限・可否の詳細は「人事」ウィンドウ上部の案内を参照してください。\n"
             "再契約の確認は、GUIモードでオフシーズン処理の実行中にダイアログで表示されます。\n"
@@ -7770,9 +8164,9 @@ class MainMenuView:
         messagebox.showinfo(
             "トレード・FA の案内",
             "ここは案内用で、編集実行の窓ではありません。\n"
-            "1対1（選手のみ）は左メニュー「人事」から実行できます。\n"
-            "multi（複数人＋現金＋RB）はシーズンメニュー「8. GMメニュー」→「10. トレード」です。\n"
-            "FA プールから手動で契約する操作は現状未対応です。条件・期限は「人事」ウィンドウ上部の案内を参照してください。\n\n"
+            "1対1（選手のみ）・multi（複数人・選手のみ）は左メニュー「人事」から実行できます。\n"
+            "multi で現金・RB を伴う取引はシーズンメニュー「8. GMメニュー」→「10. トレード」です。\n"
+            "インシーズンFA（1人）は人事から。条件・期限は「人事」ウィンドウ上部の案内を参照してください。\n\n"
             "（左メニュー「クラブ案内」は編集窓ではありません。）",
             parent=parent,
         )
@@ -8029,7 +8423,7 @@ class MainMenuView:
         bottom.pack(fill="x", pady=(10, 0))
         ttk.Button(
             bottom,
-            text="トレード・FAの案内（1対1は人事／multiはCLI）",
+            text="トレード・FAの案内（1対1・multi選手のみは人事／現金RBはCLI）",
             style="Menu.TButton",
             command=self._on_gm_cli_trade_fa_hint,
         ).pack(side="left")
