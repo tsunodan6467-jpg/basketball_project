@@ -48,7 +48,6 @@ def ensure_fa_market_fields(player: Player) -> None:
         player.team_id = None
 
 
-
 def ensure_team_fa_market_fields(team: Team) -> None:
     """
     Team側の最低限の安全補完。
@@ -58,22 +57,6 @@ def ensure_team_fa_market_fields(team: Team) -> None:
 
     if not hasattr(team, "players") or team.players is None:
         team.players = []
-
-
-
-def normalize_free_agents(free_agents: List[Player]) -> List[Player]:
-    """
-    retired選手を除外しつつ、必要属性を補完して返す。
-    """
-    normalized: List[Player] = []
-
-    for player in free_agents:
-        ensure_fa_market_fields(player)
-        if getattr(player, "is_retired", False):
-            continue
-        normalized.append(player)
-
-    return normalized
 
 
 
@@ -120,6 +103,30 @@ def estimate_fa_market_value(player: Player) -> int:
 
     return max(int(MIN_SALARY_DEFAULT), int(base))
 
+
+def sync_fa_pool_player_salary_to_estimate(player: Player) -> None:
+    """
+    FAプール正規化専用: `player.salary` を市場ベース年俸として `estimate_fa_market_value` に揃える。
+    **normalize_free_agents からのみ呼ぶこと**（ロスター所属中等への誤爆防止）。
+    """
+    player.salary = int(estimate_fa_market_value(player))
+
+
+def normalize_free_agents(free_agents: List[Player]) -> List[Player]:
+    """
+    retired選手を除外しつつ、必要属性を補完して返す。
+    FAプール上の `player.salary` を `estimate_fa_market_value` に同期し、CPU本格FA等の参照を揃える。
+    """
+    normalized: List[Player] = []
+
+    for player in free_agents:
+        ensure_fa_market_fields(player)
+        if getattr(player, "is_retired", False):
+            continue
+        sync_fa_pool_player_salary_to_estimate(player)
+        normalized.append(player)
+
+    return normalized
 
 
 def estimate_fa_contract_years(player: Player) -> int:
@@ -594,7 +601,7 @@ def maintain_minimum_fa_pool(
         player.team_id = None
         normalized.append(player)
 
-    return normalized
+    return normalize_free_agents(normalized)
 
 
 
