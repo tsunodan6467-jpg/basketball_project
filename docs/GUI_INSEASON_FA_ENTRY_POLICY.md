@@ -12,14 +12,14 @@
 | 人事・編成の理想例示 | `docs/IDEAL_GAME_DESIGN_MASTER.md` |
 | トレード最小導線（比較） | `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` |
 
-**コード上の事実（リポジトリ静的確認・2026-04-07）**: `main.py` の `run_gm_menu` に **FA プールから選手を選んで契約するメニュー項目はない**。`sign_free_agent` の呼び出しは **`free_agent_market.run_cpu_fa_market_cycle` 内**（＋テスト）に限定される。シーズンシミュ中は `Season._process_inseason_free_agency` → `run_cpu_fa_market_cycle` で **CPU チーム**が補強しうる。人事 GUI の **契約＋1年**・**解除（FA 送り）**・**1対1トレード**は別経路。
+**コード上の事実（リポジトリ静的確認・2026-04-07、2026-04-06 GUI 実装反映）**: `main.py` の `run_gm_menu` に **FA プールから選手を選んで契約するメニュー項目はない**。**GUI** では人事ウィンドウ **「インシーズンFA（1人）」** から `season.free_agents` を一覧し **1 名**を `sign_free_agent` で獲得できる（最小・交渉なし）。`sign_free_agent` の呼び出しは **`run_cpu_fa_market_cycle` 内**、**テスト**、**上記 GUI**。シーズンシミュ中は `Season._process_inseason_free_agency` → `run_cpu_fa_market_cycle` で **CPU チーム**が補強しうる。人事 GUI の **契約＋1年**・**解除（FA 送り）**・**1対1トレード**は別経路。
 
 ---
 
 ## 0. この文書の使い方
 
 - **何のためか**: **オフ再契約 GUI 済み**の次候補として「インシーズンFA / 契約」を語る前に、**いまプレイヤーが何をできて何をできないか**を事実で揃え、**最小の GUI スコープ**を1つに絞る。
-- **コード変更ではない**: 本書のみ。ウィンドウ追加は別タスク。
+- **コード変更ではない**: 本書は設計・事実メモ。実装差分はコードと変更履歴を参照。
 - **役割分担**: オフ再契約・`resign_ui_prompt` は **`GUI_FA_CONTRACT_ENTRY_POLICY.md`**。本書は **レギュラー中の FA プール契約（ユーザー操作）**に限定する。
 
 ---
@@ -29,9 +29,9 @@
 | 論点 | 内容 |
 |------|------|
 | **CLI で「FA プールから契約」** | **`run_gm_menu` に該当項目なし**（静的確認）。トレードは **10** のみ（`run_trade_menu`）。multi は **チーム間＋現金**であり、**FA 一覧からの指名ではない**。 |
-| **GUI でシーズン中の契約** | **契約＋1年延長**・**契約解除（FA 送り）**・**1対1トレード**は人事にあり。**FA プールからの新規獲得 UI はなし**。 |
+| **GUI でシーズン中の契約** | **契約＋1年延長**・**契約解除（FA 送り）**・**1対1トレード**は人事にあり。**FA プールからの新規獲得**は人事 **「インシーズンFA（1人）」**（1 名・最小）。 |
 | **CPU インシーズンFA** | 各ラウンド処理の一部で `Season._process_inseason_free_agency` → `run_cpu_fa_market_cycle`。`cpu_inseason_fa_allowed_for_simulated_round` により **ラウンド22超過後は空振り**（`season_transaction_rules` と整合）。 |
-| **`sign_free_agent` の利用箇所** | **`run_cpu_fa_market_cycle` 内**と **pytest**（`test_economy_r1_fa_payroll_trace` 等）。**ユーザー対話コードからは呼ばれていない**（静的確認）。 |
+| **`sign_free_agent` の利用箇所** | **`run_cpu_fa_market_cycle` 内**、**pytest**、`main_menu_view` の **インシーズンFA（1人）** ウィザード。 |
 | **未確認** | リポジトリ外ブランチ・ローカル未コミットの有無。**全エントリポイントの動的網羅**（手動プレイ全分岐）は未実施。 |
 | **文言上のギャップ** | `main_menu_view._format_hr_trade_fa_guidance_text` は **「インシーズンFA の本操作は CLI が正本」** と書くが、**対応する CLI メニューは `run_gm_menu` に見当たらない**。→ **案内と実装の不一致**（本メモでは断定せず **要修正候補**として扱う）。 |
 
@@ -43,8 +43,8 @@
 
 | 問い | 整理結果 |
 |------|----------|
-| **ユーザーがインシーズンFAを自分で選んで契約できる経路があるか** | **リポジトリ内の `main.py` ユーザー向けメニューでは見つからない**（**未実装と判断**）。 |
-| **あるならどこか** | **該当なし**（上記確認範囲）。 |
+| **ユーザーがインシーズンFAを自分で選んで契約できる経路があるか** | **CLI の `run_gm_menu` には該当なし**。**GUI 人事**の **インシーズンFA（1人）** で 1 名まで可。 |
+| **あるならどこか** | **`main_menu_view` 人事ウィンドウ**（`inseason_roster_moves_unlocked` 等は 1対1 トレードと同一）。 |
 | **ないなら近い既存経路** | **CPU 自動補強**（シミュ進行に紐づく）。**人事の解除**で選手を FA プールへ送ることはできるが、**プールからの逆方向（獲得）は別操作**。 |
 | **CPU 補強の経路** | `Season` ラウンド進行 → `_process_inseason_free_agency` → `run_cpu_fa_market_cycle`（全 `all_teams`、ユーザーチームも対象になりうる）。 |
 | **`sign_free_agent` が使われる層** | **`free_agent_market`（CPU サイクル）** と **テスト**。 |
@@ -144,3 +144,4 @@
 - 2026-04-07: 人事ウィンドウ案内の「インシーズンFA は CLI 正本」表現を、実装事実に合わせて修正（別コミット・`main_menu_view`）。
 - 2026-04-07: クラブ案内 `_format_gm_cli_hint_block` のトレード／FA 文言を人事案内と事実ベースで整合（別コミット）。
 - 2026-04-07: クラブ案内の「トレード・FA（CLI）」ボタンと `messagebox` 短文を人事案内と整合（別コミット）。
+- 2026-04-06: 人事 **インシーズンFA（1人）** ウィザードを実装（`sign_free_agent`・`precheck_user_fa_sign`・ロックはトレードと同系）。CLI FA 契約メニューは引き続きなし。

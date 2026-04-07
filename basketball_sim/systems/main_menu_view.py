@@ -1043,8 +1043,8 @@ class MainMenuView:
             "・選手のみの 1対1 トレードは、本ウィンドウの「1対1トレード（選手のみ）」からも実行できます"
             "（インシーズンの可否は CLI のトレードと同一ルール）。\n"
             "・複数人＋現金＋RB の multi トレードは、CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）が正本です。\n"
-            "・FA プールから手動で選手を契約する操作は、現状ターミナルメニューにも GUI にもありません。"
-            "レギュラー中の FA 補強はシーズン進行に連動した自動処理が中心です。\n"
+            "・FA プールからの手動契約は、人事の「インシーズンFA（1人）」で 1 名まで（交渉・金額入力なし）。"
+            "レギュラー中の CPU 補強はシーズン進行に連動した自動処理が中心です。\n"
             "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、上記・CLI の案内を担当します。\n"
             "・再契約の確認は、オフシーズン処理の実行中にダイアログで表示されます（GUIモード）。\n\n"
             "【現在の条件】\n"
@@ -1384,7 +1384,7 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 10))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（1対1は下のボタン／multiはCLI／FAプール手動契約は未対応）",
+            text="トレード・FA（1対1・インシーズンFA1人は下／multiはCLI）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -1395,6 +1395,13 @@ class MainMenuView:
             "1対1トレード（選手のみ）",
             self._on_roster_one_for_one_trade,
             side="left",
+        )
+        self._jpn_text_button(
+            tf_btn_row,
+            "インシーズンFA（1人）",
+            self._on_roster_inseason_fa_one,
+            side="left",
+            padx=(10, 0),
         )
         tf_row = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
         tf_row.pack(fill="both", expand=False)
@@ -1837,6 +1844,249 @@ class MainMenuView:
 
         refresh_list()
 
+    def _on_roster_inseason_fa_one(self) -> None:
+        """人事から FA プールを一覧し、1 人だけ `sign_free_agent` で獲得する最小ウィザード。"""
+        parent = getattr(self, "_roster_window", None) or self.root
+        if self.team is None:
+            messagebox.showwarning("インシーズンFA", "チームが未接続です。", parent=parent)
+            return
+        if self.season is None:
+            messagebox.showwarning(
+                "インシーズンFA",
+                "シーズン未接続のため FA プールを参照できません。",
+                parent=parent,
+            )
+            return
+        if not inseason_roster_moves_unlocked(self.season):
+            messagebox.showwarning(
+                "インシーズンFA",
+                INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
+                parent=parent,
+            )
+            return
+        self._run_inseason_fa_one_wizard(parent)
+
+    def _run_inseason_fa_one_wizard(self, parent: Any) -> None:
+        from basketball_sim.systems.free_agent_market import (
+            ensure_fa_market_fields,
+            ensure_team_fa_market_fields,
+            estimate_fa_contract_years,
+            estimate_fa_market_value,
+            get_team_fa_signing_limit,
+            normalize_free_agents,
+            precheck_user_fa_sign,
+            sign_free_agent,
+        )
+        from basketball_sim.systems.roster_rules import RosterViolationError
+
+        team = self.team
+        season = self.season
+        assert team is not None and season is not None
+
+        raw = list(getattr(season, "free_agents", []) or [])
+        candidates = normalize_free_agents(raw)
+        candidates.sort(
+            key=lambda p: (-int(getattr(p, "ovr", 0) or 0), str(getattr(p, "name", "")))
+        )
+
+        _fa_nat_ja = {
+            "Japan": "日本",
+            "Foreign": "外国籍",
+            "Asia": "アジア",
+            "Naturalized": "帰化",
+        }
+
+        top = tk.Toplevel(parent)
+        top.title("インシーズンFA（1人）")
+        top.configure(bg="#15171c")
+        try:
+            top.transient(parent)
+        except Exception:
+            pass
+        top.geometry("780x460")
+        top.minsize(640, 380)
+
+        outer = ttk.Frame(top, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+
+        ttk.Label(
+            outer,
+            text="FA プールから 1 人を選び契約します。年俸は市場目安が自動適用されます（交渉・金額入力なし）。",
+            wraplength=720,
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 6))
+
+        hint_var = tk.StringVar(value="一覧から選手を選び、「制限を確認」→ 問題なければ「契約する」。")
+        ttk.Label(outer, textvariable=hint_var, wraplength=720).pack(fill="x", pady=(0, 6))
+
+        tree_fr = ttk.Frame(outer, style="Panel.TFrame")
+        tree_fr.pack(fill="both", expand=True, pady=(0, 8))
+        tree_fr.rowconfigure(0, weight=1)
+        tree_fr.columnconfigure(0, weight=1)
+
+        cols = ("name", "pos", "ovr", "age", "nat", "salary")
+        tv = ttk.Treeview(
+            tree_fr,
+            columns=cols,
+            show="headings",
+            height=12,
+            selectmode="browse",
+        )
+        tv.heading("name", text="選手名")
+        tv.heading("pos", text="POS")
+        tv.heading("ovr", text="OVR")
+        tv.heading("age", text="年齢")
+        tv.heading("nat", text="国籍区分")
+        tv.heading("salary", text="年俸目安")
+        tv.column("name", width=200, stretch=True)
+        tv.column("pos", width=44, stretch=False)
+        tv.column("ovr", width=48, stretch=False)
+        tv.column("age", width=48, stretch=False)
+        tv.column("nat", width=72, stretch=False)
+        tv.column("salary", width=120, stretch=False)
+
+        vsb = ttk.Scrollbar(tree_fr, orient="vertical", command=tv.yview)
+        tv.configure(yscrollcommand=vsb.set)
+        tv.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+
+        item_to_player: Dict[str, Any] = {}
+        for p in candidates:
+            ensure_fa_market_fields(p)
+            pid = getattr(p, "player_id", None)
+            iid = str(pid) if pid is not None else f"id_{id(p)}"
+            item_to_player[iid] = p
+            nat_key = str(getattr(p, "nationality", "Japan") or "Japan")
+            nat_j = _fa_nat_ja.get(nat_key, nat_key)
+            est = int(estimate_fa_market_value(p))
+            tv.insert(
+                "",
+                tk.END,
+                iid=iid,
+                values=(
+                    str(getattr(p, "name", "?")),
+                    str(getattr(p, "position", "?")),
+                    int(getattr(p, "ovr", 0) or 0),
+                    int(getattr(p, "age", 0) or 0),
+                    nat_j,
+                    f"{est:,}",
+                ),
+            )
+
+        status_var = tk.StringVar(value="")
+        ttk.Label(outer, textvariable=status_var, wraplength=720).pack(fill="x", pady=(0, 4))
+
+        if not candidates:
+            hint_var.set("FA プールに契約可能な選手がいません。")
+
+        def _selected_player() -> Optional[Any]:
+            sel = tv.selection()
+            if not sel:
+                return None
+            return item_to_player.get(str(sel[0]))
+
+        def on_check() -> None:
+            player = _selected_player()
+            if player is None:
+                messagebox.showinfo("インシーズンFA", "一覧から選手を選択してください。", parent=top)
+                return
+            ensure_team_fa_market_fields(team)
+            ensure_fa_market_fields(player)
+            sal = int(estimate_fa_market_value(player))
+            yrs = int(estimate_fa_contract_years(player))
+            room = int(get_team_fa_signing_limit(team))
+            money = int(getattr(team, "money", 0) or 0)
+            ok, reason = precheck_user_fa_sign(team, player)
+            nm = str(getattr(player, "name", "?"))
+            if ok:
+                status_var.set(f"「{nm}」: 契約可能（確認済み）。")
+                messagebox.showinfo(
+                    "インシーズンFA（制限確認）",
+                    f"選手: {nm}\n"
+                    f"年俸目安: {sal:,} 円\n"
+                    f"契約年数: {yrs} 年\n"
+                    f"サラリー契約余地: {room:,} 円\n"
+                    f"所持金: {money:,} 円\n\n"
+                    "上記条件で契約できます。「契約する」で確定してください。",
+                    parent=top,
+                )
+            else:
+                status_var.set(f"「{nm}」: 契約不可 — {reason}")
+                messagebox.showwarning(
+                    "インシーズンFA（制限確認）",
+                    f"選手: {nm}\n"
+                    f"年俸目安: {sal:,} 円\n"
+                    f"サラリー契約余地: {room:,} 円\n"
+                    f"所持金: {money:,} 円\n\n"
+                    f"契約できません: {reason}",
+                    parent=top,
+                )
+
+        def on_sign() -> None:
+            player = _selected_player()
+            if player is None:
+                messagebox.showinfo("インシーズンFA", "一覧から選手を選択してください。", parent=top)
+                return
+            ok, reason = precheck_user_fa_sign(team, player)
+            nm = str(getattr(player, "name", "?"))
+            if not ok:
+                messagebox.showwarning("インシーズンFA", reason, parent=top)
+                return
+            sal = int(estimate_fa_market_value(player))
+            yrs = int(estimate_fa_contract_years(player))
+            if not messagebox.askyesno(
+                "インシーズンFA（最終確認）",
+                f"{nm} と契約しますか？\n\n年俸目安 {sal:,} 円 / {yrs} 年\n"
+                "（標準の FA 契約処理で反映。所持金の即時減算はありません。）",
+                parent=top,
+            ):
+                return
+            try:
+                sign_free_agent(team, player)
+            except RosterViolationError as exc:
+                messagebox.showwarning("インシーズンFA", str(exc), parent=top)
+                return
+            roster = list(getattr(team, "players", []) or [])
+            if player not in roster:
+                messagebox.showwarning(
+                    "インシーズンFA",
+                    "契約の反映に失敗しました（ルールにより見送られた可能性があります）。",
+                    parent=top,
+                )
+                return
+            fa_list = getattr(season, "free_agents", None)
+            if fa_list is not None:
+                if player in fa_list:
+                    fa_list.remove(player)
+                else:
+                    pid = getattr(player, "player_id", None)
+                    if pid is not None:
+                        for fp in list(fa_list):
+                            if getattr(fp, "player_id", None) == pid:
+                                fa_list.remove(fp)
+                                break
+            messagebox.showinfo(
+                "インシーズンFA",
+                f"{nm} を獲得しました。ロスターに反映済みです。",
+                parent=top,
+            )
+            top.destroy()
+            self._refresh_roster_window()
+            try:
+                self.refresh()
+            except Exception:
+                pass
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame")
+        btn_row.pack(fill="x")
+
+        def on_close() -> None:
+            top.destroy()
+
+        self._jpn_text_button(btn_row, "閉じる", on_close, side="left")
+        self._jpn_text_button(btn_row, "制限を確認", on_check, side="right", padx=(8, 0))
+        self._jpn_text_button(btn_row, "契約する", on_sign, side="right", primary=True)
+
     def _on_roster_extend_one_year_selected(self) -> None:
         """contract_logic.apply_contract_extension を GUI から1回だけ適用（年俸据え置き）。"""
         parent = getattr(self, "_roster_window", None) or self.root
@@ -2061,8 +2311,8 @@ class MainMenuView:
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
             "【トレード】選手のみ 1対1 はウィンドウ上部のボタンから。"
             " multi（現金・RB・複数人）は CLI「8. GMメニュー」→「10. トレード」。"
-            "【インシーズンFA】FA プールから手動で契約する操作は現状未対応です。"
-            "期限の表示はトレードと同じルールです（上部の案内を参照）。"
+            "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
+            "期限はトレードと同じルールです（上部の案内を参照）。"
         )
 
         trade_txt = getattr(self, "roster_trade_fa_text", None)
@@ -6643,7 +6893,8 @@ class MainMenuView:
             "ここは閲覧・案内・ターミナル（CLI）へのショートカットのみです（実行画面ではありません）。\n\n"
             "【トレード・FA】1対1（選手のみ）は左メニュー「人事」から実行できます。\n"
             "multi（複数人＋現金＋RB）は CLI が正本です（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
-            "FA プールから手動で契約する操作は現状未対応です。期限・可否の詳細は「人事」ウィンドウ上部の案内を参照してください。\n"
+            "レギュラー中の FA プールからの手動獲得は、人事の「インシーズンFA（1人）」から 1 名まで。"
+            "期限・可否の詳細は「人事」ウィンドウ上部の案内を参照してください。\n"
             "再契約の確認は、GUIモードでオフシーズン処理の実行中にダイアログで表示されます。\n"
             f"消化ラウンド: {cr}/{tr}\n"
             "ウィンドウ下のボタンはターミナル（CLI）へのショートカットです。\n\n"

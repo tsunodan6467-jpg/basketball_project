@@ -198,6 +198,43 @@ def get_team_fa_signing_limit(
 
 
 
+def precheck_user_fa_sign(team: Team, player: Player) -> Tuple[bool, str]:
+    """
+    GUI 向け: `sign_free_agent` 実行前の可否と簡潔な理由。
+
+    `sign_free_agent` は所持金を見ないため、ここで `can_team_afford_free_agent` も含める。
+    """
+    from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
+    from basketball_sim.systems.roster_rules import can_add_contract_player
+
+    ensure_team_fa_market_fields(team)
+    ensure_fa_market_fields(player)
+
+    ok_roster, roster_msg = can_add_contract_player(team, player)
+    if not ok_roster:
+        code = roster_msg or ""
+        if code == "contract_roster_full":
+            return False, f"本契約ロスターが上限（{CONTRACT_ROSTER_MAX}人）に達しています。"
+        if code == "nationality_slot":
+            return False, "国籍枠の都合により追加できません。"
+        return False, code or "ロスターに追加できません。"
+
+    if not can_team_sign_player_by_japan_rule(team, player):
+        return False, "国籍枠・チームルールにより契約できません。"
+
+    if not can_team_afford_free_agent(team, player):
+        salary = estimate_fa_market_value(player)
+        room = int(get_team_fa_signing_limit(team))
+        money = int(getattr(team, "money", 0) or 0)
+        if money < salary:
+            return False, f"所持金が不足しています（年俸目安 {salary:,} 円、所持 {money:,} 円）。"
+        return False, (
+            f"サラリー上限の契約余地が不足しています（年俸目安 {salary:,} 円、余地 {room:,} 円）。"
+        )
+
+    return True, ""
+
+
 def can_team_afford_free_agent(
     team: Team,
     player: Player,
