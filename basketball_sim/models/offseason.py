@@ -21,6 +21,7 @@ from basketball_sim.systems.top_prospect_generator import generate_top_prospects
 
 try:
     from basketball_sim.systems.contract_logic import (
+        MIN_SALARY_DEFAULT,
         advance_contract_years,
         apply_contract_extension,
         apply_resign_offer,
@@ -31,6 +32,7 @@ try:
         get_team_player_rank,
     )
 except Exception:
+    MIN_SALARY_DEFAULT = None
     ensure_contract_fields = None
     calculate_desired_contract_terms = None
     evaluate_resign_offer = None
@@ -61,21 +63,24 @@ def _safe_cli_stdout_text(text: str) -> str:
 
 def _sync_payroll_budget_with_roster_payroll(teams: List[Team]) -> None:
     """
-    オフFA直前の薄い同期: 各チームの payroll_budget を実ペイロール未満にしない。
+    オフFA直前の薄い同期: 各チームの payroll_budget を「実ペイロール＋最低年俸1人分」未満にしない。
 
     `_process_team_finances` より前に手動FA・CPU FA が走るため、ロスター年俸が動いたあとも
     payroll_budget が古いと `free_agency._calculate_offer` の room_to_budget が 0 になりうる。
-    第1弾は `max(既存, get_team_payroll)` のみ（docs/OFFSEASON_FA_PAYROLL_BUDGET_SYNC_PLAN_2026-04.md）。
+    第1弾: `max(既存, roster)`（docs/OFFSEASON_FA_PAYROLL_BUDGET_SYNC_PLAN_2026-04.md）。
+    第2弾: `max(既存, roster + MIN_SALARY_DEFAULT)`（docs/OFFSEASON_FA_PAYROLL_BUDGET_BUFFER_PLAN_2026-04.md）。
     """
     if get_team_payroll is None:
         return
+    buffer = int(MIN_SALARY_DEFAULT) if MIN_SALARY_DEFAULT is not None else 0
     for team in teams or []:
         try:
             existing = int(getattr(team, "payroll_budget", 0) or 0)
         except (TypeError, ValueError):
             existing = 0
         roster_payroll = int(get_team_payroll(team))
-        team.payroll_budget = int(max(0, max(existing, roster_payroll)))
+        buffered_payroll_budget_floor = roster_payroll + buffer
+        team.payroll_budget = int(max(0, max(existing, buffered_payroll_budget_floor)))
 
 
 # 仮経営バランス第2弾: オフ締めの modeled 収益が実ペイロール規模に追従していないため、
