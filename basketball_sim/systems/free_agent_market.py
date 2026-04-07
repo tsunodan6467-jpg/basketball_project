@@ -15,7 +15,8 @@ from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap,
 FA_SOFT_CAP_SIGNING_BUFFER_RATIO = 0.08
 FA_SOFT_CAP_MIN_ROOM = 8_000_000
 
-# オフ手動FA専用: `estimate_fa_market_value` をベースにした下限（CPU本格FA・estimate 係数本体は不変更）
+# オフ手動FA専用: `estimate_fa_market_value` に対する契約額の下限倍率（例: 1.35 → estimate の 135% 未満に押し上げない）。
+# CPU 本格FA・`estimate_fa_market_value` の式本体とは独立。d995b48 由来の暫定。
 MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER = 1.35
 
 # 旧 estimate の ovr*12000 加算補正を、開幕ロスター単価へ載せ替えるときのスケール除数
@@ -453,39 +454,56 @@ def sign_free_agent(
 def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int, int]:
     """
     オフ手動FA（`conduct_free_agency` 直前）専用: CPU 本格FA と同じ
-    `free_agency._calculate_offer` / `_determine_contract_years` による年俸・契約年数。
-    `conduct_free_agency` 本体は変更しない（同関数を読むだけ）。
+    `free_agency._calculate_offer` / `_determine_contract_years` を読むだけ（本体は変更しない）。
 
-    `_calculate_offer` は `Team.payroll_budget`（クラブ目安）でオファー上限を切る。
-    オフFA直前は `_process_team_finances` より前で `payroll_budget` が実ペイロールに対して
-    小さいままのことがあり、`room_to_budget` が 0 となって **全件オファー0** になりうる。
-    その場合でも `get_team_fa_signing_limit` 上まだ契約余地があるときは、
-    **表示＝契約**のため `estimate_fa_market_value` を上限 `room` でクリップした額にフォールバックする
-    （CPU本格FAの式は触らない）。
+    処理の流れ（`docs/OFFSEASON_MANUAL_FA_ALIGNMENT_PLAN_2026-04.md` と対応）:
 
-    上記 **core_offer** を維持したうえで、オフ手動専用に
-    `estimate_fa_market_value * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER` を下限として乗せ、
-    `get_team_fa_signing_limit` 内にクリップする（インシーズンFA・`conduct_free_agency` には波及しない）。
+    1. **signing_room** … `get_team_fa_signing_limit` による契約可能な年俸余地の上限。
+    2. **core_offer（主経路）** … `_calculate_offer`。`player.salary` 等を芯に、予算・キャップで圧縮された額。
+    3. **estimate フォールバック** … `core_offer <= 0` かつ余地ありのとき、主経路が 0 でも
+       表示＝契約を成立させるため `estimate_fa_market_value` を芯にし `min(estimate, signing_room)` で上書き。
+    4. **manual_floor_offer（オフ手動専用下限）** … `estimate * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER`
+       （d995b48 由来の暫定倍率。インシーズンFA には使わない）。
+    5. **final_salary** … `max(core_offer, manual_floor_offer)` を `signing_room` でクリップ。
+
+    `_calculate_offer` が 0 になりうる背景: オフFA直前は `_process_team_finances` より前で
+    `payroll_budget` が実ペイロールに追いついておらず `room_to_budget` が 0 となりうる、等。
     """
     from basketball_sim.systems.free_agency import _calculate_offer, _determine_contract_years
 
     ensure_team_fa_market_fields(team)
     ensure_fa_market_fields(player)
 
-    room = int(get_team_fa_signing_limit(team))
-    est: Optional[int] = None
+    # --- 1. サイン可能な年俸余地（キャップ系の単一入口） ---
+    signing_room = int(get_team_fa_signing_limit(team))
+    has_signing_room = signing_room > 0
+
+    # --- 2. 主経路: CPU 本格FA 同型のオファー芯 ---
     core_offer = int(_calculate_offer(team, player))
-    if core_offer <= 0 and room > 0:
-        est = int(estimate_fa_market_value(player))
-        core_offer = min(est, room)
+
+    # --- 3. フォールバック: 主経路が 0 以下だがキャップ上は余地があるとき estimate で芯を立てる ---
+    estimate_for_floor: Optional[int] = None
+    needs_estimate_fallback = core_offer <= 0 and has_signing_room
+    if needs_estimate_fallback:
+        estimate_for_floor = int(estimate_fa_market_value(player))
+        core_offer = min(estimate_for_floor, signing_room)
+
     if core_offer <= 0:
         return 0, 1
-    if est is None:
-        est = int(estimate_fa_market_value(player))
-    floor_offer = int(est * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER)
-    final_salary = min(max(core_offer, floor_offer), room)
+
+    # 下限計算用に estimate を1回確保（フォールバック済みなら再利用）
+    if estimate_for_floor is None:
+        estimate_for_floor = int(estimate_fa_market_value(player))
+
+    # --- 4. オフ手動専用下限（estimate × 定数倍率） ---
+    manual_floor_offer = int(estimate_for_floor * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER)
+
+    # --- 5. 下限適用後、signing_room で最終クリップ ---
+    final_salary = min(max(core_offer, manual_floor_offer), signing_room)
+
     if final_salary <= 0:
         return 0, 1
+
     years = int(_determine_contract_years(player, team, final_salary))
     return final_salary, max(1, years)
 
