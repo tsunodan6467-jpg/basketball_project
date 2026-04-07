@@ -3143,6 +3143,7 @@ class MainMenuView:
         header.pack(fill="x", pady=(0, 12))
 
         self.strategy_header_var = tk.StringVar(value="")
+        self.strategy_hint_var = tk.StringVar(value="")
         ttk.Label(
             header,
             textvariable=self.strategy_header_var,
@@ -3394,9 +3395,8 @@ class MainMenuView:
             anchor="w",
             font=("Yu Gothic UI", 9),
             padx=2,
-            pady=(0, 6),
             wraplength=420,
-        ).pack(fill="x", anchor="w")
+        ).pack(fill="x", anchor="w", pady=(0, 6))
 
         ttk.Label(
             lineup_panel,
@@ -3492,7 +3492,6 @@ class MainMenuView:
             command=lambda: self._on_reset_starting_lineup_gui(_strat_parent()),
         ).pack(side="left")
 
-        self.strategy_hint_var = tk.StringVar(value="")
         tk.Label(
             notes_panel,
             textvariable=self.strategy_hint_var,
