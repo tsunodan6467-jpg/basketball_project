@@ -15,6 +15,7 @@
 | GUI 1対1トレード入口（設計） | `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` |
 | GUI FA / 契約入口（設計） | `docs/GUI_FA_CONTRACT_ENTRY_POLICY.md` |
 | GUI インシーズンFA / 契約（設計） | `docs/GUI_INSEASON_FA_ENTRY_POLICY.md` |
+| GUI multi トレード入口（設計・未実装） | `docs/GUI_MULTI_TRADE_ENTRY_POLICY.md` |
 
 **コード上の事実（静的確認・2026-04-06、2026-04-07 追記）**: 左メニュー `MENU_ITEMS` は **日程 → 人事 → クラブ案内 → 経営 → 強化 → 戦術 → 情報 → 歴史 → システム**。中央に **「次へ進む」**（`advance_button`、シーズン終了時は **「オフシーズンを実行」** 等に切替）と **「次の試合」** パネル等。コメント上 **「編集の正本は人事・戦術・経営・情報」**。**トレード**: **1対1（選手のみ）は人事 GUI** と **CLI `run_trade_menu`** が並存。**multi** は **CLI 正本**。**FA プールからの手動獲得**は **人事「インシーズンFA（1人）」** で **1 名まで**（`sign_free_agent`、CLI の `run_gm_menu` に該当項目はなし。詳細 `GUI_INSEASON_FA_ENTRY_POLICY.md`）。**オフ再契約 y/n** は **GUI オフ実行中にダイアログ**（`resign_ui_prompt`）。
 
@@ -142,3 +143,4 @@
 - 2026-04-07: 参照表に `GUI_INSEASON_FA_ENTRY_POLICY.md` を追加（インシーズンFA・現状事実と最小GUI単位）。
 - 2026-04-07: 冒頭事実欄・§1・§2・§3・§4・§5 を、1対1 GUI／オフ再契約 GUI／FA プール手動未対応の実装事実に同期。
 - 2026-04-06: 人事 **インシーズンFA（1人）** 実装を反映（冒頭事実欄・§1・§2・§4・§5）。
+- 2026-04-06: 参照表に `GUI_MULTI_TRADE_ENTRY_POLICY.md` を追加（multi GUI の入口・最小スコープの設計メモ。実装は未）。

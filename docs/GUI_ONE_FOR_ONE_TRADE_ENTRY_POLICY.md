@@ -10,6 +10,7 @@
 | 1対1 は選手のみ・現金は multi 寄せ | `docs/ONE_FOR_ONE_TRADE_CASH_POLICY.md` |
 | トレード現金の会計・履歴の思想 | `docs/TRADE_CASH_ACCOUNTING_POLICY.md` |
 | 現状ラベル | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.5・§5.7 |
+| multi の GUI 化（別紙・本書のスコープ外） | `docs/GUI_MULTI_TRADE_ENTRY_POLICY.md` |
 | 経営メニュー全体のたたき台 | `docs/GM_MANAGEMENT_MENU_SPEC_V1.md`（人事は別ウィンドウ） |
 
 **コード上の事実（2026-04-06 更新）**: `main.propose_trade`（CLI）と人事の **「1対1トレード（選手のみ）」**はいずれも `inseason_roster_moves_unlocked` 後に `get_trade_candidate_teams` / `get_tradeable_players` → `one_for_one_trade_evaluate_and_ai_gate`（評価＋AI承諾）→ 確認 → `execute_one_for_one_trade`（現金・RB なし）。GUI は `MainMenuView._all_teams_for_trade_gui` で `Season.all_teams` を優先し CLI と同じ母集団を使う。
