@@ -1042,8 +1042,8 @@ class MainMenuView:
             "【当面の運用】\n"
             "・選手のみの 1対1 トレードは、本ウィンドウの「1対1トレード（選手のみ）」からも実行できます"
             "（インシーズンの可否は CLI のトレードと同一ルール）。\n"
-            "・multi は人事の「multi（複数人）」で選手のみの入替（第1弾・現金・RB なし）が可能。"
-            "複数人＋現金＋RB のフル multi は CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）が正本です。\n"
+            "・multi は人事の「multi（複数人）」で複数選手＋現金・RB（自分→相手）まで可能（CLI multi と同じ実行経路）。\n"
+            "CLI のトレードメニューからも同様の multi が実行できます（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
             "・FA プールからの手動契約は、人事の「インシーズンFA（1人）」で 1 名まで（交渉・金額入力なし）。"
             "レギュラー中の CPU 補強はシーズン進行に連動した自動処理が中心です。\n"
             "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、上記・CLI の案内を担当します。\n"
@@ -1056,7 +1056,7 @@ class MainMenuView:
             "・ロスター表での閲覧、契約の＋1年延長（条件あり）、契約解除による FA 送り（インシーズンは"
             "トレード／インシーズンFA と同じ期限でロック）。\n\n"
             "【まだターミナル（CLI）で行うこと】\n"
-            "・multi は人事で「multi（複数人）」（選手のみ）か、CLI で複数人＋現金＋RB（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "・multi は人事で「multi（複数人）」または CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
             "・レギュラー中のトレード期限切れ後は、CLI のトレードもブロックされます（上部の可否表示と同じルール）。\n\n"
             "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
         )
@@ -1385,7 +1385,7 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 10))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（表で選手選択→解除。1対1／multi（選手のみ）／インシーズンFAは横ボタン。現金・RB付きmultiはCLI）",
+            text="トレード・FA（表で選手選択→解除。1対1／multi（複数人＋現金・RB可）／インシーズンFAは横ボタン）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -1918,7 +1918,7 @@ class MainMenuView:
 
         user_team = self.team
         top = tk.Toplevel(parent)
-        top.title("multi トレード（複数人・選手のみ）")
+        top.title("multi トレード（複数人＋現金・RB）")
         top.configure(bg="#15171c")
         try:
             top.transient(parent)
@@ -1933,8 +1933,8 @@ class MainMenuView:
         ttk.Label(
             outer,
             text=(
-                "複数選手の入替のみです（現金・RB は 0 固定）。"
-                "現金や RB を伴う取引は CLI の「トレード提案（複数人数＋現金＋RB）」を使ってください。"
+                "複数選手の入替に加え、自分→相手への現金・RB（ルーキー予算）移転を指定できます。"
+                "評価・成立は `TradeSystem` の multi 経路（CLI のトレード提案と同系）です。"
             ),
             wraplength=600,
             font=("Yu Gothic UI", 9),
@@ -2009,6 +2009,91 @@ class MainMenuView:
         count_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
         count_frame.grid_remove()
 
+        money_rb_frame = tk.Frame(lb_frame, bg="#222834")
+        tk.Label(
+            money_rb_frame,
+            text="現金・RB はいずれも「自分のクラブ → 相手クラブ」への移転です（CLI STEP 5/6 と同趣旨）。",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 9),
+            wraplength=560,
+            justify="left",
+        ).pack(anchor="w", padx=8, pady=(8, 10))
+        cash_limit_var = tk.StringVar(value="")
+        rb_limit_var = tk.StringVar(value="")
+        tk.Label(
+            money_rb_frame,
+            textvariable=cash_limit_var,
+            bg="#222834",
+            fg="#c8d0dc",
+            font=("Yu Gothic UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(0, 4))
+        row_cash = tk.Frame(money_rb_frame, bg="#222834")
+        row_cash.pack(fill="x", padx=8, pady=4)
+        tk.Label(
+            row_cash,
+            text="現金（円）:",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+            width=14,
+            anchor="w",
+        ).pack(side="left")
+        cash_entry = tk.Entry(
+            row_cash,
+            width=18,
+            font=("Yu Gothic UI", 10),
+            bg="#2a3140",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+        )
+        cash_entry.pack(side="left", padx=(0, 8))
+        tk.Label(
+            row_cash,
+            text="カンマ可・空欄は0",
+            bg="#222834",
+            fg="#8899aa",
+            font=("Yu Gothic UI", 8),
+        ).pack(side="left")
+        tk.Label(
+            money_rb_frame,
+            textvariable=rb_limit_var,
+            bg="#222834",
+            fg="#c8d0dc",
+            font=("Yu Gothic UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(8, 4))
+        row_rb = tk.Frame(money_rb_frame, bg="#222834")
+        row_rb.pack(fill="x", padx=8, pady=4)
+        tk.Label(
+            row_rb,
+            text="RB 移転:",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+            width=14,
+            anchor="w",
+        ).pack(side="left")
+        rb_entry = tk.Entry(
+            row_rb,
+            width=18,
+            font=("Yu Gothic UI", 10),
+            bg="#2a3140",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+        )
+        rb_entry.pack(side="left", padx=(0, 8))
+        tk.Label(
+            row_rb,
+            text="空欄は0",
+            bg="#222834",
+            fg="#8899aa",
+            font=("Yu Gothic UI", 8),
+        ).pack(side="left")
+        money_rb_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        money_rb_frame.grid_remove()
+
         state: Dict[str, Any] = {
             "step": 0,
             "ai_team": None,
@@ -2016,6 +2101,8 @@ class MainMenuView:
             "n_in": 1,
             "ai_receives": [],
             "user_gives": [],
+            "cash_a_to_b": 0,
+            "rookie_budget_a_to_b": 0,
             "items": [],
             "player_source": [],
         }
@@ -2037,19 +2124,22 @@ class MainMenuView:
                 f"{nat_j}  年俸 {sal:,}円"
             )
 
-        def set_list_vs_count(show_counts: bool) -> None:
-            if show_counts:
-                listbox.grid_remove()
-                vsb.grid_remove()
-                count_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
-            else:
-                count_frame.grid_remove()
+        def set_center_pane(mode: str) -> None:
+            count_frame.grid_remove()
+            money_rb_frame.grid_remove()
+            listbox.grid_remove()
+            vsb.grid_remove()
+            if mode == "list":
                 listbox.grid(row=0, column=0, sticky="nsew")
                 vsb.grid(row=0, column=1, sticky="ns")
+            elif mode == "count":
+                count_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
+            elif mode == "cash_rb":
+                money_rb_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
         def refresh_list() -> None:
             step = int(state["step"])
-            if step == 1:
+            if step in (1, 4):
                 return
             listbox.delete(0, tk.END)
             state["items"] = []
@@ -2094,11 +2184,13 @@ class MainMenuView:
             at = state["ai_team"]
             user_gives: List[Any] = list(state["user_gives"])
             ai_receives: List[Any] = list(state["ai_receives"])
+            cash_amt = int(state.get("cash_a_to_b", 0) or 0)
+            rb_amt = int(state.get("rookie_budget_a_to_b", 0) or 0)
             offer = MultiTradeOffer(
                 team_a_gives_players=user_gives,
                 team_a_receives_players=ai_receives,
-                cash_a_to_b=0,
-                rookie_budget_a_to_b=0,
+                cash_a_to_b=cash_amt,
+                rookie_budget_a_to_b=rb_amt,
             )
             ts = TradeSystem()
             user_eval, ai_eval = ts.evaluate_multi_trade(user_team, at, offer)
@@ -2129,9 +2221,14 @@ class MainMenuView:
             if ok:
                 ug = ", ".join(getattr(p, "name", "?") for p in user_gives)
                 ar = ", ".join(getattr(p, "name", "?") for p in ai_receives)
+                pay_lines = ""
+                if cash_amt > 0:
+                    pay_lines += f"\n現金（自分→相手）: {cash_amt:,} 円"
+                if rb_amt > 0:
+                    pay_lines += f"\nRB（自分→相手）: {rb_amt:,}"
                 messagebox.showinfo(
                     "トレード",
-                    f"成立: {ug} を放出 / {ar} を獲得",
+                    f"成立: {ug} を放出 / {ar} を獲得{pay_lines}",
                     parent=top,
                 )
             else:
@@ -2161,7 +2258,7 @@ class MainMenuView:
                 state["step"] = 1
                 an = str(getattr(state["ai_team"], "name", "?"))
                 hint_var.set(f"「{an}」との人数を指定してください。")
-                set_list_vs_count(True)
+                set_center_pane("count")
                 next_caption_var.set("次へ")
                 return
             if step == 1:
@@ -2194,7 +2291,7 @@ class MainMenuView:
                 state["n_out"] = n_out
                 state["n_in"] = n_in
                 state["step"] = 2
-                set_list_vs_count(False)
+                set_center_pane("list")
                 hint_var.set(
                     f"相手から {n_in} 名を、Ctrl+クリックで選んで「次へ」してください。"
                 )
@@ -2208,9 +2305,9 @@ class MainMenuView:
                 state["ai_receives"] = picked
                 state["step"] = 3
                 hint_var.set(
-                    f"自チームから {int(state['n_out'])} 名を選び、「評価する」を押してください。"
+                    f"自チームから {int(state['n_out'])} 名を選び、「次へ」を押してください。"
                 )
-                next_caption_var.set("評価する")
+                next_caption_var.set("次へ")
                 refresh_list()
                 return
             if step == 3:
@@ -2218,6 +2315,38 @@ class MainMenuView:
                 if picked is None:
                     return
                 state["user_gives"] = picked
+                max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
+                max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
+                cash_limit_var.set(f"現金: 0〜{max_cash:,} 円（空欄は送金なし）")
+                rb_limit_var.set(f"RB: 0〜{max_rb:,}（空欄は移転なし）")
+                cash_entry.delete(0, tk.END)
+                rb_entry.delete(0, tk.END)
+                state["step"] = 4
+                set_center_pane("cash_rb")
+                hint_var.set("現金・RB を入力し、「評価する」を押してください（空欄は 0）。")
+                next_caption_var.set("評価する")
+                return
+            if step == 4:
+                max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
+                max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
+                ok_c, cash_v, msg_c = bs_main.parse_multi_trade_side_payment(
+                    cash_entry.get(),
+                    max_cash,
+                    is_cash=True,
+                )
+                if not ok_c:
+                    messagebox.showwarning("トレード", msg_c, parent=top)
+                    return
+                ok_r, rb_v, msg_r = bs_main.parse_multi_trade_side_payment(
+                    rb_entry.get(),
+                    max_rb,
+                    is_cash=False,
+                )
+                if not ok_r:
+                    messagebox.showwarning("トレード", msg_r, parent=top)
+                    return
+                state["cash_a_to_b"] = cash_v
+                state["rookie_budget_a_to_b"] = rb_v
                 do_evaluate_and_finish_multi()
                 return
 
@@ -2714,8 +2843,8 @@ class MainMenuView:
             "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
             "【今できる操作（人事画面）】閲覧。＋1年延長（年俸据え置き・残年数が 1 年以上かつ"
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
-            "【トレード】1対1・multi（複数人・選手のみ）はウィンドウ上部のボタンから。"
-            " multi で現金・RB を伴う取引は CLI「8. GMメニュー」→「10. トレード」。"
+            "【トレード】1対1・multi（複数人・現金・RB）はウィンドウ上部のボタンから。"
+            " CLI からも同様のトレードメニューで実行できます（「8. GMメニュー」→「10. トレード」）。"
             "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
             "期限はトレードと同じルールです（上部の案内を参照）。\n"
             "【契約解除（FA送り）】表で選手を選び、上部トレード行または下部の同ボタンから実行（最低人数・ロックは上記）。"
@@ -7298,7 +7427,7 @@ class MainMenuView:
             "【クラブ案内】編集の正本は人事・戦術・経営・情報の各メニューです。"
             "ここは閲覧・案内・ターミナル（CLI）へのショートカットのみです（実行画面ではありません）。\n\n"
             "【トレード・FA】1対1（選手のみ）は左メニュー「人事」から実行できます。\n"
-            "multi（選手のみ）は人事、現金・RB 付きは CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "multi（複数人＋現金・RB）は人事または CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
             "レギュラー中の FA プールからの手動獲得は、人事の「インシーズンFA（1人）」から 1 名まで。"
             "期限・可否の詳細は「人事」ウィンドウ上部の案内を参照してください。\n"
             "再契約の確認は、GUIモードでオフシーズン処理の実行中にダイアログで表示されます。\n"
@@ -8164,8 +8293,8 @@ class MainMenuView:
         messagebox.showinfo(
             "トレード・FA の案内",
             "ここは案内用で、編集実行の窓ではありません。\n"
-            "1対1（選手のみ）・multi（複数人・選手のみ）は左メニュー「人事」から実行できます。\n"
-            "multi で現金・RB を伴う取引はシーズンメニュー「8. GMメニュー」→「10. トレード」です。\n"
+            "1対1（選手のみ）・multi（複数人・現金・RB）は左メニュー「人事」から実行できます。\n"
+            "同じ multi はシーズンメニュー「8. GMメニュー」→「10. トレード」からも実行できます。\n"
             "インシーズンFA（1人）は人事から。条件・期限は「人事」ウィンドウ上部の案内を参照してください。\n\n"
             "（左メニュー「クラブ案内」は編集窓ではありません。）",
             parent=parent,
@@ -8423,7 +8552,7 @@ class MainMenuView:
         bottom.pack(fill="x", pady=(10, 0))
         ttk.Button(
             bottom,
-            text="トレード・FAの案内（1対1・multi選手のみは人事／現金RBはCLI）",
+            text="トレード・FAの案内（1対1・multiは人事／CLIでも可）",
             style="Menu.TButton",
             command=self._on_gm_cli_trade_fa_hint,
         ).pack(side="left")

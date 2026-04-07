@@ -136,9 +136,9 @@
 
 | 区分 | 内容 |
 |------|------|
-| 実装済み | **1対1（選手のみ）トレードは人事 GUI**（`main_menu_view` → `main` 共用ヘルパ・`TradeSystem`、2026-04-06）。**multi（複数人・選手のみ・現金・RB=0）は人事 GUI**（第1弾、2026-04-06）。**現金・RB 付き multi は `main.py` CLI**（`trade_logic.py`）。**オフ再契約 y/n は GUI オフ実行中ダイアログ**（`offseason.py`＋`offseason_resign_tk` 注入、2026-04-07）。**インシーズン FA プールからの手動獲得は人事「インシーズンFA（1人）」**（1 名・`sign_free_agent`、2026-04-06）。**契約解除（FA送り）**は表で選手選択のうえ **トレード行＋下部の同一ハンドラ**（`_on_roster_release_selected`）。FA 市場・CPU インシーズン補強（`free_agent_market.py`, `season.py` 等）。ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。1対1 の相手候補は自チーム以外の **D1/D2/D3 全クラブ**（`Season.all_teams` / `main.get_trade_candidate_teams`）。 |
+| 実装済み | **1対1（選手のみ）トレードは人事 GUI**（`main_menu_view` → `main` 共用ヘルパ・`TradeSystem`、2026-04-06）。**multi（複数人・現金・RB・自分→相手）は人事 GUI**（`execute_multi_trade` 経路、2026-04-06）。**CLI** からも `run_trade_menu` → multi（`trade_logic.py`）。**オフ再契約 y/n は GUI オフ実行中ダイアログ**（`offseason.py`＋`offseason_resign_tk` 注入、2026-04-07）。**インシーズン FA プールからの手動獲得は人事「インシーズンFA（1人）」**（1 名・`sign_free_agent`、2026-04-06）。**契約解除（FA送り）**は表で選手選択のうえ **トレード行＋下部の同一ハンドラ**（`_on_roster_release_selected`）。FA 市場・CPU インシーズン補強（`free_agent_market.py`, `season.py` 等）。ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。1対1 の相手候補は自チーム以外の **D1/D2/D3 全クラブ**（`Season.all_teams` / `main.get_trade_candidate_teams`）。 |
 | 暫定 | **未確認**。 |
-| 未実装 | `PRODUCT` は GUI からの同一ガード通過を **残** と記載。**multi の現金・RB** 等の GUI 完結は **未**（FA 手動は **1 名まで**人事 GUI のみ）。 |
+| 未実装 | `PRODUCT` は GUI からの同一ガード通過を **残** と記載。編成まわりの **その他 GUI 完結**は **未**（例: 本格 FA 市場。FA 手動は **1 名まで**人事 GUI のみ）。 |
 | 未確認 | 全 GUI 経路でのロック整合。 |
 | 主要ファイル | `basketball_sim/main.py`, `basketball_sim/models/offseason.py`, `basketball_sim/systems/trade_logic.py`, `basketball_sim/systems/free_agent_market.py`, `basketball_sim/systems/season_transaction_rules.py`, `basketball_sim/systems/main_menu_view.py`, `basketball_sim/systems/offseason_resign_tk.py` |
 
@@ -344,7 +344,7 @@ Steam 診断: 上記 `--steam-diag`。**成功/失敗は環境依存**（DLL・S
 
 - 第1版: 2026-04-06 初版作成。
 - 2026-04-06: §5.12・§8（Steam）ほか、Steam docs 同期後の整合（§7.4・§12 の関連1行）。
-- 2026-04-07: §5.7 人事を、1対1 GUI・multi CLI・FA 手動未実装・オフ再契約 GUI と整合（`GUI_MAIN_FLOW_AUDIT.md` と同旨）。
+- 2026-04-07: §5.7 人事を、1対1 GUI・multi（人事/CLI）・FA 手動（1人GUI）・オフ再契約 GUI と整合（`GUI_MAIN_FLOW_AUDIT.md` と同旨）。
 - 2026-04-06: §5.7 に人事 **インシーズンFA（1人）**（`sign_free_agent`）を追記。`free_agent_market.py` を主要ファイルに追加。
 - 2026-04-06: §5.7 に **契約解除（FA送り）** の GUI 入口（トレード行＋下部・同一処理）を追記。
-- 2026-04-06: §5.7 に人事 **multi（複数人・選手のみ）** を追記。未実装行を現金・RB 付きに限定。
+- 2026-04-06: §5.7 に人事 **multi（複数人・現金・RB）** を追記。未実装行は本格 FA 等に限定。

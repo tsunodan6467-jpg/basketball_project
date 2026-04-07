@@ -1338,6 +1338,30 @@ def validate_multi_trade_player_counts(n_out: int, n_in: int) -> Tuple[bool, str
     return True, ""
 
 
+def parse_multi_trade_side_payment(
+    raw: str,
+    max_allowed: int,
+    *,
+    is_cash: bool,
+) -> Tuple[bool, int, str]:
+    """
+    multi の自分→相手の現金または RB 入力を解釈（`propose_multi_trade` STEP 5/6 と同趣旨）。
+    カンマ・空白除去、空は 0。
+    """
+    cleaned = raw.replace(",", "").replace(" ", "").strip()
+    try:
+        value = int(cleaned or 0)
+    except ValueError:
+        return False, 0, "整数で入力してください。"
+    if value < 0:
+        return False, 0, "0以上の整数を入力してください。"
+    if value > max_allowed:
+        if is_cash:
+            return False, 0, f"上限を超えています。（現在の上限: {max_allowed:,} 円）"
+        return False, 0, f"上限を超えています。（現在の上限: {max_allowed:,}）"
+    return True, value, ""
+
+
 def print_trade_evaluation_summary(user_eval, ai_eval):
     print_separator("トレード評価")
     print(f"あなた側評価  : {'承認' if user_eval.accepts else '拒否'} | スコア {user_eval.score}")
@@ -1532,17 +1556,9 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
         if raw.lower() in ("b", "q", "back"):
             print("トレード提案を中止しました。")
             return
-        cleaned = raw.replace(",", "").replace(" ", "")
-        try:
-            cash = int(cleaned or 0)
-        except ValueError:
-            print("整数で入力してください。")
-            continue
-        if cash < 0:
-            print("0以上の整数を入力してください。")
-            continue
-        if cash > max_cash:
-            print(f"上限を超えています。（現在の上限: {max_cash:,} 円）")
+        ok_pay, cash, pay_msg = parse_multi_trade_side_payment(raw, max_cash, is_cash=True)
+        if not ok_pay:
+            print(pay_msg)
             continue
         break
 
@@ -1555,17 +1571,9 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
         if raw.lower() in ("b", "q", "back"):
             print("トレード提案を中止しました。")
             return
-        cleaned = raw.replace(",", "").replace(" ", "")
-        try:
-            rb = int(cleaned or 0)
-        except ValueError:
-            print("整数で入力してください。")
-            continue
-        if rb < 0:
-            print("0以上の整数を入力してください。")
-            continue
-        if rb > max_rb:
-            print(f"上限を超えています。（現在の上限: {max_rb:,}）")
+        ok_rb, rb, rb_msg = parse_multi_trade_side_payment(raw, max_rb, is_cash=False)
+        if not ok_rb:
+            print(rb_msg)
             continue
         break
 
