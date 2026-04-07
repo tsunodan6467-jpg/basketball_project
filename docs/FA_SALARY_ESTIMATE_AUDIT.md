@@ -40,10 +40,11 @@
 
 | 表示箇所 | 呼び出し | 備考 |
 |----------|----------|------|
-| Treeview の「年俸目安」列 | `estimate_fa_market_value(player)` | `f"{est:,}"` で **円・カンマ区切り**（表示専用ロジックは **なし**）。 |
-| 「制限を確認」/ 最終確認の文面 | 同じく `estimate_fa_market_value`、契約年数は `estimate_fa_contract_years` | `precheck_user_fa_sign` 内のエラー文でも `estimate_fa_market_value` を使用。 |
+| Treeview の年俸・年数 | `offseason_manual_fa_offer_and_years(user_team, player)` → 内部で **`free_agency._calculate_offer`** / **`_determine_contract_years`**（**`conduct_free_agency` と同型**、2026-04-06 実装反映）。 |
+| 制限確認 | `precheck_user_fa_sign(..., contract_salary=offer)` | 上記 **offer** で所持金・サラリー余地を判定。 |
+| 最終確認・契約 | `sign_free_agent(..., contract_salary=..., contract_years=...)` | 表示と **同一の offer / years** を適用。 |
 
-**結論（事実）**: オフFA GUI の年俸表示は **`free_agent_market.estimate_fa_market_value` の戻り値そのもの**。別の「表示だけ安い」関数は **ない**。
+**結論（事実）**: オフ手動FA GUI の年俸・年数は **estimate ではなく本格FA同型**。表示専用と実契約の **別ソースはない**（**表示＝契約**）。
 
 ### 2.2 インシーズンFA GUI（`main_menu_view._run_inseason_fa_one_wizard`）
 
@@ -52,23 +53,23 @@
 | Treeview「年俸目安」 | `estimate_fa_market_value(p)` |
 | 制限確認・最終確認 | 同上 + `estimate_fa_contract_years` |
 
-**結論（事実）**: インシーズンとオフFA GUI は **同一の estimate 系**。オフ専用の別式は **ない**（静的コード上）。
+**結論（事実）**: インシーズンFA GUI は **estimate 系**。オフ手動FA GUI は **本格FA同型（§2.1）**。**オフ手動とインシーズン手動ではモデルが異なる**（意図的・`FA_SALARY_MODEL_ALIGNMENT_POLICY.md`）。
 
 ---
 
 ## 3. 実契約値の出所（`sign_free_agent`）
 
-`free_agent_market.sign_free_agent(team, player)`（抜粋の論点のみ）:
+`free_agent_market.sign_free_agent(team, player, *, contract_salary=None, contract_years=None)`（抜粋）:
 
 | 項目 | 出所 |
 |------|------|
-| **年俸 (`player.salary`)** | `salary = estimate_fa_market_value(player)` の **同一呼び出し**。 |
-| **年数** | `years = estimate_fa_contract_years(player)`。 |
-| **ガード** | `can_team_sign_player_by_japan_rule`、続けて `salary > get_team_fa_signing_limit(team)` なら **早期 return**（ロスターに載らない。**silent 見送り**）。 |
+| **既定（インシーズン等）** | `contract_salary` 未指定時は `estimate_fa_market_value`、年数は `estimate_fa_contract_years`。 |
+| **オフ手動FA** | `contract_salary` / `contract_years` 指定時は **その値**を適用（**本格FA同型の offer** と揃える）。 |
+| **ガード** | `can_team_sign_player_by_japan_rule`、`salary <= 0` で return、`salary > get_team_fa_signing_limit` で **早期 return**。 |
 
-**結論（事実）**: GUI に表示した **年俸目安と `sign_free_agent` が設定する `salary` は同一関数**（通常は **一致**。不一致になるなら **ガードで契約が成立していない**ケースのほうが先に疑う）。
+**結論（事実）**: **オフ手動GUI**では表示に使った額と **`sign_free_agent` の `contract_salary` が同一**。**インシーズンGUI**では表示＝**estimate**＝未指定時の `sign_free_agent`。
 
-**契約年数**: GUI の確認文は `estimate_fa_contract_years`。**CPU オフFA の年数決定とは別関数**（§4 参照）。
+**契約年数**: オフ手動は **`_determine_contract_years`**（§4 と同型）。インシーズン手動は **`estimate_fa_contract_years`**。
 
 ---
 
@@ -144,3 +145,4 @@
 
 - 2026-04-06: 初版。表示＝`estimate_fa_market_value`、手動契約＝同一、オフCPU本格FA＝`_calculate_offer`、インシーズンCPU＝`sign_free_agent` を整理。
 - 2026-04-06: 参照に `FA_SALARY_MODEL_ALIGNMENT_POLICY.md` を追加。§6.2 の「仕様判断」を方針メモへ誘導。
+- 2026-04-06: **オフ手動FA**を本格FA同型に変更（§2.1・§2 結論・§3）。`sign_free_agent` / `precheck_user_fa_sign` のオプション追記。

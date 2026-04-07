@@ -97,7 +97,7 @@
 | **目的** | オフ手動1人の **表示・可否・契約**を **オフCPU本格FAと同じオファー模型**にし、**表示＝契約**を維持する。 |
 | **触る範囲** | `offseason_full_fa_tk.py`、`free_agent_market.py`（`sign_free_agent` 拡張またはラッパ）、必要なら `free_agency.py` の **公開用薄ラッパ**（循環回避）。`precheck` の **オフ専用分岐**または別関数。 |
 | **触らない範囲** | **`conduct_free_agency` のアルゴリズム・ループ**、**インシーズンFA GUI／`run_cpu_fa_market_cycle` の estimate 経路**（第1弾）、**estimate の係数いじりのみの対症療法**（方針外）。 |
-| **完了条件** | オフ手動で **GUIの年俸＝契約後 salary**、かつ **同一選手・同一チーム状態**で **CPUログのオファー計算と同型の式**になっていることを **テストまたは手動**で確認、`--smoke` 通過。 |
+| **完了条件** | **満たした（2026-04-06）**: `offseason_manual_fa_offer_and_years` / `precheck_user_fa_sign(contract_salary=…)` / `sign_free_agent(contract_salary=…, contract_years=…)`。`test_offseason_manual_fa_offer_alignment.py` と `--smoke`。 |
 
 ### タスク 2（後続）: インシーズン手動／CPU を `_calculate_offer` 系に寄せるかの再評価
 
@@ -121,3 +121,4 @@
 ## 変更履歴
 
 - 2026-04-06: 初版。第1弾推奨は **オフ手動のみ `_calculate_offer` 系へ**、インシーズンは estimate 維持。
+- 2026-04-06: タスク1 **実装反映**（`offseason_manual_fa_offer_and_years`、`sign_free_agent` / `precheck_user_fa_sign` 拡張、§7 タスク1 完了条件更新）。

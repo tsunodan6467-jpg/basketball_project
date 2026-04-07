@@ -198,11 +198,19 @@ def get_team_fa_signing_limit(
 
 
 
-def precheck_user_fa_sign(team: Team, player: Player) -> Tuple[bool, str]:
+def precheck_user_fa_sign(
+    team: Team,
+    player: Player,
+    *,
+    contract_salary: Optional[int] = None,
+) -> Tuple[bool, str]:
     """
     GUI 向け: `sign_free_agent` 実行前の可否と簡潔な理由。
 
     `sign_free_agent` は所持金を見ないため、ここで `can_team_afford_free_agent` も含める。
+
+    `contract_salary` を渡した場合（オフ手動FA・本格FA同型オファー）、その額で所持金・
+    サラリー余地を判定する。未指定時は従来どおり `estimate_fa_market_value`。
     """
     from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
     from basketball_sim.systems.roster_rules import can_add_contract_player
@@ -222,14 +230,24 @@ def precheck_user_fa_sign(team: Team, player: Player) -> Tuple[bool, str]:
     if not can_team_sign_player_by_japan_rule(team, player):
         return False, "国籍枠・チームルールにより契約できません。"
 
-    if not can_team_afford_free_agent(team, player):
-        salary = estimate_fa_market_value(player)
+    if contract_salary is not None:
+        sal = int(contract_salary)
+        if sal <= 0:
+            return False, "本格FAと同型のオファー額が算出できません（0円以下）。"
+        afford = can_team_afford_fa_salary(team, sal)
+        label = "契約年俸（本格FA同型）"
+    else:
+        sal = int(estimate_fa_market_value(player))
+        afford = can_team_afford_free_agent(team, player)
+        label = "年俸目安"
+
+    if not afford:
         room = int(get_team_fa_signing_limit(team))
         money = int(getattr(team, "money", 0) or 0)
-        if money < salary:
-            return False, f"所持金が不足しています（年俸目安 {salary:,} 円、所持 {money:,} 円）。"
+        if money < sal:
+            return False, f"所持金が不足しています（{label} {sal:,} 円、所持 {money:,} 円）。"
         return False, (
-            f"サラリー上限の契約余地が不足しています（年俸目安 {salary:,} 円、余地 {room:,} 円）。"
+            f"サラリー上限の契約余地が不足しています（{label} {sal:,} 円、余地 {room:,} 円）。"
         )
 
     return True, ""
@@ -245,10 +263,19 @@ def can_team_afford_free_agent(
     """
     ensure_team_fa_market_fields(team)
     ask = estimate_fa_market_value(player)
+    return can_team_afford_fa_salary(team, ask, salary_cap=salary_cap)
 
+
+def can_team_afford_fa_salary(
+    team: Team,
+    ask: int,
+    salary_cap: Optional[int] = None,
+) -> bool:
+    """明示年俸 `ask` で所持金・サラリー契約余地を判定（オフ手動FAの本格FA同型オファー用）。"""
+    ensure_team_fa_market_fields(team)
+    ask = int(ask)
     if int(getattr(team, "money", 0)) < ask:
         return False
-
     signing_limit = get_team_fa_signing_limit(team, salary_cap=salary_cap)
     return ask <= signing_limit
 
@@ -330,13 +357,22 @@ def pick_best_free_agent_for_team(team: Team, free_agents: List[Player]) -> Opti
 
 
 
-def sign_free_agent(team: Team, player: Player) -> None:
+def sign_free_agent(
+    team: Team,
+    player: Player,
+    *,
+    contract_salary: Optional[int] = None,
+    contract_years: Optional[int] = None,
+) -> None:
     """
     FA契約を反映。
     日本独自ルールの最終ガードもここで行う。
 
     年俸相当の `money` 即時減算は行わない（R1 / 締めのみ方式）。
     年俸コストはオフ `_process_team_finances` の payroll → `record_financial_result` に一元化する。
+
+    `contract_salary` / `contract_years` を指定した場合（オフ手動FA・CPU本格FA同型のオファー）、
+    それをそのまま適用する。未指定時は `estimate_fa_market_value` / `estimate_fa_contract_years`。
     """
     ensure_team_fa_market_fields(team)
     ensure_fa_market_fields(player)
@@ -344,11 +380,23 @@ def sign_free_agent(team: Team, player: Player) -> None:
     if not can_team_sign_player_by_japan_rule(team, player):
         return
 
-    salary = estimate_fa_market_value(player)
+    if contract_salary is not None:
+        salary = int(contract_salary)
+        years = (
+            int(contract_years)
+            if contract_years is not None
+            else int(estimate_fa_contract_years(player))
+        )
+    else:
+        salary = int(estimate_fa_market_value(player))
+        years = int(estimate_fa_contract_years(player))
+
+    if salary <= 0:
+        return
+
     signing_room = int(get_team_fa_signing_limit(team))
     if salary > signing_room:
         return
-    years = estimate_fa_contract_years(player)
 
     player.salary = salary
     player.contract_years_left = years
@@ -376,6 +424,20 @@ def sign_free_agent(team: Team, player: Player) -> None:
             note=f"salary={salary} | years={years}",
         )
 
+
+def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int, int]:
+    """
+    オフ手動FA（`conduct_free_agency` 直前）専用: CPU 本格FA と同じ
+    `free_agency._calculate_offer` / `_determine_contract_years` による年俸・契約年数。
+    `conduct_free_agency` 本体は変更しない（同関数を読むだけ）。
+    """
+    from basketball_sim.systems.free_agency import _calculate_offer, _determine_contract_years
+
+    offer = int(_calculate_offer(team, player))
+    if offer <= 0:
+        return 0, 1
+    years = int(_determine_contract_years(player, team, offer))
+    return offer, max(1, years)
 
 
 def age_free_agents_one_year(free_agents: List[Player]) -> None:
