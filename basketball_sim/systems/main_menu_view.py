@@ -4743,6 +4743,17 @@ class MainMenuView:
         outer = ttk.Frame(window, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
 
+        tk.Label(
+            outer,
+            text="順位表・個人スタッツ・チーム概要など、集計データを確認する画面です。",
+            bg="#15171c",
+            fg="#a8b4c8",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=1120,
+        ).pack(fill="x", pady=(0, 8))
+
         header = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
         header.pack(fill="x", pady=(0, 10))
 
@@ -5109,6 +5120,17 @@ class MainMenuView:
 
         outer = ttk.Frame(window, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
+
+        tk.Label(
+            outer,
+            text="次戦の内容・今後と過去の試合一覧、大会の進行を確認する画面です。",
+            bg="#15171c",
+            fg="#a8b4c8",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=960,
+        ).pack(fill="x", pady=(0, 8))
 
         header = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
         header.pack(fill="x", pady=(0, 12))
@@ -5756,6 +5778,17 @@ class MainMenuView:
 
         outer = ttk.Frame(window, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
+
+        tk.Label(
+            outer,
+            text="シーズンをまたいだ成績の積み重ねやクラブ記録・レジェンドを確認する画面です。",
+            bg="#15171c",
+            fg="#a8b4c8",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=1100,
+        ).pack(fill="x", pady=(0, 6))
 
         self.history_header_var = tk.StringVar(value="")
         self.history_hint_var = tk.StringVar(value="")
