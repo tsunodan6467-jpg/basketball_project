@@ -12,6 +12,7 @@
 | PR・グッズの表示の正 | `docs/PR_MERCH_MONEY_VISIBILITY_POLICY.md` |
 | トレード CLI 導線 | `docs/TRADE_MENU_ONE_FOR_ONE_ENTRY_POLICY.md` |
 | 1対1 / multi 現金の整理 | `docs/ONE_FOR_ONE_TRADE_CASH_POLICY.md` |
+| GUI 1対1トレード入口（設計） | `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` |
 
 **コード上の事実（静的確認・2026-04-06）**: 左メニュー `MENU_ITEMS` は **日程 → 人事 → クラブ案内 → 経営 → 強化 → 戦術 → 情報 → 歴史 → システム**。中央に **「次へ進む」**（`advance_button`、シーズン終了時は **「オフシーズンを実行」** 等に切替）と **「次の試合」** パネル等。コメント上 **「編集の正本は人事・戦術・経営・情報」**、人事画面は **トレード／インシーズン FA の標準導線は CLI** と明記。
 
@@ -95,6 +96,7 @@
 | 項目 | 内容 |
 |------|------|
 | **目的** | **CLI なしで** 1 回のトレード意思決定が完結する入口を **1 か所**用意する（範囲は 1対1 限定でも可・別設計）。 |
+| **設計の正** | **入口・スコープ・フロー**は `docs/GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md`（人事ウィンドウから・選手のみ）。 |
 | **触る範囲** | `main_menu_view.py`、既存 `trade_logic` 呼び出し、必要なら `main.py` の共有ヘルパ。 |
 | **触らない範囲** | multi の全面 GUI 化、評価式の本改修、セーブ形式の破壊的変更。 |
 | **完了条件** | ドッグフードで **GUI のみ**でトレード 1 回成立、pytest または手動手順が文書化。 |
@@ -130,3 +132,4 @@
 ## 変更履歴
 
 - 2026-04-06: 初版。GUI 主導線の棚卸しと優先候補。
+- 2026-04-06: `GUI_ONE_FOR_ONE_TRADE_ENTRY_POLICY.md` を §6 タスク 1 の正として参照追加。参照表にリンク。
