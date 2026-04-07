@@ -1680,7 +1680,8 @@ class MainMenuView:
                     listbox.insert(
                         tk.END,
                         f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
-                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}",
+                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}  "
+                        f"年齢 {int(getattr(p, 'age', 0) or 0)}",
                     )
             elif step == 2:
                 players = bs_main.get_tradeable_players(user_team)
@@ -1689,7 +1690,8 @@ class MainMenuView:
                     listbox.insert(
                         tk.END,
                         f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
-                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}",
+                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}  "
+                        f"年齢 {int(getattr(p, 'age', 0) or 0)}",
                     )
 
         def do_evaluate_and_finish() -> None:
