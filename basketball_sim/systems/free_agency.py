@@ -1,5 +1,5 @@
 import random
-from typing import List
+from typing import Any, Dict, List
 from collections import defaultdict
 
 from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
@@ -224,6 +224,111 @@ def _calculate_offer(team: Team, player: Player) -> int:
         offer = int(offer * 0.85)
 
     return max(0, int(offer))
+
+
+def _calculate_offer_diagnostic(team: Team, player: Player) -> Dict[str, Any]:
+    """
+    `_calculate_offer` と同じ計算を段別に記録する観測専用関数（本番経路からは呼ばない想定）。
+
+    **ロジックは `_calculate_offer` と同一に保つこと。** 変更時は両方を直し、
+    `test_free_agency_offer_diagnostic` で `final_offer` 一致を確認する。
+    """
+    payroll_before = _team_salary(team)
+    soft_cap = _soft_cap(team)
+    cap_base = _hard_cap(team)
+    lv = league_level_for_team(team)
+
+    snap: Dict[str, Any] = {
+        "payroll_before": payroll_before,
+        "soft_cap": soft_cap,
+        "cap_base": cap_base,
+        "league_level": lv,
+        "soft_cap_early": payroll_before >= soft_cap,
+    }
+
+    if payroll_before >= soft_cap:
+        snap["final_offer"] = 0
+        snap["base"] = None
+        snap["room_to_budget"] = None
+        return snap
+
+    base = int(getattr(player, "salary", 0))
+    if base <= 0:
+        base = max(int(getattr(player, "ovr", 60)) * 10_000, 300_000)
+    snap["base"] = base
+
+    surplus = max(0, int(getattr(team, "money", 0)) - base)
+    bonus = int(surplus * 0.05)
+    max_bonus = int(base * 0.25)
+    bonus = min(bonus, max_bonus)
+    snap["surplus"] = surplus
+    snap["bonus"] = bonus
+
+    offer = base + bonus
+    snap["offer_after_base_bonus"] = offer
+
+    payroll_after = payroll_before + offer
+    snap["payroll_after_initial"] = payroll_after
+
+    if payroll_before <= cap_base < payroll_after:
+        room_to_soft = max(0, soft_cap - payroll_before)
+        offer = min(offer, room_to_soft)
+        snap["hard_cap_bridge_applied"] = True
+        snap["room_to_soft_bridge"] = room_to_soft
+    else:
+        snap["hard_cap_bridge_applied"] = False
+        snap["room_to_soft_bridge"] = None
+    snap["offer_after_hard_cap_bridge"] = offer
+
+    if payroll_before > cap_base:
+        room_to_soft = max(0, soft_cap - payroll_before)
+        low_cost_limit = min(max(base, 0), 900_000)
+        offer = min(offer, room_to_soft, low_cost_limit)
+        snap["hard_cap_over_applied"] = True
+        snap["room_to_soft_over"] = room_to_soft
+        snap["low_cost_limit"] = low_cost_limit
+    else:
+        snap["hard_cap_over_applied"] = False
+        snap["room_to_soft_over"] = None
+        snap["low_cost_limit"] = None
+    snap["offer_after_hard_cap_over"] = offer
+
+    payroll_after = payroll_before + offer
+    snap["payroll_after_pre_soft_pushback"] = payroll_after
+    if payroll_after > soft_cap:
+        offer = max(0, soft_cap - payroll_before)
+        snap["soft_cap_pushback_applied"] = True
+    else:
+        snap["soft_cap_pushback_applied"] = False
+    snap["offer_after_soft_cap_pushback"] = offer
+
+    payroll_budget = int(getattr(team, "payroll_budget", soft_cap) or soft_cap)
+    snap["payroll_budget"] = payroll_budget
+    if payroll_budget > 0:
+        room_to_budget = max(0, payroll_budget - payroll_before)
+        offer = min(offer, room_to_budget if room_to_budget > 0 else 0)
+        snap["room_to_budget"] = room_to_budget
+    else:
+        snap["room_to_budget"] = None
+    snap["offer_after_budget_clip"] = offer
+
+    tax_before = int(compute_luxury_tax(payroll_before, league_level=lv))
+    tax_after = int(compute_luxury_tax(payroll_before + offer, league_level=lv))
+    tax_delta = max(0, tax_after - tax_before)
+    tax_warn = max(8_000_000, soft_cap // 200)
+    snap["tax_before"] = tax_before
+    snap["tax_after_probe"] = tax_after
+    snap["tax_delta"] = tax_delta
+    snap["tax_warn"] = tax_warn
+    if tax_delta >= tax_warn:
+        offer = int(offer * 0.85)
+        snap["luxury_tax_clip_applied"] = True
+    else:
+        snap["luxury_tax_clip_applied"] = False
+    snap["offer_after_luxury_tax"] = offer
+
+    snap["final_offer"] = max(0, int(offer))
+    return snap
 
 
 # -------------------------------------------------
