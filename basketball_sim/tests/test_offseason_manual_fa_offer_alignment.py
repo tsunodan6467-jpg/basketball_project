@@ -4,6 +4,7 @@ from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems import free_agency as fa_mod
 from basketball_sim.systems.free_agent_market import (
+    MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER,
     estimate_fa_market_value,
     get_team_fa_signing_limit,
     offseason_manual_fa_offer_and_years,
@@ -52,7 +53,8 @@ def test_offseason_manual_fa_offer_and_years_positive():
 def test_offseason_manual_fa_fallback_when_payroll_budget_zeroes_calculate_offer():
     """
     `payroll_budget` が既存ペイロールに張り付いていると `_calculate_offer` は 0 になりうる。
-    キャップ上まだ契約余地があるときは `min(estimate, room)` にフォールバックする。
+    キャップ上まだ契約余地があるときは `min(estimate, room)` を core にし、
+    オフ手動専用下限 `estimate * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER` を乗せて `room` でクリップ。
     """
     roster = _player(101, ovr=60, salary=7_600_000, contract_years_left=1)
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[roster])
@@ -63,7 +65,8 @@ def test_offseason_manual_fa_fallback_when_payroll_budget_zeroes_calculate_offer
     assert int(fa_mod._calculate_offer(team, fa)) == 0
     est = int(estimate_fa_market_value(fa))
     off, yrs = offseason_manual_fa_offer_and_years(team, fa)
-    assert off == min(est, room)
+    expected = min(int(est * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER), room)
+    assert off == expected
     assert off > 0
     assert 1 <= yrs <= 4
 

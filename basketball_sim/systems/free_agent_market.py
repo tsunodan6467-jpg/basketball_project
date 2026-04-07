@@ -12,6 +12,9 @@ from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap,
 FA_SOFT_CAP_SIGNING_BUFFER_RATIO = 0.08
 FA_SOFT_CAP_MIN_ROOM = 8_000_000
 
+# オフ手動FA専用: `estimate_fa_market_value` をベースにした下限（CPU本格FA・estimate 係数本体は不変更）
+MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER = 1.35
+
 
 def ensure_fa_market_fields(player: Player) -> None:
     """
@@ -437,6 +440,10 @@ def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int
     その場合でも `get_team_fa_signing_limit` 上まだ契約余地があるときは、
     **表示＝契約**のため `estimate_fa_market_value` を上限 `room` でクリップした額にフォールバックする
     （CPU本格FAの式は触らない）。
+
+    上記 **core_offer** を維持したうえで、オフ手動専用に
+    `estimate_fa_market_value * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER` を下限として乗せ、
+    `get_team_fa_signing_limit` 内にクリップする（インシーズンFA・`conduct_free_agency` には波及しない）。
     """
     from basketball_sim.systems.free_agency import _calculate_offer, _determine_contract_years
 
@@ -444,14 +451,21 @@ def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int
     ensure_fa_market_fields(player)
 
     room = int(get_team_fa_signing_limit(team))
-    offer = int(_calculate_offer(team, player))
-    if offer <= 0 and room > 0:
+    est: Optional[int] = None
+    core_offer = int(_calculate_offer(team, player))
+    if core_offer <= 0 and room > 0:
         est = int(estimate_fa_market_value(player))
-        offer = min(est, room)
-    if offer <= 0:
+        core_offer = min(est, room)
+    if core_offer <= 0:
         return 0, 1
-    years = int(_determine_contract_years(player, team, offer))
-    return offer, max(1, years)
+    if est is None:
+        est = int(estimate_fa_market_value(player))
+    floor_offer = int(est * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER)
+    final_salary = min(max(core_offer, floor_offer), room)
+    if final_salary <= 0:
+        return 0, 1
+    years = int(_determine_contract_years(player, team, final_salary))
+    return final_salary, max(1, years)
 
 
 def age_free_agents_one_year(free_agents: List[Player]) -> None:
