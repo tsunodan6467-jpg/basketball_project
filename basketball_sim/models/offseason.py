@@ -186,11 +186,13 @@ class Offseason:
         *,
         draft_ui_prompt_target: Optional[Any] = None,
         draft_ui_prompt_bid: Optional[Any] = None,
+        resign_ui_prompt: Optional[Callable[..., Any]] = None,
     ):
         self.teams = teams
         self.free_agents = free_agents
         self._draft_ui_prompt_target: Optional[Callable[..., Any]] = draft_ui_prompt_target
         self._draft_ui_prompt_bid: Optional[Callable[..., Any]] = draft_ui_prompt_bid
+        self._resign_ui_prompt: Optional[Callable[..., Any]] = resign_ui_prompt
         self.draft_pool: List[Player] = []
         # 来年のドラフト候補（次オフのドラフトで使う）をリーグ状態として保持するための一時バッファ
         self.future_draft_pool: List[Player] = []
@@ -1843,6 +1845,20 @@ class Offseason:
             return False
 
         sys.stdout.flush()
+        prompt_fn = self._resign_ui_prompt
+        if prompt_fn is not None:
+            return bool(
+                prompt_fn(
+                    team=team,
+                    player=player,
+                    new_salary=new_salary,
+                    desired_years=desired_years,
+                    resign_score=resign_score,
+                    threshold=threshold,
+                    current_team_salary=current_team_salary,
+                    salary_cap=salary_cap,
+                )
+            )
         return self._prompt_yes_no(
             f"{player.name} にこの条件で再契約オファーを出しますか？",
             default="y"
