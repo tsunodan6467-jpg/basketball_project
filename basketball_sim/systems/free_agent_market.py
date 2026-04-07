@@ -15,9 +15,9 @@ from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap,
 FA_SOFT_CAP_SIGNING_BUFFER_RATIO = 0.08
 FA_SOFT_CAP_MIN_ROOM = 8_000_000
 
-# オフ手動FA専用: `estimate_fa_market_value` に対する契約額の下限倍率（例: 1.35 → estimate の 135% 未満に押し上げない）。
+# オフ手動FA専用: `estimate_fa_market_value` に対する契約額の下限倍率（例: 1.20 → estimate の 120% 未満に押し上げない）。
 # CPU 本格FA・`estimate_fa_market_value` の式本体とは独立。d995b48 由来の暫定。
-MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER = 1.35
+MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER = 1.20
 
 # 旧 estimate の ovr*12000 加算補正を、開幕ロスター単価へ載せ替えるときのスケール除数
 _ESTIMATE_FA_LEGACY_OVR_COEFF = 12000
