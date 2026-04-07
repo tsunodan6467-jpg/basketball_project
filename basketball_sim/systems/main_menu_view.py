@@ -1946,6 +1946,11 @@ class MainMenuView:
         )
         self._finance_inseason_log_text.pack(fill="both", expand=False, pady=(0, 4))
         self._finance_inseason_log_text.configure(state="disabled")
+        ttk.Label(
+            fin_sum_inner,
+            text="※ 広報・グッズの支出詳細は、経営メニュー内の各パネル履歴を参照してください。",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(2, 0))
 
         fac_content = self._resolve_content_parent(self.facility_panel)
         ttk.Label(
