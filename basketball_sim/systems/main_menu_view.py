@@ -1659,6 +1659,23 @@ class MainMenuView:
             "player_source": [],
         }
 
+        _trade_nat_ja = {
+            "Japan": "日本",
+            "Foreign": "外国籍",
+            "Asia": "アジア",
+            "Naturalized": "帰化",
+        }
+
+        def _one_for_one_trade_player_line(p: Any) -> str:
+            nat_key = str(getattr(p, "nationality", "Japan") or "Japan")
+            nat_j = _trade_nat_ja.get(nat_key, nat_key)
+            sal = int(getattr(p, "salary", 0) or 0)
+            return (
+                f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
+                f"OVR {int(getattr(p, 'ovr', 0) or 0)}  年齢 {int(getattr(p, 'age', 0) or 0)}  "
+                f"{nat_j}  年俸 {sal:,}円"
+            )
+
         def refresh_list() -> None:
             listbox.delete(0, tk.END)
             state["items"] = []
@@ -1677,22 +1694,12 @@ class MainMenuView:
                 players = bs_main.get_tradeable_players(ai_t)
                 state["player_source"] = players
                 for p in players:
-                    listbox.insert(
-                        tk.END,
-                        f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
-                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}  "
-                        f"年齢 {int(getattr(p, 'age', 0) or 0)}",
-                    )
+                    listbox.insert(tk.END, _one_for_one_trade_player_line(p))
             elif step == 2:
                 players = bs_main.get_tradeable_players(user_team)
                 state["player_source"] = players
                 for p in players:
-                    listbox.insert(
-                        tk.END,
-                        f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
-                        f"OVR {int(getattr(p, 'ovr', 0) or 0)}  "
-                        f"年齢 {int(getattr(p, 'age', 0) or 0)}",
-                    )
+                    listbox.insert(tk.END, _one_for_one_trade_player_line(p))
 
         def do_evaluate_and_finish() -> None:
             ts = TradeSystem()
