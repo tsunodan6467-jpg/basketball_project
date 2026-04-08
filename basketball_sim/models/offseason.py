@@ -61,8 +61,8 @@ def _safe_cli_stdout_text(text: str) -> str:
     return text.replace("\u2014", "-").replace("\u2013", "-").replace("\u2212", "-")
 
 
-# オフFA直前同期: 実ペイロールに足す固定余地（`roster + B` 下限の B）。決裁: docs/FA_S6_BUFFER_10M_DECISION_MEMO_2026-04.md
-_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER = 10_000_000
+# オフFA直前同期: 実ペイロールに足す固定余地（`roster + B` 下限の B）。決裁: docs/FA_S6_BUFFER_30M_DECISION_MEMO_2026-04.md
+_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER = 30_000_000
 
 
 def _sync_payroll_budget_with_roster_payroll(teams: List[Team]) -> None:

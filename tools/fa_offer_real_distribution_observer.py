@@ -36,6 +36,7 @@ from basketball_sim.utils.sim_rng import init_simulation_random  # noqa: E402
 
 TINY_MAX = 300_000
 BAND_3M = 3_000_000
+BAND_10M = 10_000_000
 HIGH_SALARY = 50_000_000
 
 
@@ -175,6 +176,7 @@ def _aggregate(rows: List[Dict[str, Any]]) -> None:
     n_zero = sum(1 for r in rows if r["final_offer"] == 0)
     n_tiny = sum(1 for r in rows if 0 < r["final_offer"] <= TINY_MAX)
     n_le_3m = sum(1 for r in rows if 0 < r["final_offer"] <= BAND_3M)
+    n_le_10m = sum(1 for r in rows if 0 < r["final_offer"] <= BAND_10M)
     n_le_buffer = sum(1 for r in rows if 0 < r["final_offer"] <= buf)
     n_final_eq_buffer = sum(1 for r in rows if r["final_offer"] == buf)
     n_final_open_lt_buffer = sum(1 for r in rows if 0 < r["final_offer"] < buf)
@@ -184,6 +186,9 @@ def _aggregate(rows: List[Dict[str, Any]]) -> None:
     )
     n_s6_le_3m = sum(
         1 for r in rows if (not r["soft_cap_early"]) and 0 < r["final_offer"] <= BAND_3M
+    )
+    n_s6_le_10m = sum(
+        1 for r in rows if (not r["soft_cap_early"]) and 0 < r["final_offer"] <= BAND_10M
     )
     n_s6_le_buffer = sum(
         1 for r in rows if (not r["soft_cap_early"]) and 0 < r["final_offer"] <= buf
@@ -218,6 +223,7 @@ def _aggregate(rows: List[Dict[str, Any]]) -> None:
     print(f"final_offer == 0:          {n_zero} ({pct(n_zero)})")
     print(f"0 < final <= {TINY_MAX}:        {n_tiny} ({pct(n_tiny)})")
     print(f"0 < final <= {BAND_3M}:        {n_le_3m} ({pct(n_le_3m)})")
+    print(f"0 < final <= {BAND_10M}:       {n_le_10m} ({pct(n_le_10m)})")
     print(f"0 < final <= buffer ({buf:,}): {n_le_buffer} ({pct(n_le_buffer)})")
     print(f"final_offer == buffer ({buf:,}): {n_final_eq_buffer} ({pct(n_final_eq_buffer)})")
     print(f"0 < final_offer < buffer:        {n_final_open_lt_buffer} ({pct(n_final_open_lt_buffer)})")
@@ -229,6 +235,10 @@ def _aggregate(rows: List[Dict[str, Any]]) -> None:
     print(
         "soft_cap_early False & "
         f"0 < final <= {BAND_3M}: {n_s6_le_3m} ({pct(n_s6_le_3m)})"
+    )
+    print(
+        "soft_cap_early False & "
+        f"0 < final <= {BAND_10M}: {n_s6_le_10m} ({pct(n_s6_le_10m)})"
     )
     print(
         "soft_cap_early False & "

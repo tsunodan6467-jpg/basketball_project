@@ -28,6 +28,8 @@ from basketball_sim.systems.salary_cap_budget import get_soft_cap  # noqa: E402
 
 # First-trial buffer band (3M) for delta vs current `_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER`
 _PRIOR_TRIAL_CLIP_CEILING = 3_000_000
+# Second-trial ceiling (10M) for delta vs current buffer
+_PRIOR_SECOND_TRIAL_CLIP_CEILING = 10_000_000
 
 
 def _roster_player(pid: int, salary: int, *, league_team_id: int = 1) -> Player:
@@ -219,6 +221,22 @@ def main() -> None:
         and d.get("room_to_budget") is not None
         and int(d["room_to_budget"]) <= _PRIOR_TRIAL_CLIP_CEILING
     )
+    n_le_prior_10m = sum(
+        1 for _, _, d, _ in rows if 0 < int(d["final_offer"]) <= _PRIOR_SECOND_TRIAL_CLIP_CEILING
+    )
+    n_s6_room_le_prior_10m = sum(
+        1
+        for _, _, d, _ in rows
+        if d["soft_cap_early"] is False
+        and d.get("room_to_budget") is not None
+        and int(d["room_to_budget"]) <= _PRIOR_SECOND_TRIAL_CLIP_CEILING
+    )
+    n_s6_false_le_prior_10m = sum(
+        1
+        for _, _, d, _ in rows
+        if d["soft_cap_early"] is False
+        and 0 < int(d["final_offer"]) <= _PRIOR_SECOND_TRIAL_CLIP_CEILING
+    )
     n_s6_false_le_prior_3m = sum(
         1
         for _, _, d, _ in rows
@@ -238,6 +256,10 @@ def main() -> None:
     print(f"soft_cap_early True:      {n_s1}")
     print(f"final_offer == 0:         {n_zero}")
     print(f"0 < final_offer <= 3M (prior trial band): {n_le_prior_3m}")
+    print(
+        "0 < final_offer <= 10M (second trial band): "
+        f"{n_le_prior_10m}"
+    )
     print(f"0 < final_offer <= buffer ({buf:,}):       {n_le_buffer}")
     print(f"room_to_budget == 0:      {n_room0}")
     print(
@@ -251,6 +273,14 @@ def main() -> None:
     print(
         "soft_cap_early False & "
         f"room_to_budget <= buffer:  {n_s6_room_le_buffer}"
+    )
+    print(
+        "soft_cap_early False & "
+        f"0 < final <= 10M (second):  {n_s6_false_le_prior_10m}"
+    )
+    print(
+        "soft_cap_early False & "
+        f"room_to_budget <= 10M:     {n_s6_room_le_prior_10m}"
     )
     print(
         "soft_cap_early False & "

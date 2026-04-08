@@ -1,5 +1,6 @@
 """`_calculate_offer_diagnostic` は `_calculate_offer` と最終額が一致すること（観測用・本番未接続）。"""
 
+from basketball_sim.models.offseason import _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems import free_agency as fa_mod
@@ -95,14 +96,14 @@ def test_diagnostic_matches_calculate_offer_budget_room_zero():
 
 
 def test_diagnostic_matches_calculate_offer_budget_room_small_positive():
-    """S6: roster+10M 余地 → 中額 FA は budget 内なら芯が通る。"""
+    """S6: roster+buffer 余地 → 中額 FA は budget 内なら芯が通る。"""
     roster = _roster_player(3, 7_600_000)
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[roster])
-    team.payroll_budget = 7_600_000 + 10_000_000
+    team.payroll_budget = 7_600_000 + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     fa = _fa_player(9003)
     d = fa_mod._calculate_offer_diagnostic(team, fa)
     assert d["soft_cap_early"] is False
-    assert d["room_to_budget"] == 10_000_000
+    assert d["room_to_budget"] == _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     assert d["final_offer"] == 5_000_000
     _assert_diagnostic_matches(team, fa)
 
