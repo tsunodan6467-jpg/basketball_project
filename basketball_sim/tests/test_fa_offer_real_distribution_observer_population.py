@@ -1,0 +1,131 @@
+"""fa_offer_real_distribution_observer population helpers (tools/; default CLI unchanged)."""
+
+import importlib.util
+from pathlib import Path
+
+from basketball_sim.models.player import Player
+from basketball_sim.models.team import Team
+
+
+def _load_observer_module():
+    root = Path(__file__).resolve().parents[2]
+    path = root / "tools" / "fa_offer_real_distribution_observer.py"
+    spec = importlib.util.spec_from_file_location("fa_offer_real_distribution_observer", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_ob = _load_observer_module()
+
+
+def _fa(pid: int, salary: int) -> Player:
+    return Player(
+        player_id=pid,
+        name=f"FA{pid}",
+        age=25,
+        nationality="Japan",
+        position="PG",
+        height_cm=185.0,
+        weight_kg=80.0,
+        shoot=60,
+        three=60,
+        drive=60,
+        passing=60,
+        rebound=60,
+        defense=60,
+        ft=60,
+        stamina=60,
+        ovr=60,
+        potential="C",
+        archetype="guard",
+        usage_base=20,
+        salary=salary,
+        contract_years_left=0,
+        contract_total_years=0,
+        team_id=None,
+    )
+
+
+def test_select_fa_sample_by_salary_rank_mid_band():
+    fas = [_fa(i, 1_000_000 * (100 - i)) for i in range(1, 61)]
+    out = _ob._select_fa_sample_by_salary_rank(fas, 11, 20)
+    assert len(out) == 10
+    assert _ob._fa_salary(out[0]) == 1_000_000 * 89
+    assert _ob._fa_salary(out[-1]) == 1_000_000 * 80
+
+
+def test_select_fa_sample_by_salary_rank_clamps_to_pool():
+    fas = [_fa(1, 5_000_000), _fa(2, 4_000_000)]
+    out = _ob._select_fa_sample_by_salary_rank(fas, 1, 100)
+    assert len(out) == 2
+
+
+def test_select_teams_by_room_orders_by_budget_minus_payroll():
+    t_low = Team(team_id=1, name="L", league_level=1, money=0, players=[], payroll_budget=100_000_000)
+    t_high = Team(team_id=2, name="H", league_level=1, money=0, players=[], payroll_budget=100_000_000)
+    t_high.players = [
+        Player(
+            player_id=10,
+            name="P",
+            age=25,
+            nationality="Japan",
+            position="PG",
+            height_cm=185.0,
+            weight_kg=80.0,
+            shoot=60,
+            three=60,
+            drive=60,
+            passing=60,
+            rebound=60,
+            defense=60,
+            ft=60,
+            stamina=60,
+            ovr=60,
+            potential="C",
+            archetype="guard",
+            usage_base=20,
+            salary=10_000_000,
+            contract_years_left=1,
+            contract_total_years=2,
+            team_id=2,
+        )
+    ]
+    t_low.players = [
+        Player(
+            player_id=11,
+            name="Q",
+            age=25,
+            nationality="Japan",
+            position="PG",
+            height_cm=185.0,
+            weight_kg=80.0,
+            shoot=60,
+            three=60,
+            drive=60,
+            passing=60,
+            rebound=60,
+            defense=60,
+            ft=60,
+            stamina=60,
+            ovr=60,
+            potential="C",
+            archetype="guard",
+            usage_base=20,
+            salary=80_000_000,
+            contract_years_left=1,
+            contract_total_years=2,
+            team_id=1,
+        )
+    ]
+    ordered = _ob._select_teams_by_room([t_low, t_high], top_n=2)
+    assert ordered[0].team_id == 2
+    assert ordered[1].team_id == 1
+
+
+def test_select_teams_by_room_zero_means_all():
+    t1 = Team(team_id=1, name="A", league_level=1, money=0, players=[], payroll_budget=50_000_000)
+    t2 = Team(team_id=2, name="B", league_level=1, money=0, players=[], payroll_budget=60_000_000)
+    out = _ob._select_teams_by_room([t1, t2], top_n=0)
+    assert len(out) == 2

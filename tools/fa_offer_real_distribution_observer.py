@@ -7,6 +7,9 @@ Uses `_calculate_offer_diagnostic` only. Run from repo root:
   python tools/fa_offer_real_distribution_observer.py
   python tools/fa_offer_real_distribution_observer.py --save path/to/file.sav
   python tools/fa_offer_real_distribution_observer.py --seasons 1 --seed 42
+  python tools/fa_offer_real_distribution_observer.py --population-mode mixed_mid_fa_roomy
+
+Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDESIGN_PLAN_2026-04.md
 
 See docs/FA_S6_TINY_OFFER_DECISION_MEMO_2026-04.md
 """
@@ -69,6 +72,32 @@ def _parse_args() -> argparse.Namespace:
         default=0,
         help="If >0, run Season.simulate_to_end() this many times after world build (slow)",
     )
+    p.add_argument(
+        "--population-mode",
+        choices=("default", "mixed_mid_fa_roomy"),
+        default="default",
+        help="default: top fa-cap FAs by salary x all teams (legacy). "
+        "mixed_mid_fa_roomy: FA salary rank band + optional top-N roomiest teams.",
+    )
+    p.add_argument(
+        "--fa-rank-start",
+        type=int,
+        default=11,
+        help="1-based inclusive start rank by FA salary (desc). Used only when --population-mode mixed_mid_fa_roomy.",
+    )
+    p.add_argument(
+        "--fa-rank-end",
+        type=int,
+        default=50,
+        help="1-based inclusive end rank by FA salary (desc). Used only when --population-mode mixed_mid_fa_roomy.",
+    )
+    p.add_argument(
+        "--roomy-team-count",
+        type=int,
+        default=0,
+        help="If >0, keep only this many teams with largest (payroll_budget - roster payroll). "
+        "0 means all teams. Used only when --population-mode mixed_mid_fa_roomy.",
+    )
     return p.parse_args()
 
 
@@ -121,12 +150,60 @@ def _fa_salary(p: Player) -> int:
         return 0
 
 
-def _select_fa_sample(free_agents: List[Player], cap: int) -> List[Player]:
+def _fa_pool_by_salary_desc(free_agents: List[Player]) -> List[Player]:
     pool = [p for p in free_agents if getattr(p, "team_id", None) is None]
     if not pool:
         pool = list(free_agents)
     pool.sort(key=_fa_salary, reverse=True)
+    return pool
+
+
+def _select_fa_sample(free_agents: List[Player], cap: int) -> List[Player]:
+    pool = _fa_pool_by_salary_desc(free_agents)
     return pool[: max(1, cap)]
+
+
+def _select_fa_sample_by_salary_rank(
+    free_agents: List[Player],
+    rank_start: int,
+    rank_end: int,
+) -> List[Player]:
+    """1-based inclusive ranks on salary-descending FA pool (same pool as legacy top-N)."""
+    pool = _fa_pool_by_salary_desc(free_agents)
+    if not pool:
+        return []
+    rs = max(1, int(rank_start))
+    re = max(rs, int(rank_end))
+    rs_c = min(rs, len(pool))
+    re_c = min(re, len(pool))
+    if rs_c > re_c:
+        return []
+    # inclusive ranks [rs_c, re_c] -> slice [rs_c - 1 : re_c]
+    return pool[rs_c - 1 : re_c]
+
+
+def _team_roster_payroll(team: Team) -> int:
+    return int(
+        sum(max(0, int(getattr(p, "salary", 0) or 0)) for p in getattr(team, "players", []) or [])
+    )
+
+
+def _team_payroll_room(team: Team) -> int:
+    budget = int(getattr(team, "payroll_budget", 0) or 0)
+    return max(0, budget - _team_roster_payroll(team))
+
+
+def _select_teams_by_room(teams: List[Team], top_n: int) -> List[Team]:
+    if top_n <= 0:
+        return list(teams)
+    n = min(int(top_n), len(teams))
+    if n <= 0:
+        return []
+    sorted_teams = sorted(
+        teams,
+        key=lambda t: (-_team_payroll_room(t), -int(getattr(t, "team_id", 0))),
+    )
+    return sorted_teams[:n]
 
 
 def _run_matrix(
@@ -169,7 +246,7 @@ def _payroll_budget_display(team: Team, d: Dict[str, Any]) -> int:
     return int(getattr(team, "payroll_budget", 0) or 0)
 
 
-def _aggregate(rows: List[Dict[str, Any]]) -> None:
+def _aggregate(rows: List[Dict[str, Any]], population_banner: str = "") -> None:
     buf = _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     n = len(rows)
     n_s1 = sum(1 for r in rows if r["soft_cap_early"])
@@ -217,6 +294,8 @@ def _aggregate(rows: List[Dict[str, Any]]) -> None:
         return f"{100.0 * x / n:.2f}%"
 
     print("FA offer real/sim distribution observer (_calculate_offer_diagnostic)")
+    if population_banner:
+        print(population_banner)
     print("---")
     print(f"total_samples (team x fa): {n}")
     print(f"soft_cap_early True:       {n_s1} ({pct(n_s1)})")
@@ -291,9 +370,32 @@ def main() -> None:
     _sync_payroll_budget_with_roster_payroll(teams)
     _sync_payroll_budget_with_roster_payroll(teams)
 
-    fa_sample = _select_fa_sample(fas, args.fa_cap)
-    rows = _run_matrix(teams, fa_sample)
-    _aggregate(rows)
+    population_banner = ""
+    if args.population_mode == "default":
+        fa_sample = _select_fa_sample(fas, args.fa_cap)
+        team_subset = teams
+    else:
+        if args.fa_rank_end < args.fa_rank_start:
+            print("fa-rank-end must be >= fa-rank-start; abort")
+            return
+        fa_sample = _select_fa_sample_by_salary_rank(fas, args.fa_rank_start, args.fa_rank_end)
+        if not fa_sample:
+            print("no FAs in selected salary-rank band; abort")
+            return
+        team_subset = _select_teams_by_room(teams, args.roomy_team_count)
+        if not team_subset:
+            print("no teams after room filter; abort")
+            return
+        rtc = args.roomy_team_count
+        rtc_note = "all teams" if rtc <= 0 else f"top {min(rtc, len(teams))} by payroll room"
+        population_banner = (
+            f"population_mode={args.population_mode} "
+            f"fa_salary_ranks={args.fa_rank_start}-{args.fa_rank_end} ({len(fa_sample)} FAs) "
+            f"teams={len(team_subset)} ({rtc_note})"
+        )
+
+    rows = _run_matrix(team_subset, fa_sample)
+    _aggregate(rows, population_banner=population_banner)
 
 
 if __name__ == "__main__":
