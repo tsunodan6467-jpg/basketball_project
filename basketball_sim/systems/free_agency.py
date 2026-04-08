@@ -1,5 +1,5 @@
 import random
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
 
 from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
@@ -171,6 +171,26 @@ def _determine_contract_years(player: Player, team: Team, offer: int) -> int:
     return max(1, min(4, years))
 
 
+def _clip_offer_to_payroll_budget(
+    offer: int,
+    payroll_before: int,
+    payroll_budget: int,
+) -> Tuple[int, Optional[int]]:
+    """
+    `payroll_budget` による room_to_budget クリップ（`_calculate_offer` / diagnostic 共通）。
+
+    `payroll_budget <= 0` のときはクリップせず、(offer, None) を返す。
+    それ以外は従来どおり room_to_budget = max(0, payroll_budget - payroll_before)、
+    offer = min(offer, room_to_budget if room_to_budget > 0 else 0)。
+    """
+    pb = int(payroll_budget)
+    if pb <= 0:
+        return int(offer), None
+    room_to_budget = max(0, pb - payroll_before)
+    clipped = min(int(offer), room_to_budget if room_to_budget > 0 else 0)
+    return clipped, room_to_budget
+
+
 def _calculate_offer(team: Team, player: Player) -> int:
     payroll_before = _team_salary(team)
     soft_cap = _soft_cap(team)
@@ -213,9 +233,7 @@ def _calculate_offer(team: Team, player: Player) -> int:
     # クラブ予算（ある場合）を超えるオファーは圧縮する。
     # payroll_budget が未設定なら従来どおり soft cap 基準で扱う。
     payroll_budget = int(getattr(team, "payroll_budget", soft_cap) or soft_cap)
-    if payroll_budget > 0:
-        room_to_budget = max(0, payroll_budget - payroll_before)
-        offer = min(offer, room_to_budget if room_to_budget > 0 else 0)
+    offer, _ = _clip_offer_to_payroll_budget(offer, payroll_before, payroll_budget)
 
     # 贅沢税の増分が大きすぎる契約は一段圧縮（過剰な赤字契約を抑制）。
     tax_before = int(compute_luxury_tax(payroll_before, league_level=lv))
@@ -306,12 +324,8 @@ def _calculate_offer_diagnostic(team: Team, player: Player) -> Dict[str, Any]:
 
     payroll_budget = int(getattr(team, "payroll_budget", soft_cap) or soft_cap)
     snap["payroll_budget"] = payroll_budget
-    if payroll_budget > 0:
-        room_to_budget = max(0, payroll_budget - payroll_before)
-        offer = min(offer, room_to_budget if room_to_budget > 0 else 0)
-        snap["room_to_budget"] = room_to_budget
-    else:
-        snap["room_to_budget"] = None
+    offer, room_to_budget = _clip_offer_to_payroll_budget(offer, payroll_before, payroll_budget)
+    snap["room_to_budget"] = room_to_budget
     snap["offer_after_budget_clip"] = offer
 
     tax_before = int(compute_luxury_tax(payroll_before, league_level=lv))
