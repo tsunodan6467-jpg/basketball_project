@@ -8,6 +8,7 @@ Uses `_calculate_offer_diagnostic` only. Run from repo root:
   python tools/fa_offer_real_distribution_observer.py --save path/to/file.sav
   python tools/fa_offer_real_distribution_observer.py --seasons 1 --seed 42
   python tools/fa_offer_real_distribution_observer.py --population-mode mixed_mid_fa_roomy
+  python tools/fa_offer_real_distribution_observer.py --save-list a.sav b.sav
 
 Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDESIGN_PLAN_2026-04.md
 
@@ -57,7 +58,16 @@ def _parse_args() -> argparse.Namespace:
         "--save",
         type=str,
         default="",
-        help="Path to .sav file (pickle). If set, skip world generation.",
+        help="Path to .sav file (pickle). If set, skip world generation. "
+        "Mutually exclusive with --save-list.",
+    )
+    p.add_argument(
+        "--save-list",
+        nargs="+",
+        default=None,
+        metavar="PATH",
+        help="Run observer once per .sav path, in order (same population-mode / fa-cap as single run). "
+        "Mutually exclusive with --save.",
     )
     p.add_argument("--seed", type=int, default=42, help="RNG seed for simulated world")
     p.add_argument(
@@ -99,6 +109,12 @@ def _parse_args() -> argparse.Namespace:
         "0 means all teams. Used only when --population-mode mixed_mid_fa_roomy.",
     )
     return p.parse_args()
+
+
+def _check_save_args_exclusive(save: str, save_list: Optional[List[str]]) -> Optional[str]:
+    if save and save_list is not None:
+        return "use either --save or --save-list, not both"
+    return None
 
 
 def _load_teams_fas_from_save(path: Path) -> Tuple[List[Team], List[Player]]:
@@ -356,16 +372,20 @@ def _aggregate(rows: List[Dict[str, Any]], population_banner: str = "") -> None:
         print(f"      final_offer={r['final_offer']:,} soft_cap_early={r['soft_cap_early']}")
 
 
-def main() -> None:
-    args = _parse_args()
-    if args.save:
-        teams, fas = _load_teams_fas_from_save(Path(args.save))
+def _run_one_observation(args: argparse.Namespace, *, save_path: Optional[str]) -> bool:
+    """Load or build world, run matrix, print aggregate. Returns False on abort."""
+    if save_path:
+        sp = Path(save_path)
+        if not sp.is_file():
+            print(f"save file not found: {sp}")
+            return False
+        teams, fas = _load_teams_fas_from_save(sp)
     else:
         teams, fas = _build_simulated_world(args)
 
     if not teams:
         print("no teams; abort")
-        return
+        return False
 
     _sync_payroll_budget_with_roster_payroll(teams)
     _sync_payroll_budget_with_roster_payroll(teams)
@@ -377,15 +397,15 @@ def main() -> None:
     else:
         if args.fa_rank_end < args.fa_rank_start:
             print("fa-rank-end must be >= fa-rank-start; abort")
-            return
+            return False
         fa_sample = _select_fa_sample_by_salary_rank(fas, args.fa_rank_start, args.fa_rank_end)
         if not fa_sample:
             print("no FAs in selected salary-rank band; abort")
-            return
+            return False
         team_subset = _select_teams_by_room(teams, args.roomy_team_count)
         if not team_subset:
             print("no teams after room filter; abort")
-            return
+            return False
         rtc = args.roomy_team_count
         rtc_note = "all teams" if rtc <= 0 else f"top {min(rtc, len(teams))} by payroll room"
         population_banner = (
@@ -396,6 +416,30 @@ def main() -> None:
 
     rows = _run_matrix(team_subset, fa_sample)
     _aggregate(rows, population_banner=population_banner)
+    return True
+
+
+def main() -> None:
+    args = _parse_args()
+    err = _check_save_args_exclusive(args.save, args.save_list)
+    if err:
+        print(err, file=sys.stderr)
+        sys.exit(2)
+
+    if args.save_list is not None:
+        total = len(args.save_list)
+        for i, path in enumerate(args.save_list, start=1):
+            print()
+            print("=" * 72)
+            print(f"# save [{i}/{total}]: {path}")
+            print("=" * 72)
+            if not _run_one_observation(args, save_path=path):
+                sys.exit(1)
+        return
+
+    save_path = args.save if args.save else None
+    if not _run_one_observation(args, save_path=save_path):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

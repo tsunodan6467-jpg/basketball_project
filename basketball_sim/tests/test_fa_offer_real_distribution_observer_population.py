@@ -124,6 +124,13 @@ def test_select_teams_by_room_orders_by_budget_minus_payroll():
     assert ordered[1].team_id == 1
 
 
+def test_check_save_args_exclusive():
+    assert _ob._check_save_args_exclusive("", None) is None
+    assert _ob._check_save_args_exclusive("", ["x.sav"]) is None
+    assert _ob._check_save_args_exclusive("a.sav", None) is None
+    assert _ob._check_save_args_exclusive("a.sav", ["b.sav"]) is not None
+
+
 def test_select_teams_by_room_zero_means_all():
     t1 = Team(team_id=1, name="A", league_level=1, money=0, players=[], payroll_budget=50_000_000)
     t2 = Team(team_id=2, name="B", league_level=1, money=0, players=[], payroll_budget=60_000_000)
