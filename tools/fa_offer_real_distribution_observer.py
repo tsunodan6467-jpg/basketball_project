@@ -12,6 +12,9 @@ Uses `_calculate_offer_diagnostic` only. Run from repo root:
 
 Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDESIGN_PLAN_2026-04.md
 
+Each run prints one ASCII summary line before the main histogram (soft_cap_early rate, room_to_budget
+uniques, pre-clip offer<=room count on non-soft_cap_early rows).
+
 See docs/FA_S6_TINY_OFFER_DECISION_MEMO_2026-04.md
 """
 
@@ -262,6 +265,30 @@ def _payroll_budget_display(team: Team, d: Dict[str, Any]) -> int:
     return int(getattr(team, "payroll_budget", 0) or 0)
 
 
+def _matrix_summary_line(rows: List[Dict[str, Any]]) -> str:
+    """One-line matrix probe: soft_cap_early share, distinct room_to_budget, pre-clip offer<=room."""
+    n = len(rows)
+    n_s1 = sum(1 for r in rows if r["soft_cap_early"])
+    pct = (100.0 * n_s1 / n) if n else 0.0
+    rooms = [r["room_to_budget"] for r in rows if r["room_to_budget"] is not None]
+    room_unique = len(set(rooms))
+    pre_le = 0
+    for r in rows:
+        if r["soft_cap_early"]:
+            continue
+        d = r["diag"]
+        o = d.get("offer_after_soft_cap_pushback")
+        rtb = d.get("room_to_budget")
+        if o is None or rtb is None:
+            continue
+        if int(o) <= int(rtb):
+            pre_le += 1
+    return (
+        f"summary: soft_cap_early={n_s1}/{n} ({pct:.1f}%), "
+        f"room_unique={room_unique}, pre_le_room={pre_le}"
+    )
+
+
 def _aggregate(rows: List[Dict[str, Any]], population_banner: str = "") -> None:
     buf = _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     n = len(rows)
@@ -415,6 +442,7 @@ def _run_one_observation(args: argparse.Namespace, *, save_path: Optional[str]) 
         )
 
     rows = _run_matrix(team_subset, fa_sample)
+    print(_matrix_summary_line(rows))
     _aggregate(rows, population_banner=population_banner)
     return True
 

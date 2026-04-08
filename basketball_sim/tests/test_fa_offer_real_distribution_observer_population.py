@@ -124,6 +124,41 @@ def test_select_teams_by_room_orders_by_budget_minus_payroll():
     assert ordered[1].team_id == 1
 
 
+def test_matrix_summary_line_mixed_soft_cap_and_pre_le():
+    rows = [
+        {"soft_cap_early": True, "room_to_budget": None, "diag": {}},
+        {
+            "soft_cap_early": False,
+            "room_to_budget": 30_000_000,
+            "diag": {
+                "offer_after_soft_cap_pushback": 50_000_000,
+                "room_to_budget": 30_000_000,
+            },
+        },
+    ]
+    s = _ob._matrix_summary_line(rows)
+    assert "soft_cap_early=1/2 (50.0%)" in s
+    assert "room_unique=1" in s
+    assert "pre_le_room=0" in s
+
+
+def test_matrix_summary_line_pre_le_room_counts():
+    rows = [
+        {
+            "soft_cap_early": False,
+            "room_to_budget": 50_000_000,
+            "diag": {
+                "offer_after_soft_cap_pushback": 40_000_000,
+                "room_to_budget": 50_000_000,
+            },
+        }
+    ]
+    s = _ob._matrix_summary_line(rows)
+    assert "pre_le_room=1" in s
+    assert "room_unique=1" in s
+    assert "soft_cap_early=0/1 (0.0%)" in s
+
+
 def test_check_save_args_exclusive():
     assert _ob._check_save_args_exclusive("", None) is None
     assert _ob._check_save_args_exclusive("", ["x.sav"]) is None
