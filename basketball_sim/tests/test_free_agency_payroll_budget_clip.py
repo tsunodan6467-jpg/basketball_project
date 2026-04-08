@@ -5,8 +5,8 @@ from unittest.mock import patch
 from basketball_sim.systems import free_agency as fa_mod
 
 
-def test_payroll_budget_clip_lambda_first_trial_value():
-    assert fa_mod._PAYROLL_BUDGET_CLIP_LAMBDA == 0.1
+def test_payroll_budget_clip_lambda_second_trial_value():
+    assert fa_mod._PAYROLL_BUDGET_CLIP_LAMBDA == 0.05
 
 
 def test_clip_skips_when_payroll_budget_nonpositive():
@@ -25,12 +25,13 @@ def test_clip_zero_room_yields_zero_offer():
 
 
 def test_clip_when_offer_exceeds_room():
+    # offer=10M, room=5M → 5M + round(0.05 * 5M) = 5_250_000
     offer, before, budget = 10_000_000, 0, 5_000_000
     room = 5_000_000
     o, r = fa_mod._clip_offer_to_payroll_budget(offer, before, budget)
     assert r == room
     assert o == room + round(fa_mod._PAYROLL_BUDGET_CLIP_LAMBDA * (offer - room))
-    assert o == 5_500_000
+    assert o == 5_250_000
 
 
 def test_clip_passes_through_when_room_large():
