@@ -61,18 +61,22 @@ def _safe_cli_stdout_text(text: str) -> str:
     return text.replace("\u2014", "-").replace("\u2013", "-").replace("\u2212", "-")
 
 
+# オフFA直前同期: 実ペイロールに足す固定余地（`roster + B` 下限の B）。決裁: docs/FA_S6_BUFFER_INCREASE_DECISION_MEMO_2026-04.md
+_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER = 3_000_000
+
+
 def _sync_payroll_budget_with_roster_payroll(teams: List[Team]) -> None:
     """
-    オフFA直前の薄い同期: 各チームの payroll_budget を「実ペイロール＋最低年俸1人分」未満にしない。
+    オフFA直前の薄い同期: 各チームの payroll_budget を「実ペイロール＋固定 buffer」未満にしない。
 
     `_process_team_finances` より前に手動FA・CPU FA が走るため、ロスター年俸が動いたあとも
     payroll_budget が古いと `free_agency._calculate_offer` の room_to_budget が 0 になりうる。
     第1弾: `max(既存, roster)`（docs/OFFSEASON_FA_PAYROLL_BUDGET_SYNC_PLAN_2026-04.md）。
-    第2弾: `max(既存, roster + MIN_SALARY_DEFAULT)`（docs/OFFSEASON_FA_PAYROLL_BUDGET_BUFFER_PLAN_2026-04.md）。
+    第2弾以降: `max(既存, roster + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER)`（buffer 額は決裁メモで更新）。
     """
     if get_team_payroll is None:
         return
-    buffer = int(MIN_SALARY_DEFAULT) if MIN_SALARY_DEFAULT is not None else 0
+    buffer = int(_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER)
     for team in teams or []:
         try:
             existing = int(getattr(team, "payroll_budget", 0) or 0)

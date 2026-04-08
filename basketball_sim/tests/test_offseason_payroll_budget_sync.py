@@ -1,13 +1,15 @@
-"""オフFA直前: payroll_budget と実ペイロール＋MIN_SALARY_DEFAULT の同期（Offseason.run）。"""
+"""オフFA直前: payroll_budget と実ペイロール＋_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER の同期（Offseason.run）。"""
 
 import inspect
 
 from basketball_sim.models import offseason as off_mod
-from basketball_sim.models.offseason import _sync_payroll_budget_with_roster_payroll
+from basketball_sim.models.offseason import (
+    _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER,
+    _sync_payroll_budget_with_roster_payroll,
+)
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems import free_agency as fa_mod
-from basketball_sim.systems.contract_logic import MIN_SALARY_DEFAULT
 
 
 def _player(pid: int, salary: int) -> Player:
@@ -43,7 +45,7 @@ def test_sync_raises_payroll_budget_when_below_roster_payroll():
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[roster])
     team.payroll_budget = 5_000_000
     _sync_payroll_budget_with_roster_payroll([team])
-    assert team.payroll_budget == 20_000_000 + int(MIN_SALARY_DEFAULT)
+    assert team.payroll_budget == 20_000_000 + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
 
 
 def test_sync_does_not_lower_payroll_budget_when_above_roster():
@@ -73,17 +75,17 @@ def test_sync_empty_and_none_teams_no_crash():
     _sync_payroll_budget_with_roster_payroll(None)  # type: ignore[arg-type]
 
 
-def test_sync_adds_min_salary_buffer_when_budget_equals_roster():
-    """payroll_budget == roster のときも floor は roster + MIN_SALARY_DEFAULT。"""
+def test_sync_adds_payroll_budget_buffer_when_budget_equals_roster():
+    """payroll_budget == roster のときも floor は roster + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER。"""
     roster = _player(4, 20_000_000)
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[roster])
     team.payroll_budget = 20_000_000
     _sync_payroll_budget_with_roster_payroll([team])
-    assert team.payroll_budget == 20_000_000 + int(MIN_SALARY_DEFAULT)
+    assert team.payroll_budget == 20_000_000 + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
 
 
 def test_sync_gives_positive_room_to_budget_and_nonzero_calculate_offer_when_tight():
-    """同期後は room_to_budget が MIN_SALARY_DEFAULT になりうる（高額オファーは別段でクリップ）。"""
+    """同期後は room_to_budget が _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER になりうる（芯は別段でクリップ）。"""
     roster = _player(5, 7_600_000)
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[roster])
     team.payroll_budget = 7_600_000
@@ -119,7 +121,7 @@ def test_sync_gives_positive_room_to_budget_and_nonzero_calculate_offer_when_tig
     _sync_payroll_budget_with_roster_payroll([team])
     pb2 = int(team.payroll_budget)
     room = max(0, pb2 - pr)
-    assert room == int(MIN_SALARY_DEFAULT)
+    assert room == _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     off = int(fa_mod._calculate_offer(team, fa))
     assert off > 0
-    assert off <= int(MIN_SALARY_DEFAULT)
+    assert off <= _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER

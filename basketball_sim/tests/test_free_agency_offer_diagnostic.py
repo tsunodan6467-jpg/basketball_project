@@ -98,12 +98,12 @@ def test_diagnostic_matches_calculate_offer_budget_room_small_positive():
     """S6: 予算に最低限の余地 → クリップ後も正のオファー。"""
     roster = _roster_player(3, 7_600_000)
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[roster])
-    team.payroll_budget = 7_900_000
+    team.payroll_budget = 7_600_000 + 3_000_000
     fa = _fa_player(9003)
     d = fa_mod._calculate_offer_diagnostic(team, fa)
     assert d["soft_cap_early"] is False
-    assert d["room_to_budget"] == 300_000
-    assert d["final_offer"] > 0
+    assert d["room_to_budget"] == 3_000_000
+    assert d["final_offer"] == 3_000_000
     _assert_diagnostic_matches(team, fa)
 
 
