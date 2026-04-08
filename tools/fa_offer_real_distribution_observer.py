@@ -15,6 +15,10 @@ Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDES
 Each run prints one ASCII summary line before the main histogram (soft_cap_early rate, room_to_budget
 uniques, pre-clip offer<=room count on non-soft_cap_early rows).
 
+After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
+uniques plus gap = payroll_budget - roster_payroll (same sign convention as roomy helper). See
+docs/FA_ROOM_UNIQUE_ONE_CAUSE_NOTE_2026-04.md
+
 See docs/FA_S6_TINY_OFFER_DECISION_MEMO_2026-04.md
 """
 
@@ -210,6 +214,54 @@ def _team_roster_payroll(team: Team) -> int:
 def _team_payroll_room(team: Team) -> int:
     budget = int(getattr(team, "payroll_budget", 0) or 0)
     return max(0, budget - _team_roster_payroll(team))
+
+
+def _team_payroll_budget_int(team: Team) -> int:
+    return int(getattr(team, "payroll_budget", 0) or 0)
+
+
+def _teams_payroll_gap_stats(teams: List[Team]) -> Dict[str, Any]:
+    """Per-team payroll_budget, roster payroll, gap (room-like); distribution summary for sync probe."""
+    if not teams:
+        return {
+            "n": 0,
+            "budget_u": 0,
+            "roster_u": 0,
+            "gap_u": 0,
+            "gap_min": None,
+            "gap_max": None,
+        }
+    budgets = [_team_payroll_budget_int(t) for t in teams]
+    rosters = [_team_roster_payroll(t) for t in teams]
+    gaps = [_team_payroll_room(t) for t in teams]
+    return {
+        "n": len(teams),
+        "budget_u": len(set(budgets)),
+        "roster_u": len(set(rosters)),
+        "gap_u": len(set(gaps)),
+        "gap_min": min(gaps),
+        "gap_max": max(gaps),
+    }
+
+
+def _print_sync_observation_block(
+    before: Dict[str, Any],
+    sync1: Dict[str, Any],
+    sync2: Dict[str, Any],
+) -> None:
+    buf = int(_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER)
+    print(f"sync_observation: buffer_const={buf} (roster+buffer floor in _sync_payroll_budget_with_roster_payroll)")
+    for label, st in (("before", before), ("sync1", sync1), ("sync2", sync2)):
+        gmin = st["gap_min"]
+        gmax = st["gap_max"]
+        if gmin is None:
+            gmin_s = gmax_s = "n/a"
+        else:
+            gmin_s, gmax_s = str(gmin), str(gmax)
+        print(
+            f"  {label}: n={st['n']} budget_unique={st['budget_u']} roster_unique={st['roster_u']} "
+            f"gap_unique={st['gap_u']} gap_min={gmin_s} gap_max={gmax_s}"
+        )
 
 
 def _select_teams_by_room(teams: List[Team], top_n: int) -> List[Team]:
@@ -414,8 +466,12 @@ def _run_one_observation(args: argparse.Namespace, *, save_path: Optional[str]) 
         print("no teams; abort")
         return False
 
+    stats_before = _teams_payroll_gap_stats(teams)
     _sync_payroll_budget_with_roster_payroll(teams)
+    stats_sync1 = _teams_payroll_gap_stats(teams)
     _sync_payroll_budget_with_roster_payroll(teams)
+    stats_sync2 = _teams_payroll_gap_stats(teams)
+    _print_sync_observation_block(stats_before, stats_sync1, stats_sync2)
 
     population_banner = ""
     if args.population_mode == "default":

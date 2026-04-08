@@ -159,6 +159,72 @@ def test_matrix_summary_line_pre_le_room_counts():
     assert "soft_cap_early=0/1 (0.0%)" in s
 
 
+def test_teams_payroll_gap_stats_empty():
+    st = _ob._teams_payroll_gap_stats([])
+    assert st["n"] == 0
+    assert st["gap_min"] is None
+
+
+def test_teams_payroll_gap_stats_two_distinct_gaps():
+    p = Player(
+        player_id=10,
+        name="P",
+        age=25,
+        nationality="Japan",
+        position="PG",
+        height_cm=185.0,
+        weight_kg=80.0,
+        shoot=60,
+        three=60,
+        drive=60,
+        passing=60,
+        rebound=60,
+        defense=60,
+        ft=60,
+        stamina=60,
+        ovr=60,
+        potential="C",
+        archetype="guard",
+        usage_base=20,
+        salary=80_000_000,
+        contract_years_left=1,
+        contract_total_years=2,
+        team_id=1,
+    )
+    t1 = Team(team_id=1, name="A", league_level=1, money=0, players=[p], payroll_budget=100_000_000)
+    q = Player(
+        player_id=11,
+        name="Q",
+        age=25,
+        nationality="Japan",
+        position="PG",
+        height_cm=185.0,
+        weight_kg=80.0,
+        shoot=60,
+        three=60,
+        drive=60,
+        passing=60,
+        rebound=60,
+        defense=60,
+        ft=60,
+        stamina=60,
+        ovr=60,
+        potential="C",
+        archetype="guard",
+        usage_base=20,
+        salary=80_000_000,
+        contract_years_left=1,
+        contract_total_years=2,
+        team_id=2,
+    )
+    t2 = Team(team_id=2, name="B", league_level=1, money=0, players=[q], payroll_budget=95_000_000)
+    st = _ob._teams_payroll_gap_stats([t1, t2])
+    assert st["n"] == 2
+    assert st["gap_u"] == 2
+    assert st["gap_min"] == 15_000_000
+    assert st["gap_max"] == 20_000_000
+
+
 def test_check_save_args_exclusive():
     assert _ob._check_save_args_exclusive("", None) is None
     assert _ob._check_save_args_exclusive("", ["x.sav"]) is None
