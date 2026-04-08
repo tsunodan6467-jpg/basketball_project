@@ -23,8 +23,8 @@ MAX_FA_SIGNINGS = 3
 MAX_FA_OFFERS_PER_TEAM = 6
 MAX_DECLINES_PER_PLAYER = 2
 
-# 線形緩和（内分）係数。0 のときは従来の min(offer, room) と同値（docs/FA_PAYROLL_BUDGET_CLIP_FORMULA_OPTIONS_NOTE_2026-04.md）。
-_PAYROLL_BUDGET_CLIP_LAMBDA = 0.0
+# 線形緩和（内分）係数。第一試行: docs/FA_PAYROLL_BUDGET_CLIP_LAMBDA_FIRST_TRIAL_DECISION_2026-04.md
+_PAYROLL_BUDGET_CLIP_LAMBDA = 0.1
 
 
 def _team_salary(team: Team) -> int:
@@ -188,7 +188,7 @@ def _clip_offer_to_payroll_budget(
     - offer <= room なら clipped = offer
     - それ以外（offer > room > 0）は
       clipped = room + round(_PAYROLL_BUDGET_CLIP_LAMBDA * (offer - room))。
-    λ=0 なら上式は room となり、従来の min(offer, room) と同値。
+    λ=0 なら上式は room となり、従来の min(offer, room) と同値（テストで monkeypatch 確認）。
     """
     pb = int(payroll_budget)
     if pb <= 0:

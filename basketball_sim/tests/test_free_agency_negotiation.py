@@ -83,12 +83,21 @@ def test_fa_roll_rejects_low_score():
 
 def test_calculate_offer_respects_payroll_budget_room():
     team = _team()
-    # 既存年俸 7.6M + 予算 8.0M -> 新規は最大 0.4M まで
+    # 既存年俸 7.6M + 予算 8.0M -> room 0.4M。芯 5M 超過時は線形緩和で room よりわずかに上げうる
     team.players = [_player(101, 4_000_000, salary=7_600_000)]
     team.payroll_budget = 8_000_000
     cand = _player(102, 9_000_000, salary=4_000_000, ovr=76)
+    d = fa._calculate_offer_diagnostic(team, cand)
+    room = d["room_to_budget"]
+    assert room == 400_000
+    pre = d["offer_after_soft_cap_pushback"]
+    assert pre == 5_000_000
+    lam = float(fa._PAYROLL_BUDGET_CLIP_LAMBDA)
+    assert pre > room
+    expected = room + round(lam * (pre - room))
     offer = fa._calculate_offer(team, cand)
-    assert offer <= 400_000
+    assert offer == expected
+    assert offer == d["final_offer"]
 
 
 def test_cap_status_is_aligned_with_shared_budget_module():
