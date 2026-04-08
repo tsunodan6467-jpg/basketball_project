@@ -177,6 +177,8 @@ def _calculate_offer(team: Team, player: Player) -> int:
     cap_base = _hard_cap(team)
     lv = league_level_for_team(team)
 
+    # 意図的ゲート（偶発ではない）: payroll >= soft cap なら FA 新規オファー芯は 0。CPU/手動で同一 `_calculate_offer`。
+    # 緩和・変更時は docs/FA_SOFT_CAP_POLICY_DECISION_MEMO_2026-04.md の決裁を先に更新すること。
     if payroll_before >= soft_cap:
         return 0
 
