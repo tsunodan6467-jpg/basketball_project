@@ -23,6 +23,9 @@ MAX_FA_SIGNINGS = 3
 MAX_FA_OFFERS_PER_TEAM = 6
 MAX_DECLINES_PER_PLAYER = 2
 
+# 線形緩和（内分）係数。0 のときは従来の min(offer, room) と同値（docs/FA_PAYROLL_BUDGET_CLIP_FORMULA_OPTIONS_NOTE_2026-04.md）。
+_PAYROLL_BUDGET_CLIP_LAMBDA = 0.0
+
 
 def _team_salary(team: Team) -> int:
     return int(get_team_payroll(team))
@@ -180,14 +183,28 @@ def _clip_offer_to_payroll_budget(
     `payroll_budget` による room_to_budget クリップ（`_calculate_offer` / diagnostic 共通）。
 
     `payroll_budget <= 0` のときはクリップせず、(offer, None) を返す。
-    それ以外は従来どおり room_to_budget = max(0, payroll_budget - payroll_before)、
-    offer = min(offer, room_to_budget if room_to_budget > 0 else 0)。
+    room = max(0, payroll_budget - payroll_before) とし、
+    - room == 0 なら clipped = 0
+    - offer <= room なら clipped = offer
+    - それ以外（offer > room > 0）は
+      clipped = room + round(_PAYROLL_BUDGET_CLIP_LAMBDA * (offer - room))。
+    λ=0 なら上式は room となり、従来の min(offer, room) と同値。
     """
     pb = int(payroll_budget)
     if pb <= 0:
         return int(offer), None
     room_to_budget = max(0, pb - payroll_before)
-    clipped = min(int(offer), room_to_budget if room_to_budget > 0 else 0)
+    offer_i = int(offer)
+    room = room_to_budget
+
+    if room == 0:
+        clipped = 0
+    elif offer_i <= room:
+        clipped = offer_i
+    else:
+        lam = float(_PAYROLL_BUDGET_CLIP_LAMBDA)
+        clipped = room + int(round(lam * (offer_i - room)))
+
     return clipped, room_to_budget
 
 

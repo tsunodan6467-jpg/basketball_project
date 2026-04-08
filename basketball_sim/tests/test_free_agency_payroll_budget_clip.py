@@ -3,6 +3,10 @@
 from basketball_sim.systems import free_agency as fa_mod
 
 
+def test_payroll_budget_clip_lambda_default_zero():
+    assert fa_mod._PAYROLL_BUDGET_CLIP_LAMBDA == 0.0
+
+
 def test_clip_skips_when_payroll_budget_nonpositive():
     o, r = fa_mod._clip_offer_to_payroll_budget(5_000_000, 100, 0)
     assert o == 5_000_000
@@ -28,3 +32,12 @@ def test_clip_passes_through_when_room_large():
     o, r = fa_mod._clip_offer_to_payroll_budget(5_000_000, 0, 100_000_000)
     assert r == 100_000_000
     assert o == 5_000_000
+
+
+def test_clip_lambda_zero_matches_legacy_min_when_offer_gt_room():
+    """λ=0 のとき offer>room>0 は従来 min(offer, room)==room と一致。"""
+    offer, before, budget = 10_000_000, 0, 5_000_000
+    room = max(0, budget - before)
+    assert room > 0 and offer > room
+    clipped, _ = fa_mod._clip_offer_to_payroll_budget(offer, before, budget)
+    assert clipped == min(offer, room)
