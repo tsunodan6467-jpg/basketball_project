@@ -123,5 +123,6 @@ def test_sync_gives_positive_room_to_budget_and_nonzero_calculate_offer_when_tig
     room = max(0, pb2 - pr)
     assert room == _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     off = int(fa_mod._calculate_offer(team, fa))
+    assert off == 5_000_000
     assert off > 0
     assert off <= _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER

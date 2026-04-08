@@ -24,7 +24,10 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from basketball_sim.models.offseason import _sync_payroll_budget_with_roster_payroll  # noqa: E402
+from basketball_sim.models.offseason import (  # noqa: E402
+    _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER,
+    _sync_payroll_budget_with_roster_payroll,
+)
 from basketball_sim.models.player import Player  # noqa: E402
 from basketball_sim.models.team import Team  # noqa: E402
 from basketball_sim.persistence.save_load import load_world, validate_payload  # noqa: E402
@@ -32,6 +35,7 @@ from basketball_sim.systems import free_agency as fa_mod  # noqa: E402
 from basketball_sim.utils.sim_rng import init_simulation_random  # noqa: E402
 
 TINY_MAX = 300_000
+BAND_3M = 3_000_000
 HIGH_SALARY = 50_000_000
 
 
@@ -165,12 +169,21 @@ def _payroll_budget_display(team: Team, d: Dict[str, Any]) -> int:
 
 
 def _aggregate(rows: List[Dict[str, Any]]) -> None:
+    buf = _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     n = len(rows)
     n_s1 = sum(1 for r in rows if r["soft_cap_early"])
     n_zero = sum(1 for r in rows if r["final_offer"] == 0)
     n_tiny = sum(1 for r in rows if 0 < r["final_offer"] <= TINY_MAX)
+    n_le_3m = sum(1 for r in rows if 0 < r["final_offer"] <= BAND_3M)
+    n_le_buffer = sum(1 for r in rows if 0 < r["final_offer"] <= buf)
     n_s6_tiny = sum(
         1 for r in rows if (not r["soft_cap_early"]) and 0 < r["final_offer"] <= TINY_MAX
+    )
+    n_s6_le_3m = sum(
+        1 for r in rows if (not r["soft_cap_early"]) and 0 < r["final_offer"] <= BAND_3M
+    )
+    n_s6_le_buffer = sum(
+        1 for r in rows if (not r["soft_cap_early"]) and 0 < r["final_offer"] <= buf
     )
     n_room_le = sum(
         1
@@ -201,9 +214,19 @@ def _aggregate(rows: List[Dict[str, Any]]) -> None:
     print(f"soft_cap_early True:       {n_s1} ({pct(n_s1)})")
     print(f"final_offer == 0:          {n_zero} ({pct(n_zero)})")
     print(f"0 < final <= {TINY_MAX}:        {n_tiny} ({pct(n_tiny)})")
+    print(f"0 < final <= {BAND_3M}:        {n_le_3m} ({pct(n_le_3m)})")
+    print(f"0 < final <= buffer ({buf:,}): {n_le_buffer} ({pct(n_le_buffer)})")
     print(
         "soft_cap_early False & "
         f"0 < final <= {TINY_MAX}: {n_s6_tiny} ({pct(n_s6_tiny)})"
+    )
+    print(
+        "soft_cap_early False & "
+        f"0 < final <= {BAND_3M}: {n_s6_le_3m} ({pct(n_s6_le_3m)})"
+    )
+    print(
+        "soft_cap_early False & "
+        f"0 < final <= buffer: {n_s6_le_buffer} ({pct(n_s6_le_buffer)})"
     )
     print(
         "room_to_budget not None & "

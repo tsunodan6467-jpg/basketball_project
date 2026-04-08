@@ -20,13 +20,14 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+from basketball_sim.models.offseason import _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER  # noqa: E402
 from basketball_sim.models.player import Player  # noqa: E402
 from basketball_sim.models.team import Team  # noqa: E402
 from basketball_sim.systems import free_agency as fa_mod  # noqa: E402
 from basketball_sim.systems.salary_cap_budget import get_soft_cap  # noqa: E402
 
-# Synthetic "S6 band" upper bound for counts (matches offseason FA payroll buffer first trial)
-_S6_SYNTHETIC_CLIP_CEILING = 3_000_000
+# First-trial buffer band (3M) for delta vs current `_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER`
+_PRIOR_TRIAL_CLIP_CEILING = 3_000_000
 
 
 def _roster_player(pid: int, salary: int, *, league_team_id: int = 1) -> Player:
@@ -122,28 +123,28 @@ def _build_cases() -> List[Tuple[str, Team, Player]]:
     out.append(("S6a_D1_budget_eq_roster", t3, _fa_player(pid)))
     pid += 1
 
-    # S6 clip: payroll_budget = roster + 3M buffer floor (mid FA)
+    # S6: payroll_budget = roster + offseason FA buffer floor (mid FA)
     r4 = _roster_player(pid, 7_600_000)
     pid += 1
     t4 = Team(team_id=4, name="S6b_D1_tiny_mid", league_level=1, money=500_000_000, players=[r4])
-    t4.payroll_budget = 7_600_000 + 3_000_000
-    out.append(("S6b_D1_buffer300k_midFA", t4, _fa_player(pid)))
+    t4.payroll_budget = 7_600_000 + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
+    out.append(("S6b_D1_buffer_midFA", t4, _fa_player(pid)))
     pid += 1
 
-    # S6 clip: same floor, high-salary FA
+    # S6: same floor, high-salary FA
     r5 = _roster_player(pid, 7_600_000)
     pid += 1
     t5 = Team(team_id=5, name="S6b_D1_tiny_high", league_level=1, money=500_000_000, players=[r5])
-    t5.payroll_budget = 7_600_000 + 3_000_000
-    out.append(("S6b_D1_buffer300k_highFA", t5, _fa_player(pid, salary=88_000_000)))
+    t5.payroll_budget = 7_600_000 + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
+    out.append(("S6b_D1_buffer_highFA", t5, _fa_player(pid, salary=88_000_000)))
     pid += 1
 
-    # D2 でも同型 S6-tiny（division 差の参照用）
+    # D2 でも同型 S6（division 差の参照用）
     r6 = _roster_player(pid, 7_600_000)
     pid += 1
     t6 = Team(team_id=6, name="S6b_D2_tiny_mid", league_level=2, money=500_000_000, players=[r6])
-    t6.payroll_budget = 7_600_000 + 3_000_000
-    out.append(("S6b_D2_buffer300k_midFA", t6, _fa_player(pid)))
+    t6.payroll_budget = 7_600_000 + _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
+    out.append(("S6b_D2_buffer_midFA", t6, _fa_player(pid)))
     pid += 1
 
     # healthy: 空ロスター・大きい budget・高額 FA
@@ -197,23 +198,38 @@ def main() -> None:
         d = fa_mod._calculate_offer_diagnostic(team, fa)
         rows.append((label, team, d, fa))
 
+    buf = _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     n = len(rows)
     n_zero = sum(1 for _, _, d, _ in rows if int(d["final_offer"]) == 0)
-    n_tiny = sum(1 for _, _, d, _ in rows if 0 < int(d["final_offer"]) <= _S6_SYNTHETIC_CLIP_CEILING)
+    n_le_prior_3m = sum(1 for _, _, d, _ in rows if 0 < int(d["final_offer"]) <= _PRIOR_TRIAL_CLIP_CEILING)
+    n_le_buffer = sum(1 for _, _, d, _ in rows if 0 < int(d["final_offer"]) <= buf)
     n_s1 = sum(1 for _, _, d, _ in rows if d["soft_cap_early"] is True)
     n_room0 = sum(1 for _, _, d, _ in rows if d.get("room_to_budget") == 0)
-    n_s6_room_le_clip = sum(
+    n_s6_room_le_buffer = sum(
         1
         for _, _, d, _ in rows
         if d["soft_cap_early"] is False
         and d.get("room_to_budget") is not None
-        and int(d["room_to_budget"]) <= _S6_SYNTHETIC_CLIP_CEILING
+        and int(d["room_to_budget"]) <= buf
     )
-    n_s6_false_tiny_offer = sum(
+    n_s6_room_le_prior_3m = sum(
         1
         for _, _, d, _ in rows
         if d["soft_cap_early"] is False
-        and 0 < int(d["final_offer"]) <= _S6_SYNTHETIC_CLIP_CEILING
+        and d.get("room_to_budget") is not None
+        and int(d["room_to_budget"]) <= _PRIOR_TRIAL_CLIP_CEILING
+    )
+    n_s6_false_le_prior_3m = sum(
+        1
+        for _, _, d, _ in rows
+        if d["soft_cap_early"] is False
+        and 0 < int(d["final_offer"]) <= _PRIOR_TRIAL_CLIP_CEILING
+    )
+    n_s6_false_le_buffer = sum(
+        1
+        for _, _, d, _ in rows
+        if d["soft_cap_early"] is False
+        and 0 < int(d["final_offer"]) <= buf
     )
 
     print("FA offer diagnostic observer (synthetic matrix, not real saves)")
@@ -221,15 +237,24 @@ def main() -> None:
     print(f"total_cases:              {n}")
     print(f"soft_cap_early True:      {n_s1}")
     print(f"final_offer == 0:         {n_zero}")
-    print(f"0 < final_offer <= 3M:    {n_tiny}")
+    print(f"0 < final_offer <= 3M (prior trial band): {n_le_prior_3m}")
+    print(f"0 < final_offer <= buffer ({buf:,}):       {n_le_buffer}")
     print(f"room_to_budget == 0:      {n_room0}")
     print(
         "soft_cap_early False & "
-        "0 < final <= 3M:          {}".format(n_s6_false_tiny_offer)
+        f"0 < final <= 3M (prior):   {n_s6_false_le_prior_3m}"
     )
     print(
         "soft_cap_early False & "
-        "room_to_budget <= 3M:     {}".format(n_s6_room_le_clip)
+        f"0 < final <= buffer:       {n_s6_false_le_buffer}"
+    )
+    print(
+        "soft_cap_early False & "
+        f"room_to_budget <= buffer:  {n_s6_room_le_buffer}"
+    )
+    print(
+        "soft_cap_early False & "
+        f"room_to_budget <= 3M:      {n_s6_room_le_prior_3m}"
     )
     print("---")
     print("per_case:")
@@ -248,10 +273,10 @@ def main() -> None:
     tiny_samples = [
         (label, team, d, fa)
         for label, team, d, fa in rows
-        if d["soft_cap_early"] is False and 0 < int(d["final_offer"]) <= _S6_SYNTHETIC_CLIP_CEILING
+        if d["soft_cap_early"] is False and 0 < int(d["final_offer"]) <= buf
     ]
     print("---")
-    print("sample S6-band offers (soft_cap_early False, 0 < final <= 3M), up to 3:")
+    print(f"sample S6-band offers (soft_cap_early False, 0 < final <= buffer), up to 3:")
     for i, (label, team, d, fa) in enumerate(tiny_samples[:3]):
         sal = _fa_salary_for_display(fa, d)
         rtb = d.get("room_to_budget")
