@@ -14,7 +14,9 @@ Uses `_calculate_offer_diagnostic` only. Run from repo root:
 Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDESIGN_PLAN_2026-04.md
 
 Each run prints one ASCII summary line before the main histogram (soft_cap_early rate, room_to_budget
-uniques, pre-clip offer<=room count on non-soft_cap_early rows).
+uniques, pre-clip offer<=room count on non-soft_cap_early rows), then a short pre_le_pop block: same
+population as pre_le_room (soft_cap_early False, offer_after_soft_cap_pushback & room_to_budget non-None)
+with min/max/p25–p75 for each key and offer_minus_room le0/gt0/gt_temp counts.
 
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = max(0, payroll_budget - roster_payroll) for these stats (same sign convention as roomy helper).
@@ -35,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import statistics
 import sys
 from collections import Counter
 from pathlib import Path
@@ -59,6 +62,9 @@ TINY_MAX = 300_000
 BAND_3M = 3_000_000
 BAND_10M = 10_000_000
 HIGH_SALARY = 50_000_000
+
+# Temporary: "large" positive offer-room gap for pre_le_pop gt_temp bucket (tune later).
+TEMP_PRE_LE_DIFF_LARGE_THRESHOLD = 5_000_000
 
 
 class _SilentWriter:
@@ -420,6 +426,60 @@ def _matrix_summary_line(rows: List[Dict[str, Any]]) -> str:
     )
 
 
+def _quartiles_int(vals: List[int]) -> Tuple[int, int, int]:
+    """Return (p25, p50, p75) as ints; vals non-empty."""
+    if len(vals) == 1:
+        v = vals[0]
+        return v, v, v
+    q1, q2, q3 = statistics.quantiles(vals, n=4, method="inclusive")
+    return int(round(q1)), int(round(q2)), int(round(q3))
+
+
+def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
+    """Same population as pre_le_room count in _matrix_summary_line (both keys non-None, not soft_cap_early)."""
+    rtbs: List[int] = []
+    offers: List[int] = []
+    for r in rows:
+        if r["soft_cap_early"]:
+            continue
+        d = r["diag"]
+        o = d.get("offer_after_soft_cap_pushback")
+        rtb = d.get("room_to_budget")
+        if o is None or rtb is None:
+            continue
+        offers.append(int(o))
+        rtbs.append(int(rtb))
+    n = len(rtbs)
+    if n == 0:
+        return [
+            "pre_le_pop: n=0 (soft_cap_early=False, offer_after_soft_cap_pushback & room_to_budget both non-None)"
+        ]
+    p25_r, p50_r, p75_r = _quartiles_int(rtbs)
+    p25_o, p50_o, p75_o = _quartiles_int(offers)
+    diffs = [offers[i] - rtbs[i] for i in range(n)]
+    n_le0 = sum(1 for x in diffs if x <= 0)
+    n_gt0 = sum(1 for x in diffs if x > 0)
+    thr = TEMP_PRE_LE_DIFF_LARGE_THRESHOLD
+    n_gt_temp = sum(1 for x in diffs if x > thr)
+    return [
+        "pre_le_pop: "
+        f"n={n} "
+        f"room_to_budget min={min(rtbs)} max={max(rtbs)} "
+        f"p25={p25_r} p50={p50_r} p75={p75_r}",
+        "  offer_after_soft_cap_pushback "
+        f"min={min(offers)} max={max(offers)} "
+        f"p25={p25_o} p50={p50_o} p75={p75_o}",
+        "  offer_minus_room "
+        f"le0={n_le0} gt0={n_gt0} gt_temp={n_gt_temp} "
+        f"(TEMP_PRE_LE_DIFF_LARGE_THRESHOLD={thr})",
+    ]
+
+
+def _print_pre_le_population_summary(rows: List[Dict[str, Any]]) -> None:
+    for line in _pre_le_population_summary_lines(rows):
+        print(line)
+
+
 def _aggregate(rows: List[Dict[str, Any]], population_banner: str = "") -> None:
     buf = _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER
     n = len(rows)
@@ -587,6 +647,7 @@ def _run_one_observation(args: argparse.Namespace, *, save_path: Optional[str]) 
 
     rows = _run_matrix(team_subset, fa_sample)
     print(_matrix_summary_line(rows))
+    _print_pre_le_population_summary(rows)
     _aggregate(rows, population_banner=population_banner)
     return True
 

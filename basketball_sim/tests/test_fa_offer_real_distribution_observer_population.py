@@ -159,6 +159,45 @@ def test_matrix_summary_line_pre_le_room_counts():
     assert "soft_cap_early=0/1 (0.0%)" in s
 
 
+def test_pre_le_population_summary_lines_empty():
+    lines = _ob._pre_le_population_summary_lines([])
+    assert len(lines) == 1
+    assert "pre_le_pop: n=0" in lines[0]
+
+
+def test_pre_le_population_summary_lines_counts_and_keywords():
+    rows = [
+        {"soft_cap_early": True, "room_to_budget": None, "diag": {}},
+        {
+            "soft_cap_early": False,
+            "room_to_budget": 100,
+            "diag": {"offer_after_soft_cap_pushback": 50, "room_to_budget": 100},
+        },
+        {
+            "soft_cap_early": False,
+            "room_to_budget": 100,
+            "diag": {"offer_after_soft_cap_pushback": 100, "room_to_budget": 100},
+        },
+        {
+            "soft_cap_early": False,
+            "room_to_budget": 1_000_000,
+            "diag": {
+                "offer_after_soft_cap_pushback": 7_000_000,
+                "room_to_budget": 1_000_000,
+            },
+        },
+    ]
+    lines = _ob._pre_le_population_summary_lines(rows)
+    assert len(lines) == 3
+    assert "pre_le_pop: n=3" in lines[0]
+    assert "room_to_budget min=100" in lines[0]
+    assert "offer_after_soft_cap_pushback" in lines[1]
+    assert "le0=2" in lines[2]
+    assert "gt0=1" in lines[2]
+    assert "gt_temp=1" in lines[2]
+    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[2]
+
+
 def test_teams_payroll_gap_stats_empty():
     st = _ob._teams_payroll_gap_stats([])
     assert st["n"] == 0
