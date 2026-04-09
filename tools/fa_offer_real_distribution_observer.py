@@ -17,7 +17,8 @@ Each run prints one ASCII summary line before the main histogram (soft_cap_early
 uniques, pre-clip offer<=room count on non-soft_cap_early rows), then a short pre_le_pop block: same
 population as pre_le_room (soft_cap_early False, offer_after_soft_cap_pushback & room_to_budget non-None)
 with min/max/p25–p75 for room_to_budget, offer_after_hard_cap_over (pushback前), offer_after_soft_cap_pushback
-(pushback後), and offer_minus_room le0/gt0/gt_temp counts.
+(pushback後), offer_minus_room le0/gt0/gt_temp counts, plus soft_cap_pushback_applied true/false counts
+and hard_over_minus_soft_pushback eq0/gt0 pair counts (same pre_le_pop population).
 
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = max(0, payroll_budget - roster_payroll) for these stats (same sign convention as roomy helper).
@@ -441,6 +442,11 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
     rtbs: List[int] = []
     offers: List[int] = []
     hard_vals: List[int] = []
+    n_applied_true = 0
+    n_applied_false = 0
+    n_hm_eq0 = 0
+    n_hm_gt0 = 0
+    n_hm_cmp = 0
     for r in rows:
         if r["soft_cap_early"]:
             continue
@@ -449,11 +455,23 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         rtb = d.get("room_to_budget")
         if o is None or rtb is None:
             continue
-        offers.append(int(o))
+        oi = int(o)
+        offers.append(oi)
         rtbs.append(int(rtb))
+        if bool(d.get("soft_cap_pushback_applied")):
+            n_applied_true += 1
+        else:
+            n_applied_false += 1
         ho = d.get("offer_after_hard_cap_over")
         if ho is not None:
-            hard_vals.append(int(ho))
+            hi = int(ho)
+            hard_vals.append(hi)
+            n_hm_cmp += 1
+            delta_hs = hi - oi
+            if delta_hs == 0:
+                n_hm_eq0 += 1
+            elif delta_hs > 0:
+                n_hm_gt0 += 1
     n = len(rtbs)
     if n == 0:
         return [
@@ -490,6 +508,10 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         "  offer_minus_room "
         f"le0={n_le0} gt0={n_gt0} gt_temp={n_gt_temp} "
         f"(TEMP_PRE_LE_DIFF_LARGE_THRESHOLD={thr})",
+        "  soft_cap_pushback_applied "
+        f"true={n_applied_true} false={n_applied_false} (n={n})",
+        "  hard_over_minus_soft_pushback "
+        f"eq0={n_hm_eq0} gt0={n_hm_gt0} (n_cmp={n_hm_cmp})",
     ]
 
 
