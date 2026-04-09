@@ -95,6 +95,42 @@ TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE = 0.98
 TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO = 1.0
 TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER = 3_000_000
 
+
+def compute_postoff_payroll_budget_with_temp_floor(team: Team, roster_payroll: int) -> int:
+    """⑦ `_process_team_finances` と同じ `max(現行式, α*roster+β)`。`TEMP_*` を参照。"""
+    league_level = int(getattr(team, "league_level", 3))
+    base_budget = {1: 7_900_000, 2: 5_450_000, 3: 3_650_000}.get(league_level, 3_650_000)
+    current_formula_budget = max(
+        base_budget,
+        int(
+            base_budget
+            + float(getattr(team, "market_size", 1.0)) * 12_500
+            + getattr(team, "popularity", 50) * 6_200
+            + getattr(team, "sponsor_power", 50) * 5_000
+            + getattr(team, "fan_base", 50) * 3_600
+        ),
+    )
+    floor_expr = int(
+        int(roster_payroll) * float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO)
+        + float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER)
+    )
+    return int(max(current_formula_budget, floor_expr))
+
+
+def reapply_temp_postoff_payroll_budget_floor_to_teams(teams: List[Team]) -> None:
+    """
+    save ロード直後の `payroll_budget` を、現行 `TEMP_*` の⑦式で上書きする（BUFFER 段階観測用）。
+    `_process_team_finances` 全体は実行しない。
+    """
+    if not teams:
+        return
+    for team in teams:
+        rp = int(
+            sum(max(0, int(getattr(p, "salary", 0) or 0)) for p in getattr(team, "players", []) or [])
+        )
+        team.payroll_budget = compute_postoff_payroll_budget_with_temp_floor(team, rp)
+
+
 # 締め revenue 内訳キー（大会賞金系 → record_financial_result / finance_history）
 OFFSEASON_REV_BREAKDOWN_ASIA_CUP = "offseason_asia_cup_prize"
 OFFSEASON_REV_BREAKDOWN_INTERCONTINENTAL = "intercontinental_cup_prize"
@@ -3510,24 +3546,8 @@ class Offseason:
                 team.offseason_competition_revenue_breakdown = {}
 
             league_level = int(getattr(team, "league_level", 3))
-            base_budget = {1: 7_900_000, 2: 5_450_000, 3: 3_650_000}.get(league_level, 3_650_000)
-            current_formula_budget = max(
-                base_budget,
-                int(
-                    base_budget
-                    + float(getattr(team, "market_size", 1.0)) * 12_500
-                    + getattr(team, "popularity", 50) * 6_200
-                    + getattr(team, "sponsor_power", 50) * 5_000
-                    + getattr(team, "fan_base", 50) * 3_600
-                ),
-            )
             roster_payroll = int(payroll)
-            floor_expr = int(
-                roster_payroll * float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO)
-                + float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER)
-            )
-            final_payroll_budget = int(max(current_formula_budget, floor_expr))
-            team.payroll_budget = final_payroll_budget
+            team.payroll_budget = compute_postoff_payroll_budget_with_temp_floor(team, roster_payroll)
 
             luxury_tax = 0
             if compute_luxury_tax is not None:

@@ -6,6 +6,7 @@ Uses `_calculate_offer_diagnostic` only. Run from repo root:
 
   python tools/fa_offer_real_distribution_observer.py
   python tools/fa_offer_real_distribution_observer.py --save path/to/file.sav
+  python tools/fa_offer_real_distribution_observer.py --save path/to/file.sav --apply-temp-postoff-floor
   python tools/fa_offer_real_distribution_observer.py --seasons 1 --seed 42
   python tools/fa_offer_real_distribution_observer.py --population-mode mixed_mid_fa_roomy
   python tools/fa_offer_real_distribution_observer.py --save-list a.sav b.sav
@@ -46,6 +47,7 @@ if str(_ROOT) not in sys.path:
 from basketball_sim.models.offseason import (  # noqa: E402
     _OFFSEASON_FA_PAYROLL_BUDGET_BUFFER,
     _sync_payroll_budget_with_roster_payroll,
+    reapply_temp_postoff_payroll_budget_floor_to_teams,
 )
 from basketball_sim.models.player import Player  # noqa: E402
 from basketball_sim.models.team import Team  # noqa: E402
@@ -122,6 +124,12 @@ def _parse_args() -> argparse.Namespace:
         default=0,
         help="If >0, keep only this many teams with largest (payroll_budget - roster payroll). "
         "0 means all teams. Used only when --population-mode mixed_mid_fa_roomy.",
+    )
+    p.add_argument(
+        "--apply-temp-postoff-floor",
+        action="store_true",
+        help="After loading --save/--save-list: overwrite each team.payroll_budget using TEMP_POSTOFF_* "
+        "(same as ⑦ floor formula). Static .sav keeps stale payroll_budget; use this for BUFFER tuning compares.",
     )
     return p.parse_args()
 
@@ -536,6 +544,12 @@ def _run_one_observation(args: argparse.Namespace, *, save_path: Optional[str]) 
     if not teams:
         print("no teams; abort")
         return False
+
+    if getattr(args, "apply_temp_postoff_floor", False):
+        if not save_path:
+            print("--apply-temp-postoff-floor requires --save or --save-list; abort")
+            return False
+        reapply_temp_postoff_payroll_budget_floor_to_teams(teams)
 
     pre_sync_snapshot = _format_pre_sync_user_team_snapshot_line(teams)
     stats_before = _teams_payroll_gap_stats(teams)
