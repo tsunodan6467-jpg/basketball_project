@@ -43,6 +43,8 @@ python tools\fa_offer_real_distribution_observer.py --save-list fa_clip_20260408
 
 リポジトリ同梱の `fa_clip_20260408_01.sav`〜`05.sav`（4 本）について、`basketball_sim.persistence.save_load` で `load_world` → `find_user_team` により **user の `league_level`** を確認した。**いずれも `league_level=3`（D3 user）**であり、**D1 または D2 の user を含む save は本リポ内に存在しなかった**。よって **上表への行追加は行わない**（新規 save の大量採取もしていない）。
 
+**手元 saves の再確認（1 本限定タスク）**: `C:\Users\tsuno\.basketball_sim\saves` を列挙したが **`.sav` は 0 件**だった。**D1／D2 user の `.sav` 1 本は用意できず**、`python tools\fa_offer_real_distribution_observer.py --save "<path>"` も**未実行**。代表表に **D1／D2 向けの行は追加していない**（未取得で終了）。
+
 確認に用いたスニペット（リポジトリルートで一時ファイルに保存して実行してもよい）:
 
 ```python
@@ -70,6 +72,7 @@ for name in (
 - **行列の `room_unique=1`／`pre_le_room=0`** は **同期後入力で均されやすい**補助指標として一貫しており、**clip 前の多様性は before で見る**という既決読みと整合する。
 - **D1／D2／D3 を save 行として分けた比較**は**できていない**（集計がリーグ横断のため）。**普遍性の判断はまだ粗い**。
 - **追記（同一日）**: リポ同梱 save の **user 断面は D3 のみ**であることが確認されただけであり、**「D1／D2 user でも before が同じ」**とは**言えない**（該当 save 未取得）。**before 集計自体は引き続き 48 チーム混在**。
+- **再確認**: 手元 `\.basketball_sim\saves` にも **`.sav` 無し**のため、**D1／D2 user 1 本の observer 値は表に載せられていない**（横展開は未着手のまま）。
 - **断定**: 「式変更必須」まではこの表だけでは言えない。
 
 ---
@@ -82,7 +85,7 @@ for name in (
 
 ## 6. 次に続く実務（1つだけ）
 
-**手元で D1 または D2 の user が載った `.sav` を 1 本用意できたら**、`python tools\fa_offer_real_distribution_observer.py --save "<path>"` を**1 回**実行し、得られた **`before:` と `summary:`** を**本表と同じ列で 1 行だけ追加する**（リポに save を同梱するかは任意）。
+**D1 または D2 の user が載った `.sav` を 1 本だけ**（例: `saves` に保存 or リポ同梱）用意し、`python tools\fa_offer_real_distribution_observer.py --save "<path>"` を**1 回だけ**実行して、**`before:`／`summary:` を本表に 1 行追加する**（それ以上は行わない）。
 
 ---
 
@@ -99,3 +102,4 @@ Select-String -Path docs\FA_BEFORE_GAP_REPRESENTATIVE_SAVE_TABLE_2026-04.md -Pat
 
 - 2026-04-08: 初版（リポ同梱 `fa_clip_*.sav` 4 本＋引数なし 1 行・observer 出力ベース）。
 - 2026-04-08: D1／D2 user save のリポ内確認（該当なし）・§3 追記・§4／§6 更新。
+- 2026-04-08: 手元 `\.basketball_sim\saves` 再確認（`.sav` 0 件）・D1／D2 行は未追加・observer 未実行。
