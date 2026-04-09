@@ -39,7 +39,28 @@ python tools\fa_offer_real_distribution_observer.py --save-list fa_clip_20260408
 | `fa_clip_20260408_04.sav` | 〃 | post-off | 0 | 0 | 1 | 1 | 0 | user `roster_payroll` が 02 より大（進行差） |
 | `fa_clip_20260408_05.sav` | 〃 | post-off | 0 | 0 | 1 | 1 | 0 | 04 と user 断面同型（`docs` 用途の別採取） |
 
-**本表に含めないもの**: **D1 または D2 の user のみ**に絞った save、`fa_gap_20260408_postoff_01.sav` のような **リポ外の post-off** は**今回 observer 未実行**のため行としては載せず、数値例は `docs/PAYROLL_BUDGET_FORMULA_CAUSE_NOTE_2026-04.md` 等を参照。**10 人ロスター特化 save** は本リポ同梱の 4 本ではラベル付けしていない；現象の整理は `docs/FA_BEFORE_GAP_ZERO_CAUSE_NOTE_2026-04.md`。
+### 追記（2026-04-08）：D1／D2 user を含む save の有無
+
+リポジトリ同梱の `fa_clip_20260408_01.sav`〜`05.sav`（4 本）について、`basketball_sim.persistence.save_load` で `load_world` → `find_user_team` により **user の `league_level`** を確認した。**いずれも `league_level=3`（D3 user）**であり、**D1 または D2 の user を含む save は本リポ内に存在しなかった**。よって **上表への行追加は行わない**（新規 save の大量採取もしていない）。
+
+確認に用いたスニペット（リポジトリルートで一時ファイルに保存して実行してもよい）:
+
+```python
+from pathlib import Path
+from basketball_sim.persistence.save_load import load_world, find_user_team
+
+for name in (
+    "fa_clip_20260408_01.sav",
+    "fa_clip_20260408_02.sav",
+    "fa_clip_20260408_04.sav",
+    "fa_clip_20260408_05.sav",
+):
+    w = load_world(Path(name))
+    ut = find_user_team(w.get("teams") or [], w.get("user_team_id"))
+    print(name, getattr(ut, "league_level", None) if ut else None)
+```
+
+**本表に含めないもの**: **`fa_gap_20260408_postoff_01.sav` のようなリポ外の post-off** は**今回 observer 未実行**のため行としては載せず、数値例は `docs/PAYROLL_BUDGET_FORMULA_CAUSE_NOTE_2026-04.md` 等を参照。**10 人ロスター特化 save** は本リポ同梱の 4 本ではラベル付けしていない；現象の整理は `docs/FA_BEFORE_GAP_ZERO_CAUSE_NOTE_2026-04.md`。
 
 ---
 
@@ -48,6 +69,7 @@ python tools\fa_offer_real_distribution_observer.py --save-list fa_clip_20260408
 - **本表に載った範囲**では、**いずれも `before` で `gap_min=gap_max=0` かつ `gap_unique=1`**（全チーム同型の潰れ）。**post-off 系（02／04／05）**でも **before 側の潰れ方は数値上は initial 系（01）と同じ見え方**になる。**差は `budget_unique` と user の `payroll_budget`／`roster_payroll` の断面**で読む必要がある。
 - **行列の `room_unique=1`／`pre_le_room=0`** は **同期後入力で均されやすい**補助指標として一貫しており、**clip 前の多様性は before で見る**という既決読みと整合する。
 - **D1／D2／D3 を save 行として分けた比較**は**できていない**（集計がリーグ横断のため）。**普遍性の判断はまだ粗い**。
+- **追記（同一日）**: リポ同梱 save の **user 断面は D3 のみ**であることが確認されただけであり、**「D1／D2 user でも before が同じ」**とは**言えない**（該当 save 未取得）。**before 集計自体は引き続き 48 チーム混在**。
 - **断定**: 「式変更必須」まではこの表だけでは言えない。
 
 ---
@@ -60,7 +82,7 @@ python tools\fa_offer_real_distribution_observer.py --save-list fa_clip_20260408
 
 ## 6. 次に続く実務（1つだけ）
 
-**この代表表を踏まえ、式変更要否の議論に入る前に、「D1 または D2 の user を含む save をあと 1〜2 本だけ追加し、同じ observer コマンドで `before`／`summary` を足すか否か」を短く決める**（採取は最小限）。
+**手元で D1 または D2 の user が載った `.sav` を 1 本用意できたら**、`python tools\fa_offer_real_distribution_observer.py --save "<path>"` を**1 回**実行し、得られた **`before:` と `summary:`** を**本表と同じ列で 1 行だけ追加する**（リポに save を同梱するかは任意）。
 
 ---
 
@@ -68,7 +90,7 @@ python tools\fa_offer_real_distribution_observer.py --save-list fa_clip_20260408
 
 ```powershell
 Set-Location c:\Users\tsuno\Desktop\basketball_project
-Select-String -Path docs\FA_BEFORE_GAP_REPRESENTATIVE_SAVE_TABLE_2026-04.md -Pattern "目的|読み方|代表表|暫定読解|非目的|次に続く実務"
+Select-String -Path docs\FA_BEFORE_GAP_REPRESENTATIVE_SAVE_TABLE_2026-04.md -Pattern "目的|読み方|代表表|暫定読解|非目的|次に続く実務|D1|D2|追記"
 ```
 
 ---
@@ -76,3 +98,4 @@ Select-String -Path docs\FA_BEFORE_GAP_REPRESENTATIVE_SAVE_TABLE_2026-04.md -Pat
 ## 改訂履歴
 
 - 2026-04-08: 初版（リポ同梱 `fa_clip_*.sav` 4 本＋引数なし 1 行・observer 出力ベース）。
+- 2026-04-08: D1／D2 user save のリポ内確認（該当なし）・§3 追記・§4／§6 更新。
