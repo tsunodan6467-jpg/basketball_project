@@ -16,7 +16,8 @@ Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDES
 Each run prints one ASCII summary line before the main histogram (soft_cap_early rate, room_to_budget
 uniques, pre-clip offer<=room count on non-soft_cap_early rows), then a short pre_le_pop block: same
 population as pre_le_room (soft_cap_early False, offer_after_soft_cap_pushback & room_to_budget non-None)
-with min/max/p25–p75 for each key and offer_minus_room le0/gt0/gt_temp counts.
+with min/max/p25–p75 for room_to_budget, offer_after_hard_cap_over (pushback前), offer_after_soft_cap_pushback
+(pushback後), and offer_minus_room le0/gt0/gt_temp counts.
 
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = max(0, payroll_budget - roster_payroll) for these stats (same sign convention as roomy helper).
@@ -439,6 +440,7 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
     """Same population as pre_le_room count in _matrix_summary_line (both keys non-None, not soft_cap_early)."""
     rtbs: List[int] = []
     offers: List[int] = []
+    hard_vals: List[int] = []
     for r in rows:
         if r["soft_cap_early"]:
             continue
@@ -449,6 +451,9 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
             continue
         offers.append(int(o))
         rtbs.append(int(rtb))
+        ho = d.get("offer_after_hard_cap_over")
+        if ho is not None:
+            hard_vals.append(int(ho))
     n = len(rtbs)
     if n == 0:
         return [
@@ -461,11 +466,24 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
     n_gt0 = sum(1 for x in diffs if x > 0)
     thr = TEMP_PRE_LE_DIFF_LARGE_THRESHOLD
     n_gt_temp = sum(1 for x in diffs if x > thr)
+    nh = len(hard_vals)
+    if nh == 0:
+        hard_line = "  offer_after_hard_cap_over n_hard=0"
+    else:
+        p25_h, p50_h, p75_h = _quartiles_int(hard_vals)
+        hard_line = (
+            "  offer_after_hard_cap_over "
+            f"min={min(hard_vals)} max={max(hard_vals)} "
+            f"p25={p25_h} p50={p50_h} p75={p75_h}"
+        )
+        if nh != n:
+            hard_line += f" n_hard={nh}"
     return [
         "pre_le_pop: "
         f"n={n} "
         f"room_to_budget min={min(rtbs)} max={max(rtbs)} "
         f"p25={p25_r} p50={p50_r} p75={p75_r}",
+        hard_line,
         "  offer_after_soft_cap_pushback "
         f"min={min(offers)} max={max(offers)} "
         f"p25={p25_o} p50={p50_o} p75={p75_o}",

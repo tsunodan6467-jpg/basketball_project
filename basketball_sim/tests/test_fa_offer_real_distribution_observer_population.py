@@ -171,12 +171,20 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
         {
             "soft_cap_early": False,
             "room_to_budget": 100,
-            "diag": {"offer_after_soft_cap_pushback": 50, "room_to_budget": 100},
+            "diag": {
+                "offer_after_soft_cap_pushback": 50,
+                "room_to_budget": 100,
+                "offer_after_hard_cap_over": 200,
+            },
         },
         {
             "soft_cap_early": False,
             "room_to_budget": 100,
-            "diag": {"offer_after_soft_cap_pushback": 100, "room_to_budget": 100},
+            "diag": {
+                "offer_after_soft_cap_pushback": 100,
+                "room_to_budget": 100,
+                "offer_after_hard_cap_over": 150,
+            },
         },
         {
             "soft_cap_early": False,
@@ -184,18 +192,36 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
             "diag": {
                 "offer_after_soft_cap_pushback": 7_000_000,
                 "room_to_budget": 1_000_000,
+                "offer_after_hard_cap_over": 9_000_000,
             },
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 3
+    assert len(lines) == 4
     assert "pre_le_pop: n=3" in lines[0]
     assert "room_to_budget min=100" in lines[0]
-    assert "offer_after_soft_cap_pushback" in lines[1]
-    assert "le0=2" in lines[2]
-    assert "gt0=1" in lines[2]
-    assert "gt_temp=1" in lines[2]
-    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[2]
+    assert "offer_after_hard_cap_over" in lines[1]
+    assert "min=150" in lines[1]
+    assert "max=9000000" in lines[1]
+    assert "offer_after_soft_cap_pushback" in lines[2]
+    assert "le0=2" in lines[3]
+    assert "gt0=1" in lines[3]
+    assert "gt_temp=1" in lines[3]
+    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[3]
+
+
+def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
+    rows = [
+        {
+            "soft_cap_early": False,
+            "room_to_budget": 100,
+            "diag": {"offer_after_soft_cap_pushback": 50, "room_to_budget": 100},
+        },
+    ]
+    lines = _ob._pre_le_population_summary_lines(rows)
+    assert len(lines) == 4
+    assert "n=1" in lines[0]
+    assert "offer_after_hard_cap_over n_hard=0" in lines[1]
 
 
 def test_teams_payroll_gap_stats_empty():
