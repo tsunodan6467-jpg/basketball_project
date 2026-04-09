@@ -91,6 +91,10 @@ def _sync_payroll_budget_with_roster_payroll(teams: List[Team]) -> None:
 # 年俸に連動する「集中配分・放映権（仮）」のみ収入側に上乗せする（本実装で置換予定）。
 TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE = 0.98
 
+# 暫定: ⑦オフ後 `payroll_budget` 再設定の roster 床（`floor_expr = ratio * roster_payroll + buffer`）。後続調整可。
+TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO = 1.0
+TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER = 3_000_000
+
 # 締め revenue 内訳キー（大会賞金系 → record_financial_result / finance_history）
 OFFSEASON_REV_BREAKDOWN_ASIA_CUP = "offseason_asia_cup_prize"
 OFFSEASON_REV_BREAKDOWN_INTERCONTINENTAL = "intercontinental_cup_prize"
@@ -3507,7 +3511,7 @@ class Offseason:
 
             league_level = int(getattr(team, "league_level", 3))
             base_budget = {1: 7_900_000, 2: 5_450_000, 3: 3_650_000}.get(league_level, 3_650_000)
-            team.payroll_budget = max(
+            current_formula_budget = max(
                 base_budget,
                 int(
                     base_budget
@@ -3515,8 +3519,15 @@ class Offseason:
                     + getattr(team, "popularity", 50) * 6_200
                     + getattr(team, "sponsor_power", 50) * 5_000
                     + getattr(team, "fan_base", 50) * 3_600
-                )
+                ),
             )
+            roster_payroll = int(payroll)
+            floor_expr = int(
+                roster_payroll * float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO)
+                + float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER)
+            )
+            final_payroll_budget = int(max(current_formula_budget, floor_expr))
+            team.payroll_budget = final_payroll_budget
 
             luxury_tax = 0
             if compute_luxury_tax is not None:
