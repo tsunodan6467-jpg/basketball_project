@@ -18,8 +18,10 @@ uniques, pre-clip offer<=room count on non-soft_cap_early rows).
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = payroll_budget - roster_payroll (same sign convention as roomy helper). See
 docs/FA_ROOM_UNIQUE_ONE_CAUSE_NOTE_2026-04.md
-Immediately after the before: line, prints one user_team_snapshot line (pre-sync money / payroll_budget /
+Immediately after the before: line, prints one user_team_snapshot line (pre-sync league_level / market_size /
+popularity / sponsor_power / fan_base — inputs to offseason payroll_budget formula — plus money / payroll_budget /
 roster_payroll / gap) for is_user_team or first team fallback. See docs/FA_BEFORE_GAP_ZERO_CAUSE_NOTE_2026-04.md
+and docs/PAYROLL_BUDGET_FORMULA_CAUSE_NOTE_2026-04.md
 Then one reading_guide line: primary=before for compare; sync1/sync2 and matrix/summary are secondary
 (runtime-aligned). See docs/FA_OBSERVER_SYNC_HANDLING_DECISION_2026-04.md
 
@@ -265,18 +267,28 @@ def _pick_snapshot_team(teams: List[Team]) -> Tuple[Team, bool]:
 def _format_pre_sync_user_team_snapshot_line(teams: List[Team]) -> str:
     """
     Single-line diagnostic aligned with pre-sync (before) state: same gap as _team_payroll_room.
+    Includes league_level / market_size / popularity / sponsor_power / fan_base for manual cross-check
+    against Offseason._process_team_finances payroll_budget formula (see PAYROLL_BUDGET_FORMULA_CAUSE_NOTE).
     """
     if not teams:
         return "user_team_snapshot: (no teams)"
     team, is_user = _pick_snapshot_team(teams)
     tag = "user_team_snapshot" if is_user else "user_team_snapshot[fallback]"
     name = str(getattr(team, "name", "?"))
+    lv = int(getattr(team, "league_level", 3) or 3)
+    ms_raw = getattr(team, "market_size", 1.0)
+    ms = float(1.0 if ms_raw is None else ms_raw)
+    pop = int(getattr(team, "popularity", 50))
+    sp = int(getattr(team, "sponsor_power", 50))
+    fb = int(getattr(team, "fan_base", 50))
     money = int(getattr(team, "money", 0) or 0)
     pb = _team_payroll_budget_int(team)
     rp = _team_roster_payroll(team)
     gap = _team_payroll_room(team)
+    ms_s = f"{ms:g}"
     return (
-        f"{tag}: team={name} money={money:,} payroll_budget={pb:,} "
+        f"{tag}: team={name} league_level={lv} market_size={ms_s} popularity={pop} "
+        f"sponsor_power={sp} fan_base={fb} money={money:,} payroll_budget={pb:,} "
         f"roster_payroll={rp:,} gap={gap:,}"
     )
 

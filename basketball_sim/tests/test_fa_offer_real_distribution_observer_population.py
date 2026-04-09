@@ -247,12 +247,29 @@ def test_select_teams_by_room_zero_means_all():
 
 def test_format_pre_sync_user_team_snapshot_prefers_is_user_team():
     cpu = Team(team_id=1, name="CPU", league_level=1, money=0, players=[], payroll_budget=10, is_user_team=False)
-    usr = Team(team_id=2, name="UserSide", league_level=1, money=9_999, players=[], payroll_budget=10, is_user_team=True)
+    usr = Team(
+        team_id=2,
+        name="UserSide",
+        league_level=3,
+        money=9_999,
+        players=[],
+        payroll_budget=10,
+        is_user_team=True,
+        market_size=1.2,
+        popularity=44,
+        sponsor_power=49,
+        fan_base=5510,
+    )
     line = _ob._format_pre_sync_user_team_snapshot_line([cpu, usr])
     assert line.startswith("user_team_snapshot:")
     assert "[fallback]" not in line
     assert "UserSide" in line
     assert "9,999" in line
+    assert "league_level=3" in line
+    assert "market_size=1.2" in line
+    assert "popularity=44" in line
+    assert "sponsor_power=49" in line
+    assert "fan_base=5510" in line
 
 
 def test_format_pre_sync_user_team_snapshot_fallback_first_team():
@@ -261,3 +278,8 @@ def test_format_pre_sync_user_team_snapshot_fallback_first_team():
     assert "user_team_snapshot[fallback]" in line
     assert "FirstOnly" in line
     assert "500" in line
+    assert "league_level=1" in line
+    assert "market_size=" in line
+    assert "popularity=50" in line
+    assert "sponsor_power=50" in line
+    assert "fan_base=5000" in line
