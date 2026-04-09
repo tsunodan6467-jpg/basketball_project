@@ -18,6 +18,8 @@ uniques, pre-clip offer<=room count on non-soft_cap_early rows).
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = payroll_budget - roster_payroll (same sign convention as roomy helper). See
 docs/FA_ROOM_UNIQUE_ONE_CAUSE_NOTE_2026-04.md
+Then one reading_guide line: primary=before for compare; sync1/sync2 and matrix/summary are secondary
+(runtime-aligned). See docs/FA_OBSERVER_SYNC_HANDLING_DECISION_2026-04.md
 
 See docs/FA_S6_TINY_OFFER_DECISION_MEMO_2026-04.md
 """
@@ -244,6 +246,12 @@ def _teams_payroll_gap_stats(teams: List[Team]) -> Dict[str, Any]:
     }
 
 
+READING_GUIDE_LINE = (
+    "reading_guide: primary=before (compare); secondary=sync1/sync2 and matrix/summary below "
+    "(runtime-aligned reference)"
+)
+
+
 def _print_sync_observation_block(
     before: Dict[str, Any],
     sync1: Dict[str, Any],
@@ -262,6 +270,7 @@ def _print_sync_observation_block(
             f"  {label}: n={st['n']} budget_unique={st['budget_u']} roster_unique={st['roster_u']} "
             f"gap_unique={st['gap_u']} gap_min={gmin_s} gap_max={gmax_s}"
         )
+    print(READING_GUIDE_LINE)
 
 
 def _select_teams_by_room(teams: List[Team], top_n: int) -> List[Team]:

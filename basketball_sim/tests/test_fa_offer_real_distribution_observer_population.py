@@ -225,6 +225,12 @@ def test_teams_payroll_gap_stats_two_distinct_gaps():
     assert st["gap_max"] == 20_000_000
 
 
+def test_reading_guide_line_documents_compare_axis():
+    assert "primary=before" in _ob.READING_GUIDE_LINE
+    assert "secondary=" in _ob.READING_GUIDE_LINE
+    assert "sync1" in _ob.READING_GUIDE_LINE
+
+
 def test_check_save_args_exclusive():
     assert _ob._check_save_args_exclusive("", None) is None
     assert _ob._check_save_args_exclusive("", ["x.sav"]) is None
