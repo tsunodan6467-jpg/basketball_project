@@ -1,5 +1,6 @@
 from collections import Counter
 from copy import deepcopy
+import os
 import random
 import sys
 from pathlib import Path
@@ -64,6 +65,62 @@ from basketball_sim.systems.gm_ui_constants import (
 )
 
 TEMP_INITIAL_TEAM_MONEY = 2_000_000_000
+
+# 新規ゲーム開始時のみ `build_initial_game_world` 末尾から参照。save 読込では呼ばない。
+DEBUG_BOOST_USER_TEAM_ENV = "BASKETBALL_SIM_DEBUG_BOOST_USER_TEAM"
+_DEBUG_BOOST_TEAM_MONEY = 50_000_000_000  # 通常の初期資金より上だが int 範囲内
+
+
+def debug_boost_user_team_env_enabled() -> bool:
+    """`BASKETBALL_SIM_DEBUG_BOOST_USER_TEAM=1` のときのみ True（他の truthy は認めない）。"""
+    return os.environ.get(DEBUG_BOOST_USER_TEAM_ENV, "").strip() == "1"
+
+
+def apply_debug_boost_user_team_for_new_game(user_team) -> None:
+    """
+    デバッグ専用: 新規開始でロスター確定・normalize 後の user チームを強化する。
+    通常プレイでは環境変数未設定のため no-op。
+    """
+    if not debug_boost_user_team_env_enabled():
+        return
+
+    print_separator(f"[DEBUG] user team boost ({DEBUG_BOOST_USER_TEAM_ENV}=1)")
+
+    user_team.money = int(_DEBUG_BOOST_TEAM_MONEY)
+    user_team.popularity = int(max(getattr(user_team, "popularity", 50), 95))
+    user_team.sponsor_power = 100
+    user_team.fan_base = int(max(getattr(user_team, "fan_base", 5000), 25_000))
+    ms = float(getattr(user_team, "market_size", 1.0) or 1.0)
+    user_team.market_size = float(min(1.28, max(ms, 1.0) * 1.06))
+
+    stat_names = (
+        "shoot",
+        "three",
+        "drive",
+        "passing",
+        "rebound",
+        "defense",
+        "ft",
+        "stamina",
+        "handling",
+        "iq",
+        "speed",
+        "power",
+        "basketball_iq",
+        "competitiveness",
+    )
+    for pl in getattr(user_team, "players", []) or []:
+        for attr in stat_names:
+            if not hasattr(pl, attr):
+                continue
+            cur = int(getattr(pl, attr))
+            setattr(pl, attr, min(99, max(1, cur + 10)))
+        if hasattr(pl, "popularity"):
+            pl.popularity = int(min(100, max(0, int(pl.popularity) + 15)))
+        if hasattr(pl, "ovr"):
+            pl.ovr = int(min(96, max(1, int(pl.ovr) + 12)))
+            if hasattr(pl, "update_peak_ovr"):
+                pl.update_peak_ovr()
 
 try:
     from basketball_sim.systems.main_menu_view import launch_main_menu
@@ -2528,6 +2585,8 @@ def build_initial_game_world():
     assign_fictional_teams_and_rival(teams, user_team, fictional_pool, free_agents)
 
     normalize_initial_payrolls_for_teams(teams)
+
+    apply_debug_boost_user_team_for_new_game(user_team)
 
     return teams, free_agents, user_team, icon_player
 
