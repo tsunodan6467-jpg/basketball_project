@@ -2699,8 +2699,12 @@ class Season:
         if not self.free_agents:
             return
 
+        # インシーズン CPU FA はユーザーチームを自動補強しない（`docs/INSEASON_CPU_FA_USER_TEAM_EXCLUSION_DECISION_2026-04.md`）。
+        eligible_teams = [
+            t for t in self.all_teams if not bool(getattr(t, "is_user_team", False))
+        ]
         logs = run_cpu_fa_market_cycle(
-            teams=self.all_teams,
+            teams=eligible_teams,
             free_agents=self.free_agents,
             max_signings_per_team=1,
             simulated_round=round_number,
