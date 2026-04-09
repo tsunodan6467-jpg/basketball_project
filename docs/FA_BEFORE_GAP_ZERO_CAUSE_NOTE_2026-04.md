@@ -18,6 +18,7 @@
   とみなす。ここで **`roster_payroll`** は **`team.players` の `salary` 合算**（`_team_roster_payroll`）。本番の同期 `_sync_payroll_budget_with_roster_payroll` が使う `get_team_payroll(team)` も、通常は同じロスターに対する給与合計であり、**before 統計の解釈上は「ロスター給与との差」**でよい。
 - **意味**: **「人件費目安（`payroll_budget`）が、いまのロスター年俸総額よりどれだけ上にあるか」**の非負クリップ。**キャップ room／診断の `room_to_budget` と同型の読み**（符号は「予算 − 実ペイロール」）。
 - **`money` ではない**: **所持金 `money` はこの式に入らない**。before の `gap` は **給与ガイドライン用フィールドとロスター契約額の関係**だけで決まる。
+- **追記（2026-04-08）**: **`payroll_budget` が小さく見えても即「バグ」と短絡しないこと。** 当該フィールドは **現行オフ後式の結果**（`roster_payroll` と**別軸**）。観測上の `gap` は **room の比較**用で、式の是非は **`docs/PAYROLL_BUDGET_POSTOFF_DECISION_2026-04.md`**（式変更は別決裁）。
 - **別論点**: ゲーム進行のどこかで `money` が間接的に `payroll_budget` の更新経路に関与しうるかは **このメモの主題外**だが、**一般に「金は潤沢＝ gap が開く」とは限らない**。
 
 ---
@@ -107,3 +108,4 @@ Select-String -Path docs\FA_BEFORE_GAP_ZERO_CAUSE_NOTE_2026-04.md -Pattern "gap|
 ## 改訂履歴
 
 - 2026-04-08: 初版（10 人 save と before `gap=0` の原因整理）。
+- 2026-04-08: §2 追記（POSTOFF 決裁との整合・バグ短絡の回避）。

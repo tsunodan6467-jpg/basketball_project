@@ -16,14 +16,16 @@ Each run prints one ASCII summary line before the main histogram (soft_cap_early
 uniques, pre-clip offer<=room count on non-soft_cap_early rows).
 
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
-uniques plus gap = payroll_budget - roster_payroll (same sign convention as roomy helper). See
-docs/FA_ROOM_UNIQUE_ONE_CAUSE_NOTE_2026-04.md
+uniques plus gap = max(0, payroll_budget - roster_payroll) for these stats (same sign convention as roomy helper).
+payroll_budget is the team's stored field (post-offseason formula when ⑦ has run); roster_payroll is sum of
+player salaries (contract reality). Do not equate low budget with "bug" — see docs/PAYROLL_BUDGET_POSTOFF_DECISION_2026-04.md.
+See docs/FA_ROOM_UNIQUE_ONE_CAUSE_NOTE_2026-04.md
 Immediately after the before: line, prints one user_team_snapshot line (pre-sync league_level / market_size /
 popularity / sponsor_power / fan_base — inputs to offseason payroll_budget formula — plus money / payroll_budget /
-roster_payroll / gap) for is_user_team or first team fallback. See docs/FA_BEFORE_GAP_ZERO_CAUSE_NOTE_2026-04.md
-and docs/PAYROLL_BUDGET_FORMULA_CAUSE_NOTE_2026-04.md
-Then one reading_guide line: primary=before for compare; sync1/sync2 and matrix/summary are secondary
-(runtime-aligned). See docs/FA_OBSERVER_SYNC_HANDLING_DECISION_2026-04.md
+roster_payroll / gap). payroll_budget vs roster_payroll meanings same as sync_observation. See
+docs/FA_BEFORE_GAP_ZERO_CAUSE_NOTE_2026-04.md and docs/PAYROLL_BUDGET_FORMULA_CAUSE_NOTE_2026-04.md
+Then reading_guide plus reading_note_ja: primary=before for compare; sync1/sync2 and matrix/summary are secondary
+(prod-aligned). See docs/FA_OBSERVER_SYNC_HANDLING_DECISION_2026-04.md
 
 See docs/FA_S6_TINY_OFFER_DECISION_MEMO_2026-04.md
 """
@@ -251,8 +253,15 @@ def _teams_payroll_gap_stats(teams: List[Team]) -> Dict[str, Any]:
 
 
 READING_GUIDE_LINE = (
-    "reading_guide: primary=before (compare); secondary=sync1/sync2 and matrix/summary below "
-    "(runtime-aligned reference)"
+    "reading_guide: primary=before (compare axis); secondary=sync1/sync2 and matrix/summary below "
+    "(prod-aligned auxiliary). "
+    "payroll_budget=current post-off formula field (not roster sum); roster_payroll=contract sum; "
+    "gap=max(0, payroll_budget-roster_payroll) here."
+)
+READING_GUIDE_NOTE_JA = (
+    "reading_note_ja: payroll_budget=現行オフ後式のチームフィールド; roster_payroll=契約実態(salary合計); "
+    "gap=観測用max(0,差). before=比較主軸 / sync後・下の行列・summary=補助. 式変更は別決裁 "
+    "(docs/PAYROLL_BUDGET_POSTOFF_DECISION_2026-04.md)."
 )
 
 
@@ -267,6 +276,7 @@ def _pick_snapshot_team(teams: List[Team]) -> Tuple[Team, bool]:
 def _format_pre_sync_user_team_snapshot_line(teams: List[Team]) -> str:
     """
     Single-line diagnostic aligned with pre-sync (before) state: same gap as _team_payroll_room.
+    payroll_budget = stored formula field; roster_payroll = sum of player salaries (not the same axis).
     Includes league_level / market_size / popularity / sponsor_power / fan_base for manual cross-check
     against Offseason._process_team_finances payroll_budget formula (see PAYROLL_BUDGET_FORMULA_CAUSE_NOTE).
     """
@@ -321,6 +331,7 @@ def _print_sync_observation_block(
     _print_one_sync_stat_line("sync1", sync1)
     _print_one_sync_stat_line("sync2", sync2)
     print(READING_GUIDE_LINE)
+    print(READING_GUIDE_NOTE_JA)
 
 
 def _select_teams_by_room(teams: List[Team], top_n: int) -> List[Team]:
@@ -377,7 +388,7 @@ def _payroll_budget_display(team: Team, d: Dict[str, Any]) -> int:
 
 
 def _matrix_summary_line(rows: List[Dict[str, Any]]) -> str:
-    """One-line matrix probe: soft_cap_early share, distinct room_to_budget, pre-clip offer<=room."""
+    """One-line matrix probe: soft_cap_early share, distinct room_to_budget, pre-clip offer<=room (post-sync inputs)."""
     n = len(rows)
     n_s1 = sum(1 for r in rows if r["soft_cap_early"])
     pct = (100.0 * n_s1 / n) if n else 0.0
@@ -396,7 +407,8 @@ def _matrix_summary_line(rows: List[Dict[str, Any]]) -> str:
             pre_le += 1
     return (
         f"summary: soft_cap_early={n_s1}/{n} ({pct:.1f}%), "
-        f"room_unique={room_unique}, pre_le_room={pre_le}"
+        f"room_unique={room_unique}, pre_le_room={pre_le} "
+        f"(matrix=post-sync payroll_budget; compare axis=sync_observation before)"
     )
 
 

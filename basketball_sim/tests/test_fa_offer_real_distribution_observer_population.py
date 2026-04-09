@@ -229,6 +229,9 @@ def test_reading_guide_line_documents_compare_axis():
     assert "primary=before" in _ob.READING_GUIDE_LINE
     assert "secondary=" in _ob.READING_GUIDE_LINE
     assert "sync1" in _ob.READING_GUIDE_LINE
+    assert "roster_payroll" in _ob.READING_GUIDE_LINE
+    assert "現行オフ後式" in _ob.READING_GUIDE_NOTE_JA
+    assert "比較主軸" in _ob.READING_GUIDE_NOTE_JA
 
 
 def test_check_save_args_exclusive():

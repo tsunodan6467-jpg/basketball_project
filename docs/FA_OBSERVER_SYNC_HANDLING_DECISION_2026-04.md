@@ -62,6 +62,10 @@
 
 **比較用観測の第一読み取り軸は `sync_observation` の `before`（同期前）とし、本番同様の同期後（現行どおり2回同期したうえでの行列・`summary:`）は併記の補助軸として維持する；観測専用の同期スキップは、before 主軸で不足が確認されるまで主路線にしない。**
 
+### 6.1 フィールドの読み方（追記・2026-04-08）
+
+`tools/fa_offer_real_distribution_observer.py` の **`sync_observation`／`user_team_snapshot`** における **`payroll_budget`** は、**現行のオフ後再設定式が `Team` に書き込んだフィールド**（経営指標）であり、**ロスター契約総額の写像ではない**。**`roster_payroll`** は **契約実態**（選手 `salary` の合計）。**`gap`** はこのツールの集計用に **`max(0, payroll_budget − roster_payroll)`** と定義される。**`before` の読み**は「`payroll_budget` の妥当性の是非」ではなく、**観測上の room／gap の比較**に用いる。オフ後式の変更の可否は **`docs/PAYROLL_BUDGET_POSTOFF_DECISION_2026-04.md`** で**別決裁**。
+
 ---
 
 ## 7. 今回はまだやらないこと
@@ -98,3 +102,4 @@ python -m basketball_sim --smoke
 ## 改訂履歴
 
 - 2026-04-08: 初版（observer 同期の比較用扱いの決裁）。
+- 2026-04-08: §6.1 追記（`PAYROLL_BUDGET_POSTOFF_DECISION` と整合するフィールド読み）。
