@@ -17,7 +17,7 @@
 - **`sync_observation` の `before`**: **比較観測の主軸**（同期前の全対象チーム集計）。
 - **`summary:` の `room_unique`／`pre_le_room`**: **同期後の `payroll_budget` を入力にした行列**由来（**補助**）。
 - **`payroll_budget`**: **現行式のフィールド**。**`roster_payroll`**: **契約実態**。同一視しない（`docs/PAYROLL_BUDGET_POSTOFF_DECISION_2026-04.md`）。
-- 本表の **`before`／`summary` はリーグ全体（48 チーム＝D1／D2／D3 各 16）の一括値**。**D 別に observer が行を分けては出力しない**。列「リーグ／母集団」はその説明と、**`user_team_snapshot` に出る user の `league_level`**（本データではいずれも **user=D3**）を併記する。
+- 本表の **`before`／`summary` はリーグ全体（48 チーム＝D1／D2／D3 各 16）の一括値**。**D 別に observer が行を分けては出力しない**。列「リーグ／母集団」はその説明と、**`user_team_snapshot` に出る user の `league_level`（実測値）**を併記する（**ファイル名の D 表記と一致しない場合がある**）。
 
 ---
 
@@ -38,6 +38,10 @@ python tools\fa_offer_real_distribution_observer.py --save-list fa_clip_20260408
 | `fa_clip_20260408_02.sav` | 〃 | post-off | 0 | 0 | 1 | 1 | 0 | `budget_unique=48`・user `payroll_budget=22,242,975`（⑦後型） |
 | `fa_clip_20260408_04.sav` | 〃 | post-off | 0 | 0 | 1 | 1 | 0 | user `roster_payroll` が 02 より大（進行差） |
 | `fa_clip_20260408_05.sav` | 〃 | post-off | 0 | 0 | 1 | 1 | 0 | 04 と user 断面同型（`docs` 用途の別採取） |
+| `debug_user_boost_d2_user.sav` | 48 チーム集計／snapshot **user=league_level 3** | debug_boost（実測 user=D3） | 0 | 0 | 1 | 1 | 0 | ファイル名は `d2` だが **snapshot は D3**。`final_offer>buffer` 1920/1920・`soft_cap_early=0/1920` は他行と同型（ユーザー observer 実測）。 |
+| `debug_user_boost_d1_user.sav` | 48 チーム集計／snapshot **user=league_level 2** | debug_boost（実測 user=D2） | 0 | 0 | 1 | 1 | 0 | ファイル名は `d1` だが **snapshot は D2（level=2）**。上記と同型の summary 比率（ユーザー observer 実測）。**observed D1（level=1）ではない**。 |
+
+**以下2行の出所**: 手元 save に対する **`fa_offer_real_distribution_observer.py` 実行結果**（ユーザー側確認）。リポジトリ同梱は任意。
 
 ### 追記（2026-04-08）：D1／D2 user を含む save の有無
 
@@ -71,8 +75,9 @@ for name in (
 - **本表に載った範囲**では、**いずれも `before` で `gap_min=gap_max=0` かつ `gap_unique=1`**（全チーム同型の潰れ）。**post-off 系（02／04／05）**でも **before 側の潰れ方は数値上は initial 系（01）と同じ見え方**になる。**差は `budget_unique` と user の `payroll_budget`／`roster_payroll` の断面**で読む必要がある。
 - **行列の `room_unique=1`／`pre_le_room=0`** は **同期後入力で均されやすい**補助指標として一貫しており、**clip 前の多様性は before で見る**という既決読みと整合する。
 - **D1／D2／D3 を save 行として分けた比較**は**できていない**（集計がリーグ横断のため）。**普遍性の判断はまだ粗い**。
-- **追記（同一日）**: リポ同梱 save の **user 断面は D3 のみ**であることが確認されただけであり、**「D1／D2 user でも before が同じ」**とは**言えない**（該当 save 未取得）。**before 集計自体は引き続き 48 チーム混在**。
-- **再確認**: 手元 `\.basketball_sim\saves` にも **`.sav` 無し**のため、**D1／D2 user 1 本の observer 値は表に載せられていない**（横展開は未着手のまま）。
+- **追記（リポ同梱のみの段階）**: 当初、リポ同梱 save の **user 断面は D3 のみ**で、**D1／D2 user の observer 行は無かった**。
+- **追記（debug_boost 2 本・ユーザー実測）**: `debug_user_boost_*` でも **`before` は `gap_unique=1`・`gap_min=gap_max=0` のまま**。**`summary` も `room_unique=1`・`pre_le_room=0`**、`final_offer>buffer` 全行などは **既存行と同型**。**user snapshot が実測で D3 と D2（level 3 と 2）の2断面**あり、**「D3 user だけの局所現象」**と切り捨てるのは**やや難しくなる**一方、**user `league_level=1`（observed D1）の行は未だ無い**（過剰一般化はしない）。
+- **ファイル名と snapshot**: 上記2本は **save 名の D 表記と `user_team_snapshot` の `league_level` がずれて見える**（実測上そう読める）。**命名ミスや意図の取り違えの可能性は残す**。
 - **断定**: 「式変更必須」まではこの表だけでは言えない。
 
 ---
@@ -85,7 +90,7 @@ for name in (
 
 ## 6. 次に続く実務（1つだけ）
 
-**D1 または D2 の user が載った `.sav` を 1 本だけ**（例: `saves` に保存 or リポ同梱）用意し、`python tools\fa_offer_real_distribution_observer.py --save "<path>"` を**1 回だけ**実行して、**`before:`／`summary:` を本表に 1 行追加する**（それ以上は行わない）。
+**observed D1（`user_team_snapshot` で `league_level=1`）の断面を 1 本だけ追加取得して本表に 1 行足すか、現状の D3／D2 実測で一旦十分として次の判断（式要否など）へ進むかを短く決める**。
 
 ---
 
@@ -103,3 +108,4 @@ Select-String -Path docs\FA_BEFORE_GAP_REPRESENTATIVE_SAVE_TABLE_2026-04.md -Pat
 - 2026-04-08: 初版（リポ同梱 `fa_clip_*.sav` 4 本＋引数なし 1 行・observer 出力ベース）。
 - 2026-04-08: D1／D2 user save のリポ内確認（該当なし）・§3 追記・§4／§6 更新。
 - 2026-04-08: 手元 `\.basketball_sim\saves` 再確認（`.sav` 0 件）・D1／D2 行は未追加・observer 未実行。
+- 2026-04-08: `debug_user_boost_d2_user.sav`／`debug_user_boost_d1_user.sav` のユーザー observer 実測を表に2行追加・§2／§4／§6 更新。
