@@ -18,6 +18,8 @@ uniques, pre-clip offer<=room count on non-soft_cap_early rows).
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = payroll_budget - roster_payroll (same sign convention as roomy helper). See
 docs/FA_ROOM_UNIQUE_ONE_CAUSE_NOTE_2026-04.md
+Immediately after the before: line, prints one user_team_snapshot line (pre-sync money / payroll_budget /
+roster_payroll / gap) for is_user_team or first team fallback. See docs/FA_BEFORE_GAP_ZERO_CAUSE_NOTE_2026-04.md
 Then one reading_guide line: primary=before for compare; sync1/sync2 and matrix/summary are secondary
 (runtime-aligned). See docs/FA_OBSERVER_SYNC_HANDLING_DECISION_2026-04.md
 
@@ -252,24 +254,60 @@ READING_GUIDE_LINE = (
 )
 
 
+def _pick_snapshot_team(teams: List[Team]) -> Tuple[Team, bool]:
+    """First is_user_team if any, else teams[0]. Second is True when user team was found."""
+    for t in teams:
+        if bool(getattr(t, "is_user_team", False)):
+            return t, True
+    return teams[0], False
+
+
+def _format_pre_sync_user_team_snapshot_line(teams: List[Team]) -> str:
+    """
+    Single-line diagnostic aligned with pre-sync (before) state: same gap as _team_payroll_room.
+    """
+    if not teams:
+        return "user_team_snapshot: (no teams)"
+    team, is_user = _pick_snapshot_team(teams)
+    tag = "user_team_snapshot" if is_user else "user_team_snapshot[fallback]"
+    name = str(getattr(team, "name", "?"))
+    money = int(getattr(team, "money", 0) or 0)
+    pb = _team_payroll_budget_int(team)
+    rp = _team_roster_payroll(team)
+    gap = _team_payroll_room(team)
+    return (
+        f"{tag}: team={name} money={money:,} payroll_budget={pb:,} "
+        f"roster_payroll={rp:,} gap={gap:,}"
+    )
+
+
+def _print_one_sync_stat_line(label: str, st: Dict[str, Any]) -> None:
+    gmin = st["gap_min"]
+    gmax = st["gap_max"]
+    if gmin is None:
+        gmin_s = gmax_s = "n/a"
+    else:
+        gmin_s, gmax_s = str(gmin), str(gmax)
+    print(
+        f"  {label}: n={st['n']} budget_unique={st['budget_u']} roster_unique={st['roster_u']} "
+        f"gap_unique={st['gap_u']} gap_min={gmin_s} gap_max={gmax_s}"
+    )
+
+
 def _print_sync_observation_block(
     before: Dict[str, Any],
     sync1: Dict[str, Any],
     sync2: Dict[str, Any],
+    *,
+    pre_sync_user_snapshot: Optional[str] = None,
 ) -> None:
     buf = int(_OFFSEASON_FA_PAYROLL_BUDGET_BUFFER)
     print(f"sync_observation: buffer_const={buf} (roster+buffer floor in _sync_payroll_budget_with_roster_payroll)")
-    for label, st in (("before", before), ("sync1", sync1), ("sync2", sync2)):
-        gmin = st["gap_min"]
-        gmax = st["gap_max"]
-        if gmin is None:
-            gmin_s = gmax_s = "n/a"
-        else:
-            gmin_s, gmax_s = str(gmin), str(gmax)
-        print(
-            f"  {label}: n={st['n']} budget_unique={st['budget_u']} roster_unique={st['roster_u']} "
-            f"gap_unique={st['gap_u']} gap_min={gmin_s} gap_max={gmax_s}"
-        )
+    _print_one_sync_stat_line("before", before)
+    if pre_sync_user_snapshot:
+        print(f"  {pre_sync_user_snapshot}")
+    _print_one_sync_stat_line("sync1", sync1)
+    _print_one_sync_stat_line("sync2", sync2)
     print(READING_GUIDE_LINE)
 
 
@@ -475,12 +513,15 @@ def _run_one_observation(args: argparse.Namespace, *, save_path: Optional[str]) 
         print("no teams; abort")
         return False
 
+    pre_sync_snapshot = _format_pre_sync_user_team_snapshot_line(teams)
     stats_before = _teams_payroll_gap_stats(teams)
     _sync_payroll_budget_with_roster_payroll(teams)
     stats_sync1 = _teams_payroll_gap_stats(teams)
     _sync_payroll_budget_with_roster_payroll(teams)
     stats_sync2 = _teams_payroll_gap_stats(teams)
-    _print_sync_observation_block(stats_before, stats_sync1, stats_sync2)
+    _print_sync_observation_block(
+        stats_before, stats_sync1, stats_sync2, pre_sync_user_snapshot=pre_sync_snapshot
+    )
 
     population_banner = ""
     if args.population_mode == "default":

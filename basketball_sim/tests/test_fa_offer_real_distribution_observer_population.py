@@ -243,3 +243,21 @@ def test_select_teams_by_room_zero_means_all():
     t2 = Team(team_id=2, name="B", league_level=1, money=0, players=[], payroll_budget=60_000_000)
     out = _ob._select_teams_by_room([t1, t2], top_n=0)
     assert len(out) == 2
+
+
+def test_format_pre_sync_user_team_snapshot_prefers_is_user_team():
+    cpu = Team(team_id=1, name="CPU", league_level=1, money=0, players=[], payroll_budget=10, is_user_team=False)
+    usr = Team(team_id=2, name="UserSide", league_level=1, money=9_999, players=[], payroll_budget=10, is_user_team=True)
+    line = _ob._format_pre_sync_user_team_snapshot_line([cpu, usr])
+    assert line.startswith("user_team_snapshot:")
+    assert "[fallback]" not in line
+    assert "UserSide" in line
+    assert "9,999" in line
+
+
+def test_format_pre_sync_user_team_snapshot_fallback_first_team():
+    t1 = Team(team_id=1, name="FirstOnly", league_level=1, money=500, players=[], payroll_budget=100, is_user_team=False)
+    line = _ob._format_pre_sync_user_team_snapshot_line([t1])
+    assert "user_team_snapshot[fallback]" in line
+    assert "FirstOnly" in line
+    assert "500" in line
