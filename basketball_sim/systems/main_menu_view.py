@@ -75,10 +75,14 @@ from basketball_sim.systems.facility_investment import (
     commit_facility_upgrade,
     get_facility_upgrade_cost,
 )
-from basketball_sim.config.game_constants import CONTRACT_ROSTER_MIN_SEASON, PLAYER_SALARY_BASE_PER_OVR
 from basketball_sim.systems.contract_logic import (
     MAX_CONTRACT_YEARS_DEFAULT,
     apply_contract_extension,
+)
+from basketball_sim.systems.roster_fa_release import (
+    apply_release_player_to_fa,
+    postcheck_release_player_to_fa_season,
+    precheck_release_player_to_fa,
 )
 from basketball_sim.systems.sponsor_management import (
     MAIN_SPONSOR_TYPES,
@@ -2696,23 +2700,9 @@ class MainMenuView:
                 parent=parent,
             )
             return
-        if not self.ensure_inseason_roster_moves_allowed(parent):
-            return
-        if bool(getattr(player, "icon_locked", False)) or bool(getattr(player, "is_icon", False)):
-            messagebox.showwarning(
-                "人事",
-                "この選手は契約解除できません（アイコン／保護選手）。",
-                parent=parent,
-            )
-            return
-        team = self.team
-        players = list(self._safe_get(team, "players", []) or [])
-        if len(players) <= CONTRACT_ROSTER_MIN_SEASON:
-            messagebox.showwarning(
-                "人事",
-                f"契約選手は最低 {CONTRACT_ROSTER_MIN_SEASON} 人必要です（現状 {len(players)} 人）。解除できません。",
-                parent=parent,
-            )
+        block = precheck_release_player_to_fa(self.team, player, self.season)
+        if block:
+            messagebox.showwarning(block[0], block[1], parent=parent)
             return
         name = str(getattr(player, "name", "選手"))
         if not messagebox.askyesno(
@@ -2721,34 +2711,12 @@ class MainMenuView:
             parent=parent,
         ):
             return
-        season = getattr(self, "season", None)
-        if season is None:
-            messagebox.showwarning(
-                "人事",
-                "シーズン未接続のため FA プールへ追加できません。",
-                parent=parent,
-            )
+        block2 = postcheck_release_player_to_fa_season(self.season)
+        if block2:
+            messagebox.showwarning(block2[0], block2[1], parent=parent)
             return
-        fa_list = getattr(season, "free_agents", None)
-        if fa_list is None:
-            messagebox.showwarning("人事", "FA プールが未初期化です。", parent=parent)
-            return
-        team.remove_player(player)
-        setattr(player, "contract_years_left", 0)
-        if int(getattr(player, "salary", 0) or 0) <= 0:
-            setattr(
-                player,
-                "salary",
-                max(int(getattr(player, "ovr", 0) or 0) * PLAYER_SALARY_BASE_PER_OVR, 300_000),
-            )
-        if player not in fa_list:
-            fa_list.append(player)
-        add_hist = getattr(team, "add_history_transaction", None)
-        if callable(add_hist):
-            try:
-                add_hist("gui_release", player, "GUI人事：契約解除")
-            except Exception:
-                pass
+        fa_list = getattr(self.season, "free_agents", [])
+        apply_release_player_to_fa(self.team, player, fa_list)
         messagebox.showinfo(
             "人事",
             f"{name} を契約解除しました。\nロスターから外れ、FAプールに追加しました。",

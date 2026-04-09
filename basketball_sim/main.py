@@ -18,6 +18,11 @@ from basketball_sim.systems.generator import (
     sync_player_id_counter_from_world,
 )
 from basketball_sim.systems.helpers import print_separator
+from basketball_sim.systems.roster_fa_release import (
+    apply_release_player_to_fa,
+    postcheck_release_player_to_fa_season,
+    precheck_release_player_to_fa,
+)
 from basketball_sim.systems.season_transaction_rules import (
     INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
@@ -2069,11 +2074,61 @@ def run_facility_investment_menu(user_team):
             print("正しい番号を入力してください。")
 
 
+def run_gm_contract_release_cli(user_team, season) -> None:
+    """GUI 人事の契約解除（FA送り）と同一ルール（`roster_fa_release`）。"""
+    players = sort_roster_for_gm_view(list(getattr(user_team, "players", []) or []))
+    if not players:
+        print("ロスターが空です。")
+        return
+    print_separator("契約解除（FA送り）")
+    for i, p in enumerate(players, start=1):
+        nm = str(getattr(p, "name", "?"))
+        pos = str(getattr(p, "position", ""))
+        ovr = int(getattr(p, "ovr", 0) or 0)
+        print(f"{i}. {nm}  {pos}  OVR{ovr}")
+    raw = input("解除する選手の番号（空で中止）: ").strip()
+    if not raw:
+        print("中止しました。")
+        return
+    try:
+        idx = int(raw)
+    except ValueError:
+        print("番号が不正です。")
+        return
+    if idx < 1 or idx > len(players):
+        print("番号が範囲外です。")
+        return
+    player = players[idx - 1]
+    block = precheck_release_player_to_fa(user_team, player, season)
+    if block:
+        print(f"[{block[0]}]\n{block[1]}")
+        return
+    name = str(getattr(player, "name", "選手"))
+    yn = input(f"{name} を契約解除し、フリーエージェントに送りますか？ y/N: ").strip().lower()
+    if yn != "y":
+        print("中止しました。")
+        return
+    block2 = postcheck_release_player_to_fa_season(season)
+    if block2:
+        print(f"[{block2[0]}]\n{block2[1]}")
+        return
+    fa_list = getattr(season, "free_agents", [])
+    apply_release_player_to_fa(
+        user_team,
+        player,
+        fa_list,
+        history_event="cli_release",
+        history_note="CLI：契約解除",
+    )
+    print(f"{name} を契約解除しました。ロスターから外れ、FAプールに追加しました。")
+
+
 def run_gm_menu(all_teams, user_team, free_agents, season=None):
     while True:
         print_separator("GMメニュー")
         trade_locked = season is not None and not inseason_roster_moves_unlocked(season)
         trade_label = "10. トレード（期限切れ）" if trade_locked else "10. トレード"
+        print("0. 契約解除（FA送り）")
         print("1. チーム情報を見る")
         print("2. 戦術を変更する")
         print("3. HCスタイルを変更する")
@@ -2094,7 +2149,9 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
 
         choice = input("番号: ").strip()
 
-        if choice == "1":
+        if choice == "0":
+            run_gm_contract_release_cli(user_team, season)
+        elif choice == "1":
             print_team_identity(user_team)
         elif choice == "2":
             set_team_strategy(user_team)

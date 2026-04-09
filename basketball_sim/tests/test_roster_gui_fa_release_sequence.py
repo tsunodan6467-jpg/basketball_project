@@ -4,9 +4,10 @@
 `_on_roster_release_selected` 本体のロジックと揃える。
 """
 
-from basketball_sim.config.game_constants import CONTRACT_ROSTER_MIN_SEASON, PLAYER_SALARY_BASE_PER_OVR
+from basketball_sim.config.game_constants import CONTRACT_ROSTER_MIN_SEASON
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.roster_fa_release import apply_release_player_to_fa
 
 
 def _player(pid: int) -> Player:
@@ -45,12 +46,7 @@ def test_release_sequence_removes_from_roster_and_appends_free_agents():
     target = roster[-1]
     assert len(team.players) > CONTRACT_ROSTER_MIN_SEASON
 
-    team.remove_player(target)
-    target.contract_years_left = 0
-    if int(getattr(target, "salary", 0) or 0) <= 0:
-        target.salary = max(int(getattr(target, "ovr", 0) or 0) * PLAYER_SALARY_BASE_PER_OVR, 300_000)
-    if target not in free_agents:
-        free_agents.append(target)
+    apply_release_player_to_fa(team, target, free_agents)
 
     assert target not in team.players
     assert target in free_agents
