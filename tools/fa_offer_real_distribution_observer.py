@@ -19,6 +19,8 @@ population as pre_le_room (soft_cap_early False, offer_after_soft_cap_pushback &
 with min/max/p25–p75 for room_to_budget, offer_after_hard_cap_over (pushback前), offer_after_soft_cap_pushback
 (pushback後), offer_minus_room le0/gt0/gt_temp counts, plus soft_cap_pushback_applied true/false counts
 and hard_over_minus_soft_pushback eq0/gt0 pair counts (same pre_le_pop population).
+Plus gate subset (pre_le rows with payroll_after_pre_soft_pushback & soft_cap non-None): payroll_after_pre_soft
+min/max/p25–p75 and gt/le_eq soft_cap counts.
 
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = max(0, payroll_budget - roster_payroll) for these stats (same sign convention as roomy helper).
@@ -447,6 +449,9 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
     n_hm_eq0 = 0
     n_hm_gt0 = 0
     n_hm_cmp = 0
+    gate_payrolls: List[int] = []
+    n_pap_gt_sc = 0
+    n_pap_le_sc = 0
     for r in rows:
         if r["soft_cap_early"]:
             continue
@@ -472,6 +477,15 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
                 n_hm_eq0 += 1
             elif delta_hs > 0:
                 n_hm_gt0 += 1
+        pap = d.get("payroll_after_pre_soft_pushback")
+        sc = d.get("soft_cap")
+        if pap is not None and sc is not None:
+            pi, si = int(pap), int(sc)
+            gate_payrolls.append(pi)
+            if pi > si:
+                n_pap_gt_sc += 1
+            else:
+                n_pap_le_sc += 1
     n = len(rtbs)
     if n == 0:
         return [
@@ -496,6 +510,24 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         )
         if nh != n:
             hard_line += f" n_hard={nh}"
+    ng = len(gate_payrolls)
+    if ng == 0:
+        gate_pap_line = "  payroll_after_pre_soft_pushback n_gate=0"
+        gate_cmp_line = "  payroll_after_pre_vs_soft_cap gt=0 (0.0%) le_eq=0 (0.0%) (n_gate=0)"
+    else:
+        p25_pap, p50_pap, p75_pap = _quartiles_int(gate_payrolls)
+        gate_pap_line = (
+            "  payroll_after_pre_soft_pushback "
+            f"min={min(gate_payrolls)} max={max(gate_payrolls)} "
+            f"p25={p25_pap} p50={p50_pap} p75={p75_pap} (n_gate={ng})"
+        )
+        pct_gt = (100.0 * n_pap_gt_sc / ng) if ng else 0.0
+        pct_le = (100.0 * n_pap_le_sc / ng) if ng else 0.0
+        gate_cmp_line = (
+            "  payroll_after_pre_vs_soft_cap "
+            f"gt={n_pap_gt_sc} ({pct_gt:.1f}%) "
+            f"le_eq={n_pap_le_sc} ({pct_le:.1f}%) (n_gate={ng})"
+        )
     return [
         "pre_le_pop: "
         f"n={n} "
@@ -512,6 +544,8 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         f"true={n_applied_true} false={n_applied_false} (n={n})",
         "  hard_over_minus_soft_pushback "
         f"eq0={n_hm_eq0} gt0={n_hm_gt0} (n_cmp={n_hm_cmp})",
+        gate_pap_line,
+        gate_cmp_line,
     ]
 
 
