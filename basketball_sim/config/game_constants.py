@@ -59,7 +59,7 @@ LEAGUE_SALARY_CAP = LEAGUE_SALARY_CAP_BY_DIVISION[1]
 # 選手年俸の OVR ベース（再契約・希望年俸・FA 下限等。開幕ロスター専用は下記ジェネレータ用）
 PLAYER_SALARY_BASE_PER_OVR = 1_000_000
 # 開幕ロスター・架空プール・国際FA生成など generator 系のみ（PR2: 12 億付近に寄せる）
-GENERATOR_INITIAL_SALARY_BASE_PER_OVR = 1_220_000
+GENERATOR_INITIAL_SALARY_BASE_PER_OVR = 1_150_000
 
 # ペイロール下限（円）。0 は「下限なし」（違反・降格ペナルティなし）
 PAYROLL_FLOOR_BY_DIVISION = {
