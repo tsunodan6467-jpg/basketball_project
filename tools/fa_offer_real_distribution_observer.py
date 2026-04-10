@@ -20,7 +20,7 @@ with min/max/p25–p75 for room_to_budget, offer_after_hard_cap_over (pushback�
 (pushback後), offer_minus_room le0/gt0/gt_temp counts, plus soft_cap_pushback_applied true/false counts
 and hard_over_minus_soft_pushback eq0/gt0 pair counts (same pre_le_pop population).
 Plus gate subset (pre_le rows with payroll_after_pre_soft_pushback & soft_cap non-None): payroll_after_pre_soft
-min/max/p25–p75 and gt/le_eq soft_cap counts.
+min/max/p25–p75 and gt/le_eq soft_cap counts. payroll_before min/max/p25–p75 for pre_le rows with payroll_before non-None.
 
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
 uniques plus gap = max(0, payroll_budget - roster_payroll) for these stats (same sign convention as roomy helper).
@@ -452,6 +452,7 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
     gate_payrolls: List[int] = []
     n_pap_gt_sc = 0
     n_pap_le_sc = 0
+    pb_vals: List[int] = []
     for r in rows:
         if r["soft_cap_early"]:
             continue
@@ -463,6 +464,9 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         oi = int(o)
         offers.append(oi)
         rtbs.append(int(rtb))
+        pbx = d.get("payroll_before")
+        if pbx is not None:
+            pb_vals.append(int(pbx))
         if bool(d.get("soft_cap_pushback_applied")):
             n_applied_true += 1
         else:
@@ -528,11 +532,24 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
             f"gt={n_pap_gt_sc} ({pct_gt:.1f}%) "
             f"le_eq={n_pap_le_sc} ({pct_le:.1f}%) (n_gate={ng})"
         )
+    npb = len(pb_vals)
+    if npb == 0:
+        pb_line = "  payroll_before n_pb=0"
+    else:
+        p25_pb, p50_pb, p75_pb = _quartiles_int(pb_vals)
+        pb_line = (
+            "  payroll_before "
+            f"min={min(pb_vals)} max={max(pb_vals)} "
+            f"p25={p25_pb} p50={p50_pb} p75={p75_pb}"
+        )
+        if npb != n:
+            pb_line += f" (n_pb={npb})"
     return [
         "pre_le_pop: "
         f"n={n} "
         f"room_to_budget min={min(rtbs)} max={max(rtbs)} "
         f"p25={p25_r} p50={p50_r} p75={p75_r}",
+        pb_line,
         hard_line,
         "  offer_after_soft_cap_pushback "
         f"min={min(offers)} max={max(offers)} "

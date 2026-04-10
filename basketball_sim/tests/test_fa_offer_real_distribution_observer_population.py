@@ -178,6 +178,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
                 "soft_cap_pushback_applied": False,
                 "payroll_after_pre_soft_pushback": 50,
                 "soft_cap": 100,
+                "payroll_before": 1_000_000,
             },
         },
         {
@@ -190,6 +191,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
                 "soft_cap_pushback_applied": True,
                 "payroll_after_pre_soft_pushback": 150,
                 "soft_cap": 100,
+                "payroll_before": 2_000_000,
             },
         },
         {
@@ -202,35 +204,39 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
                 "soft_cap_pushback_applied": True,
                 "payroll_after_pre_soft_pushback": 100,
                 "soft_cap": 120,
+                "payroll_before": 3_000_000,
             },
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 8
+    assert len(lines) == 9
     assert "pre_le_pop: n=3" in lines[0]
     assert "room_to_budget min=100" in lines[0]
-    assert "offer_after_hard_cap_over" in lines[1]
-    assert "min=100" in lines[1]
-    assert "max=9000000" in lines[1]
-    assert "offer_after_soft_cap_pushback" in lines[2]
-    assert "le0=2" in lines[3]
-    assert "gt0=1" in lines[3]
-    assert "gt_temp=1" in lines[3]
-    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[3]
-    assert "soft_cap_pushback_applied" in lines[4]
-    assert "true=2" in lines[4]
-    assert "false=1" in lines[4]
-    assert "hard_over_minus_soft_pushback" in lines[5]
-    assert "eq0=1" in lines[5]
-    assert "gt0=2" in lines[5]
-    assert "n_cmp=3" in lines[5]
-    assert "payroll_after_pre_soft_pushback" in lines[6]
-    assert "n_gate=3" in lines[6]
-    assert "min=50" in lines[6]
-    assert "max=150" in lines[6]
-    assert "payroll_after_pre_vs_soft_cap" in lines[7]
-    assert "gt=1" in lines[7]
-    assert "le_eq=2" in lines[7]
+    assert "payroll_before" in lines[1]
+    assert "min=1000000" in lines[1]
+    assert "max=3000000" in lines[1]
+    assert "offer_after_hard_cap_over" in lines[2]
+    assert "min=100" in lines[2]
+    assert "max=9000000" in lines[2]
+    assert "offer_after_soft_cap_pushback" in lines[3]
+    assert "le0=2" in lines[4]
+    assert "gt0=1" in lines[4]
+    assert "gt_temp=1" in lines[4]
+    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[4]
+    assert "soft_cap_pushback_applied" in lines[5]
+    assert "true=2" in lines[5]
+    assert "false=1" in lines[5]
+    assert "hard_over_minus_soft_pushback" in lines[6]
+    assert "eq0=1" in lines[6]
+    assert "gt0=2" in lines[6]
+    assert "n_cmp=3" in lines[6]
+    assert "payroll_after_pre_soft_pushback" in lines[7]
+    assert "n_gate=3" in lines[7]
+    assert "min=50" in lines[7]
+    assert "max=150" in lines[7]
+    assert "payroll_after_pre_vs_soft_cap" in lines[8]
+    assert "gt=1" in lines[8]
+    assert "le_eq=2" in lines[8]
 
 
 def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
@@ -244,22 +250,25 @@ def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
                 "soft_cap_pushback_applied": False,
                 "payroll_after_pre_soft_pushback": 40,
                 "soft_cap": 100,
+                "payroll_before": 999,
             },
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 8
+    assert len(lines) == 9
     assert "n=1" in lines[0]
-    assert "offer_after_hard_cap_over n_hard=0" in lines[1]
-    assert "false=1" in lines[4]
-    assert "true=0" in lines[4]
-    assert "eq0=0" in lines[5]
-    assert "gt0=0" in lines[5]
-    assert "n_cmp=0" in lines[5]
-    assert "n_gate=1" in lines[6]
-    assert "min=40" in lines[6]
-    assert "le_eq=1" in lines[7]
-    assert "gt=0" in lines[7]
+    assert "payroll_before" in lines[1]
+    assert "min=999" in lines[1]
+    assert "offer_after_hard_cap_over n_hard=0" in lines[2]
+    assert "false=1" in lines[5]
+    assert "true=0" in lines[5]
+    assert "eq0=0" in lines[6]
+    assert "gt0=0" in lines[6]
+    assert "n_cmp=0" in lines[6]
+    assert "n_gate=1" in lines[7]
+    assert "min=40" in lines[7]
+    assert "le_eq=1" in lines[8]
+    assert "gt=0" in lines[8]
 
 
 def test_teams_payroll_gap_stats_empty():
