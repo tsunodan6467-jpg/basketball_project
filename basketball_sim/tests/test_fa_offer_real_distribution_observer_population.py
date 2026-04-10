@@ -179,6 +179,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
                 "payroll_after_pre_soft_pushback": 50,
                 "soft_cap": 100,
                 "payroll_before": 1_000_000,
+                "cap_base": 700,
             },
         },
         {
@@ -192,6 +193,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
                 "payroll_after_pre_soft_pushback": 150,
                 "soft_cap": 100,
                 "payroll_before": 2_000_000,
+                "cap_base": 700,
             },
         },
         {
@@ -205,44 +207,50 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
                 "payroll_after_pre_soft_pushback": 100,
                 "soft_cap": 120,
                 "payroll_before": 3_000_000,
+                "cap_base": 800,
             },
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 11
+    assert len(lines) == 12
     assert "pre_le_pop: n=3" in lines[0]
     assert "room_to_budget min=100" in lines[0]
     assert "payroll_before" in lines[1]
     assert "min=1000000" in lines[1]
     assert "max=3000000" in lines[1]
-    assert "offer_after_hard_cap_over" in lines[2]
-    assert "min=100" in lines[2]
-    assert "max=9000000" in lines[2]
-    assert "offer_after_soft_cap_pushback" in lines[3]
-    assert "le0=2" in lines[4]
-    assert "gt0=1" in lines[4]
-    assert "gt_temp=1" in lines[4]
-    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[4]
-    assert "soft_cap_pushback_applied" in lines[5]
-    assert "true=2" in lines[5]
-    assert "false=1" in lines[5]
-    assert "hard_over_minus_soft_pushback" in lines[6]
-    assert "eq0=1" in lines[6]
-    assert "gt0=2" in lines[6]
-    assert "n_cmp=3" in lines[6]
-    assert "payroll_after_pre_soft_pushback" in lines[7]
-    assert "n_gate=3" in lines[7]
-    assert "min=50" in lines[7]
-    assert "max=150" in lines[7]
-    assert "payroll_after_pre_vs_soft_cap" in lines[8]
-    assert "gt=1" in lines[8]
-    assert "le_eq=2" in lines[8]
-    assert "soft_cap" in lines[9]
-    assert "min=100" in lines[9]
-    assert "max=120" in lines[9]
-    assert "unique=2" in lines[9]
-    assert "n_gate=3" in lines[9]
-    assert "room_to_soft value=0 (n_gate=3)" in lines[10]
+    assert "cap_base" in lines[2]
+    assert "min=700" in lines[2]
+    assert "max=800" in lines[2]
+    assert "unique=2" in lines[2]
+    assert "n_gate=3" in lines[2]
+    assert "offer_after_hard_cap_over" in lines[3]
+    assert "min=100" in lines[3]
+    assert "max=9000000" in lines[3]
+    assert "offer_after_soft_cap_pushback" in lines[4]
+    assert "le0=2" in lines[5]
+    assert "gt0=1" in lines[5]
+    assert "gt_temp=1" in lines[5]
+    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[5]
+    assert "soft_cap_pushback_applied" in lines[6]
+    assert "true=2" in lines[6]
+    assert "false=1" in lines[6]
+    assert "hard_over_minus_soft_pushback" in lines[7]
+    assert "eq0=1" in lines[7]
+    assert "gt0=2" in lines[7]
+    assert "n_cmp=3" in lines[7]
+    assert "payroll_after_pre_soft_pushback" in lines[8]
+    assert "n_gate=3" in lines[8]
+    assert "min=50" in lines[8]
+    assert "max=150" in lines[8]
+    assert "payroll_after_pre_vs_soft_cap" in lines[9]
+    assert "gt=1" in lines[9]
+    assert "le_eq=2" in lines[9]
+    assert "soft_cap" in lines[10]
+    assert "min=100" in lines[10]
+    assert "max=120" in lines[10]
+    assert "unique=2" in lines[10]
+    assert "n_gate=3" in lines[10]
+    assert "room_to_soft value=0 (n_gate=3)" in lines[11]
 
 
 def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
@@ -257,26 +265,28 @@ def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
                 "payroll_after_pre_soft_pushback": 40,
                 "soft_cap": 100,
                 "payroll_before": 999,
+                "cap_base": 40,
             },
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 11
+    assert len(lines) == 12
     assert "n=1" in lines[0]
     assert "payroll_before" in lines[1]
     assert "min=999" in lines[1]
-    assert "offer_after_hard_cap_over n_hard=0" in lines[2]
-    assert "false=1" in lines[5]
-    assert "true=0" in lines[5]
-    assert "eq0=0" in lines[6]
-    assert "gt0=0" in lines[6]
-    assert "n_cmp=0" in lines[6]
-    assert "n_gate=1" in lines[7]
-    assert "min=40" in lines[7]
-    assert "le_eq=1" in lines[8]
-    assert "gt=0" in lines[8]
-    assert "soft_cap value=100 (n_gate=1)" in lines[9]
-    assert "room_to_soft value=0 (n_gate=1)" in lines[10]
+    assert "cap_base value=40 (n_gate=1)" in lines[2]
+    assert "offer_after_hard_cap_over n_hard=0" in lines[3]
+    assert "false=1" in lines[6]
+    assert "true=0" in lines[6]
+    assert "eq0=0" in lines[7]
+    assert "gt0=0" in lines[7]
+    assert "n_cmp=0" in lines[7]
+    assert "n_gate=1" in lines[8]
+    assert "min=40" in lines[8]
+    assert "le_eq=1" in lines[9]
+    assert "gt=0" in lines[9]
+    assert "soft_cap value=100 (n_gate=1)" in lines[10]
+    assert "room_to_soft value=0 (n_gate=1)" in lines[11]
 
 
 def test_pre_le_population_summary_lines_soft_cap_line_when_n_gate_zero():
@@ -291,10 +301,11 @@ def test_pre_le_population_summary_lines_soft_cap_line_when_n_gate_zero():
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 11
+    assert len(lines) == 12
     assert "n=1" in lines[0]
-    assert "soft_cap n_gate=0" in lines[9]
-    assert "room_to_soft n_gate=0" in lines[10]
+    assert "cap_base n_gate=0" in lines[2]
+    assert "soft_cap n_gate=0" in lines[10]
+    assert "room_to_soft n_gate=0" in lines[11]
 
 
 def test_pre_le_population_summary_lines_room_to_soft_quartiles_when_multi_value():
@@ -310,6 +321,7 @@ def test_pre_le_population_summary_lines_room_to_soft_quartiles_when_multi_value
                 "payroll_after_pre_soft_pushback": 110,
                 "soft_cap": 200,
                 "payroll_before": 100,
+                "cap_base": 999,
             },
         },
         {
@@ -323,16 +335,18 @@ def test_pre_le_population_summary_lines_room_to_soft_quartiles_when_multi_value
                 "payroll_after_pre_soft_pushback": 120,
                 "soft_cap": 200,
                 "payroll_before": 50,
+                "cap_base": 999,
             },
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 11
-    assert "room_to_soft" in lines[10]
-    assert "min=100" in lines[10]
-    assert "max=150" in lines[10]
-    assert "p25=" in lines[10]
-    assert "n_gate=2" in lines[10]
+    assert len(lines) == 12
+    assert "cap_base value=999 (n_gate=2)" in lines[2]
+    assert "room_to_soft" in lines[11]
+    assert "min=100" in lines[11]
+    assert "max=150" in lines[11]
+    assert "p25=" in lines[11]
+    assert "n_gate=2" in lines[11]
 
 
 def test_teams_payroll_gap_stats_empty():
