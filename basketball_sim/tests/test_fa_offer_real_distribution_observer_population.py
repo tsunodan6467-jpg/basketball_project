@@ -209,7 +209,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 9
+    assert len(lines) == 10
     assert "pre_le_pop: n=3" in lines[0]
     assert "room_to_budget min=100" in lines[0]
     assert "payroll_before" in lines[1]
@@ -237,6 +237,11 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
     assert "payroll_after_pre_vs_soft_cap" in lines[8]
     assert "gt=1" in lines[8]
     assert "le_eq=2" in lines[8]
+    assert "soft_cap" in lines[9]
+    assert "min=100" in lines[9]
+    assert "max=120" in lines[9]
+    assert "unique=2" in lines[9]
+    assert "n_gate=3" in lines[9]
 
 
 def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
@@ -255,7 +260,7 @@ def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 9
+    assert len(lines) == 10
     assert "n=1" in lines[0]
     assert "payroll_before" in lines[1]
     assert "min=999" in lines[1]
@@ -269,6 +274,24 @@ def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
     assert "min=40" in lines[7]
     assert "le_eq=1" in lines[8]
     assert "gt=0" in lines[8]
+    assert "soft_cap value=100 (n_gate=1)" in lines[9]
+
+
+def test_pre_le_population_summary_lines_soft_cap_line_when_n_gate_zero():
+    rows = [
+        {
+            "soft_cap_early": False,
+            "room_to_budget": 100,
+            "diag": {
+                "offer_after_soft_cap_pushback": 50,
+                "room_to_budget": 100,
+            },
+        },
+    ]
+    lines = _ob._pre_le_population_summary_lines(rows)
+    assert len(lines) == 10
+    assert "n=1" in lines[0]
+    assert "soft_cap n_gate=0" in lines[9]
 
 
 def test_teams_payroll_gap_stats_empty():
