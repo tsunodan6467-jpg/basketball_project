@@ -16,14 +16,15 @@ Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDES
 Each run prints one ASCII summary line before the main histogram (soft_cap_early rate, room_to_budget
 uniques, pre-clip offer<=room count on non-soft_cap_early rows), then a short pre_le_pop block: same
 population as pre_le_room (soft_cap_early False, offer_after_soft_cap_pushback & room_to_budget non-None)
-with min/max/p25–p75 for room_to_budget, offer_after_base_bonus (hard cap 前 base+bonus), offer_after_hard_cap_over
-(pushback前), offer_after_soft_cap_pushback (pushback後), offer_minus_room le0/gt0/gt_temp counts, plus
+with min/max/p25–p75 for room_to_budget, bonus (diagnostic bonus after 5%/25% cap), offer_after_base_bonus
+(hard cap 前 base+bonus), offer_after_hard_cap_over (pushback前), offer_after_soft_cap_pushback (pushback後),
+offer_minus_room le0/gt0/gt_temp counts, plus
 soft_cap_pushback_applied true/false counts
 and hard_over_minus_soft_pushback eq0/gt0 pair counts (same pre_le_pop population).
 Plus gate subset (pre_le rows with payroll_after_pre_soft_pushback, soft_cap, payroll_before & cap_base non-None): payroll_after_pre_soft
 min/max/p25–p75 and gt/le_eq soft_cap counts; soft_cap value or min/max/unique (n_gate); room_to_soft (=max(0, soft_cap-payroll_before))
-value or min/max/p25–p50–p75 (n_gate). cap_base (hard cap) value or min/max/unique (n_gate) after payroll_before; then
-offer_after_base_bonus min/max/p25–p50–p75 (pre_le rows with key non-None; n_abb if fewer than n). payroll_before min/max/p25–p75
+value or min/max/p25–p50–p75 (n_gate). cap_base after payroll_before; then bonus min/max/p25–p50–p75 (pre_le rows with bonus
+non-None; n_bonus if fewer than n); then offer_after_base_bonus (n_abb if fewer than n). payroll_before min/max/p25–p75
 for pre_le rows with payroll_before non-None.
 
 After loading teams, prints sync_observation (before / sync1 / sync2): payroll_budget and roster payroll
@@ -460,6 +461,7 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
     rts_gate_vals: List[int] = []
     cap_gate_vals: List[int] = []
     abb_vals: List[int] = []
+    bonus_vals: List[int] = []
     pb_vals: List[int] = []
     for r in rows:
         if r["soft_cap_early"]:
@@ -475,6 +477,9 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         abb = d.get("offer_after_base_bonus")
         if abb is not None:
             abb_vals.append(int(abb))
+        bon = d.get("bonus")
+        if bon is not None:
+            bonus_vals.append(int(bon))
         pbx = d.get("payroll_before")
         if pbx is not None:
             pb_vals.append(int(pbx))
@@ -543,6 +548,18 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         )
         if nabb != n:
             abb_line += f" n_abb={nabb}"
+    nb = len(bonus_vals)
+    if nb == 0:
+        bonus_line = "  bonus n_bonus=0"
+    else:
+        p25_b, p50_b, p75_b = _quartiles_int(bonus_vals)
+        bonus_line = (
+            "  bonus "
+            f"min={min(bonus_vals)} max={max(bonus_vals)} "
+            f"p25={p25_b} p50={p50_b} p75={p75_b}"
+        )
+        if nb != n:
+            bonus_line += f" n_bonus={nb}"
     ng = len(gate_payrolls)
     if ng == 0:
         gate_pap_line = "  payroll_after_pre_soft_pushback n_gate=0"
@@ -611,6 +628,7 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         f"p25={p25_r} p50={p50_r} p75={p75_r}",
         pb_line,
         cap_base_gate_line,
+        bonus_line,
         abb_line,
         hard_line,
         "  offer_after_soft_cap_pushback "
