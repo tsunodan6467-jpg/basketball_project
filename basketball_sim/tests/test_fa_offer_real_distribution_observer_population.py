@@ -171,6 +171,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
         {
             "soft_cap_early": False,
             "room_to_budget": 100,
+            "player_salary": 4_000_000,
             "diag": {
                 "offer_after_soft_cap_pushback": 50,
                 "room_to_budget": 100,
@@ -188,6 +189,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
         {
             "soft_cap_early": False,
             "room_to_budget": 100,
+            "player_salary": 250,
             "diag": {
                 "offer_after_soft_cap_pushback": 100,
                 "room_to_budget": 100,
@@ -205,6 +207,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
         {
             "soft_cap_early": False,
             "room_to_budget": 1_000_000,
+            "player_salary": 9_000_000,
             "diag": {
                 "offer_after_soft_cap_pushback": 7_000_000,
                 "room_to_budget": 1_000_000,
@@ -221,7 +224,7 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 15
+    assert len(lines) == 16
     assert "pre_le_pop: n=3" in lines[0]
     assert "room_to_budget min=100" in lines[0]
     assert "payroll_before" in lines[1]
@@ -232,46 +235,50 @@ def test_pre_le_population_summary_lines_counts_and_keywords():
     assert "max=800" in lines[2]
     assert "unique=2" in lines[2]
     assert "n_gate=3" in lines[2]
-    assert "  base " in lines[3]
+    assert "  player_salary " in lines[3]
     assert "min=250" in lines[3]
     assert "max=9000000" in lines[3]
     assert "p25=" in lines[3]
-    assert "bonus" in lines[4]
-    assert "min=50" in lines[4]
-    assert "max=6000000" in lines[4]
+    assert "  base " in lines[4]
+    assert "min=250" in lines[4]
+    assert "max=9000000" in lines[4]
     assert "p25=" in lines[4]
-    assert "offer_after_base_bonus" in lines[5]
-    assert "min=300" in lines[5]
-    assert "max=15000000" in lines[5]
+    assert "bonus" in lines[5]
+    assert "min=50" in lines[5]
+    assert "max=6000000" in lines[5]
     assert "p25=" in lines[5]
-    assert "offer_after_hard_cap_over" in lines[6]
-    assert "min=100" in lines[6]
-    assert "max=9000000" in lines[6]
-    assert "offer_after_soft_cap_pushback" in lines[7]
-    assert "le0=2" in lines[8]
-    assert "gt0=1" in lines[8]
-    assert "gt_temp=1" in lines[8]
-    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[8]
-    assert "soft_cap_pushback_applied" in lines[9]
-    assert "true=2" in lines[9]
-    assert "false=1" in lines[9]
-    assert "hard_over_minus_soft_pushback" in lines[10]
-    assert "eq0=1" in lines[10]
-    assert "gt0=2" in lines[10]
-    assert "n_cmp=3" in lines[10]
-    assert "payroll_after_pre_soft_pushback" in lines[11]
-    assert "n_gate=3" in lines[11]
-    assert "min=50" in lines[11]
-    assert "max=150" in lines[11]
-    assert "payroll_after_pre_vs_soft_cap" in lines[12]
-    assert "gt=1" in lines[12]
-    assert "le_eq=2" in lines[12]
-    assert "soft_cap" in lines[13]
-    assert "min=100" in lines[13]
-    assert "max=120" in lines[13]
-    assert "unique=2" in lines[13]
-    assert "n_gate=3" in lines[13]
-    assert "room_to_soft value=0 (n_gate=3)" in lines[14]
+    assert "offer_after_base_bonus" in lines[6]
+    assert "min=300" in lines[6]
+    assert "max=15000000" in lines[6]
+    assert "p25=" in lines[6]
+    assert "offer_after_hard_cap_over" in lines[7]
+    assert "min=100" in lines[7]
+    assert "max=9000000" in lines[7]
+    assert "offer_after_soft_cap_pushback" in lines[8]
+    assert "le0=2" in lines[9]
+    assert "gt0=1" in lines[9]
+    assert "gt_temp=1" in lines[9]
+    assert "TEMP_PRE_LE_DIFF_LARGE_THRESHOLD=" in lines[9]
+    assert "soft_cap_pushback_applied" in lines[10]
+    assert "true=2" in lines[10]
+    assert "false=1" in lines[10]
+    assert "hard_over_minus_soft_pushback" in lines[11]
+    assert "eq0=1" in lines[11]
+    assert "gt0=2" in lines[11]
+    assert "n_cmp=3" in lines[11]
+    assert "payroll_after_pre_soft_pushback" in lines[12]
+    assert "n_gate=3" in lines[12]
+    assert "min=50" in lines[12]
+    assert "max=150" in lines[12]
+    assert "payroll_after_pre_vs_soft_cap" in lines[13]
+    assert "gt=1" in lines[13]
+    assert "le_eq=2" in lines[13]
+    assert "soft_cap" in lines[14]
+    assert "min=100" in lines[14]
+    assert "max=120" in lines[14]
+    assert "unique=2" in lines[14]
+    assert "n_gate=3" in lines[14]
+    assert "room_to_soft value=0 (n_gate=3)" in lines[15]
 
 
 def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
@@ -279,6 +286,7 @@ def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
         {
             "soft_cap_early": False,
             "room_to_budget": 100,
+            "player_salary": 37_655,
             "diag": {
                 "offer_after_soft_cap_pushback": 50,
                 "room_to_budget": 100,
@@ -294,32 +302,35 @@ def test_pre_le_population_summary_lines_hard_cap_over_all_missing():
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 15
+    assert len(lines) == 16
     assert "n=1" in lines[0]
     assert "payroll_before" in lines[1]
     assert "min=999" in lines[1]
     assert "cap_base value=40 (n_gate=1)" in lines[2]
-    assert "  base " in lines[3]
+    assert "  player_salary " in lines[3]
     assert "min=37655" in lines[3]
     assert "max=37655" in lines[3]
-    assert "bonus" in lines[4]
-    assert "min=12345" in lines[4]
-    assert "max=12345" in lines[4]
-    assert "offer_after_base_bonus" in lines[5]
-    assert "min=50000" in lines[5]
-    assert "max=50000" in lines[5]
-    assert "offer_after_hard_cap_over n_hard=0" in lines[6]
-    assert "false=1" in lines[9]
-    assert "true=0" in lines[9]
-    assert "eq0=0" in lines[10]
-    assert "gt0=0" in lines[10]
-    assert "n_cmp=0" in lines[10]
-    assert "n_gate=1" in lines[11]
-    assert "min=40" in lines[11]
-    assert "le_eq=1" in lines[12]
-    assert "gt=0" in lines[12]
-    assert "soft_cap value=100 (n_gate=1)" in lines[13]
-    assert "room_to_soft value=0 (n_gate=1)" in lines[14]
+    assert "  base " in lines[4]
+    assert "min=37655" in lines[4]
+    assert "max=37655" in lines[4]
+    assert "bonus" in lines[5]
+    assert "min=12345" in lines[5]
+    assert "max=12345" in lines[5]
+    assert "offer_after_base_bonus" in lines[6]
+    assert "min=50000" in lines[6]
+    assert "max=50000" in lines[6]
+    assert "offer_after_hard_cap_over n_hard=0" in lines[7]
+    assert "false=1" in lines[10]
+    assert "true=0" in lines[10]
+    assert "eq0=0" in lines[11]
+    assert "gt0=0" in lines[11]
+    assert "n_cmp=0" in lines[11]
+    assert "n_gate=1" in lines[12]
+    assert "min=40" in lines[12]
+    assert "le_eq=1" in lines[13]
+    assert "gt=0" in lines[13]
+    assert "soft_cap value=100 (n_gate=1)" in lines[14]
+    assert "room_to_soft value=0 (n_gate=1)" in lines[15]
 
 
 def test_pre_le_population_summary_lines_soft_cap_line_when_n_gate_zero():
@@ -334,14 +345,15 @@ def test_pre_le_population_summary_lines_soft_cap_line_when_n_gate_zero():
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 15
+    assert len(lines) == 16
     assert "n=1" in lines[0]
     assert "cap_base n_gate=0" in lines[2]
-    assert "base n_base=0" in lines[3]
-    assert "bonus n_bonus=0" in lines[4]
-    assert "offer_after_base_bonus n_abb=0" in lines[5]
-    assert "soft_cap n_gate=0" in lines[13]
-    assert "room_to_soft n_gate=0" in lines[14]
+    assert "player_salary n_salary=0" in lines[3]
+    assert "base n_base=0" in lines[4]
+    assert "bonus n_bonus=0" in lines[5]
+    assert "offer_after_base_bonus n_abb=0" in lines[6]
+    assert "soft_cap n_gate=0" in lines[14]
+    assert "room_to_soft n_gate=0" in lines[15]
 
 
 def test_pre_le_population_summary_lines_room_to_soft_quartiles_when_multi_value():
@@ -349,6 +361,7 @@ def test_pre_le_population_summary_lines_room_to_soft_quartiles_when_multi_value
         {
             "soft_cap_early": False,
             "room_to_budget": 100,
+            "player_salary": 40,
             "diag": {
                 "offer_after_soft_cap_pushback": 10,
                 "room_to_budget": 100,
@@ -366,6 +379,7 @@ def test_pre_le_population_summary_lines_room_to_soft_quartiles_when_multi_value
         {
             "soft_cap_early": False,
             "room_to_budget": 100,
+            "player_salary": 55,
             "diag": {
                 "offer_after_soft_cap_pushback": 20,
                 "room_to_budget": 100,
@@ -382,22 +396,25 @@ def test_pre_le_population_summary_lines_room_to_soft_quartiles_when_multi_value
         },
     ]
     lines = _ob._pre_le_population_summary_lines(rows)
-    assert len(lines) == 15
+    assert len(lines) == 16
     assert "cap_base value=999 (n_gate=2)" in lines[2]
-    assert "  base " in lines[3]
+    assert "  player_salary " in lines[3]
     assert "min=40" in lines[3]
     assert "max=55" in lines[3]
-    assert "bonus" in lines[4]
-    assert "min=10" in lines[4]
-    assert "max=25" in lines[4]
-    assert "offer_after_base_bonus" in lines[5]
-    assert "min=50" in lines[5]
-    assert "max=80" in lines[5]
-    assert "room_to_soft" in lines[14]
-    assert "min=100" in lines[14]
-    assert "max=150" in lines[14]
-    assert "p25=" in lines[14]
-    assert "n_gate=2" in lines[14]
+    assert "  base " in lines[4]
+    assert "min=40" in lines[4]
+    assert "max=55" in lines[4]
+    assert "bonus" in lines[5]
+    assert "min=10" in lines[5]
+    assert "max=25" in lines[5]
+    assert "offer_after_base_bonus" in lines[6]
+    assert "min=50" in lines[6]
+    assert "max=80" in lines[6]
+    assert "room_to_soft" in lines[15]
+    assert "min=100" in lines[15]
+    assert "max=150" in lines[15]
+    assert "p25=" in lines[15]
+    assert "n_gate=2" in lines[15]
 
 
 def test_teams_payroll_gap_stats_empty():

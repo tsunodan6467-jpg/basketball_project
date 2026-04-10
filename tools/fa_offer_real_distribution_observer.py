@@ -16,14 +16,15 @@ Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDES
 Each run prints one ASCII summary line before the main histogram (soft_cap_early rate, room_to_budget
 uniques, pre-clip offer<=room count on non-soft_cap_early rows), then a short pre_le_pop block: same
 population as pre_le_room (soft_cap_early False, offer_after_soft_cap_pushback & room_to_budget non-None)
-with min/max/p25–p75 for room_to_budget, base (diagnostic base before bonus), bonus (after 5%/25% cap),
+with min/max/p25–p75 for room_to_budget, player_salary (raw int getattr FA salary, pre base replacement),
+base (diagnostic base before bonus), bonus (after 5%/25% cap),
 offer_after_base_bonus (hard cap 前 base+bonus), offer_after_hard_cap_over (pushback前), offer_after_soft_cap_pushback (pushback後),
 offer_minus_room le0/gt0/gt_temp counts, plus
 soft_cap_pushback_applied true/false counts
 and hard_over_minus_soft_pushback eq0/gt0 pair counts (same pre_le_pop population).
 Plus gate subset (pre_le rows with payroll_after_pre_soft_pushback, soft_cap, payroll_before & cap_base non-None): payroll_after_pre_soft
 min/max/p25–p75 and gt/le_eq soft_cap counts; soft_cap value or min/max/unique (n_gate); room_to_soft (=max(0, soft_cap-payroll_before))
-value or min/max/p25–p50–p75 (n_gate). cap_base after payroll_before; then base (n_base if fewer than n); then bonus;
+value or min/max/p25–p50–p75 (n_gate). cap_base after payroll_before; then player_salary (n_salary if fewer than n); then base (n_base if fewer than n); then bonus;
 then offer_after_base_bonus (n_abb if fewer than n). payroll_before min/max/p25–p75
 for pre_le rows with payroll_before non-None.
 
@@ -385,6 +386,7 @@ def _run_matrix(
             rtb = d.get("room_to_budget")
             rtb_i: Optional[int] = int(rtb) if rtb is not None else None
             sal = _fa_salary(fa)
+            raw_ps = int(getattr(fa, "salary", 0))
             rows.append(
                 {
                     "team_name": getattr(team, "name", "?"),
@@ -396,6 +398,7 @@ def _run_matrix(
                     "payroll_before": int(d["payroll_before"]),
                     "payroll_budget": _payroll_budget_display(team, d),
                     "fa_salary": sal,
+                    "player_salary": raw_ps,
                     "fa_id": int(getattr(fa, "player_id", 0)),
                     "diag": d,
                 }
@@ -463,6 +466,7 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
     abb_vals: List[int] = []
     bonus_vals: List[int] = []
     base_vals: List[int] = []
+    player_salary_vals: List[int] = []
     pb_vals: List[int] = []
     for r in rows:
         if r["soft_cap_early"]:
@@ -484,6 +488,9 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         bs = d.get("base")
         if bs is not None:
             base_vals.append(int(bs))
+        psal = r.get("player_salary")
+        if psal is not None:
+            player_salary_vals.append(int(psal))
         pbx = d.get("payroll_before")
         if pbx is not None:
             pb_vals.append(int(pbx))
@@ -576,6 +583,18 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         )
         if nbase != n:
             base_line += f" n_base={nbase}"
+    nsal = len(player_salary_vals)
+    if nsal == 0:
+        player_salary_line = "  player_salary n_salary=0"
+    else:
+        p25_sl, p50_sl, p75_sl = _quartiles_int(player_salary_vals)
+        player_salary_line = (
+            "  player_salary "
+            f"min={min(player_salary_vals)} max={max(player_salary_vals)} "
+            f"p25={p25_sl} p50={p50_sl} p75={p75_sl}"
+        )
+        if nsal != n:
+            player_salary_line += f" n_salary={nsal}"
     ng = len(gate_payrolls)
     if ng == 0:
         gate_pap_line = "  payroll_after_pre_soft_pushback n_gate=0"
@@ -644,6 +663,7 @@ def _pre_le_population_summary_lines(rows: List[Dict[str, Any]]) -> List[str]:
         f"p25={p25_r} p50={p50_r} p75={p75_r}",
         pb_line,
         cap_base_gate_line,
+        player_salary_line,
         base_line,
         bonus_line,
         abb_line,
