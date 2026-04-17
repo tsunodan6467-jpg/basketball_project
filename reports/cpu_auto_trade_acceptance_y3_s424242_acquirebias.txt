@@ -1,0 +1,103 @@
+cpu_auto_trade_acceptance_observe | seed=424242 years=3
+Source: trade.conduct_trades — captured lines starting with [TRADE]
+
+conduct_trades 成立条件（trade.py 要約）:
+  1) 参加チームは勝敗に応じた確率で選ばれる
+  2) tradeable: ルーキー契約でない / コアでない / OVR>=MIN_TRADE_OVR(58)
+  3) rebuilding なら若手高ポテ(OVR>=68,<=22,S/A)を候補から除外
+  4) 候補は評価値で昇順ソートし先頭12、シャッフル後ペア探索
+  5) |OVR差|<=MAX_TRADE_OVR_GAP(8), 給与吸収, 日本籍ルール
+  6) gain_* = gets - gives（_evaluate_trade_value）; min_gain = _get_min_gain_threshold(再建1.0/win_now1.2/他1.0)
+  7) gain_a>=min_a かつ gain_b>=min_b かつ |gain_a-gain_b|<=14 で成立
+
+Total [TRADE] events captured: 17
+
+[TRADE] 佐賀ブーマーズ traded Player_122 (OVR:62) to 島根カグヅチウィザーズ for Player_194 (OVR:68) | gain_a=2.9 gain_b=1.6 | 佐賀ブーマーズ:1,013,959,384(under_cap) | 島根カグヅチウィザーズ:824,446,683(under_cap)
+  year=1  gain_a=2.90 gain_b=1.60 |gain_a-gain_b|=1.30
+  a_gets_pb: age=36 ovr=68 pot=D strategy_tag=push
+  b_gets_pa: age=27 ovr=62 pot=D strategy_tag=hold
+
+[TRADE] ビーホークス三河 traded Player_69 (OVR:70) to アペカムイ北海道 for Player_213 (OVR:71) | gain_a=2.3 gain_b=1.6 | ビーホークス三河:1,182,221,922(under_cap) | アペカムイ北海道:719,501,128(under_cap)
+  year=1  gain_a=2.30 gain_b=1.60 |gain_a-gain_b|=0.70
+  a_gets_pb: age=24 ovr=71 pot=D strategy_tag=push
+  b_gets_pa: age=28 ovr=70 pot=D strategy_tag=push
+
+[TRADE] 名古屋ハートホエールズ traded Player_57 (OVR:70) to 岩手ベアーズ for Player_430 (OVR:68) | gain_a=2.1 gain_b=2.8 | 名古屋ハートホエールズ:957,881,666(under_cap) | 岩手ベアーズ:514,310,493(under_cap)
+  year=1  gain_a=2.10 gain_b=2.80 |gain_a-gain_b|=0.70
+  a_gets_pb: age=22 ovr=68 pot=C strategy_tag=push
+  b_gets_pa: age=31 ovr=70 pot=D strategy_tag=push
+
+[TRADE] メタル名古屋 traded Player_304 (OVR:73) to 新潟エルトロックス for Player_533 (OVR:69) | gain_a=7.6 gain_b=2.0 | メタル名古屋:575,643,478(under_cap) | 新潟エルトロックス:545,325,632(under_cap)
+  year=1  gain_a=7.60 gain_b=2.00 |gain_a-gain_b|=5.60
+  a_gets_pb: age=27 ovr=69 pot=C strategy_tag=push
+  b_gets_pa: age=26 ovr=73 pot=D strategy_tag=hold
+
+[TRADE] 横浜マーベラス traded Player_464 (OVR:71) to 金沢ニンジャズ for Player_540 (OVR:77) | gain_a=2.2 gain_b=2.1 | 横浜マーベラス:530,742,672(under_cap) | 金沢ニンジャズ:567,030,500(under_cap)
+  year=1  gain_a=2.20 gain_b=2.10 |gain_a-gain_b|=0.10
+  a_gets_pb: age=27 ovr=77 pot=D strategy_tag=push
+  b_gets_pa: age=23 ovr=71 pot=A strategy_tag=push
+
+[TRADE] 川崎ブレイクライトニング traded Player_85 (OVR:75) to 京都ホーネッツ for Player_328 (OVR:74) | gain_a=1.6 gain_b=1.2 | 川崎ブレイクライトニング:738,396,526(under_cap) | 京都ホーネッツ:622,251,391(under_cap)
+  year=1  gain_a=1.60 gain_b=1.20 |gain_a-gain_b|=0.40
+  a_gets_pb: age=26 ovr=74 pot=C strategy_tag=push
+  b_gets_pa: age=23 ovr=75 pot=C strategy_tag=push
+
+[TRADE] 信州ブレイクストーンズ traded Player_354 (OVR:63) to 青森ワルツ for Player_425 (OVR:65) | gain_a=3.5 gain_b=2.8 | 信州ブレイクストーンズ:609,261,174(under_cap) | 青森ワルツ:396,183,580(under_cap)
+  year=1  gain_a=3.50 gain_b=2.80 |gain_a-gain_b|=0.70
+  a_gets_pb: age=23 ovr=65 pot=D strategy_tag=push
+  b_gets_pa: age=23 ovr=63 pot=C strategy_tag=push
+
+[TRADE] 福井ストームズ traded Player_406 (OVR:67) to 鳥取サキューズ for Player_586 (OVR:69) | gain_a=1.9 gain_b=2.8 | 福井ストームズ:675,760,693(under_cap) | 鳥取サキューズ:775,486,919(under_cap)
+  year=2  gain_a=1.90 gain_b=2.80 |gain_a-gain_b|=0.90
+  a_gets_pb: age=24 ovr=69 pot=C strategy_tag=push
+  b_gets_pa: age=26 ovr=67 pot=B strategy_tag=push
+
+[TRADE] 秋田ノースラッキーズ traded Player_239 (OVR:60) to アペカムイ北海道 for Player_214 (OVR:67) | gain_a=6.6 gain_b=5.1 | 秋田ノースラッキーズ:714,984,453(under_cap) | アペカムイ北海道:714,061,311(under_cap)
+  year=2  gain_a=6.60 gain_b=5.10 |gain_a-gain_b|=1.50
+  a_gets_pb: age=35 ovr=67 pot=D strategy_tag=push
+  b_gets_pa: age=24 ovr=60 pot=D strategy_tag=push
+
+[TRADE] 岩手ベアーズ traded Player_431 (OVR:69) to 徳島ファイティングス for Player_584 (OVR:71) | gain_a=3.6 gain_b=3.9 | 岩手ベアーズ:591,295,238(under_cap) | 徳島ファイティングス:353,716,650(under_cap)
+  year=2  gain_a=3.60 gain_b=3.90 |gain_a-gain_b|=0.30
+  a_gets_pb: age=28 ovr=71 pot=D strategy_tag=push
+  b_gets_pa: age=24 ovr=69 pot=A strategy_tag=hold
+
+[TRADE] 埼玉ライバルズ traded Player_604 (OVR:62) to 岡山リングス for Player_618 (OVR:64) | gain_a=4.0 gain_b=2.8 | 埼玉ライバルズ:439,848,040(under_cap) | 岡山リングス:403,268,422(under_cap)
+  year=2  gain_a=4.00 gain_b=2.80 |gain_a-gain_b|=1.20
+  a_gets_pb: age=22 ovr=64 pot=D strategy_tag=push
+  b_gets_pa: age=25 ovr=62 pot=D strategy_tag=push
+
+[TRADE] シンライダーズ渋谷 traded Player_148 (OVR:68) to 愛媛レッドホークス for Player_498 (OVR:71) | gain_a=4.0 gain_b=2.1 | シンライダーズ渋谷:866,665,130(under_cap) | 愛媛レッドホークス:515,475,825(under_cap)
+  year=2  gain_a=4.00 gain_b=2.10 |gain_a-gain_b|=1.90
+  a_gets_pb: age=27 ovr=71 pot=D strategy_tag=push
+  b_gets_pa: age=28 ovr=68 pot=D strategy_tag=push
+
+[TRADE] 茨城メカニックス traded Player_255 (OVR:64) to 神戸スパーズ for Player_892 (OVR:64) | gain_a=2.3 gain_b=5.2 | 茨城メカニックス:611,807,644(under_cap) | 神戸スパーズ:611,900,509(under_cap)
+  year=3  gain_a=2.30 gain_b=5.20 |gain_a-gain_b|=2.90
+  a_gets_pb: age=19 ovr=64 pot=A strategy_tag=hold
+  b_gets_pa: age=25 ovr=64 pot=C strategy_tag=push
+
+[TRADE] 浜松サンダーバーズ traded Player_178 (OVR:71) to 香川スピアーズ for Player_564 (OVR:65) | gain_a=1.2 gain_b=6.4 | 浜松サンダーバーズ:1,020,821,973(under_cap) | 香川スピアーズ:445,636,462(under_cap)
+  year=3  gain_a=1.20 gain_b=6.40 |gain_a-gain_b|=5.20
+  a_gets_pb: age=26 ovr=65 pot=D strategy_tag=push
+  b_gets_pa: age=35 ovr=71 pot=D strategy_tag=push
+
+[TRADE] シンライダーズ渋谷 traded Player_150 (OVR:71) to 福井ストームズ for Player_407 (OVR:72) | gain_a=1.7 gain_b=8.6 | シンライダーズ渋谷:906,974,639(under_cap) | 福井ストームズ:699,534,556(under_cap)
+  year=3  gain_a=1.70 gain_b=8.60 |gain_a-gain_b|=6.90
+  a_gets_pb: age=30 ovr=72 pot=D strategy_tag=push
+  b_gets_pa: age=24 ovr=71 pot=B strategy_tag=hold
+
+[TRADE] 秋田ノースラッキーズ traded Player_242 (OVR:66) to 長崎パルカンズ for Player_105 (OVR:65) | gain_a=2.7 gain_b=2.0 | 秋田ノースラッキーズ:629,961,114(under_cap) | 長崎パルカンズ:1,042,706,947(under_cap)
+  year=3  gain_a=2.70 gain_b=2.00 |gain_a-gain_b|=0.70
+  a_gets_pb: age=28 ovr=65 pot=D strategy_tag=push
+  b_gets_pa: age=32 ovr=66 pot=D strategy_tag=hold
+
+[TRADE] 富山グリズリーズ traded Player_295 (OVR:65) to 横浜パイレーツ for Player_205 (OVR:66) | gain_a=3.5 gain_b=5.3 | 富山グリズリーズ:515,804,422(under_cap) | 横浜パイレーツ:1,161,372,301(under_cap)
+  year=3  gain_a=3.50 gain_b=5.30 |gain_a-gain_b|=1.80
+  a_gets_pb: age=27 ovr=66 pot=D strategy_tag=push
+  b_gets_pa: age=26 ovr=65 pot=C strategy_tag=push
+
+Aggregate (acquired players both sides):
+  n_acquisitions=34  mean_age=26.50
+  mean_gain_a=3.159  mean_gain_b=3.429
+  mean|gain_a-gain_b|=1.929

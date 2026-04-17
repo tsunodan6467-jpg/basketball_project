@@ -1,0 +1,146 @@
+cpu_auto_trade_value_breakdown_observe | seed=424243 years=5
+Method: breakdown via trade_mod._age_bonus etc.; wrap _evaluate_trade_value; on each [TRADE] print, match ring tail (gain計算の4連呼の直後に print のみ)
+Eval breakdown vs official mismatch count (|sum(parts)-official|>0.02): 0
+
+Trades parsed from [TRADE]: 19  |  quad matched to eval log: 19
+
+Aggregate: mean component diff (incoming - outgoing) toward each team’s gain
+  Team A gain = value(p_b at team_a, in) - value(p_a at team_a, out)
+  Team B gain = value(p_a at team_b, in) - value(p_b at team_b, out)
+
+  mean gain_a (line)=2.9263  mean gain_b=3.5421
+  mean diff parts — side A (gain_a):
+    ovr: -0.3684
+    age_bonus: +0.7895
+    potential_bonus: +0.8421
+    contract_bonus: +0.2105
+    position_need_bonus: +0.8289
+    strategy_fit_bonus: +0.6805
+    direction_ovr_bonus: -0.0553
+  mean diff parts — side B (gain_b):
+    ovr: +0.3684
+    age_bonus: +0.0526
+    potential_bonus: -0.8421
+    contract_bonus: -0.2105
+    position_need_bonus: +3.1026
+    strategy_fit_bonus: +0.8684
+    direction_ovr_bonus: +0.2053
+
+Largest |mean| component for gain_a: potential_bonus (+0.8421)
+Largest |mean| component for gain_b: position_need_bonus (+3.1026)
+
+Per-trade (abbrev):
+
+[TRADE] 信州ブレイクストーンズ traded Player_358 (OVR:68) to 富山グリズリーズ for Player_295 (OVR:69) | gain_a=3.5 gain_b=2.3 | 信州ブレイクストーンズ:838,960,910(under_cap) | 富山グリズリーズ:676,671,914(under_cap)
+  y=1 gain_a=3.50 gain_b=2.30 |calcΔa=0.0200 calcΔb=0.0200 | tags a_gets:hold b_gets:rebuild
+  players: Player_358 age=23 pot=D <-> Player_295 age=28 pot=B
+  gain_a parts: ovr=+1.00 age_bonus=+2.50 potential_bonus=+4.50 contract_bonus=+0.00 position_need_bonus=-6.30 strategy_fit_bonus=+1.33 direction_ovr_bonus=+0.45
+  gain_b parts: ovr=-1.00 age_bonus=+3.00 potential_bonus=-4.50 contract_bonus=+0.00 position_need_bonus=+6.30 strategy_fit_bonus=-1.33 direction_ovr_bonus=-0.15
+
+[TRADE] 愛媛レッドホークス traded Player_502 (OVR:71) to 川崎ブレイクライトニング for Player_82 (OVR:65) | gain_a=1.4 gain_b=3.2 | 愛媛レッドホークス:369,888,803(under_cap) | 川崎ブレイクライトニング:764,091,896(under_cap)
+  y=1 gain_a=1.40 gain_b=3.20 |calcΔa=0.0200 calcΔb=0.0200 | tags a_gets:rebuild b_gets:push
+  players: Player_502 age=29 pot=D <-> Player_82 age=21 pot=A
+  gain_a parts: ovr=-6.00 age_bonus=+4.00 potential_bonus=+7.00 contract_bonus=-1.20 position_need_bonus=-2.25 strategy_fit_bonus=+0.32 direction_ovr_bonus=-0.45
+  gain_b parts: ovr=+6.00 age_bonus=+3.50 potential_bonus=-7.00 contract_bonus=+1.20 position_need_bonus=-4.50 strategy_fit_bonus=+1.28 direction_ovr_bonus=+2.70
+
+[TRADE] ビーホークス三河 traded Player_66 (OVR:71) to 福島フレイムボムズ for Player_401 (OVR:68) | gain_a=3.1 gain_b=1.9 | ビーホークス三河:919,179,379(under_cap) | 福島フレイムボムズ:730,490,749(under_cap)
+  y=1 gain_a=3.10 gain_b=1.90 |calcΔa=0.0100 calcΔb=0.0000 | tags a_gets:rebuild b_gets:rebuild
+  players: Player_66 age=30 pot=D <-> Player_401 age=26 pot=C
+  gain_a parts: ovr=-3.00 age_bonus=+3.00 potential_bonus=+2.00 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=+0.21 direction_ovr_bonus=-1.35
+  gain_b parts: ovr=+3.00 age_bonus=-3.00 potential_bonus=-2.00 contract_bonus=+0.00 position_need_bonus=-2.25 strategy_fit_bonus=+4.80 direction_ovr_bonus=+1.35
+
+[TRADE] アペカムイ北海道 traded Player_218 (OVR:75) to 新潟エルトロックス for Player_526 (OVR:77) | gain_a=1.7 gain_b=4.0 | アペカムイ北海道:740,913,859(under_cap) | 新潟エルトロックス:440,451,156(under_cap)
+  y=1 gain_a=1.70 gain_b=4.00 |calcΔa=0.0000 calcΔb=0.0300 | tags a_gets:push b_gets:hold
+  players: Player_218 age=29 pot=B <-> Player_526 age=27 pot=B
+  gain_a parts: ovr=+2.00 age_bonus=+0.00 potential_bonus=+0.00 contract_bonus=-1.20 position_need_bonus=+0.00 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.90
+  gain_b parts: ovr=-2.00 age_bonus=+0.00 potential_bonus=+0.00 contract_bonus=+1.20 position_need_bonus=+4.05 strategy_fit_bonus=+1.68 direction_ovr_bonus=-0.90
+
+[TRADE] 群馬ブラックボルツ traded Player_103 (OVR:67) to 富山グリズリーズ for Player_293 (OVR:64) | gain_a=2.1 gain_b=3.9 | 群馬ブラックボルツ:963,356,423(under_cap) | 富山グリズリーズ:586,299,355(under_cap)
+  y=2 gain_a=2.10 gain_b=3.90 |calcΔa=0.0100 calcΔb=0.0100 | tags a_gets:push b_gets:rebuild
+  players: Player_103 age=33 pot=D <-> Player_293 age=25 pot=D
+  gain_a parts: ovr=-3.00 age_bonus=+7.00 potential_bonus=+0.00 contract_bonus=+1.20 position_need_bonus=-1.80 strategy_fit_bonus=-0.41 direction_ovr_bonus=-0.90
+  gain_b parts: ovr=+3.00 age_bonus=-7.00 potential_bonus=+0.00 contract_bonus=-1.20 position_need_bonus=+6.30 strategy_fit_bonus=+1.89 direction_ovr_bonus=+0.90
+
+[TRADE] 越谷ガンマズ traded Player_263 (OVR:69) to 熊本バッテリーズ for Player_389 (OVR:71) | gain_a=2.2 gain_b=1.8 | 越谷ガンマズ:620,608,017(under_cap) | 熊本バッテリーズ:762,677,625(under_cap)
+  y=2 gain_a=2.20 gain_b=1.80 |calcΔa=0.0000 calcΔb=0.0500 | tags a_gets:push b_gets:push
+  players: Player_263 age=27 pot=B <-> Player_389 age=23 pot=D
+  gain_a parts: ovr=+2.00 age_bonus=-2.50 potential_bonus=-4.50 contract_bonus=+0.00 position_need_bonus=+6.30 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.90
+  gain_b parts: ovr=-2.00 age_bonus=+2.50 potential_bonus=+4.50 contract_bonus=+0.00 position_need_bonus=-2.25 strategy_fit_bonus=+0.00 direction_ovr_bonus=-0.90
+
+[TRADE] 鹿児島ナイツ traded Player_520 (OVR:69) to 鳥取サキューズ for Player_598 (OVR:66) | gain_a=5.7 gain_b=6.1 | 鹿児島ナイツ:541,652,268(under_cap) | 鳥取サキューズ:467,911,252(under_cap)
+  y=2 gain_a=5.70 gain_b=6.10 |calcΔa=0.0100 calcΔb=0.0100 | tags a_gets:push b_gets:push
+  players: Player_520 age=28 pot=D <-> Player_598 age=22 pot=B
+  gain_a parts: ovr=-3.00 age_bonus=-2.50 potential_bonus=+4.50 contract_bonus=+2.80 position_need_bonus=+4.50 strategy_fit_bonus=+0.76 direction_ovr_bonus=-1.35
+  gain_b parts: ovr=+3.00 age_bonus=+2.50 potential_bonus=-4.50 contract_bonus=-2.80 position_need_bonus=+6.30 strategy_fit_bonus=+0.24 direction_ovr_bonus=+1.35
+
+[TRADE] 富山グリズリーズ traded Player_1205 (OVR:60) to 広島タイガーランズ for Player_134 (OVR:64) | gain_a=1.4 gain_b=2.1 | 富山グリズリーズ:510,983,096(under_cap) | 広島タイガーランズ:620,607,749(under_cap)
+  y=3 gain_a=1.40 gain_b=2.10 |calcΔa=0.0000 calcΔb=0.0100 | tags a_gets:push b_gets:hold
+  players: Player_1205 age=19 pot=A <-> Player_134 age=24 pot=C
+  gain_a parts: ovr=+4.00 age_bonus=+1.00 potential_bonus=-5.00 contract_bonus=+4.00 position_need_bonus=-4.50 strategy_fit_bonus=+1.90 direction_ovr_bonus=+0.00
+  gain_b parts: ovr=-4.00 age_bonus=-1.00 potential_bonus=+5.00 contract_bonus=-4.00 position_need_bonus=+2.25 strategy_fit_bonus=+3.84 direction_ovr_bonus=+0.00
+
+[TRADE] 名古屋ハートホエールズ traded Player_669 (OVR:64) to 新潟エルトロックス for Player_1033 (OVR:61) | gain_a=2.8 gain_b=2.2 | 名古屋ハートホエールズ:1,148,307,766(under_cap) | 新潟エルトロックス:400,457,693(under_cap)
+  y=3 gain_a=2.80 gain_b=2.20 |calcΔa=0.0500 calcΔb=0.0200 | tags a_gets:push b_gets:push
+  players: Player_669 age=20 pot=C <-> Player_1033 age=20 pot=S
+  gain_a parts: ovr=-3.00 age_bonus=+0.00 potential_bonus=+8.00 contract_bonus=+0.00 position_need_bonus=-2.25 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.00
+  gain_b parts: ovr=+3.00 age_bonus=+0.00 potential_bonus=-8.00 contract_bonus=+0.00 position_need_bonus=+6.30 strategy_fit_bonus=+0.92 direction_ovr_bonus=+0.00
+
+[TRADE] 茨城メカニックス traded Player_826 (OVR:62) to 群馬ブラックボルツ for Player_98 (OVR:65) | gain_a=1.5 gain_b=5.6 | 茨城メカニックス:613,796,616(under_cap) | 群馬ブラックボルツ:1,019,594,959(under_cap)
+  y=3 gain_a=1.50 gain_b=5.60 |calcΔa=0.0400 calcΔb=0.0400 | tags a_gets:push b_gets:push
+  players: Player_826 age=19 pot=A <-> Player_98 age=30 pot=D
+  gain_a parts: ovr=+3.00 age_bonus=+0.50 potential_bonus=-7.00 contract_bonus=+0.00 position_need_bonus=+0.00 strategy_fit_bonus=+4.96 direction_ovr_bonus=+0.00
+  gain_b parts: ovr=-3.00 age_bonus=-0.50 potential_bonus=+7.00 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=-0.19 direction_ovr_bonus=+0.00
+
+[TRADE] 越谷ガンマズ traded Player_270 (OVR:66) to 川崎ブレイクライトニング for Player_88 (OVR:64) | gain_a=1.2 gain_b=5.5 | 越谷ガンマズ:492,400,532(under_cap) | 川崎ブレイクライトニング:941,910,780(under_cap)
+  y=3 gain_a=1.20 gain_b=5.50 |calcΔa=0.0500 calcΔb=0.0000 | tags a_gets:push b_gets:push
+  players: Player_270 age=25 pot=D <-> Player_88 age=29 pot=C
+  gain_a parts: ovr=-2.00 age_bonus=+0.00 potential_bonus=+2.00 contract_bonus=-2.80 position_need_bonus=+4.50 strategy_fit_bonus=+0.00 direction_ovr_bonus=-0.45
+  gain_b parts: ovr=+2.00 age_bonus=+0.00 potential_bonus=-2.00 contract_bonus=+2.80 position_need_bonus=+2.25 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.45
+
+[TRADE] 横浜パイレーツ traded Player_199 (OVR:73) to アペカムイ北海道 for Player_217 (OVR:75) | gain_a=2.2 gain_b=4.6 | 横浜パイレーツ:1,136,722,444(under_cap) | アペカムイ北海道:820,830,822(under_cap)
+  y=3 gain_a=2.20 gain_b=4.60 |calcΔa=0.0500 calcΔb=0.0000 | tags a_gets:push b_gets:push
+  players: Player_199 age=24 pot=A <-> Player_217 age=32 pot=B
+  gain_a parts: ovr=+2.00 age_bonus=-0.50 potential_bonus=-2.50 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.90
+  gain_b parts: ovr=-2.00 age_bonus=+0.50 potential_bonus=+2.50 contract_bonus=+0.00 position_need_bonus=+4.50 strategy_fit_bonus=+0.00 direction_ovr_bonus=-0.90
+
+[TRADE] 福井ストームズ traded Player_410 (OVR:66) to 福島フレイムボムズ for Player_391 (OVR:62) | gain_a=1.5 gain_b=1.4 | 福井ストームズ:1,031,030,213(under_cap) | 福島フレイムボムズ:497,739,567(under_cap)
+  y=3 gain_a=1.50 gain_b=1.40 |calcΔa=0.0500 calcΔb=0.0200 | tags a_gets:push b_gets:push
+  players: Player_410 age=26 pot=D <-> Player_391 age=22 pot=D
+  gain_a parts: ovr=-4.00 age_bonus=-2.50 potential_bonus=+0.00 contract_bonus=+4.00 position_need_bonus=+4.50 strategy_fit_bonus=+0.00 direction_ovr_bonus=-0.45
+  gain_b parts: ovr=+4.00 age_bonus=+2.50 potential_bonus=+0.00 contract_bonus=-4.00 position_need_bonus=-2.25 strategy_fit_bonus=+0.72 direction_ovr_bonus=+0.45
+
+[TRADE] 名古屋ハートホエールズ traded Player_55 (OVR:67) to 信州ブレイクストーンズ for Player_295 (OVR:69) | gain_a=2.1 gain_b=6.5 | 名古屋ハートホエールズ:960,139,505(under_cap) | 信州ブレイクストーンズ:636,302,130(under_cap)
+  y=4 gain_a=2.10 gain_b=6.50 |calcΔa=0.0500 calcΔb=0.0200 | tags a_gets:push b_gets:push
+  players: Player_55 age=23 pot=A <-> Player_295 age=31 pot=B
+  gain_a parts: ovr=+2.00 age_bonus=-0.50 potential_bonus=-2.50 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.90
+  gain_b parts: ovr=-2.00 age_bonus=+0.50 potential_bonus=+2.50 contract_bonus=+0.00 position_need_bonus=+6.30 strategy_fit_bonus=+0.08 direction_ovr_bonus=-0.90
+
+[TRADE] アペカムイ北海道 traded Player_1335 (OVR:61) to 佐賀ブーマーズ for Player_130 (OVR:62) | gain_a=4.2 gain_b=4.3 | アペカムイ北海道:1,110,780,173(under_cap) | 佐賀ブーマーズ:648,411,798(under_cap)
+  y=4 gain_a=4.20 gain_b=4.30 |calcΔa=0.0500 calcΔb=0.0000 | tags a_gets:push b_gets:push
+  players: Player_1335 age=19 pot=B <-> Player_130 age=29 pot=C
+  gain_a parts: ovr=+1.00 age_bonus=+3.50 potential_bonus=-2.50 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.00
+  gain_b parts: ovr=-1.00 age_bonus=-3.50 potential_bonus=+2.50 contract_bonus=+0.00 position_need_bonus=+6.30 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.00
+
+[TRADE] ビーホークス三河 traded Player_78 (OVR:65) to 仙台46ers for Player_802 (OVR:64) | gain_a=8.6 gain_b=2.7 | ビーホークス三河:577,079,275(under_cap) | 仙台46ers:668,488,427(under_cap)
+  y=4 gain_a=8.60 gain_b=2.70 |calcΔa=0.0400 calcΔb=0.0200 | tags a_gets:push b_gets:hold
+  players: Player_78 age=27 pot=C <-> Player_802 age=20 pot=S
+  gain_a parts: ovr=-1.00 age_bonus=-3.50 potential_bonus=+8.00 contract_bonus=+1.20 position_need_bonus=+4.05 strategy_fit_bonus=-0.19 direction_ovr_bonus=+0.00
+  gain_b parts: ovr=+1.00 age_bonus=+3.50 potential_bonus=-8.00 contract_bonus=-1.20 position_need_bonus=+6.30 strategy_fit_bonus=+1.08 direction_ovr_bonus=+0.00
+
+[TRADE] 青森ワルツ traded Player_422 (OVR:62) to 鹿児島ナイツ for Player_516 (OVR:64) | gain_a=2.6 gain_b=4.4 | 青森ワルツ:399,165,651(under_cap) | 鹿児島ナイツ:422,292,216(under_cap)
+  y=4 gain_a=2.60 gain_b=4.40 |calcΔa=0.0200 calcΔb=0.0000 | tags a_gets:push b_gets:push
+  players: Player_422 age=22 pot=D <-> Player_516 age=29 pot=C
+  gain_a parts: ovr=+2.00 age_bonus=+2.50 potential_bonus=+2.00 contract_bonus=-4.00 position_need_bonus=-2.25 strategy_fit_bonus=+2.33 direction_ovr_bonus=+0.00
+  gain_b parts: ovr=-2.00 age_bonus=-2.50 potential_bonus=-2.00 contract_bonus=+4.00 position_need_bonus=+6.30 strategy_fit_bonus=+0.60 direction_ovr_bonus=+0.00
+
+[TRADE] 愛媛レッドホークス traded Player_507 (OVR:71) to 奈良ディアーズ for Player_484 (OVR:70) | gain_a=2.4 gain_b=1.7 | 愛媛レッドホークス:395,025,694(under_cap) | 奈良ディアーズ:500,595,546(under_cap)
+  y=4 gain_a=2.40 gain_b=1.70 |calcΔa=0.0100 calcΔb=0.0000 | tags a_gets:hold b_gets:push
+  players: Player_507 age=28 pot=D <-> Player_484 age=26 pot=C
+  gain_a parts: ovr=-1.00 age_bonus=+3.00 potential_bonus=+2.00 contract_bonus=+0.00 position_need_bonus=+0.00 strategy_fit_bonus=-1.44 direction_ovr_bonus=-0.15
+  gain_b parts: ovr=+1.00 age_bonus=+0.00 potential_bonus=-2.00 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=+0.00 direction_ovr_bonus=+0.45
+
+[TRADE] 滋賀リバーズ traded Player_322 (OVR:69) to 鳥取サキューズ for Player_589 (OVR:69) | gain_a=5.4 gain_b=3.1 | 滋賀リバーズ:968,167,390(under_cap) | 鳥取サキューズ:444,029,955(under_cap)
+  y=5 gain_a=5.40 gain_b=3.10 |calcΔa=0.0100 calcΔb=0.0400 | tags a_gets:push b_gets:push
+  players: Player_322 age=26 pot=B <-> Player_589 age=27 pot=B
+  gain_a parts: ovr=+0.00 age_bonus=+0.00 potential_bonus=+0.00 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=+3.16 direction_ovr_bonus=+0.00
+  gain_b parts: ovr=+0.00 age_bonus=+0.00 potential_bonus=+0.00 contract_bonus=+0.00 position_need_bonus=+2.25 strategy_fit_bonus=+0.89 direction_ovr_bonus=+0.00

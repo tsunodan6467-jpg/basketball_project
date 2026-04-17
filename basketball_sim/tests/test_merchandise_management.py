@@ -5,9 +5,36 @@ from basketball_sim.systems.merchandise_management import (
     advance_merchandise_phase,
     ensure_merchandise_on_team,
     estimate_dummy_merch_sales_lines,
+    format_cli_merchandise_management_screen_lines,
     get_merchandise_item,
     management_merchandise_revenue_bonus,
 )
+
+
+def test_format_cli_merch_screen_fresh():
+    t = Team(team_id=50, name="CliMer", league_level=1, is_user_team=True, money=5_000_000)
+    text = "\n".join(format_cli_merchandise_management_screen_lines(t))
+    assert "【グッズサマリー】" in text
+    assert "【候補比較】" in text
+    assert "直近施策: 未実行" in text
+    assert "履歴: 履歴なし" in text
+    assert "オルタネイトジャージ" in text
+    assert "ユニフォーム系" in text
+
+
+def test_format_cli_merch_screen_after_advance_marks_latest():
+    t = Team(team_id=51, name="CliMer2", league_level=1, is_user_team=True, money=5_000_000)
+    ok, _ = advance_merchandise_phase(t, "fan_towel")
+    assert ok is True
+    text = "\n".join(format_cli_merchandise_management_screen_lines(t))
+    assert "履歴: 1件" in text
+    assert "（直近）" in text
+    assert "チーム応援タオル" in text
+
+
+def test_format_cli_merch_screen_none_team():
+    text = "\n".join(format_cli_merchandise_management_screen_lines(None))
+    assert "情報なし" in text
 
 
 def test_ensure_builds_three_lines():

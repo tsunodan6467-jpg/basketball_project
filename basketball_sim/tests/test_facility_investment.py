@@ -5,6 +5,7 @@ from basketball_sim.systems.facility_investment import (
     FACILITY_MAX_LEVEL,
     can_commit_facility_upgrade,
     commit_facility_upgrade,
+    format_cli_facility_screen_header_lines,
     get_facility_upgrade_cost,
 )
 
@@ -42,3 +43,37 @@ def test_unknown_facility_key_rejected():
     ok, msg = can_commit_facility_upgrade(t, "not_a_facility")
     assert ok is False
     assert "不明" in msg
+
+
+def test_cli_facility_header_flat_levels_placeholders():
+    t = Team(team_id=1, name="T", league_level=1)
+    text = "\n".join(format_cli_facility_screen_header_lines(t))
+    assert "【施設サマリー】" in text
+    assert "【施設の見どころ】" in text
+    assert "全体水準: 低い" in text
+    assert "投資履歴: 履歴なし（未投資）" in text
+    assert "強み: 情報なし" in text
+    assert "弱み: 情報なし" in text
+    assert "次に上げたい候補: 情報なし" in text
+
+
+def test_cli_facility_header_spread_shows_strength_weakness_next():
+    t = Team(team_id=1, name="T", league_level=1)
+    t.arena_level = 4
+    t.training_facility_level = 2
+    t.medical_facility_level = 2
+    t.front_office_level = 3
+    text = "\n".join(format_cli_facility_screen_header_lines(t))
+    assert "強み: アリーナ" in text
+    assert "弱み: トレーニング施設 / メディカル施設" in text
+    assert "次に上げたい候補: トレーニング施設 / メディカル施設" in text
+
+
+def test_cli_facility_header_counts_upgrade_notes():
+    t = Team(team_id=1, name="T", league_level=1)
+    t.finance_history = [
+        {"note": "facility_upgrade:arena_level:Lv2", "revenue": 0, "expense": 1, "cashflow": -1},
+        {"note": "other", "revenue": 0, "expense": 0, "cashflow": 0},
+    ]
+    text = "\n".join(format_cli_facility_screen_header_lines(t))
+    assert "投資履歴: 1件" in text

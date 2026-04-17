@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Mapping
 
+from basketball_sim.config.game_constants import INITIAL_TEAM_MONEY_NEW_GAME
 from basketball_sim.systems.competition_rules import league_contract_active_rule
 from basketball_sim.systems.japan_regulation import count_regulation_slots, player_regulation_bucket_from_rule
 
@@ -37,6 +38,8 @@ class Team:
 
     home_city: str = ""
     is_user_team: bool = False
+    # 開幕 generate_teams 時のペイロール格（top/middle/bottom）。セーブ互換のため既定は空。
+    initial_payroll_tier: str = ""
 
     players: List[Player] = field(default_factory=list)
     starting_lineup: List[int] = field(default_factory=list)
@@ -45,8 +48,8 @@ class Team:
 
     popularity: int = 50
     market_size: float = 1.0
-    # 仮バランス調整: 経営即死を避けるための初期運転資金（後で本設計へ差し替え想定）
-    money: int = 2_000_000_000
+    # 新規開始時の初期運転資金（正本は game_constants.INITIAL_TEAM_MONEY_NEW_GAME）
+    money: int = INITIAL_TEAM_MONEY_NEW_GAME
 
     fan_base: int = 5000
     season_ticket_base: int = 2500
@@ -77,8 +80,8 @@ class Team:
     scout_focus: str = "balanced"
     scout_dispatch: str = "college"
 
-    rookie_budget: int = 40000000
-    rookie_budget_remaining: int = 40000000
+    rookie_budget: int = 120_000_000
+    rookie_budget_remaining: int = 120_000_000
 
     # -------------------------
     # Youth system (v1 foundation)
@@ -164,7 +167,7 @@ class Team:
         if getattr(self, "scout_dispatch", "college") not in valid_scout_dispatches:
             self.scout_dispatch = "college"
 
-        self.rookie_budget = int(max(0, getattr(self, "rookie_budget", 40000000)))
+        self.rookie_budget = int(max(0, getattr(self, "rookie_budget", 120_000_000)))
         # ソフトキャップ運用のため、remaining はマイナスも許容する（税を含めた支出管理）
         self.rookie_budget_remaining = int(getattr(self, "rookie_budget_remaining", self.rookie_budget))
 
@@ -289,7 +292,7 @@ class Team:
             self.scout_dispatch = "college"
 
         if not hasattr(self, "rookie_budget") or self.rookie_budget is None:
-            self.rookie_budget = 30000000
+            self.rookie_budget = 120_000_000
         self.rookie_budget = int(max(0, self.rookie_budget))
 
         if not hasattr(self, "rookie_budget_remaining") or self.rookie_budget_remaining is None:
@@ -3027,3 +3030,121 @@ class Team:
                     f"GP:{row.get('career_games_played', 0)} | "
                     f"Peak:{row.get('peak_ovr', 0)}"
                 )
+
+
+def _cli_owner_trust_band(trust: int) -> str:
+    if trust >= 70:
+        return "高い"
+    if trust >= 45:
+        return "普通"
+    if trust >= 25:
+        return "低い"
+    return "危険"
+
+
+def _cli_owner_focus_line(team: Any, latest: Optional[dict], missions: List[Any]) -> str:
+    if isinstance(latest, dict):
+        rs = latest.get("results")
+        if isinstance(rs, list):
+            titles: List[str] = []
+            for r in rs:
+                if len(titles) >= 3:
+                    break
+                if isinstance(r, dict):
+                    t = str(r.get("title", "") or "").strip()
+                    if t:
+                        titles.append(t)
+            if titles:
+                return " / ".join(titles)
+    if isinstance(missions, list):
+        cats: List[str] = []
+        seen: set[str] = set()
+        for m in missions:
+            if len(cats) >= 3:
+                break
+            if isinstance(m, dict):
+                cat = Team._owner_mission_category_label(m.get("category"))
+                if cat and cat not in seen:
+                    seen.add(cat)
+                    cats.append(cat)
+        if cats:
+            return " / ".join(cats)
+    return "情報なし"
+
+
+def format_cli_owner_mission_screen_header_lines(team: Any) -> List[str]:
+    """CLI オーナーミッション画面先頭用サマリー（表示のみ。信頼度・ミッションの計算ロジックは変更しない）。"""
+    ensure = getattr(team, "_ensure_history_fields", None)
+    if callable(ensure):
+        try:
+            ensure()
+        except Exception:
+            pass
+
+    missions: List[Any] = []
+    refresh = getattr(team, "refresh_owner_missions", None)
+    if callable(refresh):
+        try:
+            out = refresh(force=False)
+            if isinstance(out, list):
+                missions = out
+        except Exception:
+            missions = []
+    if not missions:
+        raw_m = getattr(team, "owner_missions", None)
+        missions = list(raw_m) if isinstance(raw_m, list) else []
+
+    hist_raw = getattr(team, "owner_mission_history", None)
+    hist: List[Any] = hist_raw if isinstance(hist_raw, list) else []
+
+    try:
+        trust = int(getattr(team, "owner_trust", 0) or 0)
+    except (TypeError, ValueError):
+        trust = 0
+
+    band = _cli_owner_trust_band(trust)
+
+    exp = "情報なし"
+    gel = getattr(team, "_get_owner_expectation_label", None)
+    if callable(gel):
+        try:
+            exp = str(gel()).strip() or "情報なし"
+        except Exception:
+            exp = "情報なし"
+
+    n_m = len(missions)
+    mission_line = "未実行" if n_m == 0 else f"{n_m}件"
+
+    n_h = len(hist)
+    hist_line = "履歴なし" if n_h == 0 else f"{n_h}件"
+
+    latest = hist[-1] if hist else None
+    latest_dict = latest if isinstance(latest, dict) else None
+    if latest_dict is not None:
+        try:
+            td = int(latest_dict.get("trust_delta_total", 0) or 0)
+        except (TypeError, ValueError):
+            td = 0
+        if td > 0:
+            eval_label = "やや改善"
+        elif td < 0:
+            eval_label = "悪化"
+        else:
+            eval_label = "横ばい"
+    else:
+        eval_label = "未更新"
+
+    focus = _cli_owner_focus_line(team, latest_dict, missions)
+
+    return [
+        "【オーナーサマリー】",
+        f"信頼度: {trust}（{band}）",
+        f"期待: {exp}",
+        f"進行中ミッション: {mission_line}",
+        f"評価履歴: {hist_line}",
+        "",
+        "【進行状況】",
+        f"直近評価: {eval_label}",
+        f"主な注目点: {focus}",
+        "",
+    ]

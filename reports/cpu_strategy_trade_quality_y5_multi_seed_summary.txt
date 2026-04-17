@@ -1,0 +1,41 @@
+CPU strategy trade quality — multi-seed summary
+years=5  seeds=5
+seed list: 424242, 424243, 424244, 424245, 424246
+
+Per-seed (CPU trade acquisitions, tag at acquire time):
+
+--- seed 424242  total_incoming=62 ---
+  push    n=45   mean_age=24.87  p50_age=24.0  mean_ovr=65.89  p50_ovr=67.0  age<=24%=57.8%  young_SA%=11.1%  mean_pot=1.16
+  hold    n=15   mean_age=27.73  p50_age=28.0  mean_ovr=68.27  p50_ovr=68.0  age<=24%=20.0%  young_SA%=0.0%  mean_pot=0.47
+  rebuild n=2    mean_age=31.00  p50_age=31.0  mean_ovr=60.00  p50_ovr=60.0  age<=24%=0.0%  young_SA%=0.0%  mean_pot=0.00
+
+--- seed 424243  total_incoming=48 ---
+  push    n=36   mean_age=25.97  p50_age=25.0  mean_ovr=65.58  p50_ovr=64.0  age<=24%=44.4%  young_SA%=13.9%  mean_pot=1.03
+  hold    n=6    mean_age=27.83  p50_age=28.5  mean_ovr=69.00  p50_ovr=68.5  age<=24%=16.7%  young_SA%=0.0%  mean_pot=0.50
+  rebuild n=6    mean_age=24.83  p50_age=25.0  mean_ovr=66.50  p50_ovr=65.5  age<=24%=50.0%  young_SA%=16.7%  mean_pot=1.50
+
+--- seed 424244  total_incoming=52 ---
+  push    n=38   mean_age=23.05  p50_age=22.0  mean_ovr=64.76  p50_ovr=64.0  age<=24%=65.8%  young_SA%=13.2%  mean_pot=1.05
+  hold    n=10   mean_age=26.20  p50_age=26.5  mean_ovr=66.00  p50_ovr=66.5  age<=24%=30.0%  young_SA%=0.0%  mean_pot=0.50
+  rebuild n=4    mean_age=22.25  p50_age=22.0  mean_ovr=64.50  p50_ovr=64.5  age<=24%=75.0%  young_SA%=50.0%  mean_pot=2.00
+
+--- seed 424245  total_incoming=48 ---
+  push    n=34   mean_age=24.44  p50_age=24.0  mean_ovr=65.79  p50_ovr=63.0  age<=24%=55.9%  young_SA%=11.8%  mean_pot=1.06
+  hold    n=13   mean_age=26.23  p50_age=26.0  mean_ovr=67.77  p50_ovr=69.0  age<=24%=30.8%  young_SA%=0.0%  mean_pot=0.54
+  rebuild n=1    mean_age=22.00  p50_age=22.0  mean_ovr=64.00  p50_ovr=64.0  age<=24%=100.0%  young_SA%=0.0%  mean_pot=0.00
+
+--- seed 424246  total_incoming=38 ---
+  push    n=27   mean_age=23.78  p50_age=24.0  mean_ovr=64.52  p50_ovr=63.0  age<=24%=59.3%  young_SA%=7.4%  mean_pot=0.78
+  hold    n=9    mean_age=26.11  p50_age=23.0  mean_ovr=63.00  p50_ovr=61.0  age<=24%=55.6%  young_SA%=11.1%  mean_pot=0.78
+  rebuild n=2    mean_age=29.00  p50_age=29.0  mean_ovr=71.00  p50_ovr=71.0  age<=24%=0.0%  young_SA%=0.0%  mean_pot=0.00
+
+=== Cross-seed rollups ===
+Seeds where push_n > hold_n: 5 / 5
+Seeds where (push mean_age < hold mean_age), both n>0: 5 / 5
+Seeds where (push mean_ovr > hold mean_ovr), both n>0: 1 / 5
+Seeds where (rebuild mean_age < push mean_age), both n>0: 3 / 5
+Seeds where rebuild n < 5: 4 / 5
+
+Interpretation hints:
+- If push_n > hold_n is stable but age/OVR ordering flips across seeds, 'youth skew' may be noise.
+- If rebuild n < 5 in most seeds, sample starvation is structural for this observe window.

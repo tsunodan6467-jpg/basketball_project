@@ -1,13 +1,74 @@
 import random
+from typing import Optional
 
 from basketball_sim.config.game_constants import GENERATOR_INITIAL_SALARY_BASE_PER_OVR
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.club_profile import get_initial_team_money_cpu
 from basketball_sim.systems.contract_logic import MIN_SALARY_DEFAULT
+from basketball_sim.systems.opening_roster_salary_v11 import (
+    _MIN_SALARY_D1,
+    _MIN_SALARY_D2_D3,
+    apply_opening_roster_age_profile_v11,
+    apply_opening_team_payroll_v11,
+    payroll_tier_labels_for_division,
+    roll_target_team_payroll,
+)
 
 # 選手IDが重複しないように管理するカウンタ
 _player_id_counter = 1
 
+# 開幕48チーム（強さ順: D1×16 → D2×16 → D3×16）。`generate_teams` の league_level ループ順と一致させる。
+OPENING_LEAGUE_TEAMS: list[tuple[str, str]] = [
+    ("エルバード東京", "東京"),
+    ("千葉ジャイアンツ", "千葉"),
+    ("琉球プラチナクラウンズ", "沖縄"),
+    ("宇都宮ブレイバーズ", "宇都宮"),
+    ("名古屋ハートホエールズ", "名古屋"),
+    ("ビーホークス三河", "三河"),
+    ("川崎ブレイクライトニング", "川崎"),
+    ("群馬ブラックボルツ", "群馬"),
+    ("長崎パルカンズ", "長崎"),
+    ("佐賀ブーマーズ", "佐賀"),
+    ("広島タイガーランズ", "広島"),
+    ("シンライダーズ渋谷", "渋谷"),
+    ("大阪エビーズ", "大阪"),
+    ("浜松サンダーバーズ", "浜松"),
+    ("島根カグヅチウィザーズ", "島根"),
+    ("横浜パイレーツ", "横浜"),
+    ("アペカムイ北海道", "北海道"),
+    ("仙台46ers", "仙台"),
+    ("秋田ノースラッキーズ", "秋田"),
+    ("茨城メカニックス", "茨城"),
+    ("越谷ガンマズ", "越谷"),
+    ("エルトゥール千葉", "千葉"),
+    ("富山グリズリーズ", "富山"),
+    ("メタル名古屋", "名古屋"),
+    ("滋賀リバーズ", "滋賀"),
+    ("京都ホーネッツ", "京都"),
+    ("神戸スパーズ", "神戸"),
+    ("信州ブレイクストーンズ", "長野"),
+    ("福岡ファルコンズ", "福岡"),
+    ("熊本バッテリーズ", "熊本"),
+    ("福島フレイムボムズ", "福島"),
+    ("福井ストームズ", "福井"),
+    ("青森ワルツ", "青森"),
+    ("岩手ベアーズ", "岩手"),
+    ("山形ドラゴンズ", "山形"),
+    ("横浜マーベラス", "横浜"),
+    ("サミッツ静岡", "静岡"),
+    ("奈良ディアーズ", "奈良"),
+    ("愛媛レッドホークス", "愛媛"),
+    ("鹿児島ナイツ", "鹿児島"),
+    ("新潟エルトロックス", "新潟"),
+    ("金沢ニンジャズ", "金沢"),
+    ("岐阜フォークス", "岐阜"),
+    ("香川スピアーズ", "香川"),
+    ("徳島ファイティングス", "徳島"),
+    ("鳥取サキューズ", "鳥取"),
+    ("埼玉ライバルズ", "埼玉"),
+    ("岡山リングス", "岡山"),
+]
 
 def sync_player_id_counter_from_world(teams, free_agents) -> int:
     """
@@ -30,22 +91,23 @@ def sync_player_id_counter_from_world(teams, free_agents) -> int:
     return _player_id_counter
 
 
-def calculate_initial_salary(ovr: int) -> int:
+def _generator_salary_floor(*, league_market_division: Optional[int] = None) -> int:
+    """
+    生成時の年俸最低床（opening v1.1 と整合）。
+    `league_market_division` が無い呼び出しは `MIN_SALARY_DEFAULT` にフォールバックする。
+    """
+    if league_market_division is None:
+        return int(MIN_SALARY_DEFAULT)
+    d = int(max(1, min(3, int(league_market_division))))
+    if d == 1:
+        return int(_MIN_SALARY_D1)
+    return int(_MIN_SALARY_D2_D3)
+
+
+def calculate_initial_salary(ovr: int, *, league_market_division: Optional[int] = None) -> int:
     """OVR をもとに generator が付与する初期年俸（開幕ペイロール用。契約希望額は PLAYER_SALARY_BASE_PER_OVR）。"""
-    return int(ovr) * GENERATOR_INITIAL_SALARY_BASE_PER_OVR
-
-
-def _initial_roster_target_team_payroll(league_level: int) -> int:
-    """
-    開幕ロスター専用: ディビジョンごとの目標総年俸（円/年）。
-    `generate_teams` のみで使用。D1 > D2 > D3 となる非重複レンジで段差を付ける。
-    """
-    lv = max(1, min(3, int(league_level)))
-    if lv == 1:
-        return random.randint(1_020_000_000, 1_140_000_000)
-    if lv == 2:
-        return random.randint(680_000_000, 780_000_000)
-    return random.randint(480_000_000, 580_000_000)
+    raw = int(ovr) * int(GENERATOR_INITIAL_SALARY_BASE_PER_OVR)
+    return max(_generator_salary_floor(league_market_division=league_market_division), int(raw))
 
 
 def _stable_player_tier_sort_key(player: Player) -> tuple[int, int]:
@@ -111,18 +173,21 @@ def _allocate_budget_proportionally(weights: list[int], target: int, floor: int)
     return alloc
 
 
-def _rebalance_team_initial_salaries_to_target(players: list[Player], target_total: int) -> None:
+def _rebalance_team_initial_salaries_to_target(
+    players: list[Player],
+    target_total: int,
+    *,
+    league_market_division: Optional[int] = None,
+) -> None:
     """
-    チーム合計を target_total に固定したまま年俸を配分する。generate_teams 専用。
-
-    第2弾: OVR 降順で上位5 / 中位5 / 下位3 に分け、層予算 58% / 32% / 10% を層内素年俸比例で配る。
-    13人以外のロスターは従来どおり一括比例（退避経路）。
+    旧開幕再配分（OVR 層 58/32/10）。`generate_teams` は `opening_roster_salary_v11` に移行済み。
+    テスト・呼び出し互換のため残す。
     """
     n = len(players)
     if n == 0 or target_total <= 0:
         return
 
-    floor = int(MIN_SALARY_DEFAULT)
+    floor = int(_generator_salary_floor(league_market_division=league_market_division))
     min_sum = floor * n
     if target_total < min_sum:
         target_total = min_sum
@@ -476,7 +541,8 @@ def generate_single_player(
     position_override: str = None,
     nationality_override: str = None,
     height_override: float = None,
-    weight_override: float = None
+    weight_override: float = None,
+    league_market_division: Optional[int] = None,
 ) -> Player:
     """
     ランダムで実情に即した能力や特徴を持つ選手を1人生成します。
@@ -590,7 +656,9 @@ def generate_single_player(
         popularity=pop
     )
 
-    player.salary = calculate_initial_salary(player.ovr)
+    player.salary = calculate_initial_salary(
+        player.ovr, league_market_division=league_market_division
+    )
     _assign_extended_attributes(player, pos, final_ovr)
     player.years_pro = max(0, player.age - 18)
     player.contract_years_left = random.randint(2, 4)
@@ -606,12 +674,19 @@ def generate_fictional_player(
     position_override: str = None,
     nationality_override: str = None,
     height_override: float = None,
-    weight_override: float = None
+    weight_override: float = None,
+    league_market_division: Optional[int] = None,
 ) -> Player:
     """
     D3の架空チーム向け、弱め設定の選手を1人生成する。
     OVR目安は 50〜68。
     """
+    # 明示指定が無いときは D3 文脈の最低床（正本 D2-D3）を使う。
+    _div_fictional = (
+        3
+        if league_market_division is None
+        else int(max(1, min(3, int(league_market_division))))
+    )
     global _player_id_counter
     pid = _player_id_counter
     _player_id_counter += 1
@@ -720,7 +795,9 @@ def generate_fictional_player(
         popularity=pop
     )
 
-    player.salary = calculate_initial_salary(player.ovr)
+    player.salary = calculate_initial_salary(
+        player.ovr, league_market_division=_div_fictional
+    )
     _assign_extended_attributes(player, pos, final_ovr)
     player.years_pro = max(0, player.age - 18)
     player.contract_years_left = random.randint(1, 3)
@@ -917,8 +994,8 @@ def generate_international_free_agent(nationality: str, reborn_profile: dict | N
         player.draft_origin_type = "international"
         _set_acquisition(player, "international", "international_market")
 
-    player.contract_years_left = random.randint(1, 2)
-    player.salary = calculate_initial_salary(player.ovr)
+    # FA プール等では `fa_pool_market_salary` / `normalize_free_agents` が年俸の正本。
+    # ここでは `generate_single_player` が付けた salary を維持し、呼び出し側で市場基準値へ同期する。
     player.league_years = 0
 
     if nationality == "Asia":
@@ -936,15 +1013,16 @@ def generate_teams() -> list[Team]:
     """
     teams = []
 
-    base_cities = ["Tokyo", "Osaka", "Nagoya", "Fukuoka", "Sapporo", "Sendai", "Kyoto", "Yokohama"]
-    city_pool = []
-    for city in base_cities:
+    if len(OPENING_LEAGUE_TEAMS) != 48:
+        raise RuntimeError("OPENING_LEAGUE_TEAMS must contain exactly 48 entries")
+
+    # 開幕ロスター乱数列は旧実装と一致させる（都市プールの shuffle / pop / マスコット抽選の順序）。
+    city_pool: list[str] = []
+    for _city in ("Tokyo", "Osaka", "Nagoya", "Fukuoka", "Sapporo", "Sendai", "Kyoto", "Yokohama"):
         for _ in range(6):
-            city_pool.append(city)
+            city_pool.append(_city)
     random.shuffle(city_pool)
-
     mascots = ["Wolves", "Kings", "Mariners", "Eagles", "Lions", "Dragons", "Bulls", "Bears"]
-
     market_size_map = {
         "Tokyo": 1.15,
         "Osaka": 1.15,
@@ -953,19 +1031,20 @@ def generate_teams() -> list[Team]:
         "Fukuoka": 1.00,
         "Sapporo": 1.00,
         "Kyoto": 1.00,
-        "Sendai": 0.90
+        "Sendai": 0.90,
     }
 
     print("Generating 48 teams (3 Leagues x 16 Teams)...")
 
     team_id_counter = 1
     for level in range(1, 4):
-        for _ in range(16):
+        tier_labels = payroll_tier_labels_for_division(first_team_must_be_bottom=(level == 3))
+        for idx_div in range(16):
             city = city_pool.pop()
-            mascot = random.choice(mascots)
-            name = f"{city} {mascot}_{team_id_counter}"
-
+            random.choice(mascots)  # 旧: チーム名用。表示名は OPENING_LEAGUE_TEAMS 固定。
+            name, home_city = OPENING_LEAGUE_TEAMS[team_id_counter - 1]
             market_size = market_size_map.get(city, 1.0)
+            payroll_tier = tier_labels[idx_div]
 
             team = Team(
                 team_id=team_id_counter,
@@ -974,7 +1053,9 @@ def generate_teams() -> list[Team]:
                 strategy=_get_team_strategy(),
                 coach_style=_get_coach_style(),
                 popularity=random.randint(40, 60),
-                market_size=market_size
+                market_size=market_size,
+                initial_payroll_tier=payroll_tier,
+                home_city=home_city,
             )
 
             # 本契約13枠の国籍スロットを先に決めてから生成する。
@@ -985,7 +1066,9 @@ def generate_teams() -> list[Team]:
             random.shuffle(nationality_slots)
 
             for nat in nationality_slots:
-                p = generate_single_player(nationality_override=nat)
+                p = generate_single_player(
+                    nationality_override=nat, league_market_division=level
+                )
                 p.years_pro = max(0, p.age - 18)
                 p.contract_years_left = random.randint(2, 4)
                 p.league_years = p.years_pro
@@ -993,8 +1076,11 @@ def generate_teams() -> list[Team]:
                 _set_acquisition(p, "normal", "initial_team_roster")
                 team.add_player(p)
 
-            target_pay = _initial_roster_target_team_payroll(team.league_level)
-            _rebalance_team_initial_salaries_to_target(team.players, target_pay)
+            apply_opening_roster_age_profile_v11(team)
+            target_pay = roll_target_team_payroll(team.league_level, payroll_tier)
+            apply_opening_team_payroll_v11(team, target_total=target_pay)
+
+            team.money = int(get_initial_team_money_cpu(team))
 
             teams.append(team)
             team_id_counter += 1

@@ -1,12 +1,13 @@
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 import random
 
 from basketball_sim.config.game_constants import (
     GENERATOR_INITIAL_SALARY_BASE_PER_OVR,
-    PLAYER_SALARY_BASE_PER_OVR,
+    INITIAL_TEAM_MONEY_NEW_GAME,
 )
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.opening_roster_salary_v11 import _MIN_SALARY_D1, _MIN_SALARY_D2_D3
 from basketball_sim.systems.season_transaction_rules import cpu_inseason_fa_allowed_for_simulated_round
 from basketball_sim.systems.contract_logic import MIN_SALARY_DEFAULT, get_team_payroll
 from basketball_sim.systems.salary_cap_budget import get_hard_cap, get_soft_cap, league_level_for_team
@@ -28,7 +29,21 @@ def _scale_fa_estimate_bonus(old_bonus: int) -> int:
     return int(old_bonus * GENERATOR_INITIAL_SALARY_BASE_PER_OVR // _ESTIMATE_FA_LEGACY_OVR_COEFF)
 
 
-def ensure_fa_market_fields(player: Player) -> None:
+def fa_market_floor_for_estimate(*, league_market_division: Optional[int] = None) -> int:
+    """
+    見積・欠損補完用の最低年俸（opening v1.1 と同一の D1 / D2-D3 床）。
+
+    division が取れないときだけ `MIN_SALARY_DEFAULT`（従来の 300_000）にフォールバックする。
+    """
+    if league_market_division is None:
+        return int(MIN_SALARY_DEFAULT)
+    d = int(max(1, min(3, int(league_market_division))))
+    if d == 1:
+        return int(_MIN_SALARY_D1)
+    return int(_MIN_SALARY_D2_D3)
+
+
+def ensure_fa_market_fields(player: Player, *, league_market_division: Optional[int] = None) -> None:
     """
     FA市場用の安全補完。
     既存セーブでも落ちにくいように最低限の属性を埋める。
@@ -40,7 +55,7 @@ def ensure_fa_market_fields(player: Player) -> None:
         player.is_retired = False
 
     if not hasattr(player, "salary") or player.salary is None:
-        player.salary = max(getattr(player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
+        player.salary = int(fa_market_floor_for_estimate(league_market_division=league_market_division))
 
     if not hasattr(player, "contract_years_left") or player.contract_years_left is None:
         player.contract_years_left = 0
@@ -54,21 +69,24 @@ def ensure_team_fa_market_fields(team: Team) -> None:
     Team側の最低限の安全補完。
     """
     if not hasattr(team, "money") or team.money is None:
-        team.money = 2_000_000_000
+        team.money = int(INITIAL_TEAM_MONEY_NEW_GAME)
 
     if not hasattr(team, "players") or team.players is None:
         team.players = []
 
 
 
-def estimate_fa_market_value(player: Player) -> int:
+def estimate_fa_market_value(player: Player, *, league_market_division: Optional[int] = None) -> int:
     """
-    FA市場でのざっくり年俸目安（インシーズンFAの表示＝`sign_free_agent` 未指定時の契約額の単一ソース）。
+    FA市場でのざっくり年俸目安（補助値）。
+
+    インシーズンFA の **主たる契約額** は `inseason_fa_contract_salary`（正本帯＋本値のブレンド）。
+    本関数はそのブレンドの入力の一つとして残す。FAプール保存の正本は `fa_pool_market_salary`。
 
     第1弾: 開幕ロスターと同じ `GENERATOR_INITIAL_SALARY_BASE_PER_OVR` オーダーへ寄せる。
     旧 `ovr*12000` 核に載っていた potential / 年齢 / FA待機の加算は、同じ比率で円額スケールする。
     """
-    ensure_fa_market_fields(player)
+    ensure_fa_market_fields(player, league_market_division=league_market_division)
 
     ovr = int(getattr(player, "ovr", 0))
     age = int(getattr(player, "age", 25))
@@ -102,29 +120,99 @@ def estimate_fa_market_value(player: Player) -> int:
     if fa_wait >= 3:
         base -= _scale_fa_estimate_bonus(150_000)
 
-    return max(int(MIN_SALARY_DEFAULT), int(base))
+    return max(
+        int(fa_market_floor_for_estimate(league_market_division=league_market_division)),
+        int(base),
+    )
 
 
-def sync_fa_pool_player_salary_to_estimate(player: Player) -> None:
+def fa_pool_market_salary(player: Player, *, league_division: int = 3) -> int:
     """
-    FAプール正規化専用: `player.salary` を市場ベース年俸として `estimate_fa_market_value` に揃える。
+    FAプール上の `player.salary` の意味を固定する単一入口: 正本 v1.1 帯ベースの市場基準値。
+    最終契約額ではない。`estimate_fa_market_value` は補助ブレンドのみ。
+    """
+    div = int(max(1, min(3, int(league_division))))
+    ensure_fa_market_fields(player, league_market_division=div)
+    from basketball_sim.systems.resign_salary_anchor import blend_fa_pool_market_salary
+
+    est = int(estimate_fa_market_value(player, league_market_division=div))
+    return int(blend_fa_pool_market_salary(player, div, est))
+
+
+def resolve_league_market_division_for_fa_pool(
+    *,
+    team: Optional[Team] = None,
+    teams: Optional[List[Team]] = None,
+    league_market_division: Optional[int] = None,
+) -> int:
+    """FA プール用の division 文脈（`normalize_free_agents` と同系統）。"""
+    if league_market_division is not None:
+        return int(max(1, min(3, int(league_market_division))))
+    if team is not None:
+        return int(league_level_for_team(team))
+    if teams:
+        from basketball_sim.systems.resign_salary_anchor import median_league_level_for_teams
+
+        return int(median_league_level_for_teams(teams))
+    return 3
+
+
+def assign_fa_pool_market_salary_on_release_to_fa(
+    player: Player,
+    *,
+    team: Optional[Team] = None,
+    teams: Optional[List[Team]] = None,
+    league_market_division: Optional[int] = None,
+) -> None:
+    """
+    FA プールへ載せる直前に、年俸が 0 以下なら `fa_pool_market_salary`（市場基準値）へ揃える。
+
+    最終契約額ではない。trim / overflow / 落選などの仮置き用。
+    """
+    if int(getattr(player, "salary", 0) or 0) > 0:
+        return
+    div = resolve_league_market_division_for_fa_pool(
+        team=team, teams=teams, league_market_division=league_market_division
+    )
+    player.salary = int(fa_pool_market_salary(player, league_division=div))
+
+
+def inseason_fa_contract_salary(team: Team, player: Player) -> int:
+    """
+    インシーズンFA の契約・表示・可否判定に使う年俸（円）。
+
+    正本 v1.1 帯（`get_fa_offer_anchor_band`）を主に、`estimate_fa_market_value` を補助ブレンドする。
+    `sign_free_agent(..., contract_salary=None)` / CPU インシーズン補強 / GUI 目安で共通。
+    """
+    from basketball_sim.systems.resign_salary_anchor import blend_inseason_fa_contract_salary
+
+    div = int(league_level_for_team(team))
+    ensure_fa_market_fields(player, league_market_division=div)
+    est = int(estimate_fa_market_value(player, league_market_division=div))
+    return int(blend_inseason_fa_contract_salary(team, player, est))
+
+
+def sync_fa_pool_player_salary_to_estimate(player: Player, league_market_division: int = 3) -> None:
+    """
+    FAプール正規化専用: `player.salary` を `fa_pool_market_salary`（市場基準値）に揃える。
+    関数名は後方互換のため維持。estimate は `fa_pool_market_salary` 内で補助のみ使用。
     **normalize_free_agents からのみ呼ぶこと**（ロスター所属中等への誤爆防止）。
     """
-    player.salary = int(estimate_fa_market_value(player))
+    player.salary = int(fa_pool_market_salary(player, league_division=int(league_market_division)))
 
 
-def normalize_free_agents(free_agents: List[Player]) -> List[Player]:
+def normalize_free_agents(free_agents: List[Player], *, league_market_division: int = 3) -> List[Player]:
     """
     retired選手を除外しつつ、必要属性を補完して返す。
-    FAプール上の `player.salary` を `estimate_fa_market_value` に同期し、CPU本格FA等の参照を揃える。
+    FAプール上の `player.salary` を `fa_pool_market_salary` に同期し、CPU本格FA等の参照を揃える。
     """
     normalized: List[Player] = []
 
     for player in free_agents:
-        ensure_fa_market_fields(player)
+        ensure_fa_market_fields(player, league_market_division=int(league_market_division))
         if getattr(player, "is_retired", False):
             continue
-        sync_fa_pool_player_salary_to_estimate(player)
+        sync_fa_pool_player_salary_to_estimate(player, league_market_division)
         normalized.append(player)
 
     return normalized
@@ -153,7 +241,8 @@ def evaluate_team_need_for_player(team: Team, player: Player) -> float:
     ポジション不足と若干の戦術適性だけ見る安全版。
     """
     ensure_team_fa_market_fields(team)
-    ensure_fa_market_fields(player)
+    _div_eval = int(league_level_for_team(team))
+    ensure_fa_market_fields(player, league_market_division=_div_eval)
 
     base_score = float(getattr(player, "ovr", 0))
 
@@ -236,13 +325,14 @@ def precheck_user_fa_sign(
     `sign_free_agent` は所持金を見ないため、ここで `can_team_afford_free_agent` も含める。
 
     `contract_salary` を渡した場合（オフ手動FA・本格FA同型オファー）、その額で所持金・
-    サラリー余地を判定する。未指定時は従来どおり `estimate_fa_market_value`。
+    サラリー余地を判定する。未指定時は `inseason_fa_contract_salary`（正本帯主＋estimate 補助）。
     """
     from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
     from basketball_sim.systems.roster_rules import can_add_contract_player
 
     ensure_team_fa_market_fields(team)
-    ensure_fa_market_fields(player)
+    _div_pre = int(league_level_for_team(team))
+    ensure_fa_market_fields(player, league_market_division=_div_pre)
 
     ok_roster, roster_msg = can_add_contract_player(team, player)
     if not ok_roster:
@@ -263,7 +353,7 @@ def precheck_user_fa_sign(
         afford = can_team_afford_fa_salary(team, sal)
         label = "契約年俸（本格FA同型）"
     else:
-        sal = int(estimate_fa_market_value(player))
+        sal = int(inseason_fa_contract_salary(team, player))
         afford = can_team_afford_free_agent(team, player)
         label = "年俸目安"
 
@@ -288,7 +378,7 @@ def can_team_afford_free_agent(
     所持金 + サラリーキャップの両方で判定する。
     """
     ensure_team_fa_market_fields(team)
-    ask = estimate_fa_market_value(player)
+    ask = inseason_fa_contract_salary(team, player)
     return can_team_afford_fa_salary(team, ask, salary_cap=salary_cap)
 
 
@@ -319,7 +409,8 @@ def can_team_sign_player_by_japan_rule(team: Team, player: Player) -> bool:
     目的は CPU FA が明確な枠超過契約をしないようにすること。
     """
     ensure_team_fa_market_fields(team)
-    ensure_fa_market_fields(player)
+    _div_jp = int(league_level_for_team(team))
+    ensure_fa_market_fields(player, league_market_division=_div_jp)
 
     try:
         from basketball_sim.systems.roster_rules import can_add_contract_player
@@ -362,8 +453,9 @@ def pick_best_free_agent_for_team(team: Team, free_agents: List[Player]) -> Opti
     """
     candidates = []
 
+    _div_pick = int(league_level_for_team(team))
     for player in free_agents:
-        ensure_fa_market_fields(player)
+        ensure_fa_market_fields(player, league_market_division=_div_pick)
         if getattr(player, "is_retired", False):
             continue
         if not can_team_afford_free_agent(team, player):
@@ -398,10 +490,11 @@ def sign_free_agent(
     年俸コストはオフ `_process_team_finances` の payroll → `record_financial_result` に一元化する。
 
     `contract_salary` / `contract_years` を指定した場合（オフ手動FA・CPU本格FA同型のオファー）、
-    それをそのまま適用する。未指定時は `estimate_fa_market_value` / `estimate_fa_contract_years`。
+    それをそのまま適用する。未指定時は `inseason_fa_contract_salary` / `estimate_fa_contract_years`。
     """
     ensure_team_fa_market_fields(team)
-    ensure_fa_market_fields(player)
+    _div_sign = int(league_level_for_team(team))
+    ensure_fa_market_fields(player, league_market_division=_div_sign)
 
     if not can_team_sign_player_by_japan_rule(team, player):
         return
@@ -414,7 +507,7 @@ def sign_free_agent(
             else int(estimate_fa_contract_years(player))
         )
     else:
-        salary = int(estimate_fa_market_value(player))
+        salary = int(inseason_fa_contract_salary(team, player))
         years = int(estimate_fa_contract_years(player))
 
     if salary <= 0:
@@ -472,7 +565,8 @@ def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int
     from basketball_sim.systems.free_agency import _calculate_offer, _determine_contract_years
 
     ensure_team_fa_market_fields(team)
-    ensure_fa_market_fields(player)
+    _div_manual = int(league_level_for_team(team))
+    ensure_fa_market_fields(player, league_market_division=_div_manual)
 
     # --- 1. サイン可能な年俸余地（キャップ系の単一入口） ---
     signing_room = int(get_team_fa_signing_limit(team))
@@ -485,7 +579,7 @@ def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int
     estimate_for_floor: Optional[int] = None
     needs_estimate_fallback = core_offer <= 0 and has_signing_room
     if needs_estimate_fallback:
-        estimate_for_floor = int(estimate_fa_market_value(player))
+        estimate_for_floor = int(estimate_fa_market_value(player, league_market_division=_div_manual))
         core_offer = min(estimate_for_floor, signing_room)
 
     if core_offer <= 0:
@@ -493,7 +587,7 @@ def offseason_manual_fa_offer_and_years(team: Team, player: Player) -> Tuple[int
 
     # 下限計算用に estimate を1回確保（フォールバック済みなら再利用）
     if estimate_for_floor is None:
-        estimate_for_floor = int(estimate_fa_market_value(player))
+        estimate_for_floor = int(estimate_fa_market_value(player, league_market_division=_div_manual))
 
     # --- 4. オフ手動専用下限（estimate × 定数倍率） ---
     manual_floor_offer = int(estimate_for_floor * MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER)
@@ -598,12 +692,14 @@ def maintain_minimum_fa_pool(
     free_agents: List[Player],
     target_minimum: int,
     generator_func=None,
+    *,
+    league_market_division: int = 3,
 ) -> List[Player]:
     """
     FA市場が枯れすぎないように最低人数を維持する。
     generator_func は Player を1人返す関数を想定。
     """
-    normalized = normalize_free_agents(free_agents)
+    normalized = normalize_free_agents(free_agents, league_market_division=league_market_division)
 
     if generator_func is None:
         return normalized
@@ -614,13 +710,41 @@ def maintain_minimum_fa_pool(
         except Exception:
             break
 
-        ensure_fa_market_fields(player)
+        ensure_fa_market_fields(player, league_market_division=int(league_market_division))
         player.contract_years_left = 0
         player.team_id = None
+        # 補充選手の FA プール年俸は `fa_pool_market_salary` を単一正本とする（最終 normalize でも再同期される）
+        sync_fa_pool_player_salary_to_estimate(player, int(league_market_division))
         normalized.append(player)
 
-    return normalize_free_agents(normalized)
+    return normalize_free_agents(normalized, league_market_division=league_market_division)
 
+
+def _cpu_fa_cycle_participation_probability(team: Any) -> float:
+    """
+    インシーズン CPU FA サイクル用の薄い参加確率（1.0 = 常に試行）。
+    ユーザーチームは常に 1.0（本経路では通常来ないが無変更担保）。
+    """
+    if bool(getattr(team, "is_user_team", False)):
+        return 1.0
+    try:
+        from basketball_sim.systems.cpu_club_strategy import get_cpu_club_strategy
+
+        a = float(get_cpu_club_strategy(team, None).fa_aggressiveness)
+    except Exception:
+        return 1.0
+    if a != a or abs(a - 1.0) > 0.25:
+        return 1.0
+    # hold 付近 0.97 を基準に、ag から ±数％相当だけシフト（体感で暴れない）
+    p = 0.97 + 0.12 * (a - 1.0)
+    return max(0.925, min(0.992, p))
+
+
+def _cpu_fa_cycle_participation_gate(team: Any) -> bool:
+    p = _cpu_fa_cycle_participation_probability(team)
+    if p >= 1.0:
+        return True
+    return random.random() < p
 
 
 def run_cpu_fa_market_cycle(
@@ -642,14 +766,19 @@ def run_cpu_fa_market_cycle(
     ):
         return []
 
+    from basketball_sim.systems.resign_salary_anchor import median_league_level_for_teams
+
     logs: List[str] = []
-    market = normalize_free_agents(free_agents)
+    div_m = int(median_league_level_for_teams(teams))
+    market = normalize_free_agents(free_agents, league_market_division=div_m)
 
     for team in teams:
         ensure_team_fa_market_fields(team)
 
         sign_count = 0
         while sign_count < max_signings_per_team:
+            if not _cpu_fa_cycle_participation_gate(team):
+                break
             target = pick_best_free_agent_for_team(team, market)
             if target is None:
                 break
@@ -664,7 +793,7 @@ def run_cpu_fa_market_cycle(
             logs.append(
                 f"[FA-SIGN] {team.name} signed {target.name} "
                 f"(OVR:{getattr(target, 'ovr', 0)}) | "
-                f"Salary:{estimate_fa_market_value(target)} | "
+                f"Salary:{inseason_fa_contract_salary(team, target)} | "
                 f"Years:{estimate_fa_contract_years(target)} | "
                 f"Payroll:{get_team_payroll(team)} / SoftCap:{int(get_soft_cap(league_level=league_level_for_team(team)))}"
             )

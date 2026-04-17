@@ -6,8 +6,10 @@ from typing import List, Tuple, Dict, Optional, Set
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.competition_rules import league_contract_active_rule
-from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.contract_logic import get_team_payroll, is_draft_rookie_contract_active
+from basketball_sim.systems.free_agent_market import assign_fa_pool_market_salary_on_release_to_fa
 from basketball_sim.systems.japan_regulation import count_regulation_slots
+from basketball_sim.systems.cpu_club_strategy import get_cpu_club_strategy
 from basketball_sim.systems.salary_cap_budget import get_soft_cap, league_level_for_team
 
 
@@ -36,6 +38,19 @@ class TradeSystem:
     """
 
     POSITION_KEYS = ["PG", "SG", "SF", "PF", "C"]
+
+    def _cpu_future_value_trade_multiplier(self, team: Team) -> float:
+        """CPU のみ: 将来価値寄りの部分に掛ける薄い倍率（1.0±数％）。ユーザーチームは常に 1.0。"""
+        if bool(getattr(team, "is_user_team", False)):
+            return 1.0
+        try:
+            w = float(get_cpu_club_strategy(team, None).future_value_weight)
+        except Exception:
+            return 1.0
+        if w != w or abs(w - 1.0) > 0.25:
+            return 1.0
+        m = 1.0 + 0.4 * (w - 1.0)
+        return max(0.965, min(1.035, m))
 
     def _player_key(self, player: Player) -> int:
         # player_id が無いケースでも落ちないように保険
@@ -171,11 +186,13 @@ class TradeSystem:
 
         value = 0.0
         value += ovr * 1.35
-        value += max(0, 28 - abs(age - 27)) * 0.40
+        m_fut = self._cpu_future_value_trade_multiplier(team)
+        youth_peak = max(0, 28 - abs(age - 27)) * 0.40
+        value += youth_peak * m_fut
         value += self._get_contract_score(player)
-        value += self._get_age_curve_bonus(player, team)
-        value += max(0, popularity - 50) * 0.05
-
+        ac = self._get_age_curve_bonus(player, team)
+        future_pos_ac = max(0.0, ac)
+        future_neg_ac = ac - future_pos_ac
         potential_bonus = {
             "S": 5.0,
             "A": 3.5,
@@ -183,7 +200,11 @@ class TradeSystem:
             "C": 0.8,
             "D": 0.0,
         }
-        value += potential_bonus.get(potential, 0.0)
+        pot = potential_bonus.get(potential, 0.0)
+        value += pot * m_fut
+        value += future_pos_ac * m_fut
+        value += future_neg_ac
+        value += max(0, popularity - 50) * 0.05
 
         if injured:
             value -= 4.0
@@ -208,6 +229,9 @@ class TradeSystem:
 
         if getattr(send_player, "icon_locked", False):
             return TradeEvaluation(False, -999.0, ["icon_locked"])
+
+        if is_draft_rookie_contract_active(send_player):
+            return TradeEvaluation(False, -999.0, ["draft_rookie_locked"])
 
         if not self._passes_nationality_rule_after_trade(team, send_player, receive_player):
             return TradeEvaluation(False, -999.0, ["nationality_rule_violation"])
@@ -237,7 +261,13 @@ class TradeSystem:
         if getattr(receive_player, "ovr", 50) > getattr(send_player, "ovr", 50):
             reasons.append("higher_ovr_return")
 
-        accepts = score >= 0.5
+        cutoff = 0.5
+        if not bool(getattr(team, "is_user_team", False)):
+            st = get_cpu_club_strategy(team, None)
+            # trade_loss_tolerance > 1: わずかに損を許容（閾値を下げる）
+            cutoff = 0.5 - 0.12 * (float(st.trade_loss_tolerance) - 1.0)
+            cutoff = max(0.38, min(0.58, cutoff))
+        accepts = score >= cutoff
         return TradeEvaluation(accepts, round(score, 2), reasons)
 
     def evaluate_one_for_one_trade(
@@ -300,6 +330,9 @@ class TradeSystem:
         if player_a not in getattr(team_a, "players", []):
             return False
         if player_b not in getattr(team_b, "players", []):
+            return False
+
+        if is_draft_rookie_contract_active(player_a) or is_draft_rookie_contract_active(player_b):
             return False
 
         if not self._passes_nationality_rule_after_trade(team_a, player_a, player_b):
@@ -463,6 +496,9 @@ class TradeSystem:
         if any(bool(getattr(p, "icon_locked", False)) for p in (gives_players + receives_players)):
             return TradeEvaluation(False, -999.0, ["icon_locked"])
 
+        if any(is_draft_rookie_contract_active(p) for p in gives_players):
+            return TradeEvaluation(False, -999.0, ["draft_rookie_locked"])
+
         # 所属・資産チェック
         if any(self._player_key(p) not in {self._player_key(tp) for tp in getattr(team, "players", [])} for p in gives_players):
             return TradeEvaluation(False, -999.0, ["gives_players_not_on_team"])
@@ -555,6 +591,11 @@ class TradeSystem:
         n_assets = len(gives_players) + len(kept_incoming)
         base_threshold = {"strong": 1.2, "normal": 0.6, "rebuild": -0.2}.get(stance, 0.6)
         threshold = base_threshold + 0.05 * max(0, n_assets - 2)
+        if not bool(getattr(team, "is_user_team", False)):
+            st = get_cpu_club_strategy(team, None)
+            adj = 0.1 * (float(st.trade_loss_tolerance) - 1.0)
+            base_threshold -= adj
+            threshold -= adj
 
         # 参考理由
         if score >= base_threshold + 1.0:
@@ -646,6 +687,8 @@ class TradeSystem:
             return False
         if any(bool(getattr(p, "icon_locked", False)) for p in (gives_a + receives_a)):
             return False
+        if any(is_draft_rookie_contract_active(p) for p in (gives_a + gives_b)):
+            return False
         if cash < 0 or rb < 0:
             return False
 
@@ -726,16 +769,14 @@ class TradeSystem:
             if p in getattr(team_a, "players", []):
                 team_a.remove_player(p)
                 p.contract_years_left = 0
-                if int(getattr(p, "salary", 0) or 0) <= 0:
-                    p.salary = max(int(getattr(p, "ovr", 0) or 0) * 10_000, 300_000)
+                assign_fa_pool_market_salary_on_release_to_fa(p, team=team_a)
                 if free_agents is not None:
                     free_agents.append(p)
         for p in dropped_b:
             if p in getattr(team_b, "players", []):
                 team_b.remove_player(p)
                 p.contract_years_left = 0
-                if int(getattr(p, "salary", 0) or 0) <= 0:
-                    p.salary = max(int(getattr(p, "ovr", 0) or 0) * 10_000, 300_000)
+                assign_fa_pool_market_salary_on_release_to_fa(p, team=team_b)
                 if free_agents is not None:
                     free_agents.append(p)
 

@@ -55,11 +55,15 @@ def run_user_offseason_fa_one_pick(
         precheck_user_fa_sign,
         sign_free_agent,
     )
+    from basketball_sim.systems.salary_cap_budget import league_level_for_team
     from basketball_sim.systems.roster_rules import RosterViolationError
 
     ensure_team_fa_market_fields(user_team)
+    _league_market_division = int(league_level_for_team(user_team))
     raw = list(free_agents)
-    candidates = normalize_free_agents(raw)
+    candidates = normalize_free_agents(
+        raw, league_market_division=_league_market_division
+    )
     candidates.sort(
         key=lambda p: (-int(getattr(p, "ovr", 0) or 0), str(getattr(p, "name", "")))
     )
@@ -133,7 +137,7 @@ def run_user_offseason_fa_one_pick(
 
     item_to_player: dict[str, Player] = {}
     for p in candidates:
-        ensure_fa_market_fields(p)
+        ensure_fa_market_fields(p, league_market_division=_league_market_division)
         pid = getattr(p, "player_id", None)
         iid = str(pid) if pid is not None else f"id_{id(p)}"
         item_to_player[iid] = p
@@ -182,7 +186,7 @@ def run_user_offseason_fa_one_pick(
             messagebox.showinfo("オフFA", "一覧から選手を選択してください。", parent=top)
             return
         ensure_team_fa_market_fields(user_team)
-        ensure_fa_market_fields(player)
+        ensure_fa_market_fields(player, league_market_division=_league_market_division)
         sal, yrs = offseason_manual_fa_offer_and_years(user_team, player)
         room = int(get_team_fa_signing_limit(user_team))
         money = int(getattr(user_team, "money", 0) or 0)

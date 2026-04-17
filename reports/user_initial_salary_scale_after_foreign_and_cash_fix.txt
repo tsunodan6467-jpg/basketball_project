@@ -1,0 +1,39 @@
+seed=424242  opening_v11_applied=True
+user_team league_level=3 initial_payroll_tier=bottom money=200,000,000  foreign_count=3
+
+AFTER auto_draft (before opening v11 user pass)
+  players=13 total=905,050,000 avg=69,619,230 max=78,200,000 min=0 get_team_payroll=905,050,000
+
+AFTER opening v11 user pass
+  players=13 total=391,504,113 avg=30,115,701 max=60,231,403 min=0 get_team_payroll=391,504,113
+
+foreign top 3 by salary (name, nat, ovr, salary)
+  Fictional_774         Foreign     ovr= 66    60,231,403
+  Fictional_698         Foreign     ovr= 65    60,231,402
+  Fictional_706         Foreign     ovr= 60    40,154,268
+Japan players by salary (desc)
+  Fictional_718         age=27  ovr= 68    40,154,268
+  Fictional_795         age=20  ovr= 68    35,134,984
+  Fictional_700         age=25  ovr= 67    35,134,984
+  Fictional_712         age=28  ovr= 67    30,115,701
+  Fictional_778         age=25  ovr= 67    25,096,418
+  Fictional_642         age=23  ovr= 66    20,077,134
+  Fictional_779         age=32  ovr= 66    20,077,134
+  Fictional_664         age=26  ovr= 64    15,057,850
+  Fictional_692         age=20  ovr= 63    10,038,567
+  Player_462            age=27  ovr= 92             0
+
+name                  pos  age  ovr  nat          icon  salary
+Player_462              SG    27   92  Japan         Y                0
+Fictional_718           C     27   68  Japan                 40,154,268
+Fictional_795           SG    20   68  Japan                 35,134,984
+Fictional_700           PF    25   67  Japan                 35,134,984
+Fictional_712           C     28   67  Japan                 30,115,701
+Fictional_778           PF    25   67  Japan                 25,096,418
+Fictional_642           SF    23   66  Japan                 20,077,134
+Fictional_774           SG    18   66  Foreign               60,231,403
+Fictional_779           SF    32   66  Japan                 20,077,134
+Fictional_698           PG    28   65  Foreign               60,231,402
+Fictional_664           SF    26   64  Japan                 15,057,850
+Fictional_692           PF    20   63  Japan                 10,038,567
+Fictional_706           PG    27   60  Foreign               40,154,268

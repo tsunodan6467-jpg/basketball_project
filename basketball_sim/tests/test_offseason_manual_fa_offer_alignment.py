@@ -7,6 +7,7 @@ from basketball_sim.systems.free_agent_market import (
     MANUAL_OFFSEASON_FA_OFFER_FLOOR_MULTIPLIER,
     estimate_fa_market_value,
     get_team_fa_signing_limit,
+    inseason_fa_contract_salary,
     offseason_manual_fa_offer_and_years,
     sign_free_agent,
 )
@@ -82,10 +83,10 @@ def test_sign_free_agent_contract_override_sets_salary_and_years():
     assert int(fa.contract_years_left) == yrs
 
 
-def test_sign_free_agent_without_override_still_uses_estimate():
+def test_sign_free_agent_without_override_uses_inseason_anchor_blend():
     team = Team(team_id=1, name="T", league_level=1, money=500_000_000, players=[])
     fa = _player(88003, ovr=66)
-    expected = int(estimate_fa_market_value(fa))
+    expected = int(inseason_fa_contract_salary(team, fa))
     sign_free_agent(team, fa)
     assert fa in team.players
     assert int(fa.salary) == expected

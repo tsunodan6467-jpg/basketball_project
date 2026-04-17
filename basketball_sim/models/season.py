@@ -8,6 +8,8 @@ from .player import Player
 from .match import Match
 from basketball_sim.systems.player_stats import PlayerStatsManager
 from basketball_sim.systems.free_agent_market import run_cpu_fa_market_cycle
+from basketball_sim.systems.match_postgame_cli_display import format_match_postgame_cli_lines
+from basketball_sim.systems.match_preview_cli_display import format_match_preview_cli_lines
 
 
 @dataclass
@@ -2800,6 +2802,8 @@ class Season:
         round_points = 0
         round_game_count = 0
 
+        user_team = next((t for t in self.all_teams if bool(getattr(t, "is_user_team", False))), None)
+
         for event in round_events:
             if event.event_type != "game":
                 continue
@@ -2808,6 +2812,28 @@ class Season:
             if is_national_team_break and event.competition_type == "regular_season":
                 continue
 
+            if user_team is not None and (
+                event.home_team is user_team or event.away_team is user_team
+            ):
+                opp_team = event.away_team if event.home_team is user_team else event.home_team
+                try:
+                    from basketball_sim.systems.schedule_importance_cli_display import (
+                        format_schedule_importance_cli_lines,
+                    )
+
+                    _imp = format_schedule_importance_cli_lines(
+                        self, user_team, opp_team, for_standings_only=False
+                    )
+                    if _imp:
+                        print("\n".join(_imp))
+                except Exception:
+                    pass
+                try:
+                    is_home = event.home_team is user_team
+                    print("\n".join(format_match_preview_cli_lines(user_team, opp_team, user_is_home=is_home)))
+                except Exception:
+                    pass
+
             match = Match(
                 home_team=event.home_team,
                 away_team=event.away_team,
@@ -2815,6 +2841,14 @@ class Season:
                 competition_type=event.competition_type
             )
             _, home_score, away_score = match.simulate()
+            if user_team is not None and (
+                event.home_team is user_team or event.away_team is user_team
+            ):
+                try:
+                    print("\n".join(format_match_postgame_cli_lines(match, user_team)))
+                except Exception:
+                    pass
+
             self.game_results.append({
                 "home_team": event.home_team.name,
                 "away_team": event.away_team.name,
@@ -2984,6 +3018,18 @@ class Season:
                     f"({t.regular_wins}-{t.regular_losses}) "
                     f"得失点差:{point_diff:+}"
                 )
+
+        user_team = next((t for t in self.all_teams if bool(getattr(t, "is_user_team", False))), None)
+        if user_team is not None and int(getattr(self, "game_count", 0) or 0) > 0:
+            try:
+                from basketball_sim.systems.schedule_importance_cli_display import (
+                    format_user_standings_importance_cli_lines,
+                )
+
+                for _ln in format_user_standings_importance_cli_lines(self, user_team):
+                    print(_ln)
+            except Exception:
+                pass
 
     def print_progress(self):
         print("\n==============================")

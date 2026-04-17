@@ -1,0 +1,56 @@
+CPU strategy trade VALUE breakdown | seed=424244 years=5
+Per incoming CPU trade player: components mirror trade_logic.calculate_player_trade_value.
+fut_delta_on_scaled_parts = (youth_peak_raw + pot_raw + age_pos_raw) * (m_fut - 1)
+Total acquisitions recorded: 52
+
+=== tag=push ===
+  n=38  parts_vs_official_mismatch_n=0
+  mean_ovr_term: 87.4303
+  mean_youth_peak_raw: 9.3684
+  mean_youth_peak_term: 9.1436
+  mean_contract: -1.7368
+  mean_age_pos_raw: 0.7263
+  mean_age_neg_raw: -0.0263
+  mean_age_pos_term: 0.7089
+  mean_age_neg_term: -0.0263
+  mean_pot_raw: 1.1
+  mean_pot_term: 1.0736
+  mean_pop_term: 0.0158
+  mean_m_fut: 0.976
+  mean_raw_fvw: 0.94
+  mean_fut_delta_on_scaled_parts: -0.2687
+  mean_total_official: 96.5037
+=== tag=hold ===
+  n=10  parts_vs_official_mismatch_n=0
+  mean_ovr_term: 89.1
+  mean_youth_peak_raw: 10.0
+  mean_youth_peak_term: 10.0
+  mean_contract: -1.6
+  mean_age_pos_raw: 0.36
+  mean_age_neg_raw: -0.2
+  mean_age_pos_term: 0.36
+  mean_age_neg_term: -0.2
+  mean_pot_raw: 0.44
+  mean_pot_term: 0.44
+  mean_pop_term: 0.065
+  mean_m_fut: 1.0
+  mean_raw_fvw: 1.0
+  mean_fut_delta_on_scaled_parts: 0.0
+  mean_total_official: 98.165
+=== tag=rebuild ===
+  n=4  parts_vs_official_mismatch_n=0
+  mean_ovr_term: 87.075
+  mean_youth_peak_raw: 9.3
+  mean_youth_peak_term: 9.5232
+  mean_contract: -1.75
+  mean_age_pos_raw: 0.6
+  mean_age_neg_raw: 0.0
+  mean_age_pos_term: 0.6144
+  mean_age_neg_term: 0.0
+  mean_pot_raw: 2.25
+  mean_pot_term: 2.304
+  mean_pop_term: 0.1125
+  mean_m_fut: 1.024
+  mean_raw_fvw: 1.06
+  mean_fut_delta_on_scaled_parts: 0.2916
+  mean_total_official: 97.8775

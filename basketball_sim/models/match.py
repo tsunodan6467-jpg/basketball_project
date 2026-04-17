@@ -1,7 +1,7 @@
 import random
 from collections import Counter
 from itertools import combinations
-from typing import Tuple, List, Optional, Dict, Set
+from typing import Tuple, List, Optional, Dict, Set, Any
 
 from .team import Team
 from .player import Player
@@ -122,6 +122,8 @@ class Match:
         self.commentary_index: int = 0
         self.play_sequence_log: List[Dict] = []
         self.play_sequence_index: int = 0
+
+        self._live_momentum_state: Dict[str, Any] = {"last_score_team_key": None, "streak_pts": 0}
 
         self._event_context_quarter: Optional[int] = None
         self._event_context_clock_seconds: Optional[int] = None
@@ -350,6 +352,36 @@ class Match:
             "meta": meta.copy() if meta else {},
         }
         self.play_by_play_log.append(event)
+
+        if str(event_type) in {"made_2", "made_3", "made_ft"} and int(points or 0) > 0 and scoring_team is not None:
+            try:
+                from basketball_sim.systems.live_game_log_cli import build_live_game_momentum_note
+
+                prev_h, prev_a = int(self.home_score), int(self.away_score)
+                new_h = int(event.get("home_score", 0) or 0)
+                new_a = int(event.get("away_score", 0) or 0)
+                sk = self._team_key(scoring_team)
+                hk = self._team_key(self.home_team)
+                ak = self._team_key(self.away_team)
+                _, line = build_live_game_momentum_note(
+                    self._live_momentum_state,
+                    prev_home=prev_h,
+                    prev_away=prev_a,
+                    new_home=new_h,
+                    new_away=new_a,
+                    home_name=str(getattr(self.home_team, "name", "") or "ホーム"),
+                    away_name=str(getattr(self.away_team, "name", "") or "アウェイ"),
+                    scoring_team_key=sk,
+                    home_team_key=hk,
+                    away_team_key=ak,
+                    points=int(points),
+                    quarter=quarter,
+                    clock_seconds=clock_seconds,
+                )
+                if line:
+                    print(f"  {line}")
+            except Exception:
+                pass
 
     def _add_lineup_minutes(self, lineup: List[Player]):
         for p in lineup:

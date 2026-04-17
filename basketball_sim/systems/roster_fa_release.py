@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from typing import Any, List, Optional, Tuple
 
-from basketball_sim.config.game_constants import CONTRACT_ROSTER_MIN_SEASON, PLAYER_SALARY_BASE_PER_OVR
+from basketball_sim.config.game_constants import CONTRACT_ROSTER_MIN_SEASON
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.free_agent_market import assign_fa_pool_market_salary_on_release_to_fa
 from basketball_sim.systems.season_transaction_rules import INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA, inseason_roster_moves_unlocked
 
 
@@ -72,12 +73,7 @@ def apply_release_player_to_fa(
     """前提チェック済みの契約解除を適用する。"""
     team.remove_player(player)
     setattr(player, "contract_years_left", 0)
-    if int(getattr(player, "salary", 0) or 0) <= 0:
-        setattr(
-            player,
-            "salary",
-            max(int(getattr(player, "ovr", 0) or 0) * PLAYER_SALARY_BASE_PER_OVR, 300_000),
-        )
+    assign_fa_pool_market_salary_on_release_to_fa(player, team=team)
     if player not in free_agents:
         free_agents.append(player)
     add_hist = getattr(team, "add_history_transaction", None)

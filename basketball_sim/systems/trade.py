@@ -1,15 +1,43 @@
+import os
 import random
-from typing import List
+from typing import List, Optional
 
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
+from basketball_sim.systems.contract_logic import is_draft_rookie_contract_active
 from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.cpu_club_strategy import get_cpu_club_strategy
 from basketball_sim.systems.salary_cap_budget import get_soft_cap, league_level_for_team
 
 
 MIN_TRADE_OVR = 58
 MAX_TRADE_OVR_GAP = 8
+
+
+def _load_position_need_bonus_scale() -> float:
+    """モジュール import 時に一度だけ評価。観測比較用に環境変数で上書き可（既定 0.90）。"""
+    raw = os.environ.get("BASKETBALL_SIM_POSITION_NEED_BONUS_SCALE", "0.90")
+    try:
+        v = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return 0.90
+    if not (0.01 <= v <= 2.0):
+        return 0.90
+    return v
+
+
+# CPU 自動トレードの _evaluate_trade_value におけるポジション需要補正の振幅（段階ロジックの後に乗算）
+POSITION_NEED_BONUS_SCALE = _load_position_need_bonus_scale()
 DEBUG_TRADE = True
+
+# CPU 戦略タグ別の候補生成のみの薄いロスター保護（gain・承諾閾値は変更しない）
+STRATEGY_TRADE_PROTECT_MIN_REMAINING = 4
+PUSH_TRADE_PROTECT_MIN_OVR = 73
+
+# CPU 資産運用（第1段）: 放出候補のソートキーにだけ加える keep バイアスの上限（gain・閾値は不変）
+_OUTGOING_ASSET_KEEP_BIAS_CAP = 1.35
+# 獲得候補の探索順ソートにだけ加える acquire バイアスの上限（gain・閾値は不変）
+_INCOMING_ASSET_SORT_ADJUST_CAP = 1.25
 
 
 def _debug(message: str):
@@ -137,12 +165,14 @@ def _position_need_bonus(player: Player, team: Team, is_incoming: bool) -> float
     same_pos_count = len(same_pos_players)
 
     if same_pos_count <= 1:
-        return 5.0
-    if same_pos_count == 2:
-        return 2.5
-    if same_pos_count >= 4:
-        return -2.0
-    return 0.0
+        raw = 5.0
+    elif same_pos_count == 2:
+        raw = 2.5
+    elif same_pos_count >= 4:
+        raw = -2.0
+    else:
+        raw = 0.0
+    return float(raw) * float(POSITION_NEED_BONUS_SCALE)
 
 
 def _strategy_fit_bonus(player: Player, team: Team) -> float:
@@ -273,6 +303,9 @@ def _is_tradeable_player(player: Player, team: Team) -> bool:
     """
     実際にトレード候補に入れてよい選手か。
     """
+    if is_draft_rookie_contract_active(player):
+        return False
+
     if _is_core_player(player, team):
         return False
 
@@ -280,6 +313,153 @@ def _is_tradeable_player(player: Player, team: Team) -> bool:
         return False
 
     return True
+
+
+def _strategy_tag_protect_exclude_player(player: Player, strategy_tag: str) -> bool:
+    """
+    True なら conduct_trades の候補リストから除外する（薄いロスター保護）。
+    rebuild / hold / push で守る対象が少しだけ異なる。
+    """
+    age = int(getattr(player, "age", 99) or 99)
+    pot = str(getattr(player, "potential", "C")).upper()
+    ovr = int(getattr(player, "ovr", 0) or 0)
+    if strategy_tag == "rebuild":
+        return age <= 22 and pot in ("S", "A")
+    if strategy_tag == "push":
+        return ovr >= PUSH_TRADE_PROTECT_MIN_OVR
+    if strategy_tag == "hold":
+        return age <= 21 and pot == "S"
+    return False
+
+
+def _apply_strategy_trade_candidate_filter(team: Team, tradeable: List[Player]) -> List[Player]:
+    """
+    get_cpu_club_strategy の strategy_tag に応じて tradeable を薄く絞る。
+    候補が削りすぎた場合は保護を捨てて元の tradeable に戻す。
+    """
+    if not tradeable or len(tradeable) <= 1:
+        return tradeable
+    try:
+        tag = get_cpu_club_strategy(team, season=None).strategy_tag
+    except Exception:
+        tag = "hold"
+    if tag not in ("rebuild", "hold", "push"):
+        tag = "hold"
+    filtered = [p for p in tradeable if not _strategy_tag_protect_exclude_player(p, tag)]
+    if not filtered:
+        return tradeable
+    if len(filtered) < STRATEGY_TRADE_PROTECT_MIN_REMAINING and len(tradeable) >= STRATEGY_TRADE_PROTECT_MIN_REMAINING:
+        return tradeable
+    return filtered
+
+
+def _strategy_tag_for_trade_sort(team: Team) -> str:
+    try:
+        tag = get_cpu_club_strategy(team, season=None).strategy_tag
+    except Exception:
+        return "hold"
+    if tag not in ("rebuild", "hold", "push"):
+        return "hold"
+    return tag
+
+
+def _trade_outgoing_sort_adjustment_for_tag(strategy_tag: str, player: Player) -> float:
+    """
+    CPU 資産運用の第1段: 放出候補の並びだけを微調整する。
+    conduct_trades では昇順ソート → 値が小さいほど先頭（やや「出しやすい」側）。
+    正の値ほどキーが上がり、先頭から遠ざかる＝保持寄り。
+    """
+    age = int(getattr(player, "age", 25) or 25)
+    ovr = int(getattr(player, "ovr", 60) or 60)
+    pot = str(getattr(player, "potential", "C")).upper()
+    adj = 0.0
+    if strategy_tag == "rebuild":
+        if age >= 30:
+            adj -= min(0.9, (age - 29) * 0.12)
+        elif age >= 28:
+            adj -= 0.22
+        if age <= 24 and pot in ("S", "A"):
+            adj += 0.82
+        elif age <= 24 and pot == "B":
+            adj += 0.26
+    elif strategy_tag == "push":
+        if ovr >= PUSH_TRADE_PROTECT_MIN_OVR:
+            adj += 0.92
+        elif ovr >= 70:
+            adj += 0.36
+        if ovr <= 64 and age <= 24:
+            adj -= 0.52
+        elif ovr <= 62:
+            adj -= 0.22
+    else:
+        if ovr >= 72:
+            adj += 0.32
+        if age >= 32:
+            adj -= 0.28
+        if age <= 21 and pot == "S":
+            adj += 0.2
+    return max(-_OUTGOING_ASSET_KEEP_BIAS_CAP, min(_OUTGOING_ASSET_KEEP_BIAS_CAP, adj))
+
+
+def _outgoing_trade_candidate_sort_key(
+    team: Team, player: Player, *, strategy_tag: Optional[str] = None
+) -> float:
+    tag = strategy_tag if strategy_tag is not None else _strategy_tag_for_trade_sort(team)
+    return _evaluate_trade_value(player, team, is_incoming=False) + _trade_outgoing_sort_adjustment_for_tag(
+        tag, player
+    )
+
+
+def _trade_incoming_sort_adjustment_for_tag(strategy_tag: str, player: Player, team: Team) -> float:
+    """
+    獲得側（相手ロスターから来る選手）の探索順だけを微調整する。
+    conduct_trades では降順ソートで先頭ほど先に試す＝「取りにいきやすい」側。
+    gain 計算には使わない。
+    """
+    age = int(getattr(player, "age", 25) or 25)
+    ovr = int(getattr(player, "ovr", 60) or 60)
+    pot = str(getattr(player, "potential", "C")).upper()
+    salary = int(getattr(player, "salary", 500_000) or 0)
+    ref_pay = max(1, int(ovr * 12_000))
+    heavy_contract = salary > int(ref_pay * 1.18)
+    adj = 0.0
+
+    if strategy_tag == "rebuild":
+        if age <= 24 and pot in ("S", "A", "B"):
+            adj += 0.62 if pot in ("S", "A") else 0.38
+        if age >= 31:
+            adj -= min(0.52, (age - 30) * 0.07)
+        if pot == "D":
+            adj -= 0.2
+        if heavy_contract:
+            adj -= 0.26
+    elif strategy_tag == "push":
+        if ovr >= PUSH_TRADE_PROTECT_MIN_OVR:
+            adj += 0.58
+        elif ovr >= 70:
+            adj += 0.3
+        if ovr <= 64:
+            adj -= 0.36
+            if age <= 23:
+                adj -= 0.16
+    else:
+        if 66 <= ovr <= 73:
+            adj += 0.1
+        if 24 <= age <= 28:
+            adj += 0.06
+        if ovr >= 76 or (age >= 34 and ovr <= 62):
+            adj -= 0.06
+
+    return max(-_INCOMING_ASSET_SORT_ADJUST_CAP, min(_INCOMING_ASSET_SORT_ADJUST_CAP, adj))
+
+
+def _incoming_trade_candidate_sort_key(
+    team_recv: Team, player: Player, *, strategy_tag: Optional[str] = None
+) -> float:
+    tag = strategy_tag if strategy_tag is not None else _strategy_tag_for_trade_sort(team_recv)
+    return _evaluate_trade_value(
+        player, team_recv, is_incoming=True
+    ) + _trade_incoming_sort_adjustment_for_tag(tag, player, team_recv)
 
 
 def _get_trade_payroll_after(team: Team, outgoing: Player, incoming: Player) -> int:
@@ -466,6 +646,7 @@ def conduct_trades(teams: List[Team]):
             continue
 
         tradeable_a = [p for p in team_a.players if _is_tradeable_player(p, team_a)]
+        tradeable_a = _apply_strategy_trade_candidate_filter(team_a, tradeable_a)
         if not tradeable_a:
             _debug(f"{team_a.name} | skip=no_tradeable_players")
             continue
@@ -485,9 +666,12 @@ def conduct_trades(teams: List[Team]):
             _debug(f"{team_a.name} | skip=tradeable_empty_after_direction_filter")
             continue
 
+        tag_sort_a = _strategy_tag_for_trade_sort(team_a)
         tradeable_a = sorted(
             tradeable_a,
-            key=lambda p: _evaluate_trade_value(p, team_a, is_incoming=False)
+            key=lambda p, ta=team_a, tga=tag_sort_a: _outgoing_trade_candidate_sort_key(
+                ta, p, strategy_tag=tga
+            ),
         )
 
         potential_partners = [
@@ -500,6 +684,7 @@ def conduct_trades(teams: List[Team]):
 
         for team_b in potential_partners:
             tradeable_b = [p for p in team_b.players if _is_tradeable_player(p, team_b)]
+            tradeable_b = _apply_strategy_trade_candidate_filter(team_b, tradeable_b)
             if not tradeable_b:
                 continue
 
@@ -517,16 +702,33 @@ def conduct_trades(teams: List[Team]):
             if not tradeable_b:
                 continue
 
+            tag_sort_b = _strategy_tag_for_trade_sort(team_b)
             tradeable_b = sorted(
                 tradeable_b,
-                key=lambda p: _evaluate_trade_value(p, team_b, is_incoming=False)
+                key=lambda p, tb=team_b, tgb=tag_sort_b: _outgoing_trade_candidate_sort_key(
+                    tb, p, strategy_tag=tgb
+                ),
             )
 
             candidates_a = tradeable_a[:12]
             candidates_b = tradeable_b[:12]
 
-            random.shuffle(candidates_a)
-            random.shuffle(candidates_b)
+            # 獲得側: 相手から受け取る選手を、受け側クラブの strategy_tag に応じて探索順だけ並べ替え（gain は従来式）。
+            # p_a は B の incoming、p_b は A の incoming。
+            candidates_a = sorted(
+                candidates_a,
+                key=lambda p, tr=team_b, tg=tag_sort_b: _incoming_trade_candidate_sort_key(
+                    tr, p, strategy_tag=tg
+                ),
+                reverse=True,
+            )
+            candidates_b = sorted(
+                candidates_b,
+                key=lambda p, tr=team_a, tg=tag_sort_a: _incoming_trade_candidate_sort_key(
+                    tr, p, strategy_tag=tg
+                ),
+                reverse=True,
+            )
 
             checked_pairs = 0
 

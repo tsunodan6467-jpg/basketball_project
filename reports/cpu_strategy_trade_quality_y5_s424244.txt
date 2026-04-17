@@ -1,0 +1,39 @@
+CPU strategy trade quality observe | seed=424244 years=5
+Classification: strategy_tag on acquiring CPU team at add_history_transaction time (trade in).
+
+--- completed sim year 1 ---
+--- completed sim year 2 ---
+--- completed sim year 3 ---
+--- completed sim year 4 ---
+--- completed sim year 5 ---
+
+Total trade player acquisitions (CPU, incoming): 52
+
+=== tag=push ===
+  n=38
+  mean_age=23.05  p50_age=22.0
+  mean_ovr=64.76  p50_ovr=64.0
+  age<=24_rate=65.8%
+  young_high_pot_SA_rate=13.2%  (age<=24 & potential S/A)
+  mean_potential_score=1.05  (S=4..C=1 proxy)
+
+=== tag=hold ===
+  n=10
+  mean_age=26.20  p50_age=26.5
+  mean_ovr=66.00  p50_ovr=66.5
+  age<=24_rate=30.0%
+  young_high_pot_SA_rate=0.0%  (age<=24 & potential S/A)
+  mean_potential_score=0.50  (S=4..C=1 proxy)
+
+=== tag=rebuild ===
+  n=4
+  mean_age=22.25  p50_age=22.0
+  mean_ovr=64.50  p50_ovr=64.5
+  age<=24_rate=75.0%
+  young_high_pot_SA_rate=50.0%  (age<=24 & potential S/A)
+  mean_potential_score=2.00  (S=4..C=1 proxy)
+
+=== Cross-tag comparison (same metrics) ===
+  push: n=38
+  hold: n=10
+  rebuild: n=4

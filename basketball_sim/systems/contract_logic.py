@@ -8,6 +8,7 @@ from basketball_sim.config.game_constants import (
     PLAYER_SALARY_BASE_PER_OVR,
     SALARY_SOFT_LIMIT_MULTIPLIER,
 )
+from basketball_sim.systems.opening_roster_salary_v11 import _MIN_SALARY_D1, _MIN_SALARY_D2_D3
 from basketball_sim.systems.salary_cap_budget import get_hard_cap, league_level_for_team, payroll_exceeds_soft_cap
 
 
@@ -34,6 +35,53 @@ SALARY_CAP_DEFAULT = LEAGUE_SALARY_CAP
 # リーグ年俸上限の実数値は salary_cap_budget.get_hard_cap / get_soft_cap（同一額）と一致させること
 MIN_SALARY_DEFAULT = 300_000
 MAX_CONTRACT_YEARS_DEFAULT = 5
+
+
+def contract_min_salary_floor_for_division(division: Optional[int]) -> int:
+    """
+    リーグ区分 1/2/3 に対する最低年俸床（opening v1.1 と整合）。
+    `division` が `None` のときは `MIN_SALARY_DEFAULT`。
+    """
+    if division is None:
+        return int(MIN_SALARY_DEFAULT)
+    d = int(max(1, min(3, int(division))))
+    if d == 1:
+        return int(_MIN_SALARY_D1)
+    return int(_MIN_SALARY_D2_D3)
+
+
+def contract_min_salary_floor_for_team(team: Optional[object]) -> int:
+    """
+    契約希望・ペイロール正規化の下限（opening v1.1 と整合）。
+    `team` が無い経路（FA プールの demand 更新など）は `MIN_SALARY_DEFAULT`。
+    """
+    if team is None:
+        return int(MIN_SALARY_DEFAULT)
+    return contract_min_salary_floor_for_division(int(league_level_for_team(team)))
+
+
+def is_draft_rookie_contract_active(player: object) -> bool:
+    """ドラフト rookie 固定3年契約が有効中（移籍・再契約・年俸改定の対象外）。"""
+    if not bool(getattr(player, "is_draft_rookie_contract", False)):
+        return False
+    return int(getattr(player, "contract_years_left", 0) or 0) > 0
+
+
+def clear_draft_rookie_contract_for_market_entry(player: object) -> None:
+    """3年満了で FA 等へ出すとき、通常市場用にフラグを外す。"""
+    setattr(player, "is_draft_rookie_contract", False)
+    setattr(player, "draft_rookie_locked_salary", 0)
+
+
+def is_auction_rookie_contract_active(player: object) -> bool:
+    """互換: 旧名。`is_draft_rookie_contract_active` と同一。"""
+    return is_draft_rookie_contract_active(player)
+
+
+def clear_auction_rookie_contract_for_market_entry(player: object) -> None:
+    """互換: 旧名。`clear_draft_rookie_contract_for_market_entry` と同一。"""
+    clear_draft_rookie_contract_for_market_entry(player)
+
 
 # FA: _offer_score に対する受諾ロール（スコア下限, 採択確率）。free_agency が参照。
 FA_ACCEPT_SCORE_TIERS: Tuple[Tuple[float, float], ...] = (
@@ -225,7 +273,15 @@ def set_contract_foundation_fields(player: object, team: Optional[object] = None
 # -----------------------------
 # demand calculation
 # -----------------------------
-def calculate_desired_salary(player: object) -> int:
+def _blend_resign_desired_salary(player: object, team: object) -> int:
+    """再契約専用: 生希望額を正本 v1.1 anchor 帯へ寄せる。"""
+    from basketball_sim.systems.resign_salary_anchor import blend_desired_salary_for_resign
+
+    raw = calculate_desired_salary(player, team)
+    return int(blend_desired_salary_for_resign(player, team, raw))
+
+
+def calculate_desired_salary(player: object, team: Optional[object] = None) -> int:
     """
     安全版の希望年俸計算。
     OVR主軸 + potential / age / popularity / career の軽補正。
@@ -271,7 +327,8 @@ def calculate_desired_salary(player: object) -> int:
         + peak_bonus
     )
 
-    return clamp_int(desired_salary, MIN_SALARY_DEFAULT, 500_000_000)
+    floor = int(contract_min_salary_floor_for_team(team))
+    return clamp_int(desired_salary, floor, 500_000_000)
 
 
 
@@ -295,10 +352,18 @@ def calculate_desired_years(player: object) -> int:
 
 
 
-def update_player_contract_demand(player: object, team: Optional[object] = None) -> ContractDemand:
+def update_player_contract_demand(
+    player: object,
+    team: Optional[object] = None,
+    *,
+    use_resign_anchor: bool = False,
+) -> ContractDemand:
     set_contract_foundation_fields(player, team)
 
-    desired_salary = calculate_desired_salary(player)
+    if use_resign_anchor and team is not None:
+        desired_salary = _blend_resign_desired_salary(player, team)
+    else:
+        desired_salary = calculate_desired_salary(player, team)
     desired_years = calculate_desired_years(player)
 
     setattr(player, "desired_salary", desired_salary)
@@ -361,6 +426,11 @@ def advance_contract_years(
             current_years = safe_getattr_int(player, "contract_years_left", 0)
             setattr(player, "contract_years_left", current_years - 1)
 
+            if is_draft_rookie_contract_active(player):
+                locked = int(getattr(player, "draft_rookie_locked_salary", 0) or 0)
+                if locked > 0:
+                    setattr(player, "salary", locked)
+
             if safe_getattr_int(player, "contract_years_left", 0) <= 0:
                 leaving_players.append(player)
 
@@ -375,6 +445,7 @@ def advance_contract_years(
 
             if player not in free_agents:
                 free_agents.append(player)
+            clear_draft_rookie_contract_for_market_entry(player)
             moved_to_fa.append((player, team))
 
     return moved_to_fa
@@ -424,7 +495,7 @@ def calculate_resign_score(
     offer_salary: int,
     offer_years: int,
 ) -> float:
-    demand = update_player_contract_demand(player, team)
+    demand = update_player_contract_demand(player, team, use_resign_anchor=True)
     loyalty = safe_getattr_int(player, "loyalty", 50)
 
     salary_ratio = offer_salary / max(1, demand.desired_salary)
@@ -561,11 +632,14 @@ def apply_contract_extension(
     player: object,
     add_years: int = 1,
     season_label: Optional[int] = None,
-) -> None:
+) -> bool:
     """
     同一条件の契約延長（年俸・役割は据え置き、残り年数のみ加算）。
     再契約（apply_resign）とは別ルート。
+    オークション rookie 固定3年中は変更しない（False を返す）。
     """
+    if is_draft_rookie_contract_active(player):
+        return False
     add_years = clamp_int(int(add_years), 1, MAX_CONTRACT_YEARS_DEFAULT)
     cur = safe_getattr_int(player, "contract_years_left", 0)
     setattr(player, "contract_years_left", cur + add_years)
@@ -581,6 +655,7 @@ def apply_contract_extension(
             event="Contract Extension",
             note=f"+{add_years}Y (same terms)",
         )
+    return True
 
 
 def apply_resign(
@@ -590,6 +665,8 @@ def apply_resign(
     offer_years: int,
     season_label: Optional[int] = None,
 ) -> None:
+    if is_draft_rookie_contract_active(player):
+        return
     set_contract_foundation_fields(player, team)
 
     setattr(player, "salary", int(offer_salary))
@@ -649,7 +726,8 @@ def normalize_team_payroll_under_league_cap(team: object, *, margin: float = 0.9
         return False
 
     league_cap = int(get_hard_cap(league_level=league_level_for_team(team)))
-    floor_sum = MIN_SALARY_DEFAULT * len(players)
+    pfloor = int(contract_min_salary_floor_for_team(team))
+    floor_sum = pfloor * len(players)
     target = max(floor_sum, int(league_cap * margin))
 
     total = get_team_payroll(team)
@@ -659,14 +737,14 @@ def normalize_team_payroll_under_league_cap(team: object, *, margin: float = 0.9
     factor = target / max(1, total)
     adjusted: List[Tuple[object, int]] = []
     for p in players:
-        old = max(MIN_SALARY_DEFAULT, safe_getattr_int(p, "salary", 0))
-        adjusted.append((p, max(MIN_SALARY_DEFAULT, int(round(old * factor)))))
+        old = max(pfloor, safe_getattr_int(p, "salary", 0))
+        adjusted.append((p, max(pfloor, int(round(old * factor)))))
 
     diff = target - sum(s for _, s in adjusted)
     if diff != 0 and adjusted:
         idx = max(range(len(adjusted)), key=lambda i: adjusted[i][1])
         p0, s0 = adjusted[idx]
-        adjusted[idx] = (p0, max(MIN_SALARY_DEFAULT, s0 + diff))
+        adjusted[idx] = (p0, max(pfloor, s0 + diff))
 
     for p, s in adjusted:
         setattr(p, "salary", int(s))
@@ -705,8 +783,12 @@ def initialize_contract_foundations_for_league(teams: Iterable[object], free_age
 # -----------------------------
 # offseason.py 向け互換ラッパー（名前を固定）
 # -----------------------------
-def calculate_desired_contract_terms(player: object) -> Tuple[int, int]:
-    return calculate_desired_salary(player), calculate_desired_years(player)
+def calculate_desired_contract_terms(player: object, team: Optional[object] = None) -> Tuple[int, int]:
+    if team is not None:
+        salary = _blend_resign_desired_salary(player, team)
+    else:
+        salary = calculate_desired_salary(player)
+    return salary, calculate_desired_years(player)
 
 
 def evaluate_resign_offer(

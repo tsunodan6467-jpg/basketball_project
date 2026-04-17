@@ -1,0 +1,57 @@
+club_profile_user9_probe (USER9 + compare sample)
+
+=== 1) get_club_base_profile (USER9) ===
+  team_id=1 name='エルバード東京' -> fin=1.06 mkt=1.045 arena=1.06 youth=0.96 win_now=1.06
+  team_id=2 name='千葉ジャイアンツ' -> fin=1.06 mkt=1.045 arena=1.06 youth=0.98 win_now=1.045
+  team_id=3 name='琉球プラチナクラウンズ' -> fin=1.03 mkt=1.03 arena=1.06 youth=1.0 win_now=1.045
+  team_id=4 name='宇都宮ブレイバーズ' -> fin=1.03 mkt=1.02 arena=1.0 youth=1.03 win_now=1.045
+  team_id=5 name='名古屋ハートホエールズ' -> fin=1.03 mkt=1.015 arena=1.06 youth=0.98 win_now=1.03
+  team_id=7 name='川崎ブレイクライトニング' -> fin=1.0 mkt=1.015 arena=1.0 youth=1.0 win_now=1.015
+  team_id=12 name='シンライダーズ渋谷' -> fin=1.0 mkt=1.03 arena=0.98 youth=0.98 win_now=1.03
+  team_id=13 name='大阪エビーズ' -> fin=1.0 mkt=1.015 arena=1.0 youth=0.98 win_now=1.005
+  team_id=29 name='福岡ファルコンズ' -> fin=0.98 mkt=1.005 arena=0.98 youth=1.0 win_now=1.015
+
+=== 1b) compare: type-template / pilot-only (not in USER9) ===
+  team_id=6 name='ビーホークス三河' -> fin=1.02 mkt=1.0 arena=1.0 youth=1.0 win_now=1.02
+  team_id=8 name='群馬ブラックボルツ' -> fin=0.96 mkt=0.96 arena=1.02 youth=1.06 win_now=0.96
+  team_id=14 name='浜松サンダーバーズ' -> fin=0.98 mkt=0.96 arena=1.02 youth=1.04 win_now=0.98
+  team_id=15 name='島根カグヅチウィザーズ' -> fin=0.98 mkt=0.96 arena=1.02 youth=1.04 win_now=0.98
+  team_id=48 name='岡山リングス' -> fin=1.02 mkt=1.0 arena=1.0 youth=1.0 win_now=1.02
+
+=== 2) payroll fac (CPU) + budget(roster_payroll=0 and actual) ===
+  user_like is_user_team=True fac=1.000000 (expect 1.0)
+  id=1 fac=1.003030 budget_rp0=26,598,123 budget_actual_rp=1,047,079,016->1,050,079,016
+  id=2 fac=1.003030 budget_rp0=26,517,279 budget_actual_rp=797,334,426->800,334,426
+  id=3 fac=1.002100 budget_rp0=26,497,027 budget_actual_rp=1,048,377,037->1,051,377,037
+  id=4 fac=1.001020 budget_rp0=26,524,327 budget_actual_rp=1,049,144,400->1,052,144,400
+  id=5 fac=1.001830 budget_rp0=26,458,831 budget_actual_rp=1,014,000,000->1,017,000,000
+  id=7 fac=1.000270 budget_rp0=26,529,260 budget_actual_rp=787,777,507->790,777,507
+  id=12 fac=1.000240 budget_rp0=26,441,644 budget_actual_rp=776,999,112->779,999,112
+  id=13 fac=1.000270 budget_rp0=26,475,321 budget_actual_rp=1,166,370,662->1,169,370,662
+  id=29 fac=0.999350 budget_rp0=23,946,799 budget_actual_rp=573,724,210->576,724,210
+
+=== 3) strategy: tendency + ambiguous + profile nudge + tag + scalars ===
+  id=1 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=2 push_s=0 reb_s=0 diff=0 ambiguous=True net=-0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=3 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=4 push_s=2 reb_s=0 diff=2 ambiguous=False net=0.0150 -> n/a (not ambiguous) | tag=push fa=1.06 trade_tol=0.94 fut=0.94
+  id=5 push_s=0 reb_s=2 diff=-2 ambiguous=False net=0.0000 -> n/a (not ambiguous) | tag=rebuild fa=0.94 trade_tol=1.06 fut=1.06
+  id=7 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=12 push_s=0 reb_s=2 diff=-2 ambiguous=False net=0.0300 -> n/a (not ambiguous) | tag=rebuild fa=0.94 trade_tol=1.06 fut=1.06
+  id=13 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0050 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=29 push_s=2 reb_s=0 diff=2 ambiguous=False net=0.0350 -> n/a (not ambiguous) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=6 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=14 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+
+=== 4) fac spread (USER9 only, sorted by fac desc) ===
+  fac_rank tid=1 fac=1.003030 name='エルバード東京'
+  fac_rank tid=2 fac=1.003030 name='千葉ジャイアンツ'
+  fac_rank tid=3 fac=1.002100 name='琉球プラチナクラウンズ'
+  fac_rank tid=5 fac=1.001830 name='名古屋ハートホエールズ'
+  fac_rank tid=4 fac=1.001020 name='宇都宮ブレイバーズ'
+  fac_rank tid=7 fac=1.000270 name='川崎ブレイクライトニング'
+  fac_rank tid=13 fac=1.000270 name='大阪エビーズ'
+  fac_rank tid=12 fac=1.000240 name='シンライダーズ渋谷'
+  fac_rank tid=29 fac=0.999350 name='福岡ファルコンズ'
+
+Done.

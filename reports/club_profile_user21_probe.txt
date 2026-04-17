@@ -1,0 +1,106 @@
+club_profile_user21_probe (USER21 individual overrides + compare)
+
+=== 1) get_club_base_profile (USER21) ===
+  team_id=1 name='エルバード東京' -> fin=1.06 mkt=1.045 arena=1.06 youth=0.96 win_now=1.06
+  team_id=2 name='千葉ジャイアンツ' -> fin=1.06 mkt=1.045 arena=1.06 youth=0.98 win_now=1.045
+  team_id=3 name='琉球プラチナクラウンズ' -> fin=1.03 mkt=1.03 arena=1.06 youth=1.0 win_now=1.045
+  team_id=4 name='宇都宮ブレイバーズ' -> fin=1.03 mkt=1.02 arena=1.0 youth=1.03 win_now=1.045
+  team_id=5 name='名古屋ハートホエールズ' -> fin=1.03 mkt=1.015 arena=1.06 youth=0.98 win_now=1.03
+  team_id=7 name='川崎ブレイクライトニング' -> fin=1.0 mkt=1.015 arena=1.0 youth=1.0 win_now=1.015
+  team_id=11 name='広島タイガーランズ' -> fin=1.03 mkt=1.0 arena=1.0 youth=0.98 win_now=1.03
+  team_id=12 name='シンライダーズ渋谷' -> fin=1.0 mkt=1.03 arena=0.98 youth=0.98 win_now=1.03
+  team_id=13 name='大阪エビーズ' -> fin=1.0 mkt=1.015 arena=1.0 youth=0.98 win_now=1.005
+  team_id=14 name='浜松サンダーバーズ' -> fin=1.0 mkt=1.0 arena=1.0 youth=1.03 win_now=1.015
+  team_id=15 name='島根カグヅチウィザーズ' -> fin=1.03 mkt=1.005 arena=1.0 youth=1.0 win_now=1.015
+  team_id=18 name='仙台46ers' -> fin=1.0 mkt=1.015 arena=1.0 youth=1.0 win_now=1.015
+  team_id=19 name='秋田ノースラッキーズ' -> fin=0.98 mkt=0.995 arena=1.0 youth=1.03 win_now=0.99
+  team_id=21 name='越谷ガンマズ' -> fin=1.0 mkt=1.0 arena=1.0 youth=1.0 win_now=0.99
+  team_id=25 name='滋賀リバーズ' -> fin=1.0 mkt=0.99 arena=1.03 youth=1.0 win_now=0.99
+  team_id=26 name='京都ホーネッツ' -> fin=1.0 mkt=1.005 arena=1.0 youth=1.0 win_now=1.0
+  team_id=27 name='神戸スパーズ' -> fin=1.0 mkt=1.005 arena=1.03 youth=1.0 win_now=0.99
+  team_id=29 name='福岡ファルコンズ' -> fin=0.98 mkt=1.005 arena=0.98 youth=1.0 win_now=1.015
+  team_id=33 name='青森ワルツ' -> fin=0.98 mkt=0.97 arena=0.98 youth=1.03 win_now=0.96
+  team_id=38 name='奈良ディアーズ' -> fin=0.98 mkt=0.98 arena=0.98 youth=1.03 win_now=0.97
+  team_id=46 name='鳥取サキューズ' -> fin=0.96 mkt=0.96 arena=0.96 youth=1.06 win_now=0.96
+
+=== 1b) compare: type-template clubs (not in USER21) ===
+  team_id=6 name='ビーホークス三河' -> fin=1.02 mkt=1.0 arena=1.0 youth=1.0 win_now=1.02
+  team_id=9 name='長崎パルカンズ' -> fin=0.98 mkt=0.96 arena=1.02 youth=1.04 win_now=0.98
+  team_id=10 name='佐賀ブーマーズ' -> fin=0.98 mkt=0.96 arena=1.02 youth=1.04 win_now=0.98
+  team_id=20 name='茨城メカニックス' -> fin=1.02 mkt=1.0 arena=1.0 youth=1.0 win_now=1.02
+  team_id=48 name='岡山リングス' -> fin=1.02 mkt=1.0 arena=1.0 youth=1.0 win_now=1.02
+
+=== 2) payroll fac (CPU) + budget(roster_payroll=0 and actual) ===
+  user_like is_user_team=True fac=1.000000 (expect 1.0)
+  id=1 fac=1.003030 budget_rp0=26,527,836 budget_actual_rp=1,181,976,188->1,184,976,188
+  id=2 fac=1.003030 budget_rp0=26,613,645 budget_actual_rp=1,005,831,588->1,008,831,588
+  id=3 fac=1.002100 budget_rp0=26,497,027 budget_actual_rp=1,014,000,000->1,017,000,000
+  id=4 fac=1.001020 budget_rp0=26,513,791 budget_actual_rp=805,443,591->808,443,591
+  id=5 fac=1.001830 budget_rp0=26,525,903 budget_actual_rp=1,018,969,704->1,021,969,704
+  id=7 fac=1.000270 budget_rp0=26,493,926 budget_actual_rp=953,778,958->956,778,958
+  id=11 fac=1.000660 budget_rp0=26,473,235 budget_actual_rp=1,176,132,449->1,179,132,449
+  id=12 fac=1.000240 budget_rp0=26,454,047 budget_actual_rp=1,013,430,720->1,016,430,720
+  id=13 fac=1.000270 budget_rp0=26,500,128 budget_actual_rp=987,162,724->990,162,724
+  id=14 fac=1.000000 budget_rp0=26,466,300 budget_actual_rp=1,002,191,606->1,005,191,606
+  id=15 fac=1.000750 budget_rp0=26,460,080 budget_actual_rp=794,734,210->797,734,210
+  id=18 fac=1.000270 budget_rp0=24,047,591 budget_actual_rp=726,138,030->729,138,030
+  id=19 fac=0.999470 budget_rp0=23,947,800 budget_actual_rp=803,908,185->806,908,185
+  id=21 fac=1.000000 budget_rp0=24,024,375 budget_actual_rp=603,571,587->606,571,587
+  id=25 fac=1.000270 budget_rp0=24,047,591 budget_actual_rp=713,649,663->716,649,663
+  id=26 fac=1.000090 budget_rp0=24,055,664 budget_actual_rp=718,532,915->721,532,915
+  id=27 fac=1.000540 budget_rp0=24,085,098 budget_actual_rp=766,917,061->769,917,061
+  id=29 fac=0.999350 budget_rp0=23,993,244 budget_actual_rp=591,190,927->594,190,927
+  id=33 fac=0.998720 budget_rp0=22,211,382 budget_actual_rp=402,096,493->405,096,493
+  id=38 fac=0.998900 budget_rp0=22,206,121 budget_actual_rp=521,269,941->524,269,941
+  id=46 fac=0.997800 budget_rp0=22,148,865 budget_actual_rp=387,059,119->390,059,119
+
+=== 3) strategy: tendency + opening_profile_hint + ambiguous preview + tag + scalars ===
+  id=1 push_s=0 reb_s=0 hint=(1,0) eff=1,0 diff_eff=1 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=2 push_s=0 reb_s=0 hint=(1,0) eff=1,0 diff_eff=1 ambiguous=True net=-0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=3 push_s=0 reb_s=0 hint=(1,0) eff=1,0 diff_eff=1 ambiguous=True net=0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=4 push_s=2 reb_s=0 hint=(1,0) eff=3,0 diff_eff=3 ambiguous=False net=0.0150 -> n/a (not ambiguous) | tag=push fa=1.06 trade_tol=0.94 fut=0.94
+  id=5 push_s=0 reb_s=2 hint=(0,0) eff=0,2 diff_eff=-2 ambiguous=False net=0.0000 -> n/a (not ambiguous) | tag=rebuild fa=0.94 trade_tol=1.06 fut=1.06
+  id=7 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=11 push_s=2 reb_s=0 hint=(0,0) eff=2,0 diff_eff=2 ambiguous=False net=0.0000 -> n/a (not ambiguous) | tag=push fa=1.06 trade_tol=0.94 fut=0.94
+  id=12 push_s=0 reb_s=2 hint=(0,0) eff=0,2 diff_eff=-2 ambiguous=False net=0.0300 -> n/a (not ambiguous) | tag=rebuild fa=0.94 trade_tol=1.06 fut=1.06
+  id=13 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=0.0050 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=14 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=15 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=-0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=18 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=0.0150 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=19 push_s=0 reb_s=0 hint=(0,1) eff=0,1 diff_eff=-1 ambiguous=True net=0.0100 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=21 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=-0.0100 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=25 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=-0.0100 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=26 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=27 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=-0.0100 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=29 push_s=2 reb_s=0 hint=(0,1) eff=2,1 diff_eff=1 ambiguous=False net=0.0350 -> n/a (not ambiguous) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=33 push_s=2 reb_s=0 hint=(0,1) eff=2,1 diff_eff=1 ambiguous=False net=-0.0200 -> n/a (not ambiguous) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=38 push_s=0 reb_s=0 hint=(0,1) eff=0,1 diff_eff=-1 ambiguous=True net=-0.0100 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=46 push_s=0 reb_s=0 hint=(0,1) eff=0,1 diff_eff=-1 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=6 push_s=0 reb_s=0 hint=(0,0) eff=0,0 diff_eff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=9 push_s=0 reb_s=0 hint=(0,1) eff=0,1 diff_eff=-1 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+  id=10 push_s=0 reb_s=0 hint=(0,1) eff=0,1 diff_eff=-1 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold fa=1.0 trade_tol=1.0 fut=1.0
+
+=== 4) fac spread (USER21 only, sorted by fac desc) ===
+  fac_rank tid=1 fac=1.003030 name='エルバード東京'
+  fac_rank tid=2 fac=1.003030 name='千葉ジャイアンツ'
+  fac_rank tid=3 fac=1.002100 name='琉球プラチナクラウンズ'
+  fac_rank tid=5 fac=1.001830 name='名古屋ハートホエールズ'
+  fac_rank tid=4 fac=1.001020 name='宇都宮ブレイバーズ'
+  fac_rank tid=15 fac=1.000750 name='島根カグヅチウィザーズ'
+  fac_rank tid=11 fac=1.000660 name='広島タイガーランズ'
+  fac_rank tid=27 fac=1.000540 name='神戸スパーズ'
+  fac_rank tid=7 fac=1.000270 name='川崎ブレイクライトニング'
+  fac_rank tid=13 fac=1.000270 name='大阪エビーズ'
+  fac_rank tid=18 fac=1.000270 name='仙台46ers'
+  fac_rank tid=25 fac=1.000270 name='滋賀リバーズ'
+  fac_rank tid=12 fac=1.000240 name='シンライダーズ渋谷'
+  fac_rank tid=26 fac=1.000090 name='京都ホーネッツ'
+  fac_rank tid=14 fac=1.000000 name='浜松サンダーバーズ'
+  fac_rank tid=21 fac=1.000000 name='越谷ガンマズ'
+  fac_rank tid=19 fac=0.999470 name='秋田ノースラッキーズ'
+  fac_rank tid=29 fac=0.999350 name='福岡ファルコンズ'
+  fac_rank tid=38 fac=0.998900 name='奈良ディアーズ'
+  fac_rank tid=33 fac=0.998720 name='青森ワルツ'
+  fac_rank tid=46 fac=0.997800 name='鳥取サキューズ'
+
+Done.

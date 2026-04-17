@@ -5,7 +5,14 @@ from typing import Dict, List, Optional
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.free_agent_market import assign_fa_pool_market_salary_on_release_to_fa
 from basketball_sim.systems.generator import generate_single_player
+from basketball_sim.systems.salary_cap_budget import league_level_for_team
+from basketball_sim.systems.opening_roster_salary_v11 import _MIN_SALARY_D1, _MIN_SALARY_D2_D3
+from basketball_sim.systems.resign_salary_anchor import (
+    resign_anchor_lo_hi_effective,
+    resign_nat_band_key,
+)
 
 
 YOUTH_GLOBAL_POLICIES = ("technical", "physical", "balanced")
@@ -109,7 +116,14 @@ def generate_youth_intake_for_team(team: Team) -> List[Player]:
         age = random.choice([16, 17, 18])
         base_ovr = random.randint(low, high)
         pos = _choose_youth_position(team)
-        p = generate_single_player(age_override=age, base_ovr_override=base_ovr, position_override=pos, nationality_override="Japan")
+        _youth_div = int(league_level_for_team(team))
+        p = generate_single_player(
+            age_override=age,
+            base_ovr_override=base_ovr,
+            position_override=pos,
+            nationality_override="Japan",
+            league_market_division=_youth_div,
+        )
         p.acquisition_type = "youth"
         p.acquisition_note = "youth_intake"
         p.youth_team_id = getattr(team, "team_id", None)
@@ -154,7 +168,14 @@ def process_icon_youth_returns_for_team(team: Team) -> List[Player]:
         base_ovr = int(max(55, min(70, peak * random.uniform(0.68, 0.75) + random.randint(-2, 2))))
         age = random.choice([16, 17, 18])
         pos = str(r.get("position", "SF") or "SF")
-        p = generate_single_player(age_override=age, base_ovr_override=base_ovr, position_override=pos, nationality_override="Japan")
+        _youth_div = int(league_level_for_team(team))
+        p = generate_single_player(
+            age_override=age,
+            base_ovr_override=base_ovr,
+            position_override=pos,
+            nationality_override="Japan",
+            league_market_division=_youth_div,
+        )
         p.name = str(r.get("from_name", p.name) or p.name)
         p.is_icon = True
         p.icon_locked = True
@@ -334,10 +355,27 @@ def _trim_team_roster_to_13(team: Team, free_agents: Optional[List[Player]] = No
     )
     team.remove_player(release)
     release.contract_years_left = 0
-    if int(getattr(release, "salary", 0) or 0) <= 0:
-        release.salary = max(int(getattr(release, "ovr", 0) or 0) * 10_000, 300_000)
+    assign_fa_pool_market_salary_on_release_to_fa(release, team=team)
     if free_agents is not None:
         free_agents.append(release)
+
+
+def _youth_graduate_roster_contract_salary(team: Team, player: Player) -> int:
+    """
+    ユース卒業の「プロ契約（通常ロスター）」年俸。
+    固定 MIN は使わず、正本 v1.1（opening 帯 + resign_anchor の bottom・若手上限）に接続する。
+    """
+    div = int(max(1, min(3, int(getattr(team, "league_level", 3) or 3))))
+    age = int(getattr(player, "age", 19) or 19)
+    nat_key = resign_nat_band_key(player)
+    lo, hi = resign_anchor_lo_hi_effective(div, nat_key, "bottom", age)
+    ovr = int(max(40, min(99, int(getattr(player, "ovr", 52) or 52))))
+    t = max(0.0, min(1.0, (ovr - 40) / 59.0))
+    base = int(lo + (hi - lo) * (0.22 + 0.58 * float(t)))
+    base += int(random.randint(-200_000, 200_000))
+    sal = int(max(lo, min(hi, base)))
+    floor = _MIN_SALARY_D1 if div == 1 else _MIN_SALARY_D2_D3
+    return int(max(floor, sal))
 
 
 def run_youth_offseason_update_for_teams(teams: List[Team], free_agents: Optional[List[Player]] = None) -> List[Player]:
@@ -359,7 +397,7 @@ def run_youth_offseason_update_for_teams(teams: List[Team], free_agents: Optiona
         for p in new_rights:
             p.acquisition_type = "youth_graduate"
             p.acquisition_note = "youth_sign"
-            p.salary = 300_000
+            p.salary = _youth_graduate_roster_contract_salary(t, p)
             p.contract_years_left = 2
             p.contract_total_years = 2
             t.add_player(p, force=True)

@@ -1,0 +1,70 @@
+cpu_auto_trade_assetrule_multi_longrun
+os.environ BASKETBALL_SIM_POSITION_NEED_BONUS_SCALE='0.90'
+years=5  seeds=[424242, 424243, 424244, 424245, 424246]
+
+Outgoing: sender team's strategy_tag; player attrs after trade (name+OVR lookup). rebuild: age<=24 & pot in S/A/B; push: OVR thresholds vs PUSH_TRADE_PROTECT_MIN_OVR.
+
+--- seed 424242 ---
+  n_trades=32  by_year={1: 7, 2: 5, 3: 6, 4: 5, 5: 9}
+  outgoing events (2 per trade): total=64
+  by_sender_tag: {'push': 54, 'hold': 10}
+  rebuild: out_total=0  sab24_out=0 (0.0%)  sa22_out=0 (0.0%)  mean_ovr=0.0 mean_age=0.0
+  push: out_total=54  ge73_out=2 (3.7%)  ge70_out=7 (12.96%)  mean_ovr=64.94 mean_age=24.43
+  hold: out_total=10  thin_s_out=0 (0.0%)  mean_ovr=65.1 mean_age=28.6
+  other_tag_out=0  missing_player_lookups=0
+
+--- seed 424243 ---
+  n_trades=26  by_year={1: 3, 2: 6, 3: 5, 4: 6, 5: 6}
+  outgoing events (2 per trade): total=52
+  by_sender_tag: {'push': 40, 'rebuild': 2, 'hold': 10}
+  rebuild: out_total=2  sab24_out=0 (0.0%)  sa22_out=0 (0.0%)  mean_ovr=70.0 mean_age=28.5
+  push: out_total=40  ge73_out=0 (0.0%)  ge70_out=4 (10.0%)  mean_ovr=64.4 mean_age=23.75
+  hold: out_total=10  thin_s_out=0 (0.0%)  mean_ovr=64.1 mean_age=25.2
+  other_tag_out=0  missing_player_lookups=0
+
+--- seed 424244 ---
+  n_trades=32  by_year={1: 4, 2: 4, 3: 8, 4: 7, 5: 9}
+  outgoing events (2 per trade): total=64
+  by_sender_tag: {'rebuild': 2, 'push': 54, 'hold': 8}
+  rebuild: out_total=2  sab24_out=0 (0.0%)  sa22_out=0 (0.0%)  mean_ovr=68.0 mean_age=29.0
+  push: out_total=54  ge73_out=0 (0.0%)  ge70_out=7 (12.96%)  mean_ovr=63.91 mean_age=24.24
+  hold: out_total=8  thin_s_out=0 (0.0%)  mean_ovr=63.88 mean_age=24.62
+  other_tag_out=0  missing_player_lookups=0
+
+--- seed 424245 ---
+  n_trades=24  by_year={1: 5, 2: 5, 3: 2, 4: 7, 5: 5}
+  outgoing events (2 per trade): total=48
+  by_sender_tag: {'push': 40, 'hold': 8}
+  rebuild: out_total=0  sab24_out=0 (0.0%)  sa22_out=0 (0.0%)  mean_ovr=0.0 mean_age=0.0
+  push: out_total=40  ge73_out=2 (5.0%)  ge70_out=3 (7.5%)  mean_ovr=64.1 mean_age=25.12
+  hold: out_total=8  thin_s_out=0 (0.0%)  mean_ovr=64.25 mean_age=22.38
+  other_tag_out=0  missing_player_lookups=0
+
+--- seed 424246 ---
+  n_trades=24  by_year={1: 5, 2: 5, 3: 4, 4: 5, 5: 5}
+  outgoing events (2 per trade): total=48
+  by_sender_tag: {'rebuild': 2, 'push': 39, 'hold': 7}
+  rebuild: out_total=2  sab24_out=0 (0.0%)  sa22_out=0 (0.0%)  mean_ovr=68.0 mean_age=25.5
+  push: out_total=39  ge73_out=4 (10.26%)  ge70_out=12 (30.77%)  mean_ovr=66.49 mean_age=25.72
+  hold: out_total=7  thin_s_out=0 (0.0%)  mean_ovr=66.0 mean_age=24.86
+  other_tag_out=0  missing_player_lookups=0
+
+=== Across seeds (mean of per-seed metrics) ===
+  mean n_trades: 27.6000
+  mean rebuild_out_total: 1.2000
+  mean rebuild_out_sab24: 0.0000
+  mean pct_rebuild_sab24: 0.0000
+  mean rebuild_out_sa22: 0.0000
+  mean pct_rebuild_sa22: 0.0000
+  mean push_out_total: 45.4000
+  mean push_out_ge73: 1.6000
+  mean pct_push_ge73: 3.7920
+  mean push_out_ge70: 6.6000
+  mean pct_push_ge70: 14.8380
+  mean hold_out_total: 8.6000
+  mean hold_out_thin_s: 0.0000
+  mean rebuild_mean_ovr: 41.2000
+  mean push_mean_ovr: 64.7680
+  mean hold_mean_ovr: 64.6660
+
+Note: Strict before/after (pre-asset-rule) not automated. Prior roster_protect 5y5s ~mean n_trades 26.2/seed for same seeds (reference).

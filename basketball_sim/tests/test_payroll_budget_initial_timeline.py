@@ -5,11 +5,8 @@ from __future__ import annotations
 import contextlib
 import io
 
-from basketball_sim.main import (
-    CITY_MARKET_SIZE,
-    TEMP_INITIAL_TEAM_MONEY,
-    apply_user_team_to_league,
-)
+from basketball_sim.main import CITY_MARKET_SIZE, apply_user_team_to_league
+from basketball_sim.systems.club_profile import get_initial_user_team_money
 from basketball_sim.systems.contract_logic import normalize_initial_payrolls_for_teams
 from basketball_sim.systems.generator import generate_teams
 from basketball_sim.utils.sim_rng import init_simulation_random
@@ -34,13 +31,13 @@ def test_user_team_payroll_budget_stays_default_after_normalize_initial_payrolls
         )
 
     assert user_team.is_user_team is True
-    assert int(user_team.money) == TEMP_INITIAL_TEAM_MONEY
+    assert int(user_team.money) == int(get_initial_user_team_money(user_team))
     assert user_team.payroll_budget == DEFAULT_PAYROLL_BUDGET
     assert len(getattr(user_team, "players", []) or []) > 0
 
     normalize_initial_payrolls_for_teams(teams)
 
     assert user_team.payroll_budget == DEFAULT_PAYROLL_BUDGET
-    assert int(user_team.money) == TEMP_INITIAL_TEAM_MONEY
+    assert int(user_team.money) == int(get_initial_user_team_money(user_team))
     roster_payroll = sum(int(getattr(p, "salary", 0) or 0) for p in user_team.players)
     assert roster_payroll > 0

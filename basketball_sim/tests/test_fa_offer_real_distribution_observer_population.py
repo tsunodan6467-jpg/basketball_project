@@ -1,10 +1,13 @@
 """fa_offer_real_distribution_observer population helpers (tools/; default CLI unchanged)."""
 
 import importlib.util
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.free_agent_market import fa_pool_market_salary
 
 
 def _load_observer_module():
@@ -544,3 +547,51 @@ def test_format_pre_sync_user_team_snapshot_fallback_first_team():
     assert "popularity=50" in line
     assert "sponsor_power=50" in line
     assert "fan_base=5000" in line
+
+
+def test_resync_helper_sets_salary_to_fa_pool_market():
+    p = _fa(1, 999_999_999)
+    out = _ob._resync_free_agent_salaries_for_observation([p])
+    assert out == [p]
+    assert p.salary == fa_pool_market_salary(p, league_division=3)
+
+
+def test_resync_helper_uses_median_league_level_from_teams():
+    p = _fa(4, 999_999_999)
+    teams = [
+        Team(team_id=i, name=f"T{i}", league_level=lv, money=0, players=[], payroll_budget=1)
+        for i, lv in enumerate([3, 3, 2, 2, 1])
+    ]
+    out = _ob._resync_free_agent_salaries_for_observation([p], teams=teams)
+    assert out == [p]
+    assert p.salary == fa_pool_market_salary(p, league_division=2)
+
+
+def test_league_market_division_observer_resync_fallback_when_no_teams():
+    d0, fb0 = _ob._league_market_division_for_observer_fa_resync(None)
+    assert d0 == 3 and fb0 is True
+    d1, fb1 = _ob._league_market_division_for_observer_fa_resync([])
+    assert d1 == 3 and fb1 is True
+
+
+def test_resync_helper_excludes_retired_free_agents():
+    p = _fa(2, 10_000_000)
+    p.is_retired = True
+    out = _ob._resync_free_agent_salaries_for_observation([p])
+    assert out == []
+
+
+def test_parse_args_resync_fa_salary_default_off():
+    with patch.object(sys, "argv", ["fa_offer_real_distribution_observer.py", "--save", "x.sav"]):
+        ns = _ob._parse_args()
+    assert ns.resync_fa_salary is False
+
+
+def test_parse_args_resync_fa_salary_flag_on():
+    with patch.object(
+        sys,
+        "argv",
+        ["fa_offer_real_distribution_observer.py", "--save", "x.sav", "--resync-fa-salary"],
+    ):
+        ns = _ob._parse_args()
+    assert ns.resync_fa_salary is True

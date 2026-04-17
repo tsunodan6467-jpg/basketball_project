@@ -16,6 +16,7 @@ from basketball_sim.config.game_constants import (
 )
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.free_agent_market import assign_fa_pool_market_salary_on_release_to_fa
 
 
 class RosterViolationError(ValueError):
@@ -107,6 +108,5 @@ def ensure_contract_roster_nationality_after_force(team: Team, free_agents: List
         )
         team.remove_player(release)
         release.contract_years_left = 0
-        if int(getattr(release, "salary", 0) or 0) <= 0:
-            release.salary = max(int(getattr(release, "ovr", 0) or 0) * 10_000, 300_000)
+        assign_fa_pool_market_salary_on_release_to_fa(release, team=team)
         free_agents.append(release)

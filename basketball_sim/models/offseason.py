@@ -13,6 +13,7 @@ from basketball_sim.systems.salary_cap_budget import (
 from .team import Team
 from .player import Player
 from .match import Match
+from basketball_sim.systems.club_profile import get_club_base_profile
 from basketball_sim.systems.draft import conduct_draft
 from basketball_sim.systems.draft_auction import conduct_auction_draft
 from basketball_sim.systems.free_agency import conduct_free_agency
@@ -21,7 +22,6 @@ from basketball_sim.systems.top_prospect_generator import generate_top_prospects
 
 try:
     from basketball_sim.systems.contract_logic import (
-        MIN_SALARY_DEFAULT,
         advance_contract_years,
         apply_contract_extension,
         apply_resign_offer,
@@ -30,9 +30,9 @@ try:
         evaluate_resign_offer,
         get_team_payroll,
         get_team_player_rank,
+        is_draft_rookie_contract_active,
     )
 except Exception:
-    MIN_SALARY_DEFAULT = None
     ensure_contract_fields = None
     calculate_desired_contract_terms = None
     evaluate_resign_offer = None
@@ -41,6 +41,7 @@ except Exception:
     apply_contract_extension = None
     get_team_payroll = None
     get_team_player_rank = None
+    is_draft_rookie_contract_active = None
 
 try:
     from basketball_sim.systems.free_agent_market import (
@@ -92,28 +93,49 @@ def _sync_payroll_budget_with_roster_payroll(teams: List[Team]) -> None:
 TEMP_OFFSEASON_CENTRAL_PAYROLL_SHARE = 0.98
 
 # 暫定: ⑦オフ後 `payroll_budget` 再設定の roster 床（`floor_expr = ratio * roster_payroll + buffer`）。後続調整可。
-TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO = 1.0
-TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER = 3_000_000
+# ratio<1 で「実年俸フル張り付き床」から保険寄りに緩め、formula 採用の余地を作る。
+TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO = 0.85
+TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER = 1_000_000
 
 
 def compute_postoff_payroll_budget_with_temp_floor(team: Team, roster_payroll: int) -> int:
-    """⑦ `_process_team_finances` と同じ `max(現行式, α*roster+β)`。`TEMP_*` を参照。"""
+    """⑦ `_process_team_finances` と同じ `max(現行式, min(α*roster+β, 現行式))`（soft_cap=現行式）。`TEMP_*` を参照。"""
     league_level = int(getattr(team, "league_level", 3))
     base_budget = {1: 7_900_000, 2: 5_450_000, 3: 3_650_000}.get(league_level, 3_650_000)
-    current_formula_budget = max(
-        base_budget,
-        int(
-            base_budget
-            + float(getattr(team, "market_size", 1.0)) * 12_500
-            + getattr(team, "popularity", 50) * 6_200
-            + getattr(team, "sponsor_power", 50) * 5_000
-            + getattr(team, "fan_base", 50) * 3_600
-        ),
+    inner_sum = float(
+        base_budget
+        + float(getattr(team, "market_size", 1.0)) * 12_500
+        + getattr(team, "popularity", 50) * 6_200
+        + getattr(team, "sponsor_power", 50) * 5_000
+        + getattr(team, "fan_base", 50) * 3_600
     )
-    floor_expr = int(
+    try:
+        if bool(getattr(team, "is_user_team", False)):
+            fac = 1.0
+        else:
+            prof = get_club_base_profile(team)
+            fac = (
+                1.0
+                + 0.022 * (float(prof.financial_power) - 1.0)
+                + 0.018 * (float(prof.market_size) - 1.0)
+                + 0.015 * (float(prof.arena_grade) - 1.0)
+            )
+            # club_profile: 勝利圧を⑦式 fac に極小接続（CPU のみ・長期の補強余力差を薄く出す）
+            wn = float(prof.win_now_pressure)
+            if wn >= 1.04:
+                fac += 0.005
+            elif wn <= 0.98:
+                fac -= 0.005
+            fac = max(0.97, min(1.03, float(fac)))
+    except Exception:
+        fac = 1.0
+    current_formula_budget = max(base_budget, int(inner_sum * fac))
+    raw_floor = int(
         int(roster_payroll) * float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO)
         + float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER)
     )
+    soft_cap = int(current_formula_budget)
+    floor_expr = min(raw_floor, soft_cap)
     return int(max(current_formula_budget, floor_expr))
 
 
@@ -541,6 +563,16 @@ class Offseason:
             if 0 <= idx < len(OFFSEASON_PHASES):
                 pid, title = OFFSEASON_PHASES[idx]
                 print_phase_banner(phase_no, pid, title)
+        except Exception:
+            pass
+        try:
+            from basketball_sim.systems.offseason_progress_cli_display import (
+                format_offseason_progress_cli_lines,
+            )
+
+            extra = format_offseason_progress_cli_lines(self, int(phase_no))
+            if extra:
+                print("\n".join(extra))
         except Exception:
             pass
 
@@ -1424,10 +1456,14 @@ class Offseason:
             self.free_agents, retired_fa = retire_stale_free_agents(self.free_agents)
 
         if maintain_minimum_fa_pool is not None:
+            from basketball_sim.systems.resign_salary_anchor import median_league_level_for_teams
+
+            div_m = int(median_league_level_for_teams(self.teams))
             self.free_agents = maintain_minimum_fa_pool(
                 self.free_agents,
                 target_minimum=40,
                 generator_func=self._generate_fa_fallback_player,
+                league_market_division=div_m,
             )
 
         if retired_fa:
@@ -1441,7 +1477,7 @@ class Offseason:
         player.contract_years_left = 0
         player.team_id = None
         player.fa_years_waiting = 0
-        player.salary = max(getattr(player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 350000)
+        # `player.salary` は `maintain_minimum_fa_pool` 内の `fa_pool_market_salary` 同期に一本化する
         return player
 
     def _all_players(self) -> List[Player]:
@@ -1913,6 +1949,19 @@ class Offseason:
             f"{player.name} | {player.position} | Age:{player.age} | "
             f"OVR:{player.ovr} | GP:{player.games_played}"
         )
+        try:
+            from basketball_sim.systems.resign_cli_display import format_re_sign_cli_hint
+
+            _hint = format_re_sign_cli_hint(
+                team,
+                player,
+                ask_salary=int(new_salary),
+                current_salary=int(getattr(player, "salary", 0) or 0),
+            )
+            if _hint:
+                print(f"  {_hint}")
+        except Exception:
+            pass
         print(
             f"Current Salary: {getattr(player, 'salary', 0):,}円 | "
             f"Proposed: {new_salary:,}円 / {desired_years} years"
@@ -2076,6 +2125,8 @@ class Offseason:
             for player in list(team.players):
                 if getattr(player, "contract_years_left", 0) != 1:
                     continue
+                if is_draft_rookie_contract_active is not None and is_draft_rookie_contract_active(player):
+                    continue
                 if bool(getattr(player, "icon_locked", False)):
                     continue
                 if int(getattr(player, "ovr", 0) or 0) > 64:
@@ -2091,11 +2142,11 @@ class Offseason:
                 if random.random() > 0.32:
                     continue
 
-                apply_contract_extension(team, player, add_years=1)
-                print(
-                    f"[CONTRACT-EXT] {team.name} extended {player.name} +1y (same salary) "
-                    f"| OVR:{getattr(player, 'ovr', 0)} rank:{rank}"
-                )
+                if apply_contract_extension(team, player, add_years=1):
+                    print(
+                        f"[CONTRACT-EXT] {team.name} extended {player.name} +1y (same salary) "
+                        f"| OVR:{getattr(player, 'ovr', 0)} rank:{rank}"
+                    )
 
     def _resign_players(self):
         print("Conducting Re-signing...")
@@ -2106,8 +2157,13 @@ class Offseason:
         else:
             for user_team in user_teams:
                 expiring_preview = [
-                    p for p in user_team.players
+                    p
+                    for p in user_team.players
                     if getattr(p, "contract_years_left", 0) == 1
+                    and not (
+                        is_draft_rookie_contract_active is not None
+                        and is_draft_rookie_contract_active(p)
+                    )
                 ]
                 expiring_preview.sort(key=lambda p: (p.ovr, getattr(p, "games_played", 0)), reverse=True)
 
@@ -2127,12 +2183,32 @@ class Offseason:
                             f"Current:{getattr(p, 'salary', 0):,}円 "
                             f"Ask:{desired_salary:,}円/{desired_years}y"
                         )
+                        try:
+                            from basketball_sim.systems.resign_cli_display import (
+                                format_re_sign_cli_hint,
+                            )
+
+                            _list_hint = format_re_sign_cli_hint(
+                                user_team,
+                                p,
+                                ask_salary=int(desired_salary),
+                                current_salary=int(getattr(p, "salary", 0) or 0),
+                            )
+                            if _list_hint:
+                                print(f"   {_list_hint}")
+                        except Exception:
+                            pass
 
         for team in self.teams:
             salary_cap = int(get_hard_cap(league_level=league_level_for_team(team)))
             expiring_players = [
-                p for p in team.players
+                p
+                for p in team.players
                 if getattr(p, "contract_years_left", 0) == 1
+                and not (
+                    is_draft_rookie_contract_active is not None
+                    and is_draft_rookie_contract_active(p)
+                )
             ]
 
             if not expiring_players:
@@ -2149,7 +2225,7 @@ class Offseason:
                     ensure_contract_fields(player)
 
                 if calculate_desired_contract_terms is not None:
-                    desired_salary, desired_years = calculate_desired_contract_terms(player)
+                    desired_salary, desired_years = calculate_desired_contract_terms(player, team)
                 else:
                     current_salary = max(getattr(player, "salary", 0), player.ovr * PLAYER_SALARY_BASE_PER_OVR)
                     desired_salary = max(current_salary, player.ovr * PLAYER_SALARY_BASE_PER_OVR)
@@ -2596,6 +2672,11 @@ class Offseason:
     def _refresh_international_market(self):
         print("Refreshing International Market...")
 
+        from basketball_sim.systems.free_agent_market import fa_pool_market_salary
+        from basketball_sim.systems.resign_salary_anchor import median_league_level_for_teams
+
+        div_m = int(median_league_level_for_teams(self.teams))
+
         foreign_to_add = 3
         asia_to_add = 1
 
@@ -2608,7 +2689,7 @@ class Offseason:
 
             player = self._make_international_player("Foreign", reborn_data)
             player.contract_years_left = random.randint(1, 2)
-            player.salary = max(player.ovr * 12000, 500000)
+            player.salary = fa_pool_market_salary(player, league_division=div_m)
             self.free_agents.append(player)
             added_players.append((player, reborn_data, "Foreign"))
 
@@ -2619,7 +2700,7 @@ class Offseason:
 
             player = self._make_international_player("Asia", reborn_data)
             player.contract_years_left = random.randint(1, 2)
-            player.salary = max(player.ovr * 11000, 450000)
+            player.salary = fa_pool_market_salary(player, league_division=div_m)
             self.free_agents.append(player)
             added_players.append((player, reborn_data, "Asia"))
 

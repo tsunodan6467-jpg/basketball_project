@@ -1,0 +1,90 @@
+
+CONFIG seed=20260413 years=3
+
+=== opening ===
+D1 team_payroll yen: min=768,503,511 p25=933,480,685 p50=1,024,134,239 p75=1,080,671,231 max=1,259,893,522 (n=16)
+D1 player_salary yen: min=34,000,000 p25=35,590,760 p50=51,500,000 p75=105,661,666 max=250,844,590 (n=208)
+D2 team_payroll yen: min=591,268,264 p25=663,420,452 p50=690,859,723 p75=743,056,744 max=826,390,959 (n=16)
+D2 player_salary yen: min=16,000,000 p25=24,105,690 p50=50,867,246 p75=74,716,629 max=133,690,915 (n=208)
+D3 team_payroll yen: min=380,620,245 p25=459,370,652 p50=491,580,930 p75=523,292,705 max=597,750,825 (n=16)
+D3 player_salary yen: min=13,877,712 p25=22,784,267 p50=34,214,196 p75=52,135,139 max=82,000,000 (n=208)
+Anomalies: D1 salary<1M (count)=0 | D2 salary<500k=0 | D3 salary<500k=0
+ROOKIE salary vs locked: no mismatches on rosters.
+ROOKIE mid-lock trades (team change while rookie): none.
+D1 age 18-20 salary med summary: Japan:n=24 med=35,958,052 | Foreign:n=6 med=55,000,000
+D1 age 21-23 salary med summary: Japan:n=21 med=36,975,536 | Foreign:n=7 med=105,000,000
+Youth high earners age<=23 sal>=120M non-rookie (sample up to 8): 4
+  pid=102 age=23 nat=Foreign ovr=69 sal=207,410,573 D1 tid=8
+  pid=123 age=22 nat=Japan ovr=77 sal=140,173,795 D1 tid=10
+  pid=196 age=22 nat=Naturalized ovr=53 sal=155,000,000 D1 tid=16
+  pid=208 age=22 nat=Foreign ovr=72 sal=175,000,001 D1 tid=16
+
+--- Season sim year 1 ---
+
+--- Offseason run year 1 ---
+
+=== after_offseason_y1 ===
+D1 team_payroll yen: min=589,411,711 p25=793,304,322 p50=1,002,690,630 p75=1,055,110,349 max=1,259,893,522 (n=16)
+D1 player_salary yen: min=16,000,000 p25=35,768,302 p50=54,552,273 p75=105,000,000 max=250,844,590 (n=203)
+D2 team_payroll yen: min=476,573,372 p25=590,025,420 p50=690,859,723 p75=751,421,543 max=1,048,062,189 (n=16)
+D2 player_salary yen: min=16,000,000 p25=29,660,938 p50=44,900,985 p75=73,326,918 max=183,710,836 (n=207)
+D3 team_payroll yen: min=331,709,353 p25=459,967,498 p50=493,343,964 p75=544,219,064 max=673,188,695 (n=16)
+D3 player_salary yen: min=13,877,712 p25=22,419,125 p50=35,531,719 p75=54,330,747 max=128,087,267 (n=203)
+Anomalies: D1 salary<1M (count)=0 | D2 salary<500k=0 | D3 salary<500k=0
+ROOKIE salary != locked (1):
+  pid=625 name=Player_625 sal=30,107,350 lock=33,453,393 cy=2
+ROOKIE mid-lock trades (team change while rookie): none.
+D1 age 18-20 salary med summary: Japan:n=20 med=35,643,056 | Foreign:n=3 med=55,000,000
+D1 age 21-23 salary med summary: Japan:n=21 med=36,079,526 | Foreign:n=5 med=70,779,744
+Youth high earners age<=23 sal>=120M non-rookie (sample up to 8): 3
+  pid=123 age=23 nat=Japan ovr=77 sal=140,173,795 D2 tid=10
+  pid=196 age=23 nat=Naturalized ovr=53 sal=155,000,000 D1 tid=16
+  pid=208 age=23 nat=Foreign ovr=72 sal=175,000,001 D1 tid=16
+
+--- Season sim year 2 ---
+
+--- Offseason run year 2 ---
+
+=== after_offseason_y2 ===
+D1 team_payroll yen: min=587,256,484 p25=891,346,178 p50=1,019,832,488 p75=1,093,335,385 max=1,200,000,000 (n=16)
+D1 player_salary yen: min=8,643,127 p25=38,800,718 p50=54,401,168 p75=108,696,694 max=241,534,270 (n=203)
+D2 team_payroll yen: min=514,760,224 p25=594,961,160 p50=610,943,814 p75=688,869,646 max=1,026,831,237 (n=16)
+D2 player_salary yen: min=9,338,568 p25=20,322,222 p50=44,420,256 p75=69,135,956 max=250,844,590 (n=208)
+D3 team_payroll yen: min=353,636,752 p25=455,689,532 p50=488,104,797 p75=533,461,302 max=756,649,661 (n=16)
+D3 player_salary yen: min=8,597,717 p25=21,907,027 p50=34,538,075 p75=50,960,000 max=183,710,836 (n=208)
+Anomalies: D1 salary<1M (count)=0 | D2 salary<500k=0 | D3 salary<500k=0
+ROOKIE salary vs locked: no mismatches on rosters.
+ROOKIE mid-lock trades (team change while rookie): none.
+D1 age 18-20 salary med summary: Japan:n=35 med=39,578,774
+D1 age 21-23 salary med summary: Japan:n=18 med=36,393,380
+Youth high earners age<=23 sal>=120M non-rookie (sample up to 8): 0
+
+--- Season sim year 3 ---
+
+--- Offseason run year 3 ---
+
+=== after_offseason_y3 ===
+D1 team_payroll yen: min=688,953,343 p25=950,324,790 p50=1,035,676,079 p75=1,136,186,949 max=1,176,794,269 (n=16)
+D1 player_salary yen: min=7,759,462 p25=40,064,892 p50=67,042,830 p75=128,980,724 max=235,592,484 (n=204)
+D2 team_payroll yen: min=516,297,194 p25=579,016,108 p50=627,591,294 p75=672,035,787 max=992,422,129 (n=16)
+D2 player_salary yen: min=7,287,894 p25=20,997,679 p50=40,996,896 p75=70,000,000 max=250,844,590 (n=208)
+D3 team_payroll yen: min=387,533,500 p25=439,115,777 p50=463,745,374 p75=485,516,877 max=728,658,566 (n=16)
+D3 player_salary yen: min=8,597,717 p25=20,001,196 p50=32,912,418 p75=49,016,178 max=165,561,398 (n=208)
+Anomalies: D1 salary<1M (count)=0 | D2 salary<500k=0 | D3 salary<500k=0
+ROOKIE salary vs locked: no mismatches on rosters.
+ROOKIE mid-lock trades (team change while rookie): none.
+D1 age 18-20 salary med summary: Japan:n=38 med=40,076,090
+D1 age 21-23 salary med summary: Japan:n=20 med=41,363,120
+Youth high earners age<=23 sal>=120M non-rookie (sample up to 8): 0
+
+=== Rookie cohort (players ever flagged draft rookie in snap) ===
+pid=625 Player_625 kind=? join=after_offseason_y1 salaries={'after_offseason_y1': 30107350} teams={'after_offseason_y1': 10} traded={}
+pid=1113 栗崎 貴洋 kind=auction join=after_offseason_y2 salaries={'after_offseason_y2': 33542035, 'after_offseason_y3': 33542035} teams={'after_offseason_y2': 45, 'after_offseason_y3': 45} traded={}
+pid=1136 Player_1136 kind=auction join=after_offseason_y2 salaries={'after_offseason_y2': 8643127, 'after_offseason_y3': 8643127} teams={'after_offseason_y2': 16, 'after_offseason_y3': 16} traded={}
+pid=1142 Player_1142 kind=auction join=after_offseason_y2 salaries={'after_offseason_y2': 10968734, 'after_offseason_y3': 10968734} teams={'after_offseason_y2': 18, 'after_offseason_y3': 18} traded={}
+pid=1148 Player_1148 kind=auction join=after_offseason_y2 salaries={'after_offseason_y2': 8597717, 'after_offseason_y3': 8597717} teams={'after_offseason_y2': 38, 'after_offseason_y3': 38} traded={}
+pid=1150 Player_1150 kind=auction join=after_offseason_y2 salaries={'after_offseason_y2': 9338568, 'after_offseason_y3': 9338568} teams={'after_offseason_y2': 8, 'after_offseason_y3': 8} traded={}
+pid=1390 Player_1390 kind=auction join=after_offseason_y3 salaries={'after_offseason_y3': 8605863} teams={'after_offseason_y3': 1} traded={}
+pid=1391 Player_1391 kind=auction join=after_offseason_y3 salaries={'after_offseason_y3': 7287894} teams={'after_offseason_y3': 20} traded={}
+pid=1402 Player_1402 kind=auction join=after_offseason_y3 salaries={'after_offseason_y3': 7759462} teams={'after_offseason_y3': 26} traded={}
+pid=1411 Player_1411 kind=auction join=after_offseason_y3 salaries={'after_offseason_y3': 36648391} teams={'after_offseason_y3': 15} traded={}

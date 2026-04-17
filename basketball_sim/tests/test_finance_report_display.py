@@ -7,6 +7,7 @@ from basketball_sim.models.team import (
 )
 from basketball_sim.systems.finance_report_display import (
     breakdown_matches_total,
+    format_cli_finance_screen_header_lines,
     format_finance_report_detail_lines,
     format_inseason_cash_round_log_lines,
     normalize_breakdown_dict,
@@ -93,6 +94,42 @@ def test_format_inseason_cash_round_log_lines_shows_matchday_label():
     assert "R12" in text
     assert "主場・門前概算" in text
     assert "500,000" in text
+
+
+def test_format_cli_finance_screen_header_lines_fresh_team():
+    t = Team(team_id=1, name="T", league_level=1)
+    t._ensure_history_fields()
+    lines = format_cli_finance_screen_header_lines(t)
+    text = "\n".join(lines)
+    assert "【財務サマリー】" in text
+    assert "前季収支: 未更新" in text
+    assert "財務履歴: 履歴なし" in text
+    assert "【主要内訳】" in text
+    assert "情報なし" in text
+
+
+def test_format_cli_finance_screen_header_lines_with_breakdown_snapshot():
+    t = Team(team_id=1, name="T", league_level=1, money=9_000_000)
+    t.revenue_last_season = 12_000_000
+    t.expense_last_season = 10_000_000
+    t.cashflow_last_season = 2_000_000
+    t.finance_history = [
+        {
+            "revenue": 100,
+            "expense": 60,
+            "cashflow": 40,
+            "note": "Wins:10",
+            "breakdown_revenue": {"gate": 70, "sponsor": 30},
+            "breakdown_expense": {"payroll": 40, "travel": 20},
+        }
+    ]
+    lines = format_cli_finance_screen_header_lines(t)
+    text = "\n".join(lines)
+    assert "（黒字）" in text
+    assert "財務履歴: 1件" in text
+    assert "直近収入合計: 100円" in text
+    assert "チケット・興行" in text
+    assert "選手給与（年俸）" in text
 
 
 def test_format_finance_report_detail_lines_with_snapshot():

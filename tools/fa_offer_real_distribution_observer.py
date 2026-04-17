@@ -10,6 +10,7 @@ Uses `_calculate_offer_diagnostic` only. Run from repo root:
   python tools/fa_offer_real_distribution_observer.py --seasons 1 --seed 42
   python tools/fa_offer_real_distribution_observer.py --population-mode mixed_mid_fa_roomy
   python tools/fa_offer_real_distribution_observer.py --save-list a.sav b.sav
+  python tools/fa_offer_real_distribution_observer.py --save path/to/file.sav --resync-fa-salary
 
 Optional population modes (default unchanged): see docs/FA_OBSERVER_MATRIX_REDESIGN_PLAN_2026-04.md
 
@@ -66,6 +67,8 @@ from basketball_sim.models.player import Player  # noqa: E402
 from basketball_sim.models.team import Team  # noqa: E402
 from basketball_sim.persistence.save_load import load_world, validate_payload  # noqa: E402
 from basketball_sim.systems import free_agency as fa_mod  # noqa: E402
+from basketball_sim.systems.free_agent_market import normalize_free_agents  # noqa: E402
+from basketball_sim.systems.resign_salary_anchor import median_league_level_for_teams  # noqa: E402
 from basketball_sim.utils.sim_rng import init_simulation_random  # noqa: E402
 
 TINY_MAX = 300_000
@@ -147,6 +150,13 @@ def _parse_args() -> argparse.Namespace:
         help="After loading --save/--save-list: overwrite each team.payroll_budget using TEMP_POSTOFF_* "
         "(same as ⑦ floor formula). Static .sav keeps stale payroll_budget; use this for BUFFER tuning compares.",
     )
+    p.add_argument(
+        "--resync-fa-salary",
+        action="store_true",
+        help="Before the matrix: re-run normalize_free_agents on the FA pool so player.salary matches "
+        "fa_pool_market_salary using median_league_level_for_teams(loaded teams); division 3 if teams empty "
+        "(observation-only).",
+    )
     return p.parse_args()
 
 
@@ -154,6 +164,23 @@ def _check_save_args_exclusive(save: str, save_list: Optional[List[str]]) -> Opt
     if save and save_list is not None:
         return "use either --save or --save-list, not both"
     return None
+
+
+def _league_market_division_for_observer_fa_resync(teams: Optional[List[Team]]) -> Tuple[int, bool]:
+    """(league_market_division, used_fallback). Empty teams → 3 (従来 observer 相当)."""
+    if not teams:
+        return 3, True
+    return int(median_league_level_for_teams(teams)), False
+
+
+def _resync_free_agent_salaries_for_observation(
+    free_agents: List[Player],
+    *,
+    teams: Optional[List[Team]] = None,
+) -> List[Player]:
+    """FA pool only: sync salaries via game FA normalization (drops retired)."""
+    div, _ = _league_market_division_for_observer_fa_resync(teams)
+    return normalize_free_agents(free_agents, league_market_division=div)
 
 
 def _load_teams_fas_from_save(path: Path) -> Tuple[List[Team], List[Player]]:
@@ -820,6 +847,15 @@ def _run_one_observation(args: argparse.Namespace, *, save_path: Optional[str]) 
             print("--apply-temp-postoff-floor requires --save or --save-list; abort")
             return False
         reapply_temp_postoff_payroll_budget_floor_to_teams(teams)
+
+    resync = bool(getattr(args, "resync_fa_salary", False))
+    if resync:
+        div_m, used_fb = _league_market_division_for_observer_fa_resync(teams)
+        fb = ",fallback" if used_fb else ""
+        print(f"[observer] fa salary resync: enabled (league_market_division={div_m}{fb})")
+        fas = _resync_free_agent_salaries_for_observation(fas, teams=teams)
+    else:
+        print("[observer] fa salary resync: disabled")
 
     pre_sync_snapshot = _format_pre_sync_user_team_snapshot_line(teams)
     stats_before = _teams_payroll_gap_stats(teams)

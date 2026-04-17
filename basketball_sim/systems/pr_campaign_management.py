@@ -40,6 +40,13 @@ PR_CAMPAIGNS: Tuple[Dict[str, Any], ...] = (
 
 PR_CAMPAIGN_IDS = frozenset(x["id"] for x in PR_CAMPAIGNS)
 
+# CLI 候補比較用の短文（表示のみ。cost / delta の数値ロジックは変更しない）
+PR_CAMPAIGN_CLI_COMPARISON_HINTS: Dict[str, str] = {
+    "sns_buzz": "低コスト即効・話題・知名度寄り",
+    "community_day": "地元密着・中コストで人気とファン基盤",
+    "fan_festival": "大型イベント・高コスト・集客・ファン拡大",
+}
+
 
 def ensure_pr_campaigns_on_team(team: Any) -> None:
     if not hasattr(team, "management") or team.management is None or not isinstance(team.management, dict):
@@ -96,6 +103,36 @@ def commit_pr_campaign(team: Any, campaign_id: str, season: Any) -> Tuple[bool, 
     return _commit_pr_campaign_core(team, campaign_id, season, actor="user")
 
 
+def can_commit_pr_campaign(team: Any, campaign_id: str, season: Any) -> Tuple[bool, str]:
+    """
+    広報施策の実行可否のみ（状態は変えない）。GUI プレビュー用。
+    `sync_pr_round_quota` は週キー変更時に management を更新し得る（既存の format_pr_status_line と同様）。
+    """
+    if not bool(getattr(team, "is_user_team", False)):
+        return False, "自チームのみ広報施策を実行できます。"
+    cid = str(campaign_id or "").strip()
+    if cid not in PR_CAMPAIGN_IDS:
+        return False, "不明な施策です。"
+    spec = _campaign_spec(cid)
+    if spec is None:
+        return False, "不明な施策です。"
+    key, allowed, reason = sync_pr_round_quota(team, season)
+    if not allowed:
+        return False, reason
+    block = team.management["pr_campaigns"]
+    used = int(block.get("count_this_round", 0) or 0)
+    if used >= MAX_ACTIONS_PER_ROUND:
+        return (
+            False,
+            f"今週（ラウンド {key.replace('round_', '')}）の実行上限（{MAX_ACTIONS_PER_ROUND}回）に達しています。",
+        )
+    cost = int(spec["cost"])
+    money = int(getattr(team, "money", 0))
+    if money < cost:
+        return False, f"資金が不足しています（必要 {cost:,} 円）。"
+    return True, ""
+
+
 def _commit_pr_campaign_core(team: Any, campaign_id: str, season: Any, *, actor: str) -> Tuple[bool, str]:
     if actor not in ("user", "cpu"):
         return False, ""
@@ -108,22 +145,31 @@ def _commit_pr_campaign_core(team: Any, campaign_id: str, season: Any, *, actor:
     if spec is None:
         return False, "不明な施策です。"
 
-    key, allowed, reason = sync_pr_round_quota(team, season)
-    if not allowed:
-        return False, reason
+    if actor == "user":
+        ok_pre, err_pre = can_commit_pr_campaign(team, cid, season)
+        if not ok_pre:
+            return False, err_pre
+    else:
+        key, allowed, reason = sync_pr_round_quota(team, season)
+        if not allowed:
+            return False, reason
+        block = team.management["pr_campaigns"]
+        used = int(block.get("count_this_round", 0) or 0)
+        if used >= MAX_ACTIONS_PER_ROUND:
+            return (
+                False,
+                f"今週（ラウンド {key.replace('round_', '')}）の実行上限（{MAX_ACTIONS_PER_ROUND}回）に達しています。",
+            )
+        cost = int(spec["cost"])
+        money = int(getattr(team, "money", 0))
+        if money < cost:
+            return False, f"資金が不足しています（必要 {cost:,} 円）。"
 
+    key, _, _ = sync_pr_round_quota(team, season)
     block = team.management["pr_campaigns"]
     used = int(block.get("count_this_round", 0) or 0)
-    if used >= MAX_ACTIONS_PER_ROUND:
-        return (
-            False,
-            f"今週（ラウンド {key.replace('round_', '')}）の実行上限（{MAX_ACTIONS_PER_ROUND}回）に達しています。",
-        )
-
     cost = int(spec["cost"])
     money = int(getattr(team, "money", 0))
-    if money < cost:
-        return False, f"資金が不足しています（必要 {cost:,} 円）。"
 
     pop_d = int(spec.get("popularity_delta", 0))
     fan_d = int(spec.get("fan_base_delta", 0))
@@ -164,6 +210,110 @@ def try_cpu_pr_campaign(team: Any, season: Any, rng: Random) -> bool:
     cid = rng.choice([x["id"] for x in PR_CAMPAIGNS])
     ok, _ = _commit_pr_campaign_core(team, cid, season, actor="cpu")
     return ok
+
+
+def format_cli_pr_campaign_management_screen_lines(team: Any, season: Any) -> List[str]:
+    """
+    CLI 広報施策画面用（サマリー＋候補比較）。
+    `format_pr_status_line` で週次枠を既存どおり同期表示する（表示目的の既存経路の再利用）。
+    """
+    if team is None:
+        return [
+            "【広報サマリー】",
+            "直近施策: 情報なし",
+            "実行状態: 情報なし",
+            "週次情報: 情報なし",
+            "履歴: 履歴なし",
+            "直近更新: 情報なし",
+            "",
+            "【候補比較】",
+            "情報なし",
+            "",
+        ]
+
+    hist: List[Any] = []
+    n_hist = 0
+    try:
+        mg = getattr(team, "management", None)
+        if isinstance(mg, dict):
+            block = mg.get("pr_campaigns")
+            if isinstance(block, dict):
+                raw_h = block.get("history")
+                if isinstance(raw_h, list):
+                    hist = raw_h
+                    n_hist = len(hist)
+    except Exception:
+        hist = []
+        n_hist = 0
+
+    last_label = "未実行"
+    last_update = "履歴なし"
+    last_cid = ""
+    if hist:
+        row = hist[-1]
+        if isinstance(row, dict):
+            lab = str(row.get("label") or "").strip()
+            last_label = lab if lab else "情報なし"
+            last_cid = str(row.get("campaign_id") or "").strip()
+            at = str(row.get("at") or "").strip()
+            at_disp = at[:19].replace("T", " ") if at else ""
+            if at_disp:
+                last_update = f"{at_disp}  {last_label}"
+            else:
+                last_update = last_label
+        else:
+            last_label = "情報なし"
+            last_update = "情報なし"
+
+    hist_disp = f"{n_hist}件" if n_hist > 0 else "履歴なし"
+
+    frame = "情報なし"
+    exec_state = "情報なし"
+    if season is not None:
+        try:
+            frame = format_pr_status_line(team, season)
+            block = team.management.get("pr_campaigns")
+            if isinstance(block, dict):
+                used = int(block.get("count_this_round", 0) or 0)
+                _, allowed, _ = resolve_pr_round_context(season)
+                if not allowed:
+                    exec_state = "未実行"
+                elif used >= MAX_ACTIONS_PER_ROUND:
+                    exec_state = f"上限到達（今週 {MAX_ACTIONS_PER_ROUND} 回消化）"
+                elif used > 0:
+                    exec_state = f"実行済み（今週 {used} / {MAX_ACTIONS_PER_ROUND}）"
+                else:
+                    exec_state = "未実行"
+        except Exception:
+            frame = "情報なし"
+            exec_state = "情報なし"
+    else:
+        frame = "情報なし（シーズン未接続）"
+        exec_state = "情報なし"
+
+    lines: List[str] = [
+        "【広報サマリー】",
+        f"直近施策: {last_label}",
+        f"実行状態: {exec_state}",
+        f"週次情報: {frame}",
+        f"履歴: {hist_disp}",
+        f"直近更新: {last_update}",
+        "",
+        "【候補比較】",
+    ]
+    for i, spec in enumerate(PR_CAMPAIGNS, start=1):
+        cid = str(spec.get("id", "") or "")
+        lab = str(spec.get("label", cid) or cid)
+        hint = PR_CAMPAIGN_CLI_COMPARISON_HINTS.get(cid, "情報なし")
+        try:
+            cost = int(spec.get("cost", 0) or 0)
+            cost_s = f"{cost:,}円"
+        except (TypeError, ValueError):
+            cost_s = "情報なし"
+        mark = "（直近）" if cid and cid == last_cid else ""
+        lines.append(f"{i}. {lab}{mark}  …  {hint}（{cost_s}）")
+    lines.append("")
+    return lines
 
 
 def format_pr_status_line(team: Any, season: Any) -> str:

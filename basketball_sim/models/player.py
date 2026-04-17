@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, List, Optional
 import random
 
 
@@ -95,6 +95,10 @@ class Player:
     acquisition_note: str = ""
     # 直近の契約更新種別（Step 2: 再契約 vs 延長の区別用）
     contract_last_action: str = ""
+
+    # ドラフト（オークション / スネーク共通）の 3 年固定 rookie（一般の再契約・年俸改定・トレード対象外）
+    is_draft_rookie_contract: bool = False
+    draft_rookie_locked_salary: int = 0
 
     # ユース（v1土台）
     youth_team_id: Optional[int] = None
@@ -241,6 +245,9 @@ class Player:
         self.contract_role_expectation = self._normalize_contract_role_expectation(self.contract_role_expectation)
         self.contract_last_action = str(getattr(self, "contract_last_action", "") or "")
 
+        self._migrate_legacy_saved_rookie_contract_keys()
+        self._normalize_draft_rookie_contract_fields()
+
         if self.contract_total_years <= 0 and self.contract_years_left > 0:
             self.contract_total_years = self.contract_years_left
         elif self.contract_total_years > 0 and self.contract_years_left > self.contract_total_years:
@@ -253,6 +260,44 @@ class Player:
         self._initialize_growth_profile()
         self._initialize_hidden_traits()
         self._initialize_fa_profile()
+
+    def _migrate_legacy_saved_rookie_contract_keys(self) -> None:
+        """旧 save の __dict__ キー（is_auction_rookie_* 等）を正本 draft_rookie_* へ取り込む。"""
+        if not hasattr(self, "__dict__"):
+            return
+        d = self.__dict__
+        if "is_auction_rookie_contract" in d:
+            if bool(d.pop("is_auction_rookie_contract", False)):
+                self.is_draft_rookie_contract = True
+        if "auction_rookie_locked_salary" in d:
+            v = int(d.pop("auction_rookie_locked_salary") or 0)
+            if v > 0:
+                self.draft_rookie_locked_salary = max(
+                    int(getattr(self, "draft_rookie_locked_salary", 0) or 0), v
+                )
+
+    def _normalize_draft_rookie_contract_fields(self) -> None:
+        self.is_draft_rookie_contract = bool(getattr(self, "is_draft_rookie_contract", False))
+        self.draft_rookie_locked_salary = int(max(0, getattr(self, "draft_rookie_locked_salary", 0) or 0))
+
+    def __getstate__(self) -> dict[str, Any]:
+        self._migrate_legacy_saved_rookie_contract_keys()
+        self._normalize_draft_rookie_contract_fields()
+        st = dict(getattr(self, "__dict__", {}) or {})
+        st.pop("is_auction_rookie_contract", None)
+        st.pop("auction_rookie_locked_salary", None)
+        return st
+
+    def __setstate__(self, state: Any) -> None:
+        if not isinstance(state, dict):
+            raise TypeError("Player.__setstate__ expects a dict")
+        if not hasattr(self, "__dict__"):
+            object.__setattr__(self, "__dict__", {})
+        self.__dict__.update(state)
+        self._migrate_legacy_saved_rookie_contract_keys()
+        self._normalize_draft_rookie_contract_fields()
+        self.__dict__.pop("is_auction_rookie_contract", None)
+        self.__dict__.pop("auction_rookie_locked_salary", None)
 
     def _normalize_potential(self, raw: str) -> str:
         val = str(raw).upper().strip()
@@ -897,3 +942,25 @@ class Player:
 
         self.update_peak_ovr()
         return self.ovr - old_ovr
+
+
+def _install_player_legacy_draft_rookie_alias_props() -> None:
+    """旧名 is_auction_rookie_* は draft rookie 正本へのプロパティ互換（save / 外部参照用）。"""
+
+    def _g_auction_flag(self: Player) -> bool:
+        return bool(self.is_draft_rookie_contract)
+
+    def _s_auction_flag(self: Player, v: object) -> None:
+        self.is_draft_rookie_contract = bool(v)
+
+    def _g_auction_lock(self: Player) -> int:
+        return int(self.draft_rookie_locked_salary)
+
+    def _s_auction_lock(self: Player, v: object) -> None:
+        self.draft_rookie_locked_salary = int(max(0, int(v or 0)))
+
+    Player.is_auction_rookie_contract = property(_g_auction_flag, _s_auction_flag)  # type: ignore[assignment]
+    Player.auction_rookie_locked_salary = property(_g_auction_lock, _s_auction_lock)  # type: ignore[assignment]
+
+
+_install_player_legacy_draft_rookie_alias_props()

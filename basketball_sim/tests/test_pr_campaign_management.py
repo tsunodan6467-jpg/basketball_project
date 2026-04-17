@@ -4,6 +4,7 @@ from basketball_sim.models.team import Team
 from basketball_sim.systems.pr_campaign_management import (
     MAX_ACTIONS_PER_ROUND,
     commit_pr_campaign,
+    format_cli_pr_campaign_management_screen_lines,
     format_pr_status_line,
     sync_pr_round_quota,
 )
@@ -69,3 +70,37 @@ def test_format_status_shows_remaining():
     text = format_pr_status_line(t, s)
     assert "ラウンド" in text or "round" in text
     assert "2" in text or "回" in text
+
+
+def test_format_cli_pr_screen_fresh_team():
+    t = Team(team_id=60, name="CliPr", league_level=1, is_user_team=True, money=5_000_000)
+    s = _Season(3)
+    text = "\n".join(format_cli_pr_campaign_management_screen_lines(t, s))
+    assert "【広報サマリー】" in text
+    assert "【候補比較】" in text
+    assert "直近施策: 未実行" in text
+    assert "履歴: 履歴なし" in text
+    assert "SNS・話題づくり" in text
+    assert "低コスト即効" in text
+
+
+def test_format_cli_pr_screen_after_commit():
+    t = Team(team_id=61, name="CliPr2", league_level=1, is_user_team=True, money=5_000_000)
+    s = _Season(2)
+    ok, _ = commit_pr_campaign(t, "community_day", s)
+    assert ok is True
+    text = "\n".join(format_cli_pr_campaign_management_screen_lines(t, s))
+    assert "履歴: 1件" in text
+    assert "地域コミュニティDAY" in text
+    assert "（直近）" in text
+
+
+def test_format_cli_pr_screen_none_team():
+    text = "\n".join(format_cli_pr_campaign_management_screen_lines(None, None))
+    assert "情報なし" in text
+
+
+def test_format_cli_pr_screen_no_season():
+    t = Team(team_id=62, name="CliPr3", league_level=1, is_user_team=True, money=5_000_000)
+    text = "\n".join(format_cli_pr_campaign_management_screen_lines(t, None))
+    assert "シーズン未接続" in text

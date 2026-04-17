@@ -197,3 +197,90 @@ def _latest_breakdown_entry(history: List[Any]) -> Optional[dict]:
             if breakdown_matches_total(int(entry.get("expense", 0)), be):
                 return entry
     return None
+
+
+def format_cli_finance_screen_header_lines(team: Any) -> List[str]:
+    """
+    CLI「財務レポート」先頭用: 現状サマリーと主要内訳（表示のみ・数値ロジックは変更しない）。
+    """
+    getter = getattr(team, "_ensure_history_fields", None)
+    if callable(getter):
+        try:
+            getter()
+        except Exception:
+            pass
+
+    lines: List[str] = []
+    try:
+        money = int(getattr(team, "money", 0) or 0)
+        rev = int(getattr(team, "revenue_last_season", 0) or 0)
+        exp = int(getattr(team, "expense_last_season", 0) or 0)
+        cf = int(getattr(team, "cashflow_last_season", 0) or 0)
+        fh_raw = getattr(team, "finance_history", None) or []
+        fh = list(fh_raw) if isinstance(fh_raw, list) else []
+        n_fin = len(fh)
+
+        lines.append("【財務サマリー】")
+        lines.append(f"所持金: {money:,}円")
+
+        if rev == 0 and exp == 0 and cf == 0:
+            lines.append("前季収支: 未更新")
+        elif cf > 0:
+            lines.append(f"前季収支: {cf:+,}円（黒字）")
+        elif cf < 0:
+            lines.append(f"前季収支: {cf:+,}円（赤字）")
+        else:
+            lines.append(f"前季収支: {cf:+,}円（収支均衡）")
+
+        lines.append(f"財務履歴: {n_fin}件" if n_fin else "財務履歴: 履歴なし")
+        lines.append("")
+        lines.append("【主要内訳】")
+
+        snap = _latest_breakdown_entry(fh)
+        if snap is not None:
+            rtot = int(snap.get("revenue", 0))
+            etot = int(snap.get("expense", 0))
+            br = normalize_breakdown_dict(snap.get("breakdown_revenue"))
+            be = normalize_breakdown_dict(snap.get("breakdown_expense"))
+            lines.append(f"直近収入合計: {rtot:,}円")
+            lines.append(f"直近支出合計: {etot:,}円")
+            if br and breakdown_matches_total(rtot, br):
+                top_r = sorted(br.items(), key=lambda x: -x[1])[:2]
+                r_labels = " / ".join(REV_LABELS_JA.get(str(k), str(k)) for k, _ in top_r)
+                lines.append(f"主な収入: {r_labels}")
+            else:
+                lines.append("主な収入: 情報なし")
+            if be and breakdown_matches_total(etot, be):
+                top_e = sorted(be.items(), key=lambda x: -x[1])[:2]
+                e_labels = " / ".join(EXP_LABELS_JA.get(str(k), str(k)) for k, _ in top_e)
+                lines.append(f"主な支出: {e_labels}")
+            else:
+                lines.append("主な支出: 情報なし")
+        elif fh:
+            last = fh[-1]
+            if isinstance(last, dict):
+                try:
+                    rtot = int(last.get("revenue", 0) or 0)
+                    etot = int(last.get("expense", 0) or 0)
+                    lines.append(f"直近収入合計: {rtot:,}円")
+                    lines.append(f"直近支出合計: {etot:,}円")
+                    lines.append("主な収入: 情報なし")
+                    lines.append("主な支出: 情報なし")
+                except (TypeError, ValueError):
+                    lines.append("情報なし")
+            else:
+                lines.append("情報なし")
+        else:
+            lines.append("情報なし")
+
+        lines.append("")
+        return lines
+    except Exception:
+        return [
+            "【財務サマリー】",
+            "情報なし",
+            "",
+            "【主要内訳】",
+            "情報なし",
+            "",
+        ]

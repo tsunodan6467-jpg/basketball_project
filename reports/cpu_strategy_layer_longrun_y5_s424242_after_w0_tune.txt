@@ -1,0 +1,307 @@
+CPU strategy layer long-run observe | seed=424242 years=5
+
+=== opening strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold     48  (100.0%)
+  ALL push      0  ( 0.0%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     16  (100.0%)
+      push      0  ( 0.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     16  (100.0%)
+      push      0  ( 0.0%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     16  (100.0%)
+      push      0  ( 0.0%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=48 mean=0.00
+    push: (none)
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=48 age_mean=26.17 ovr_mean=68.68
+    push: (none)
+
+--- Season 1 (quiet) ---
+--- after_season_y1 ---
+
+=== after_season_y1 strategy_tag (CPU clubs) ===
+  ALL rebuild   8  (16.7%)
+  ALL hold     13  (27.1%)
+  ALL push     27  (56.2%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   3  (18.8%)
+      hold      7  (43.8%)
+      push      6  (37.5%)
+  D3 (n=16)
+      rebuild   5  (31.2%)
+      hold      6  (37.5%)
+      push      5  (31.2%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: n=8 mean=22.38
+    hold: n=13 mean=28.38
+    push: n=27 mean=33.04
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: teams=8 age_mean=26.20 ovr_mean=67.96
+    hold: teams=13 age_mean=26.09 ovr_mean=68.56
+    push: teams=27 age_mean=26.19 ovr_mean=68.96
+--- Offseason 1 (quiet) ---
+--- after_offseason_y1 ---
+
+=== after_offseason_y1 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold     25  (52.1%)
+  ALL push     23  (47.9%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     13  (81.2%)
+      push      3  (18.8%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     12  (75.0%)
+      push      4  (25.0%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=25 mean=0.00
+    push: n=23 mean=0.00
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=25 age_mean=26.85 ovr_mean=68.24
+    push: teams=23 age_mean=27.08 ovr_mean=69.06
+
+--- Season 2 (quiet) ---
+--- after_season_y2 ---
+
+=== after_season_y2 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold      6  (12.5%)
+  ALL push     42  (87.5%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      6  (37.5%)
+      push     10  (62.5%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=6 mean=27.33
+    push: n=42 mean=30.38
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=6 age_mean=26.82 ovr_mean=67.91
+    push: teams=42 age_mean=26.98 ovr_mean=68.72
+--- Offseason 2 (quiet) ---
+--- after_offseason_y2 ---
+
+=== after_offseason_y2 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold     25  (52.1%)
+  ALL push     23  (47.9%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     13  (81.2%)
+      push      3  (18.8%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     12  (75.0%)
+      push      4  (25.0%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=25 mean=0.00
+    push: n=23 mean=0.00
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=25 age_mean=26.68 ovr_mean=67.37
+    push: teams=23 age_mean=26.88 ovr_mean=69.29
+
+--- Season 3 (quiet) ---
+--- after_season_y3 ---
+
+=== after_season_y3 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold      3  ( 6.2%)
+  ALL push     45  (93.8%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      3  (18.8%)
+      push     13  (81.2%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=3 mean=25.33
+    push: n=45 mean=30.31
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=3 age_mean=27.36 ovr_mean=67.41
+    push: teams=45 age_mean=26.72 ovr_mean=68.37
+--- Offseason 3 (quiet) ---
+--- after_offseason_y3 ---
+
+=== after_offseason_y3 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold     25  (52.1%)
+  ALL push     23  (47.9%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     12  (75.0%)
+      push      4  (25.0%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     13  (81.2%)
+      push      3  (18.8%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=25 mean=0.00
+    push: n=23 mean=0.00
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=25 age_mean=27.00 ovr_mean=67.85
+    push: teams=23 age_mean=26.70 ovr_mean=69.27
+
+--- Season 4 (quiet) ---
+--- after_season_y4 ---
+
+=== after_season_y4 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold      4  ( 8.3%)
+  ALL push     44  (91.7%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      4  (25.0%)
+      push     12  (75.0%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=4 mean=26.25
+    push: n=44 mean=30.34
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=4 age_mean=27.29 ovr_mean=68.15
+    push: teams=44 age_mean=26.81 ovr_mean=68.56
+--- Offseason 4 (quiet) ---
+--- after_offseason_y4 ---
+
+=== after_offseason_y4 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold     26  (54.2%)
+  ALL push     22  (45.8%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     12  (75.0%)
+      push      4  (25.0%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     14  (87.5%)
+      push      2  (12.5%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=26 mean=0.00
+    push: n=22 mean=0.00
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=26 age_mean=26.59 ovr_mean=67.72
+    push: teams=22 age_mean=26.83 ovr_mean=69.48
+
+--- Season 5 (quiet) ---
+--- after_season_y5 ---
+
+=== after_season_y5 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold      5  (10.4%)
+  ALL push     43  (89.6%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      5  (31.2%)
+      push     11  (68.8%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=5 mean=26.20
+    push: n=43 mean=30.44
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=5 age_mean=26.58 ovr_mean=68.22
+    push: teams=43 age_mean=26.68 ovr_mean=68.59
+--- Offseason 5 (quiet) ---
+--- after_offseason_y5 ---
+
+=== after_offseason_y5 strategy_tag (CPU clubs) ===
+  ALL rebuild   0  ( 0.0%)
+  ALL hold     23  (47.9%)
+  ALL push     25  (52.1%)
+  D1 (n=16)
+      rebuild   0  ( 0.0%)
+      hold      0  ( 0.0%)
+      push     16  (100.0%)
+  D2 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     10  (62.5%)
+      push      6  (37.5%)
+  D3 (n=16)
+      rebuild   0  ( 0.0%)
+      hold     13  (81.2%)
+      push      3  (18.8%)
+  regular_wins mean by strategy_tag (this snapshot):
+    rebuild: (none)
+    hold: n=23 mean=0.00
+    push: n=25 mean=0.00
+  roster mean age / ovr (team means → mean by tag):
+    rebuild: (none)
+    hold: teams=23 age_mean=26.84 ovr_mean=67.56
+    push: teams=25 age_mean=26.72 ovr_mean=69.14
+
+=== Cumulative deltas by strategy_tag at previous snapshot (per team, then mean) ===
+Interpretation: after each snapshot, compare new history rows vs previous counts; attribute delta to tag observed on the team at the **previous** snapshot.
+  prev_tag=rebuild: teams=8 d_trade_in_mean=0.125 d_fa_sign_mean=0.000
+  prev_tag=hold: teams=180 d_trade_in_mean=0.044 d_fa_sign_mean=0.011
+  prev_tag=push: teams=292 d_trade_in_mean=0.182 d_fa_sign_mean=0.086

@@ -1,0 +1,72 @@
+cpu_auto_trade_acquirebias_multi_longrun
+os.environ BASKETBALL_SIM_POSITION_NEED_BONUS_SCALE='0.90'
+years=5  seeds=[424242, 424243, 424244, 424245, 424246]
+
+Incoming: acquirer's strategy_tag; player received after trade (name+OVR on roster). hold mid_band = age 24-29 and ovr 64-72 (observation shorthand).
+
+--- seed 424242 ---
+  n_trades=27  by_year={1: 7, 2: 5, 3: 5, 4: 7, 5: 3}
+  incoming events (2 per trade): total=54
+  by_acquirer_tag: {'push': 46, 'hold': 8}
+  rebuild acquire: n=0  sab24=0 (0.0%)  sa22=0 (0.0%)  mean_ovr=0.0 mean_age=0.0
+  push acquire: n=46  ge73=3 (6.52%)  ge70=12 (26.09%)  mean_ovr=66.43 mean_age=25.37
+  hold acquire: n=8  mid_band(age24-29&ovr64-72)=3 (37.5%)  mean_ovr=67.38 mean_age=24.88
+  other_tag_in=0  missing_player_lookups=0
+
+--- seed 424243 ---
+  n_trades=28  by_year={1: 3, 2: 8, 3: 5, 4: 9, 5: 3}
+  incoming events (2 per trade): total=56
+  by_acquirer_tag: {'push': 41, 'rebuild': 3, 'hold': 12}
+  rebuild acquire: n=3  sab24=1 (33.33%)  sa22=1 (33.33%)  mean_ovr=67.33 mean_age=26.33
+  push acquire: n=41  ge73=0 (0.0%)  ge70=2 (4.88%)  mean_ovr=63.93 mean_age=24.46
+  hold acquire: n=12  mid_band(age24-29&ovr64-72)=4 (33.33%)  mean_ovr=65.5 mean_age=24.67
+  other_tag_in=0  missing_player_lookups=0
+
+--- seed 424244 ---
+  n_trades=22  by_year={1: 3, 2: 4, 3: 6, 4: 5, 5: 4}
+  incoming events (2 per trade): total=44
+  by_acquirer_tag: {'rebuild': 2, 'push': 34, 'hold': 8}
+  rebuild acquire: n=2  sab24=0 (0.0%)  sa22=0 (0.0%)  mean_ovr=71.0 mean_age=22.5
+  push acquire: n=34  ge73=1 (2.94%)  ge70=10 (29.41%)  mean_ovr=67.18 mean_age=26.47
+  hold acquire: n=8  mid_band(age24-29&ovr64-72)=4 (50.0%)  mean_ovr=66.12 mean_age=25.5
+  other_tag_in=0  missing_player_lookups=0
+
+--- seed 424245 ---
+  n_trades=28  by_year={1: 5, 2: 6, 3: 6, 4: 5, 5: 6}
+  incoming events (2 per trade): total=56
+  by_acquirer_tag: {'push': 47, 'hold': 9}
+  rebuild acquire: n=0  sab24=0 (0.0%)  sa22=0 (0.0%)  mean_ovr=0.0 mean_age=0.0
+  push acquire: n=47  ge73=3 (6.38%)  ge70=10 (21.28%)  mean_ovr=65.6 mean_age=25.34
+  hold acquire: n=9  mid_band(age24-29&ovr64-72)=4 (44.44%)  mean_ovr=64.33 mean_age=24.0
+  other_tag_in=0  missing_player_lookups=0
+
+--- seed 424246 ---
+  n_trades=26  by_year={1: 5, 2: 5, 3: 7, 4: 2, 5: 7}
+  incoming events (2 per trade): total=52
+  by_acquirer_tag: {'rebuild': 1, 'push': 41, 'hold': 10}
+  rebuild acquire: n=1  sab24=0 (0.0%)  sa22=0 (0.0%)  mean_ovr=63.0 mean_age=22.0
+  push acquire: n=41  ge73=3 (7.32%)  ge70=14 (34.15%)  mean_ovr=68.02 mean_age=26.39
+  hold acquire: n=10  mid_band(age24-29&ovr64-72)=6 (60.0%)  mean_ovr=65.1 mean_age=23.6
+  other_tag_in=0  missing_player_lookups=0
+
+=== Across seeds (mean of per-seed metrics) ===
+  mean n_trades: 26.2000
+  mean rebuild_in_total: 1.2000
+  mean rebuild_in_sab24: 0.2000
+  mean pct_rebuild_sab24: 6.6660
+  mean rebuild_in_sa22: 0.2000
+  mean pct_rebuild_sa22: 6.6660
+  mean push_in_total: 41.8000
+  mean push_in_ge73: 2.0000
+  mean pct_push_ge73: 4.6320
+  mean push_in_ge70: 9.6000
+  mean pct_push_ge70: 23.1620
+  mean hold_in_total: 9.4000
+  mean hold_in_mid_band: 4.2000
+  mean pct_hold_mid: 45.0540
+  mean rebuild_mean_ovr: 40.2660
+  mean rebuild_mean_age: 14.1660
+  mean push_mean_ovr: 66.2320
+  mean push_mean_age: 25.6060
+
+Note: Strict before/after (pre-acquire-bias) not automated. Prior assetrule outgoing 5y5s ~mean n_trades 27.6/seed same seeds (reference).

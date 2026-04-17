@@ -1,0 +1,23 @@
+seed=424242  opening_v11_applied=True
+user_team league_level=3 initial_payroll_tier=bottom
+
+AFTER auto_draft (before opening v11 user pass)
+  players=13 total=915,400,000 avg=70,415,384 max=78,200,000 min=0 get_team_payroll=915,400,000
+
+AFTER opening v11 user pass
+  players=13 total=391,777,386 avg=30,136,722 max=33,422,484 min=500,000 get_team_payroll=391,777,386
+
+name                  pos  ovr  nat          salary
+Player_462              SG    92  Japan              500,000
+Fictional_682           SG    68  Japan           33,422,484
+Fictional_718           C     68  Japan           33,422,484
+Fictional_795           SG    68  Japan           33,422,483
+Fictional_700           PF    67  Japan           32,935,246
+Fictional_712           C     67  Japan           32,935,246
+Fictional_778           PF    67  Japan           32,935,246
+Fictional_642           SF    66  Japan           32,443,675
+Fictional_759           PG    66  Japan           32,443,675
+Fictional_775           PG    66  Japan           32,443,675
+Fictional_779           SF    66  Japan           32,443,675
+Fictional_664           SF    64  Japan           31,460,534
+Fictional_692           PF    63  Japan           30,968,963

@@ -46,13 +46,26 @@ def test_generate_teams_salary_rank_mostly_follows_ovr_seed42():
     assert top5_min >= bottom_min
 
 
-def test_generate_teams_tier_top5_min_ge_bot3_max_seed42():
-    """第2弾: OVR層の上位5の最小が下位3の最大以上（全チーム・seed42）。"""
+def test_generate_teams_opening_v11_d3_first_team_bottom_payroll_band_seed42():
+    """
+    正本 v1.1: D3 の先頭チーム（ユーザー開始候補＝最初の league_level==3）は bottom tier、
+    総ペイロールが D3 bottom レンジに入る。国籍×帯テンプレのため OVR 層と年俸の単調一致は要求しない。
+    """
+    random.seed(42)
+    teams = generate_teams()
+    d3_first = teams[32]
+    assert int(getattr(d3_first, "league_level", 0)) == 3
+    assert getattr(d3_first, "initial_payroll_tier", "") == "bottom"
+    payroll = get_team_payroll(d3_first)
+    assert 380_000_000 <= payroll <= 420_000_000
+    assert sum(int(getattr(p, "salary", 0)) for p in d3_first.players) == payroll
+
+
+def test_generate_teams_d1_opening_salaries_at_least_one_million_seed42():
     random.seed(42)
     teams = generate_teams()
     for t in teams:
-        roster = sorted(getattr(t, "players", []), key=_roster_tier_sort_key)
-        assert len(roster) == 13
-        s = [int(getattr(p, "salary", 0)) for p in roster]
-        assert min(s[:5]) >= max(s[10:13])
-        assert sum(s) == get_team_payroll(t)
+        if int(getattr(t, "league_level", 0)) != 1:
+            continue
+        for p in getattr(t, "players", []):
+            assert int(getattr(p, "salary", 0)) >= 1_000_000

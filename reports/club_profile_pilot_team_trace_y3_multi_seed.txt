@@ -1,0 +1,137 @@
+club_profile_pilot_team_trace_multi_seed | years=3 seeds=[424242, 424243, 424244, 424245, 424246] snapshots=7×5=35 rows per team
+
+=== Per-seed: final cum trade + FA (after last snapshot) ===
+seed id1:tin+tout=fa id4:tin+tout=fa id8:tin+tout=fa id12:tin+tout=fa id13:tin+tout=fa id18:tin+tout=fa id21:tin+tout=fa id25:tin+tout=fa id29:tin+tout=fa id33:tin+tout=fa id38:tin+tout=fa id46:tin+tout=fa
+  424242 1:0=0 4:0=0 8:0=0 12:4=0 13:0=0 18:0=0 21:0=0 25:0=1 29:0=0 33:2=0 38:0=0 46:2=0
+  424243 1:4=0 4:0=0 8:0=0 12:0=1 13:2=1 18:2=0 21:2=0 25:2=0 29:4=0 33:2=0 38:0=0 46:0=0
+  424244 1:2=0 4:2=0 8:2=0 12:0=0 13:2=0 18:0=1 21:2=0 25:2=1 29:2=0 33:2=0 38:0=0 46:4=0
+  424245 1:0=0 4:4=0 8:2=0 12:2=0 13:0=0 18:0=0 21:0=0 25:4=0 29:2=0 33:0=0 38:2=0 46:0=0
+  424246 1:2=0 4:2=0 8:4=0 12:2=1 13:2=1 18:2=0 21:2=0 25:0=2 29:2=0 33:2=0 38:2=0 46:4=0
+
+=== Per team_id: tag distribution per snapshot label (counts over seeds) ===
+team_id=1 name='エルバード東京'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=5 hold=0 reb=0 / 5
+  after_offseason_y1     push=4 hold=0 reb=1 / 5
+  after_season_y2        push=5 hold=0 reb=0 / 5
+  after_offseason_y2     push=5 hold=0 reb=0 / 5
+  after_season_y3        push=5 hold=0 reb=0 / 5
+  after_offseason_y3     push=5 hold=0 reb=0 / 5
+
+team_id=4 name='宇都宮ブレイバーズ'
+  opening                push=5 hold=0 reb=0 / 5
+  after_season_y1        push=4 hold=0 reb=1 / 5
+  after_offseason_y1     push=4 hold=0 reb=1 / 5
+  after_season_y2        push=4 hold=0 reb=1 / 5
+  after_offseason_y2     push=4 hold=1 reb=0 / 5
+  after_season_y3        push=5 hold=0 reb=0 / 5
+  after_offseason_y3     push=3 hold=2 reb=0 / 5
+
+team_id=8 name='群馬ブラックボルツ'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=4 hold=0 reb=1 / 5
+  after_offseason_y1     push=4 hold=0 reb=1 / 5
+  after_season_y2        push=4 hold=0 reb=1 / 5
+  after_offseason_y2     push=3 hold=2 reb=0 / 5
+  after_season_y3        push=4 hold=1 reb=0 / 5
+  after_offseason_y3     push=4 hold=1 reb=0 / 5
+
+team_id=12 name='シンライダーズ渋谷'
+  opening                push=0 hold=0 reb=5 / 5
+  after_season_y1        push=5 hold=0 reb=0 / 5
+  after_offseason_y1     push=5 hold=0 reb=0 / 5
+  after_season_y2        push=5 hold=0 reb=0 / 5
+  after_offseason_y2     push=4 hold=1 reb=0 / 5
+  after_season_y3        push=5 hold=0 reb=0 / 5
+  after_offseason_y3     push=4 hold=1 reb=0 / 5
+
+team_id=13 name='大阪エビーズ'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=4 hold=0 reb=1 / 5
+  after_offseason_y1     push=4 hold=0 reb=1 / 5
+  after_season_y2        push=4 hold=0 reb=1 / 5
+  after_offseason_y2     push=3 hold=1 reb=1 / 5
+  after_season_y3        push=4 hold=0 reb=1 / 5
+  after_offseason_y3     push=5 hold=0 reb=0 / 5
+
+team_id=18 name='仙台46ers'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=4 hold=1 reb=0 / 5
+  after_offseason_y1     push=5 hold=0 reb=0 / 5
+  after_season_y2        push=5 hold=0 reb=0 / 5
+  after_offseason_y2     push=4 hold=1 reb=0 / 5
+  after_season_y3        push=4 hold=1 reb=0 / 5
+  after_offseason_y3     push=5 hold=0 reb=0 / 5
+
+team_id=21 name='越谷ガンマズ'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=2 hold=3 reb=0 / 5
+  after_offseason_y1     push=4 hold=1 reb=0 / 5
+  after_season_y2        push=4 hold=1 reb=0 / 5
+  after_offseason_y2     push=3 hold=2 reb=0 / 5
+  after_season_y3        push=2 hold=2 reb=1 / 5
+  after_offseason_y3     push=3 hold=2 reb=0 / 5
+
+team_id=25 name='滋賀リバーズ'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=3 hold=2 reb=0 / 5
+  after_offseason_y1     push=5 hold=0 reb=0 / 5
+  after_season_y2        push=3 hold=2 reb=0 / 5
+  after_offseason_y2     push=4 hold=1 reb=0 / 5
+  after_season_y3        push=4 hold=1 reb=0 / 5
+  after_offseason_y3     push=5 hold=0 reb=0 / 5
+
+team_id=29 name='福岡ファルコンズ'
+  opening                push=5 hold=0 reb=0 / 5
+  after_season_y1        push=3 hold=1 reb=1 / 5
+  after_offseason_y1     push=4 hold=1 reb=0 / 5
+  after_season_y2        push=3 hold=2 reb=0 / 5
+  after_offseason_y2     push=4 hold=1 reb=0 / 5
+  after_season_y3        push=5 hold=0 reb=0 / 5
+  after_offseason_y3     push=5 hold=0 reb=0 / 5
+
+team_id=33 name='青森ワルツ'
+  opening                push=5 hold=0 reb=0 / 5
+  after_season_y1        push=0 hold=3 reb=2 / 5
+  after_offseason_y1     push=3 hold=2 reb=0 / 5
+  after_season_y2        push=5 hold=0 reb=0 / 5
+  after_offseason_y2     push=4 hold=1 reb=0 / 5
+  after_season_y3        push=5 hold=0 reb=0 / 5
+  after_offseason_y3     push=5 hold=0 reb=0 / 5
+
+team_id=38 name='奈良ディアーズ'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=3 hold=1 reb=1 / 5
+  after_offseason_y1     push=4 hold=1 reb=0 / 5
+  after_season_y2        push=5 hold=0 reb=0 / 5
+  after_offseason_y2     push=5 hold=0 reb=0 / 5
+  after_season_y3        push=5 hold=0 reb=0 / 5
+  after_offseason_y3     push=4 hold=1 reb=0 / 5
+
+team_id=46 name='鳥取サキューズ'
+  opening                push=0 hold=5 reb=0 / 5
+  after_season_y1        push=3 hold=2 reb=0 / 5
+  after_offseason_y1     push=5 hold=0 reb=0 / 5
+  after_season_y2        push=5 hold=0 reb=0 / 5
+  after_offseason_y2     push=5 hold=0 reb=0 / 5
+  after_season_y3        push=5 hold=0 reb=0 / 5
+  after_offseason_y3     push=5 hold=0 reb=0 / 5
+
+=== Per team_id: totals across seeds (mean ± stdev where n>1) ===
+team_id name | mean_final_cum_tin mean_final_cum_tout mean_final_cum_any | mean_sum_d_any/run mean_sum_d_fa/run | mean_final_age mean_final_ovr | tag_hits_35(push/hold/reb) | note
+1 'エルバード東京' | 0.80 0.80 1.60 | 1.60±1.50 0.00±0.00 | 26.51±1.34 67.94±1.04 | 29/5/1 of 35 | dominant_tag=push mean_d_any/run=1.60 mean_cum_fa@end=0.00
+4 '宇都宮ブレイバーズ' | 0.80 0.80 1.60 | 1.60±1.50 0.00±0.00 | 25.54±0.51 67.34±0.85 | 29/3/3 of 35 | dominant_tag=push mean_d_any/run=1.60 mean_cum_fa@end=0.00
+8 '群馬ブラックボルツ' | 0.80 0.80 1.60 | 1.60±1.50 0.00±0.00 | 26.60±0.99 69.55±2.77 | 23/9/3 of 35 | dominant_tag=push mean_d_any/run=1.60 mean_cum_fa@end=0.00
+12 'シンライダーズ渋谷' | 0.80 0.80 1.60 | 1.60±1.50 0.40±0.49 | 25.57±0.84 66.54±2.27 | 28/2/5 of 35 | dominant_tag=push mean_d_any/run=1.60 mean_cum_fa@end=0.40
+13 '大阪エビーズ' | 0.60 0.60 1.20 | 1.20±0.98 0.40±0.49 | 26.77±1.28 68.26±1.75 | 24/6/5 of 35 | dominant_tag=push mean_d_any/run=1.20 mean_cum_fa@end=0.40
+18 '仙台46ers' | 0.40 0.40 0.80 | 0.80±0.98 0.20±0.40 | 27.02±1.46 69.37±1.56 | 27/8/0 of 35 | dominant_tag=push mean_d_any/run=0.80 mean_cum_fa@end=0.20
+21 '越谷ガンマズ' | 0.60 0.60 1.20 | 1.20±0.98 0.00±0.00 | 27.49±0.63 68.51±1.78 | 18/16/1 of 35 | dominant_tag=push mean_d_any/run=1.20 mean_cum_fa@end=0.00
+25 '滋賀リバーズ' | 0.80 0.80 1.60 | 1.60±1.50 0.80±0.75 | 27.29±1.10 69.43±1.54 | 24/11/0 of 35 | dominant_tag=push mean_d_any/run=1.60 mean_cum_fa@end=0.80
+29 '福岡ファルコンズ' | 1.00 1.00 2.00 | 2.00±1.26 0.00±0.00 | 26.17±1.19 68.05±1.53 | 29/5/1 of 35 | dominant_tag=push mean_d_any/run=2.00 mean_cum_fa@end=0.00
+33 '青森ワルツ' | 0.80 0.80 1.60 | 1.60±0.80 0.00±0.00 | 26.58±1.29 68.29±2.62 | 27/6/2 of 35 | dominant_tag=push mean_d_any/run=1.60 mean_cum_fa@end=0.00
+38 '奈良ディアーズ' | 0.40 0.40 0.80 | 0.80±0.98 0.00±0.00 | 27.18±0.88 69.11±2.28 | 26/8/1 of 35 | dominant_tag=push mean_d_any/run=0.80 mean_cum_fa@end=0.00
+46 '鳥取サキューズ' | 1.00 1.00 2.00 | 2.00±1.79 0.00±0.00 | 26.95±1.15 71.00±1.44 | 28/7/0 of 35 | dominant_tag=push mean_d_any/run=2.00 mean_cum_fa@end=0.00
+
+=== Interpretation ===
+Per-label rows: e.g. push=4 / 5 means 4 of 5 seeds had strategy_tag=push at that snapshot.
+mean_sum_d_any/run: sum of d_any over all post-opening snapshots in one run, averaged over seeds.

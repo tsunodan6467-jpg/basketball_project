@@ -66,7 +66,7 @@ def test_apply_contract_extension_adds_years():
     t = Team(team_id=1, name="T", league_level=1)
     p = _p(3, 1)
     t.add_player(p)
-    apply_contract_extension(t, p, add_years=1)
+    assert apply_contract_extension(t, p, add_years=1) is True
     assert p.contract_years_left == 2
     assert p.contract_last_action == "extension"
 

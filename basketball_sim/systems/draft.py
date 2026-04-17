@@ -1,10 +1,11 @@
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import random
 
-from basketball_sim.config.game_constants import PLAYER_SALARY_BASE_PER_OVR
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
 
+from basketball_sim.systems.contract_logic import clear_draft_rookie_contract_for_market_entry
+from basketball_sim.systems.free_agent_market import assign_fa_pool_market_salary_on_release_to_fa
 from basketball_sim.systems.roster_rules import ensure_contract_roster_nationality_after_force
 
 try:
@@ -160,7 +161,13 @@ def _print_draft_buzz(draft_pool: List[Player], top_n: int = 5):
 
 def _set_draft_acquisition(player: Player, team: Team, pick_num: int):
     player.acquisition_type = "draft"
-    player.acquisition_note = f"pick_{pick_num}_to_{team.name}"
+    if bool(getattr(player, "is_draft_rookie_contract", False)):
+        locked = int(getattr(player, "draft_rookie_locked_salary", 0) or getattr(player, "salary", 0) or 0)
+        player.acquisition_note = (
+            f"snake_draft pick={pick_num}_to_{team.name} locked={locked} rookie_lock_3y"
+        )
+    else:
+        player.acquisition_note = f"pick_{pick_num}_to_{team.name}"
 
 
 
@@ -399,6 +406,140 @@ def _parse_report_range_mid(value: str, fallback: int = 50) -> int:
         return int(fallback)
 
 
+_DRAFT_CLI_ATTR_KEYS: Tuple[str, ...] = (
+    "three",
+    "shoot",
+    "drive",
+    "passing",
+    "rebound",
+    "defense",
+    "handling",
+    "iq",
+    "speed",
+    "power",
+    "stamina",
+    "ft",
+)
+
+_DRAFT_CLI_ATTR_LABELS_JA: Dict[str, str] = {
+    "three": "3P",
+    "shoot": "シュート",
+    "drive": "突破",
+    "passing": "パス",
+    "rebound": "リバ",
+    "defense": "守備",
+    "handling": "球さばき",
+    "iq": "判断力",
+    "speed": "スピード",
+    "power": "フィジカル",
+    "stamina": "スタミナ",
+    "ft": "FT",
+}
+
+
+def _draft_cli_safe_int_attr(player: Player, key: str) -> int:
+    try:
+        return int(getattr(player, key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _draft_cli_potential_letter(team: Team, player: Player) -> str:
+    raw = _get_report_value(team, player, "scout_potential", str(getattr(player, "potential", "C")))
+    s = str(raw).upper().strip()
+    if not s:
+        return "C"
+    ch = s[0]
+    if ch in ("S", "A", "B", "C", "D"):
+        return ch
+    return "C"
+
+
+def _draft_cli_potential_score(letter: str) -> int:
+    return {"S": 92, "A": 78, "B": 64, "C": 52, "D": 40}.get(letter, 52)
+
+
+def _draft_cli_ovr_mid_for_hint(team: Team, player: Player) -> int:
+    scout_ovr = _get_report_value(team, player, "scout_ovr_range", str(getattr(player, "ovr", 0)))
+    return _parse_report_range_mid(scout_ovr, int(getattr(player, "ovr", 0) or 0))
+
+
+def build_draft_candidate_readiness_label(team: Team, player: Player) -> str:
+    """即戦力 / 将来型 / バランス型（表示用の簡易ラベル。指名・生成ロジックは変更しない）。"""
+    try:
+        ovr_mid = _draft_cli_ovr_mid_for_hint(team, player)
+        age = int(getattr(player, "age", 20) or 20)
+        pot_letter = _draft_cli_potential_letter(team, player)
+        pot_score = _draft_cli_potential_score(pot_letter)
+        gap = int(pot_score - ovr_mid)
+    except Exception:
+        return "情報なし"
+
+    if ovr_mid >= 67 or (ovr_mid >= 63 and age >= 22):
+        return "即戦力"
+    if (pot_letter in ("S", "A") and age <= 20 and ovr_mid <= 62) or (
+        pot_score >= 74 and age <= 21 and gap >= 10 and ovr_mid <= 63
+    ):
+        return "将来型"
+    return "バランス型"
+
+
+def build_draft_candidate_role_shape_label(player: Player) -> str:
+    pos = str(getattr(player, "position", "") or "").strip().upper()
+    if pos in ("PG", "SG"):
+        return "ガード型"
+    if pos == "SF":
+        return "ウイング型"
+    if pos in ("PF", "C"):
+        return "ビッグ型"
+    return "情報なし"
+
+
+def build_draft_candidate_strength_weakness_line(player: Player) -> str:
+    """実数能力から強み2・弱み1（表示のみ）。"""
+
+    def _lab(key: str) -> str:
+        return _DRAFT_CLI_ATTR_LABELS_JA.get(key, key)
+
+    pairs: List[Tuple[str, int]] = [(k, _draft_cli_safe_int_attr(player, k)) for k in _DRAFT_CLI_ATTR_KEYS]
+    if all(v <= 0 for _, v in pairs):
+        return "強み: 情報なし / 弱み: 情報なし"
+
+    if len({v for _, v in pairs}) == 1:
+        return "強み: バランス / 弱み: バランス"
+
+    hi = sorted(pairs, key=lambda x: (-x[1], x[0]))
+    top_keys: List[str] = []
+    for k, _v in hi:
+        if k not in top_keys:
+            top_keys.append(k)
+        if len(top_keys) >= 2:
+            break
+    s1t, s2t = _lab(top_keys[0]), _lab(top_keys[1])
+    strong = f"{s1t}・{s2t}" if top_keys[0] != top_keys[1] else s1t
+
+    lo = sorted(pairs, key=lambda x: (x[1], x[0]))
+    weak_k = lo[0][0]
+    if weak_k in top_keys:
+        for k, _v in lo[1:]:
+            if k not in top_keys:
+                weak_k = k
+                break
+    weak_t = _lab(weak_k)
+    return f"強み: {strong} / 弱み: {weak_t}"
+
+
+def format_draft_candidate_cli_hint(team: Team, player: Player) -> str:
+    """ドラフト候補1人分の短い補助行（CLI 一覧用）。"""
+    try:
+        readiness = build_draft_candidate_readiness_label(team, player)
+        sw = build_draft_candidate_strength_weakness_line(player)
+        shape = build_draft_candidate_role_shape_label(player)
+        return f"{readiness} / {sw} | {shape}"
+    except Exception:
+        return "情報なし"
+
+
 def _build_scout_comment(team: Team, player: Player) -> str:
     comments = []
 
@@ -540,6 +681,7 @@ def _print_user_draft_candidates(team: Team, pick_num: int, candidates: List[Pla
         print(
             f"{i:>2}. {p.name:<15} {p.position:<2} Age:{getattr(p, 'age', 0):<2} {label}"
         )
+        print(f"    {format_draft_candidate_cli_hint(team, p)}")
         print(
             f"    Scout OVR : {scout_ovr} | Grade:{scout_grade} | Potential:{scout_potential}"
         )
@@ -568,22 +710,24 @@ def _choose_user_draft_player(team: Team, pick_num: int, draft_pool: List[Player
 
 
 def _add_drafted_player_contract(player: Player, pick_num: int):
-    if pick_num <= 16:
-        player.contract_years_left = 3
-    elif pick_num <= 32:
-        player.contract_years_left = 2
-    else:
-        player.contract_years_left = 1
-
+    """
+    スネーク指名: 順位ベースの固定額（競合なし）。オークションと同じ is_draft_rookie_* で
+    3年 salary 固定・移籍/再契約/延長から除外（命名の一般化は次段）。
+    帯: 上位 pick<=8 → 2500〜3500万 / pick<=24 → 1200〜2000万 / それ以降 → 500〜1000万
+    """
+    pick_num = int(max(1, pick_num))
     if pick_num <= 8:
-        player.salary = 700000
-    elif pick_num <= 16:
-        player.salary = 600000
-    elif pick_num <= 32:
-        player.salary = 500000
+        salary = random.randint(25_000_000, 35_000_000)
+    elif pick_num <= 24:
+        salary = random.randint(12_000_000, 20_000_000)
     else:
-        player.salary = 400000
+        salary = random.randint(5_000_000, 10_000_000)
 
+    player.is_draft_rookie_contract = True
+    player.draft_rookie_locked_salary = int(salary)
+    player.salary = int(salary)
+    player.contract_years_left = 3
+    player.contract_total_years = 3
     player.years_pro = 0
     player.league_years = 0
 
@@ -614,8 +758,7 @@ def _handle_roster_limit_after_draft(team: Team, drafted_player: Player, free_ag
     if keep_rookie:
         team.remove_player(release_player)
         release_player.contract_years_left = 0
-        if getattr(release_player, "salary", 0) <= 0:
-            release_player.salary = max(getattr(release_player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
+        assign_fa_pool_market_salary_on_release_to_fa(release_player, team=team)
         free_agents.append(release_player)
         print(
             f"[DRAFT-RELEASE] {team.name} released {release_player.name} "
@@ -625,9 +768,9 @@ def _handle_roster_limit_after_draft(team: Team, drafted_player: Player, free_ag
         return True
 
     team.remove_player(drafted_player)
+    clear_draft_rookie_contract_for_market_entry(drafted_player)
     drafted_player.contract_years_left = 0
-    if getattr(drafted_player, "salary", 0) <= 0:
-        drafted_player.salary = max(getattr(drafted_player, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
+    assign_fa_pool_market_salary_on_release_to_fa(drafted_player, team=team)
     free_agents.append(drafted_player)
     print(
         f"[DRAFT-KEEP] {team.name} kept current roster and sent {drafted_player.name} "
@@ -697,8 +840,7 @@ def conduct_draft(teams: List[Team], draft_pool: List[Player], free_agents: List
 
     for p in draft_pool:
         p.contract_years_left = 0
-        if getattr(p, "salary", 0) <= 0:
-            p.salary = max(getattr(p, "ovr", 0) * PLAYER_SALARY_BASE_PER_OVR, 300000)
+        assign_fa_pool_market_salary_on_release_to_fa(p, teams=teams)
         free_agents.append(p)
 
     draft_pool.clear()

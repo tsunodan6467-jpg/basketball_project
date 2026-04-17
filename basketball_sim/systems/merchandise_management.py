@@ -37,6 +37,13 @@ VALID_PHASES = frozenset(PHASE_ORDER)
 MAX_MERCH_HISTORY = 36
 MERCH_PRODUCT_IDS = frozenset(p["id"] for p in MERCH_PRODUCTS)
 
+# CLI 候補比較用の短文（表示のみ。フェーズ・コストの正本は既存定数）
+MERCH_PRODUCT_CLI_COMPARISON_HINTS: Dict[str, str] = {
+    "jersey_alt": "ユニフォーム系・ブランド訴求（工程は重め）",
+    "fan_towel": "観戦グッズ・ファン拡大寄り",
+    "acrylic_keychain": "小物・比較的ライトに進めやすい",
+}
+
 # オフシーズン `record_financial_result` の merchandise 内訳に加算するボーナス（1 シーズン分・簡易式）
 _MGMT_MERCH_PER_LINE: Dict[int, int] = {1: 195_000, 2: 108_000, 3: 48_000}
 _MGMT_MERCH_BONUS_CAP = 2_800_000
@@ -128,6 +135,34 @@ def advance_merchandise_phase(team: Any, product_id: str) -> Tuple[bool, str]:
     if not bool(getattr(team, "is_user_team", False)):
         return False, "自チームのみグッズ開発を進められます。"
     return _advance_merchandise_phase_core(team, product_id, source="user")
+
+
+def can_advance_merchandise_phase(team: Any, product_id: str) -> Tuple[bool, str]:
+    """次工程への進行可否のみ（状態は変えない）。GUI プレビュー用。"""
+    if not bool(getattr(team, "is_user_team", False)):
+        return False, "自チームのみグッズ開発を進められます。"
+    pid = str(product_id or "").strip()
+    if pid not in MERCH_PRODUCT_IDS:
+        return False, "不明な商品ラインです。"
+    if hasattr(team, "_ensure_history_fields"):
+        team._ensure_history_fields()
+    ensure_merchandise_on_team(team)
+    item = get_merchandise_item(team, pid)
+    if item is None:
+        return False, "商品データが見つかりません。"
+    phase = str(item.get("phase", "concept"))
+    if phase not in VALID_PHASES:
+        phase = "concept"
+    if phase == "on_sale":
+        return False, "すでに発売中です。"
+    nxt = _next_phase(phase)
+    if nxt is None:
+        return False, "これ以上進められません。"
+    cost = int(ADVANCE_COST.get(phase, 0))
+    money = int(getattr(team, "money", 0))
+    if money < cost:
+        return False, f"資金が不足しています（次段階まで {cost:,} 円）。"
+    return True, ""
 
 
 def _advance_merchandise_phase_core(team: Any, product_id: str, *, source: str) -> Tuple[bool, str]:
@@ -244,6 +279,122 @@ def estimate_dummy_merch_sales_lines(team: Any) -> List[str]:
         f"発売中ライン数: {released} / {len(MERCH_PRODUCTS)}",
         "クラブ内人気（ダミー順）: ①応援タオル ②キーホルダー ③ユニフォーム関連",
     ]
+    return lines
+
+
+def format_cli_merchandise_management_screen_lines(team: Any) -> List[str]:
+    """
+    CLI グッズ開発画面用（サマリー＋候補比較）。
+    表示のため `ensure_merchandise_on_team` で構造を揃える（既存の履歴表示と同系）。
+    """
+    if team is None:
+        return [
+            "【グッズサマリー】",
+            "直近施策: 情報なし",
+            "実行状態: 情報なし",
+            "発売中ライン: 情報なし",
+            "履歴: 履歴なし",
+            "直近更新: 情報なし",
+            "",
+            "【候補比較】",
+            "情報なし",
+            "",
+        ]
+
+    hist: List[Any] = []
+    items: List[Any] = []
+    try:
+        if hasattr(team, "_ensure_history_fields"):
+            team._ensure_history_fields()
+        ensure_merchandise_on_team(team)
+        block = team.management.get("merchandise")
+        if isinstance(block, dict):
+            raw_h = block.get("history")
+            if isinstance(raw_h, list):
+                hist = raw_h
+            raw_i = block.get("items")
+            if isinstance(raw_i, list):
+                items = raw_i
+    except Exception:
+        hist = []
+        items = []
+
+    n_hist = len(hist)
+    hist_disp = f"{n_hist}件" if n_hist > 0 else "履歴なし"
+
+    last_pid = ""
+    last_label = "未実行"
+    last_update = "履歴なし"
+    if hist:
+        row = hist[-1]
+        if isinstance(row, dict):
+            last_pid = str(row.get("product_id") or "").strip()
+            nm = str(row.get("name") or "").strip()
+            to_ph = str(row.get("to_phase") or "")
+            to_l = PHASE_LABEL_JA.get(to_ph, to_ph or "情報なし")
+            if nm:
+                last_label = f"{nm} → {to_l}"
+            else:
+                last_label = to_l if to_l else "情報なし"
+            at = str(row.get("at") or "").strip()
+            at_disp = at[:19].replace("T", " ") if at else ""
+            if at_disp:
+                last_update = f"{at_disp}  {last_label}"
+            else:
+                last_update = last_label
+        else:
+            last_label = "情報なし"
+            last_update = "情報なし"
+
+    n_on_sale = 0
+    for r in items:
+        if isinstance(r, dict) and str(r.get("phase", "")) == "on_sale":
+            n_on_sale += 1
+    n_lines = len(MERCH_PRODUCTS)
+    on_sale_disp = f"{n_on_sale} / {n_lines}"
+    if n_on_sale >= n_lines and n_lines > 0:
+        exec_state = "全ライン発売中（次工程なし）"
+    elif items:
+        exec_state = "開発進行中（未発売ラインあり）"
+    else:
+        exec_state = "情報なし"
+
+    lines: List[str] = [
+        "【グッズサマリー】",
+        f"直近施策: {last_label}",
+        f"実行状態: {exec_state}",
+        f"発売中ライン: {on_sale_disp}",
+        f"履歴: {hist_disp}",
+        f"直近更新: {last_update}",
+        "",
+        "【候補比較】",
+    ]
+    by_id: Dict[str, Dict[str, Any]] = {}
+    for r in items:
+        if isinstance(r, dict) and r.get("id"):
+            by_id[str(r["id"])] = r
+    for i, tmpl in enumerate(MERCH_PRODUCTS, start=1):
+        pid = str(tmpl.get("id", "") or "")
+        name = str(tmpl.get("name", pid) or pid)
+        cat = str(tmpl.get("category", "") or "")
+        hint = MERCH_PRODUCT_CLI_COMPARISON_HINTS.get(pid, "情報なし")
+        row = by_id.get(pid, {})
+        ph = str(row.get("phase", "concept") or "concept")
+        if ph not in VALID_PHASES:
+            ph = "concept"
+        pl = PHASE_LABEL_JA.get(ph, ph)
+        if ph == "on_sale":
+            next_s = "次工程なし"
+        else:
+            try:
+                cst = int(ADVANCE_COST.get(ph, 0) or 0)
+                next_s = f"次工程 {cst:,}円" if cst > 0 else "情報なし"
+            except (TypeError, ValueError):
+                next_s = "情報なし"
+        mark = "（直近）" if pid and pid == last_pid else ""
+        cat_s = f"{cat}／" if cat else ""
+        lines.append(f"{i}. {cat_s}{name}{mark}  …  {hint} ｜ {pl} ｜ {next_s}")
+    lines.append("")
     return lines
 
 

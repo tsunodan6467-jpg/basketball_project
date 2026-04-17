@@ -1,0 +1,24 @@
+CPU strategy trade VALUE breakdown — multi-seed summary
+years=5  n_seeds=5
+seeds: 424242, 424243, 424244, 424245, 424246
+
+Per-seed: see cpu_strategy_trade_value_breakdown_y5_s*.txt
+
+Rollups (count seeds where push mean > hold mean, both n>0):
+  youth_peak_raw: 2 / 5
+  ovr_term:       1 / 5
+  fut_delta:      0 / 5  (push fut_delta > hold fut_delta)
+
+Per-seed one-line (push vs hold: youth_peak_raw, ovr_term, m_fut, n):
+  seed 424242: push n=45 hold n=15 | youth_p_raw p/h=9.5289/9.4133 ovr p/h=88.95/92.16 m_fut p/h=0.976/1.0
+  seed 424243: push n=36 hold n=6 | youth_p_raw p/h=9.2778/10.0667 ovr p/h=88.5375/93.15 m_fut p/h=0.976/1.0
+  seed 424244: push n=38 hold n=10 | youth_p_raw p/h=9.3684/10.0 ovr p/h=87.4303/89.1 m_fut p/h=0.976/1.0
+  seed 424245: push n=34 hold n=13 | youth_p_raw p/h=9.2118/10.0923 ovr p/h=88.8221/91.4885 m_fut p/h=0.976/1.0
+  seed 424246: push n=27 hold n=9 | youth_p_raw p/h=9.6148/8.8889 ovr p/h=87.1/85.05 m_fut p/h=0.976/1.0
+
+rebuild n per seed: [2, 6, 4, 1, 2]  (seeds with rebuild n<5: 4/5)
+
+Interpretation (for report):
+- youth_peak_raw peaks near age 27; younger players still get non-zero; compare tags.
+- m_fut spread is small (~0.965–1.035 on youth/pot/pos age terms); fut_delta is usually a few tenths.
+- If push > hold on youth_peak_raw across seeds but OVR term lower, youth skew is formulaic not roster luck.

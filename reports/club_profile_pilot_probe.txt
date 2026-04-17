@@ -1,0 +1,39 @@
+club_profile_pilot_probe
+
+=== 1) get_club_base_profile (pilot 6) ===
+  team_id=1 name='エルバード東京' -> fin=1.06 mkt=1.06 arena=1.04 youth=0.98 win_now=1.06
+  team_id=14 name='浜松サンダーバーズ' -> fin=1.02 mkt=1.06 arena=0.94 youth=0.99 win_now=1.02
+  team_id=8 name='群馬ブラックボルツ' -> fin=0.96 mkt=0.96 arena=1.02 youth=1.06 win_now=0.96
+  team_id=21 name='越谷ガンマズ' -> fin=1.02 mkt=1.0 arena=1.0 youth=1.0 win_now=1.01
+  team_id=29 name='福岡ファルコンズ' -> fin=1.0 mkt=1.04 arena=1.02 youth=0.98 win_now=1.04
+  team_id=38 name='奈良ディアーズ' -> fin=0.98 mkt=0.96 arena=1.0 youth=1.06 win_now=0.96
+
+=== 1b) non-pilot sample (team_id 3, 5) ===
+  team_id=3 name='琉球プラチナクラウンズ' -> fin=1.12 mkt=0.92 arena=0.94 youth=0.96 win_now=0.97
+  team_id=5 name='名古屋ハートホエールズ' -> fin=1.12 mkt=1.08 arena=0.94 youth=0.96 win_now=0.97
+
+=== 2) payroll fac (CPU) vs user stub ===
+  pilot id=1 fac=1.003000 (expect !=1.0 typically)
+  user_like is_user_team=True fac=1.000000 (expect 1.0)
+  pilot id=14 fac=1.000620
+  pilot id=38 fac=0.998840
+
+=== 2b) full budget sample (roster_payroll=0) id=1 vs id=3 ===
+  budget id=1: 26533261  id=3: 26497796  (fac差のみ inner に効く)
+
+=== 3) strategy: ambiguous band + profile nudge preview ===
+  id=1 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold
+  id=14 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold
+  id=8 push_s=0 reb_s=0 diff=0 ambiguous=True net=0.0000 -> no nudge (|net|<=0.035) | tag=hold
+  id=21 push_s=0 reb_s=0 diff=0 ambiguous=True net=-0.0100 -> no nudge (|net|<=0.035) | tag=hold
+  id=29 push_s=2 reb_s=0 diff=2 ambiguous=False net=0.0400 -> n/a (not ambiguous) | tag=push
+  id=38 push_s=0 reb_s=0 diff=0 ambiguous=True net=-0.0200 -> no nudge (|net|<=0.035) | tag=hold
+
+  scan 48 CPU: ambiguous_band_count=34 with_profile_nudge_direction_count=29
+
+=== 4) get_cpu_club_strategy (sample pilots) ===
+  id=1 tag=hold fa=1.0 trade_tol=1.0
+  id=14 tag=hold fa=1.0 trade_tol=1.0
+  id=8 tag=hold fa=1.0 trade_tol=1.0
+
+Done.

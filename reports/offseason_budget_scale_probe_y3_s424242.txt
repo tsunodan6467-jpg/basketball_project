@@ -1,0 +1,68 @@
+offseason_budget_scale_probe | seed=424242 years=3 scales=[1.0, 1.1, 1.2, 1.3] FLOOR_RATIO=1.0 BUFFER=3000000
+team_ids=[38, 46, 1, 4, 8, 9, 16, 22, 25, 27]
+scaled_cfb = max(base_budget, int(inner_sum * fac * scale)); winner = argmax(scaled_cfb, floor)
+
+phase year tid name cfb floor gap x1.00 x1.10 x1.20 x1.30
+-------------------------------------------------------------------------------------------------
+post_season y1 38 '奈良ディアーズ' 22110001 563536149 -541426148 floor floor floor floor
+post_season y1 46 '鳥取サキューズ' 26407065 514759318 -488352253 floor floor floor floor
+post_season y1 1 'エルバード東京' 27241859 992143476 -964901617 floor floor floor floor
+post_season y1 4 '宇都宮ブレイバーズ' 28205757 808893072 -780687315 floor floor floor floor
+post_season y1 8 '群馬ブラックボルツ' 26559651 1017000000 -990440349 floor floor floor floor
+post_season y1 9 '長崎パルカンズ' 27114065 1164904520 -1137790455 floor floor floor floor
+post_season y1 16 '横浜パイレーツ' 27945809 1031148402 -1003202593 floor floor floor floor
+post_season y1 22 'エルトゥール千葉' 26998628 723778295 -696779667 floor floor floor floor
+post_season y1 25 '滋賀リバーズ' 24615619 700564834 -675949215 floor floor floor floor
+post_season y1 27 '神戸スパーズ' 24057684 598379333 -574321649 floor floor floor floor
+post_offseason y1 38 '奈良ディアーズ' 22110001 563536149 -541426148 floor floor floor floor
+post_offseason y1 46 '鳥取サキューズ' 26407065 514759318 -488352253 floor floor floor floor
+post_offseason y1 1 'エルバード東京' 27241859 992143476 -964901617 floor floor floor floor
+post_offseason y1 4 '宇都宮ブレイバーズ' 28205757 808893072 -780687315 floor floor floor floor
+post_offseason y1 8 '群馬ブラックボルツ' 26559651 1017000000 -990440349 floor floor floor floor
+post_offseason y1 9 '長崎パルカンズ' 27114065 1164904520 -1137790455 floor floor floor floor
+post_offseason y1 16 '横浜パイレーツ' 27945809 995089732 -967143923 floor floor floor floor
+post_offseason y1 22 'エルトゥール千葉' 26998628 723778295 -696779667 floor floor floor floor
+post_offseason y1 25 '滋賀リバーズ' 24615619 619977920 -595362301 floor floor floor floor
+post_offseason y1 27 '神戸スパーズ' 24057684 598379333 -574321649 floor floor floor floor
+post_season y2 38 '奈良ディアーズ' 23663069 563536149 -539873080 floor floor floor floor
+post_season y2 46 '鳥取サキューズ' 28874967 514759318 -485884351 floor floor floor floor
+post_season y2 1 'エルバード東京' 27794663 992143476 -964348813 floor floor floor floor
+post_season y2 4 '宇都宮ブレイバーズ' 29103529 808893072 -779789543 floor floor floor floor
+post_season y2 8 '群馬ブラックボルツ' 26589500 1017000000 -990410500 floor floor floor floor
+post_season y2 9 '長崎パルカンズ' 28167918 1164904520 -1136736602 floor floor floor floor
+post_season y2 16 '横浜パイレーツ' 28842584 995089732 -966247148 floor floor floor floor
+post_season y2 22 'エルトゥール千葉' 26216757 723778295 -697561538 floor floor floor floor
+post_season y2 25 '滋賀リバーズ' 26682977 619977920 -593294943 floor floor floor floor
+post_season y2 27 '神戸スパーズ' 24076294 598379333 -574303039 floor floor floor floor
+post_offseason y2 38 '奈良ディアーズ' 23663069 505763851 -482100782 floor floor floor floor
+post_offseason y2 46 '鳥取サキューズ' 28874967 778486919 -749611952 floor floor floor floor
+post_offseason y2 1 'エルバード東京' 27794663 959632396 -931837733 floor floor floor floor
+post_offseason y2 4 '宇都宮ブレイバーズ' 29103529 941278098 -912174569 floor floor floor floor
+post_offseason y2 8 '群馬ブラックボルツ' 26589500 983184509 -956595009 floor floor floor floor
+post_offseason y2 9 '長崎パルカンズ' 28167918 1167956812 -1139788894 floor floor floor floor
+post_offseason y2 16 '横浜パイレーツ' 28842584 1148144400 -1119301816 floor floor floor floor
+post_offseason y2 22 'エルトゥール千葉' 26216757 521716433 -495499676 floor floor floor floor
+post_offseason y2 25 '滋賀リバーズ' 26682977 636860017 -610177040 floor floor floor floor
+post_offseason y2 27 '神戸スパーズ' 24076294 530776171 -506699877 floor floor floor floor
+post_season y3 38 '奈良ディアーズ' 24671082 505763851 -481092769 floor floor floor floor
+post_season y3 46 '鳥取サキューズ' 31455254 778486919 -747031665 floor floor floor floor
+post_season y3 1 'エルバード東京' 29751451 959632396 -929880945 floor floor floor floor
+post_season y3 4 '宇都宮ブレイバーズ' 30681774 941278098 -910596324 floor floor floor floor
+post_season y3 8 '群馬ブラックボルツ' 27123780 983184509 -956060729 floor floor floor floor
+post_season y3 9 '長崎パルカンズ' 27495591 1167956812 -1140461221 floor floor floor floor
+post_season y3 16 '横浜パイレーツ' 29399038 1148144400 -1118745362 floor floor floor floor
+post_season y3 22 'エルトゥール千葉' 27113451 521716433 -494602982 floor floor floor floor
+post_season y3 25 '滋賀リバーズ' 28749135 636860017 -608110882 floor floor floor floor
+post_season y3 27 '神戸スパーズ' 24984184 530776171 -505791987 floor floor floor floor
+post_offseason y3 38 '奈良ディアーズ' 24671082 481370799 -456699717 floor floor floor floor
+post_offseason y3 46 '鳥取サキューズ' 31455254 1094152614 -1062697360 floor floor floor floor
+post_offseason y3 1 'エルバード東京' 29751451 1075902336 -1046150885 floor floor floor floor
+post_offseason y3 4 '宇都宮ブレイバーズ' 30681774 1043731042 -1013049268 floor floor floor floor
+post_offseason y3 8 '群馬ブラックボルツ' 27123780 1000313167 -973189387 floor floor floor floor
+post_offseason y3 9 '長崎パルカンズ' 27495591 1045706947 -1018211356 floor floor floor floor
+post_offseason y3 16 '横浜パイレーツ' 29399038 1164372301 -1134973263 floor floor floor floor
+post_offseason y3 22 'エルトゥール千葉' 27113451 465234376 -438120925 floor floor floor floor
+post_offseason y3 25 '滋賀リバーズ' 28749135 633813386 -605064251 floor floor floor floor
+post_offseason y3 27 '神戸スパーズ' 24984184 614900509 -589916325 floor floor floor floor
+
+Notes: x1.00 column should match live adopted_source (formula|floor|tie) for scaled_cfb vs floor.

@@ -6,6 +6,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
+from basketball_sim.systems.contract_logic import clear_draft_rookie_contract_for_market_entry
+from basketball_sim.systems.free_agent_market import assign_fa_pool_market_salary_on_release_to_fa
 
 
 @dataclass(frozen=True)
@@ -18,9 +20,10 @@ class DraftTierConfig:
 
 TIER_CONFIGS: Dict[str, DraftTierConfig] = {
     # 注意: 「プロスペクト（年6〜10人の注目枠）」は Tier とは別概念。T1 の上位に含まれる。
-    "T1": DraftTierConfig(tier="T1", name="期待級", min_price_low=20_000_000, min_price_high=26_000_000),
-    "T2": DraftTierConfig(tier="T2", name="有望株級", min_price_low=9_000_000, min_price_high=14_000_000),
-    "T3": DraftTierConfig(tier="T3", name="素材級", min_price_low=3_000_000, min_price_high=7_000_000),
+    # 正本 v1.1 寄せ: 目玉 ~3000万 / 通常1巡目前後 ~1500万 / 下位・育成 500〜1000万（入札基準・上限ではない）
+    "T1": DraftTierConfig(tier="T1", name="目玉級", min_price_low=27_000_000, min_price_high=33_000_000),
+    "T2": DraftTierConfig(tier="T2", name="1巡目前後", min_price_low=13_000_000, min_price_high=17_000_000),
+    "T3": DraftTierConfig(tier="T3", name="下位・育成", min_price_low=5_000_000, min_price_high=10_000_000),
 }
 
 
@@ -32,7 +35,7 @@ class DraftCandidateMeta:
     draft_value: float
 
 
-CAP_DEFAULT = 40_000_000
+CAP_DEFAULT = 120_000_000
 
 
 def _potential_bonus(potential: str) -> float:
@@ -129,6 +132,23 @@ def _tax_extra_for_total_spend(total_spend: int, cap: int) -> int:
     return int(tier1 * 1 + tier2 * 2 + tier3 * 3)
 
 
+def _max_affordable_bid(team: Team, cap: int, min_bid: int) -> int:
+    """RB 残高とぜいたく税を踏まえて入札可能な最大額（高騰をエラーにしないための AI 上限用）。"""
+    min_bid = int(max(0, min_bid))
+    lo, hi = min_bid, 120_000_000
+    best = min_bid
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        ch, _ = _compute_charge_increment(team, mid, cap)
+        rem = int(getattr(team, "rookie_budget_remaining", 0) or 0)
+        if ch <= rem:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return int(best)
+
+
 def _compute_charge_increment(team: Team, bid: int, cap: int) -> Tuple[int, int]:
     """
     bid を足したときの請求額（RBから引く増分）を返す。
@@ -207,19 +227,17 @@ def _downrank_discount_for_one_pick(team: Team, player_meta: DraftCandidateMeta)
 
 def _set_drafted_player_contract(player: Player, slot: str, bid: int) -> None:
     """
-    オークションドラフトでは「指名順固定給」ではなく、slot と bid を記録する。
-    ただしゲーム内の salary フィールドが必要なので、当面は tier/slot で安全な固定値を使う。
+    落札額 = 年俸の特殊 rookie: 3年間同一（draft_rookie_locked_salary）、競合で高騰してもそのまま採用。
+    一般若手の固定レンジ（数十万円帯）とは別制度。
     """
+    bid = int(max(0, bid))
     player.acquisition_type = "draft"
-    player.acquisition_note = f"auction_draft slot={slot} bid={int(bid)}"
-
-    if slot == "A":
-        player.contract_years_left = 3
-        player.salary = 700_000
-    else:
-        player.contract_years_left = 2
-        player.salary = 450_000
-
+    player.acquisition_note = f"auction_draft slot={slot} bid={bid} rookie_lock_3y"
+    player.is_draft_rookie_contract = True
+    player.draft_rookie_locked_salary = bid
+    player.salary = bid
+    player.contract_years_left = 3
+    player.contract_total_years = 3
     player.years_pro = 0
     player.league_years = 0
 
@@ -246,13 +264,14 @@ def _add_player_to_team_and_trim(team: Team, player: Player, free_agents: List[P
         # どうしても枠が作れない場合は新人をFAへ（安全策）
         team.remove_player(player)
         player.contract_years_left = 0
+        clear_draft_rookie_contract_for_market_entry(player)
+        assign_fa_pool_market_salary_on_release_to_fa(player, team=team)
         free_agents.append(player)
         return
 
     team.remove_player(release)
     release.contract_years_left = 0
-    if int(getattr(release, "salary", 0) or 0) <= 0:
-        release.salary = max(int(getattr(release, "ovr", 0) or 0) * 10_000, 300_000)
+    assign_fa_pool_market_salary_on_release_to_fa(release, team=team)
     free_agents.append(release)
 
     from basketball_sim.systems.roster_rules import ensure_contract_roster_nationality_after_force
@@ -330,10 +349,9 @@ def _ai_bid_amount(team: Team, meta: DraftCandidateMeta, cap: int) -> int:
     target = int(target + random.randint(-500_000, 1_200_000))
     target = max(base, target)
 
-    # 使い切りすぎ防止（0人も戦略、をAI側にも少し反映）
-    soft_max = int(base_budget * (0.92 if meta.tier == "T1" else 0.70))
-    target = min(target, soft_max)
-    return target
+    max_bid = _max_affordable_bid(team, cap, base)
+    target = min(target, max_bid, 120_000_000)
+    return int(target)
 
 
 def conduct_auction_draft(
@@ -568,8 +586,7 @@ def conduct_auction_draft(
         print(f"\n[DRAFT] Undrafted players -> FA: {len(leftover)}")
     for p in leftover:
         p.contract_years_left = 0
-        if int(getattr(p, "salary", 0) or 0) <= 0:
-            p.salary = max(int(getattr(p, "ovr", 0) or 0) * 10_000, 300_000)
+        assign_fa_pool_market_salary_on_release_to_fa(p, teams=teams)
         free_agents.append(p)
 
     # draft_pool を空にする（既存 conduct_draft と同じ契約）

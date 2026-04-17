@@ -53,10 +53,12 @@ def _expected_payroll_budget_after_finance_close_d3(
         sponsor_power=sponsor_power,
         fan_base=fan_base,
     )
-    floor_expr = int(
+    raw_floor = int(
         int(roster_payroll) * float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO)
         + float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER)
     )
+    soft_cap = int(current_formula_budget)
+    floor_expr = min(raw_floor, soft_cap)
     return int(max(current_formula_budget, floor_expr))
 
 
@@ -138,7 +140,7 @@ def test_user_team_payroll_budget_recomputed_after_process_team_finances() -> No
 
 
 def test_payroll_budget_uses_roster_floor_when_above_formula() -> None:
-    """ロスター年俸が現行式を上回るとき、`max(現行式, α*roster+β)` の大きい方になる。"""
+    """`soft_cap=cfb` のとき raw_floor が大きくても採用額は現行式（⑦は cfb に戻る）。"""
     market_size = 1.2
     popularity = 45
     sponsor_power = 50
@@ -173,11 +175,13 @@ def test_payroll_budget_uses_roster_floor_when_above_formula() -> None:
         sponsor_power=sponsor_power,
         fan_base=fan_base,
     )
-    assert expected > current
-    assert expected == int(
-        roster_salary * float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO)
+    raw_floor = int(
+        int(roster_salary) * float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_RATIO)
         + float(TEMP_POSTOFF_PAYROLL_BUDGET_FLOOR_BUFFER)
     )
+    assert raw_floor > current
+    assert expected == current
+    assert expected == max(current, min(raw_floor, int(current)))
 
     off = Offseason(teams=[user], free_agents=[])
     with contextlib.redirect_stdout(io.StringIO()):

@@ -69,7 +69,6 @@ from basketball_sim.systems.team_tactics import (
 )
 from basketball_sim.systems.facility_investment import (
     FACILITY_LABELS,
-    FACILITY_MAX_LEVEL,
     FACILITY_ORDER,
     can_commit_facility_upgrade,
     commit_facility_upgrade,
@@ -78,6 +77,7 @@ from basketball_sim.systems.facility_investment import (
 from basketball_sim.systems.contract_logic import (
     MAX_CONTRACT_YEARS_DEFAULT,
     apply_contract_extension,
+    is_draft_rookie_contract_active,
 )
 from basketball_sim.systems.roster_fa_release import (
     apply_release_player_to_fa,
@@ -108,6 +108,144 @@ from basketball_sim.systems.merchandise_management import (
     format_merchandise_row_display,
     get_merchandise_item,
 )
+from basketball_sim.systems.management_menu_snapshot import (
+    PR_FILTER_AFFORDABLE,
+    PR_FILTER_ALL,
+    PR_FILTER_EXECUTABLE,
+    PR_FILTER_FAN_HEAVY,
+    PR_FILTER_POP_HEAVY,
+    PR_SORT_COST_ASC,
+    PR_SORT_COST_DESC,
+    PR_SORT_DEFAULT,
+    build_management_menu_snapshot,
+    build_pr_selection_preview_line,
+)
+
+_PR_FINANCE_SORT_ORDER = (PR_SORT_DEFAULT, PR_SORT_COST_ASC, PR_SORT_COST_DESC)
+_PR_FINANCE_SORT_LABELS_JA = ("表示順（既定）", "コスト昇順", "コスト降順")
+_PR_FINANCE_FILTER_ORDER = (
+    PR_FILTER_ALL,
+    PR_FILTER_EXECUTABLE,
+    PR_FILTER_AFFORDABLE,
+    PR_FILTER_POP_HEAVY,
+    PR_FILTER_FAN_HEAVY,
+)
+_PR_FINANCE_FILTER_LABELS_JA = (
+    "すべて",
+    "実行可のみ",
+    "予算内のみ（所持金で支払可）",
+    "人気効果大（人気+2以上）",
+    "ファン基盤寄り（ファン+240以上）",
+)
+
+# Management dashboard: split finance block from the rest for line-by-line Text insert.
+_MANAGEMENT_FINANCE_BLOCK_SEPARATOR = "\n\n■ 施設"
+# After 施設 body, PR summary line starts with this (matches `build_pr_dashboard_summary_line`).
+_MANAGEMENT_FACILITY_PR_SEPARATOR = "\n\n■ 広報"
+_MANAGEMENT_PR_OWNER_SEPARATOR = "\n\n■ オーナー"
+_MANAGEMENT_OWNER_HISTORY_SEPARATOR = "\n\n■ 実行履歴 / 直近アクション\n"
+
+# Management dashboard Text widget base: bg #222834, fg #d6dbe3 — keep highlights subtle.
+_MGMT_DASH_CAP_BG = "#2a3346"
+_MGMT_DASH_CAP_FG = "#e2e8f2"
+_MGMT_DASH_WARN_BG = "#383226"
+_MGMT_DASH_WARN_FG = "#ebe2cf"
+_MGMT_DASH_RESULT_BG = "#2c3038"
+_MGMT_DASH_RESULT_FG = "#e4e8ef"
+_MGMT_DASH_INVEST_BG = "#2a3634"
+_MGMT_DASH_INVEST_FG = "#dfe8e4"
+
+
+def _management_finance_dashboard_line_looks_warny(s: str) -> bool:
+    """Prefix + substring heuristics on existing dashboard copy (no new semantics)."""
+    if s.startswith("財務圧力:"):
+        return any(k in s for k in ("赤字傾向", "注意", "圧迫"))
+    if s.startswith("年俸枠メモ:"):
+        return any(k in s for k in ("圧迫", "注意"))
+    if s.startswith("行動判断:"):
+        return any(k in s for k in ("未達リスク", "急ぎたい", "温存"))
+    return False
+
+
+def _management_finance_dashboard_row_tags(line: str) -> Tuple[str, ...]:
+    """Tk Text tags per finance row; reserved for future styling (colors, binds)."""
+    s = str(line)
+    if s.startswith("キャップ余白:"):
+        return ("finance_row_cap",)
+    if _management_finance_dashboard_line_looks_warny(s):
+        return ("finance_row_warning",)
+    return ("finance_row_default",)
+
+
+def _management_facility_dashboard_row_tags(line: str) -> Tuple[str, ...]:
+    """Prefix-based tags for 施設 block lines (snapshot copy unchanged)."""
+    s = str(line)
+    if s.startswith("状態:"):
+        return ("facility_row_state",)
+    if s.startswith("レベル概要:") or s.startswith("レベル:"):
+        return ("facility_row_levels",)
+    if "次の投資コスト" in s:
+        return ("facility_row_invest",)
+    if s.startswith("建設中:"):
+        return ("facility_row_build",)
+    if s.startswith("補足:"):
+        return ("facility_row_note",)
+    if s.startswith("市場規模:") or s.startswith("市場・ファン:"):
+        return ("facility_row_market",)
+    return ("facility_row_default",)
+
+
+def _management_pr_dashboard_row_tags(line: str) -> Tuple[str, ...]:
+    """Prefix / substring tags for 広報 block lines (dashboard copy unchanged)."""
+    s = str(line)
+    if s.startswith("■ 広報:") or s.startswith("広報（今ラウンド）:"):
+        return ("pr_row_status",)
+    if "実行不可" in s:
+        return ("pr_row_warning",)
+    if "残り" in s:
+        return ("pr_row_warning",)
+    if "比較" in s or "候補" in s:
+        return ("pr_row_candidates",)
+    return ("pr_row_default",)
+
+
+def _management_owner_line_warn_body(s: str) -> bool:
+    """Value-side hints (exclude `危険度の目安:` label matching `危険` alone)."""
+    _pfx, _sep, val = s.partition(":")
+    body = val if val else s
+    return any(k in body for k in ("危険", "未達", "要注意", "厳しい"))
+
+
+def _management_owner_dashboard_row_tags(line: str) -> Tuple[str, ...]:
+    """Prefix-based tags for オーナー block lines; optional second tag for hot bodies."""
+    s = str(line)
+    if s.startswith("【ミッション現況】"):
+        base: Tuple[str, ...] = ("owner_row_header",)
+    elif s.startswith("現在ミッション:"):
+        base = ("owner_row_mission",)
+    elif s.startswith("達成状況:") or s.startswith("達成率:"):
+        base = ("owner_row_progress",)
+    elif s.startswith("残り期限:"):
+        base = ("owner_row_deadline",)
+    elif s.startswith("危険度の目安:"):
+        base = ("owner_row_danger",)
+    else:
+        base = ("owner_row_default",)
+    if _management_owner_line_warn_body(s):
+        return base + ("owner_row_warning",)
+    return base
+
+
+def _management_history_dashboard_row_tags(line: str) -> Tuple[str, ...]:
+    """Prefix-based tags for 実行履歴 / 直近アクション body lines."""
+    s = str(line)
+    if s.startswith("前回施策:"):
+        return ("history_row_action",)
+    if s.startswith("結果:"):
+        return ("history_row_result",)
+    if s.startswith("実行タイミング:"):
+        return ("history_row_timing",)
+    return ("history_row_default",)
 from basketball_sim.systems.competition_display import competition_display_name
 from basketball_sim.systems import japan_regulation_display as jp_reg_display
 from basketball_sim.systems.schedule_display import (
@@ -2405,20 +2543,25 @@ class MainMenuView:
             ensure_fa_market_fields,
             ensure_team_fa_market_fields,
             estimate_fa_contract_years,
-            estimate_fa_market_value,
             get_team_fa_signing_limit,
+            inseason_fa_contract_salary,
             normalize_free_agents,
             precheck_user_fa_sign,
             sign_free_agent,
         )
         from basketball_sim.systems.roster_rules import RosterViolationError
+        from basketball_sim.systems.salary_cap_budget import league_level_for_team
 
         team = self.team
         season = self.season
         assert team is not None and season is not None
 
+        _league_market_division = int(league_level_for_team(team))
+
         raw = list(getattr(season, "free_agents", []) or [])
-        candidates = normalize_free_agents(raw)
+        candidates = normalize_free_agents(
+            raw, league_market_division=_league_market_division
+        )
         candidates.sort(
             key=lambda p: (-int(getattr(p, "ovr", 0) or 0), str(getattr(p, "name", "")))
         )
@@ -2486,13 +2629,13 @@ class MainMenuView:
 
         item_to_player: Dict[str, Any] = {}
         for p in candidates:
-            ensure_fa_market_fields(p)
+            ensure_fa_market_fields(p, league_market_division=_league_market_division)
             pid = getattr(p, "player_id", None)
             iid = str(pid) if pid is not None else f"id_{id(p)}"
             item_to_player[iid] = p
             nat_key = str(getattr(p, "nationality", "Japan") or "Japan")
             nat_j = _fa_nat_ja.get(nat_key, nat_key)
-            est = int(estimate_fa_market_value(p))
+            est = int(inseason_fa_contract_salary(team, p))
             tv.insert(
                 "",
                 tk.END,
@@ -2525,8 +2668,8 @@ class MainMenuView:
                 messagebox.showinfo("インシーズンFA", "一覧から選手を選択してください。", parent=top)
                 return
             ensure_team_fa_market_fields(team)
-            ensure_fa_market_fields(player)
-            sal = int(estimate_fa_market_value(player))
+            ensure_fa_market_fields(player, league_market_division=_league_market_division)
+            sal = int(inseason_fa_contract_salary(team, player))
             yrs = int(estimate_fa_contract_years(player))
             room = int(get_team_fa_signing_limit(team))
             money = int(getattr(team, "money", 0) or 0)
@@ -2566,7 +2709,7 @@ class MainMenuView:
             if not ok:
                 messagebox.showwarning("インシーズンFA", reason, parent=top)
                 return
-            sal = int(estimate_fa_market_value(player))
+            sal = int(inseason_fa_contract_salary(team, player))
             yrs = int(estimate_fa_contract_years(player))
             if not messagebox.askyesno(
                 "インシーズンFA（最終確認）",
@@ -2652,6 +2795,13 @@ class MainMenuView:
             messagebox.showwarning(
                 "人事",
                 "残契約年数がないため延長できません。",
+                parent=parent,
+            )
+            return
+        if is_draft_rookie_contract_active(player):
+            messagebox.showwarning(
+                "人事",
+                "オークション指名の固定3年契約中は、ここから契約年数の延長はできません。",
                 parent=parent,
             )
             return
@@ -2883,11 +3033,104 @@ class MainMenuView:
                 "下にスクロールすると各ブロックが続きます。"
                 "開いた時点で各欄に現在値、または「履歴なし・未実行・未設定・対象なし」に相当する説明が入ります。"
                 "操作で増えるのは主に履歴や確定メッセージです。"
+                "画面上部の「現況ダッシュボード」に、財務・施設・オーナー・直近施策の要約を常時表示します。"
             ),
             wraplength=1020,
             font=("Yu Gothic UI", 10),
             justify="left",
         ).pack(anchor="w")
+
+        dash_board = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
+        dash_board.pack(fill="x", pady=(0, 10))
+        ttk.Label(
+            dash_board,
+            text="現況ダッシュボード（財務 / 施設 / オーナー / 直近施策）",
+            style="SectionTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 6))
+        self._management_dashboard_text = tk.Text(
+            dash_board,
+            height=20,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=8,
+            pady=8,
+        )
+        self._management_dashboard_text.pack(fill="both", expand=False)
+        for _tag in (
+            "finance_block_header",
+            "finance_row_default",
+        ):
+            self._management_dashboard_text.tag_configure(_tag)
+        self._management_dashboard_text.tag_configure(
+            "finance_row_cap",
+            background=_MGMT_DASH_CAP_BG,
+            foreground=_MGMT_DASH_CAP_FG,
+        )
+        self._management_dashboard_text.tag_configure(
+            "finance_row_warning",
+            background=_MGMT_DASH_WARN_BG,
+            foreground=_MGMT_DASH_WARN_FG,
+        )
+        for _ftag in (
+            "facility_block_header",
+            "facility_row_default",
+            "facility_row_state",
+            "facility_row_levels",
+            "facility_row_build",
+            "facility_row_note",
+            "facility_row_market",
+        ):
+            self._management_dashboard_text.tag_configure(_ftag)
+        self._management_dashboard_text.tag_configure(
+            "facility_row_invest",
+            background=_MGMT_DASH_INVEST_BG,
+            foreground=_MGMT_DASH_INVEST_FG,
+        )
+        for _ptag in (
+            "pr_row_default",
+            "pr_row_status",
+            "pr_row_candidates",
+        ):
+            self._management_dashboard_text.tag_configure(_ptag)
+        self._management_dashboard_text.tag_configure(
+            "pr_row_warning",
+            background=_MGMT_DASH_WARN_BG,
+            foreground=_MGMT_DASH_WARN_FG,
+        )
+        for _otag in (
+            "owner_block_header",
+            "owner_row_default",
+            "owner_row_header",
+            "owner_row_mission",
+            "owner_row_progress",
+            "owner_row_deadline",
+            "owner_row_danger",
+        ):
+            self._management_dashboard_text.tag_configure(_otag)
+        self._management_dashboard_text.tag_configure(
+            "owner_row_warning",
+            background=_MGMT_DASH_WARN_BG,
+            foreground=_MGMT_DASH_WARN_FG,
+        )
+        for _htag in (
+            "history_block_header",
+            "history_row_default",
+            "history_row_action",
+            "history_row_timing",
+        ):
+            self._management_dashboard_text.tag_configure(_htag)
+        self._management_dashboard_text.tag_configure(
+            "history_row_result",
+            background=_MGMT_DASH_RESULT_BG,
+            foreground=_MGMT_DASH_RESULT_FG,
+        )
+        self._management_dashboard_text.configure(state="disabled")
 
         fin_scroll_wrap = ttk.Frame(outer, style="Root.TFrame")
         fin_scroll_wrap.pack(fill="both", expand=True)
@@ -2953,7 +3196,7 @@ class MainMenuView:
         fin_sum_inner = self._resolve_content_parent(self.finance_summary_panel)
         ttk.Label(
             fin_sum_inner,
-            text="クラブの資金（現在値）・年俸予算・前季収支・人気の要約",
+            text="資金・今季（記録）シーズン中入金・前季収支・人件費・状態の要約（詳細は下の各欄）",
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 6))
         self.finance_summary_lines = self._make_line_vars(self.finance_summary_panel, 6)
@@ -3022,7 +3265,7 @@ class MainMenuView:
         fac_content = self._resolve_content_parent(self.facility_panel)
         ttk.Label(
             fac_content,
-            text="施設レベル・市場／ファン指標（下のボタンで段階強化）。"
+            text="稼働状態・レベル概要・次投資の目安・市場／ファン指標（下のボタンで段階強化）。"
             "投資時に費用が反映され、施設レベルと関連指標が更新されます。",
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 6))
@@ -3030,16 +3273,31 @@ class MainMenuView:
         btn_row = ttk.Frame(fac_content, style="Card.TFrame")
         btn_row.pack(fill="x", pady=(12, 0))
         self._facility_upgrade_buttons: Dict[str, ttk.Button] = {}
+        self._facility_preview_vars: Dict[str, tk.StringVar] = {}
         for i, fk in enumerate(FACILITY_ORDER):
             label = FACILITY_LABELS.get(fk, fk)
+            cell = ttk.Frame(btn_row, style="Card.TFrame")
+            cell.grid(row=i // 2, column=i % 2, sticky="nsew", padx=4, pady=4)
             b = ttk.Button(
-                btn_row,
+                cell,
                 text=f"{label}を強化",
                 style="Menu.TButton",
                 command=lambda k=fk: self._on_facility_upgrade_click(k),
             )
-            b.grid(row=i // 2, column=i % 2, sticky="ew", padx=4, pady=4)
+            b.pack(fill="x")
             self._facility_upgrade_buttons[fk] = b
+            pv = tk.StringVar(value="")
+            self._facility_preview_vars[fk] = pv
+            tk.Label(
+                cell,
+                textvariable=pv,
+                bg="#222834",
+                fg="#9aa4b2",
+                anchor="w",
+                justify="left",
+                font=("Yu Gothic UI", 9),
+                wraplength=300,
+            ).pack(fill="x", pady=(4, 0))
         btn_row.columnconfigure(0, weight=1)
         btn_row.columnconfigure(1, weight=1)
         owner_parent = self._resolve_content_parent(self.owner_panel)
@@ -3131,6 +3389,7 @@ class MainMenuView:
             self._sponsor_combo.current(0)
         except tk.TclError:
             pass
+        self._sponsor_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_finance_window())
         self._sponsor_apply_btn = ttk.Button(
             sponsor_row,
             text="メイン契約を反映",
@@ -3138,6 +3397,18 @@ class MainMenuView:
             command=self._on_sponsor_contract_apply,
         )
         self._sponsor_apply_btn.pack(side="left")
+        self._sponsor_preview_var = tk.StringVar(value="")
+        tk.Label(
+            sponsor_inner,
+            textvariable=self._sponsor_preview_var,
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 6))
         tk.Label(
             sponsor_inner,
             text="契約変更履歴（直近）",
@@ -3189,6 +3460,78 @@ class MainMenuView:
             wraplength=900,
             padx=2,
         ).pack(fill="x", pady=(0, 8))
+        self._pr_remaining_var = tk.StringVar(value="")
+        tk.Label(
+            pr_inner,
+            textvariable=self._pr_remaining_var,
+            bg="#222834",
+            fg="#e8ecf2",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 10, "bold"),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 6))
+        pr_cmp_row = ttk.Frame(pr_inner, style="Card.TFrame")
+        pr_cmp_row.pack(fill="x", pady=(0, 6))
+        ttk.Label(pr_cmp_row, text="並べ替え:", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
+        self._pr_sort_combo = ttk.Combobox(
+            pr_cmp_row,
+            values=list(_PR_FINANCE_SORT_LABELS_JA),
+            state="readonly",
+            width=16,
+            font=("Yu Gothic UI", 9),
+        )
+        self._pr_sort_combo.pack(side="left", padx=(0, 14))
+        try:
+            self._pr_sort_combo.current(0)
+        except tk.TclError:
+            pass
+        self._pr_sort_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_finance_window())
+        ttk.Label(pr_cmp_row, text="絞り込み:", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
+        self._pr_filter_combo = ttk.Combobox(
+            pr_cmp_row,
+            values=list(_PR_FINANCE_FILTER_LABELS_JA),
+            state="readonly",
+            width=30,
+            font=("Yu Gothic UI", 9),
+        )
+        self._pr_filter_combo.pack(side="left", padx=(0, 0))
+        try:
+            self._pr_filter_combo.current(0)
+        except tk.TclError:
+            pass
+        self._pr_filter_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_finance_window())
+        tk.Label(
+            pr_inner,
+            text="候補一覧（比較・行を選ぶと下のコンボと実行対象が連動）",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+            padx=2,
+        ).pack(fill="x", pady=(0, 4))
+        pr_lb_fr = tk.Frame(pr_inner, bg="#222834")
+        pr_lb_fr.pack(fill="x", pady=(0, 8))
+        self._pr_comparison_listbox = tk.Listbox(
+            pr_lb_fr,
+            height=5,
+            bg="#222834",
+            fg="#d6dbe3",
+            selectbackground="#3d4a60",
+            selectforeground="#ffffff",
+            font=("Yu Gothic UI", 9),
+            activestyle="dotbox",
+            highlightthickness=0,
+            borderwidth=1,
+            relief="flat",
+        )
+        self._pr_comparison_listbox.pack(side="left", fill="both", expand=True)
+        pr_sb = ttk.Scrollbar(pr_lb_fr, orient="vertical", command=self._pr_comparison_listbox.yview)
+        pr_sb.pack(side="right", fill="y")
+        self._pr_comparison_listbox.configure(yscrollcommand=pr_sb.set)
+        self._pr_comparison_listbox.bind("<<ListboxSelect>>", self._on_pr_comparison_pick)
+        self._pr_comparison_ids: List[str] = []
         pr_row = ttk.Frame(pr_inner, style="Card.TFrame")
         pr_row.pack(fill="x", pady=(0, 8))
         self._pr_campaign_ids = [str(x["id"]) for x in PR_CAMPAIGNS]
@@ -3205,6 +3548,7 @@ class MainMenuView:
             self._pr_combo.current(0)
         except tk.TclError:
             pass
+        self._pr_combo.bind("<<ComboboxSelected>>", self._on_pr_combo_pick_light)
         self._pr_run_btn = ttk.Button(
             pr_row,
             text="施策を実行",
@@ -3212,6 +3556,18 @@ class MainMenuView:
             command=self._on_pr_campaign_run,
         )
         self._pr_run_btn.pack(side="left")
+        self._pr_selection_preview_var = tk.StringVar(value="")
+        tk.Label(
+            pr_inner,
+            textvariable=self._pr_selection_preview_var,
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 6))
         tk.Label(
             pr_inner,
             text="実行履歴（直近）",
@@ -3253,14 +3609,17 @@ class MainMenuView:
         ).pack(fill="x", pady=(0, 8))
         merch_lines_fr = ttk.Frame(merch_inner, style="Card.TFrame")
         merch_lines_fr.pack(fill="x", pady=(0, 8))
-        self._merch_rows: List[Tuple[str, tk.StringVar, ttk.Button]] = []
+        self._merch_rows: List[Tuple[str, tk.StringVar, tk.StringVar, ttk.Button]] = []
         for tmpl in MERCH_PRODUCTS:
             pid = str(tmpl["id"])
             var = tk.StringVar(value="")
+            pvar = tk.StringVar(value="")
             row_fr = ttk.Frame(merch_lines_fr, style="Card.TFrame")
             row_fr.pack(fill="x", pady=3)
+            left_col = tk.Frame(row_fr, bg="#222834")
+            left_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
             tk.Label(
-                row_fr,
+                left_col,
                 textvariable=var,
                 bg="#222834",
                 fg="#d6dbe3",
@@ -3268,7 +3627,17 @@ class MainMenuView:
                 justify="left",
                 font=("Yu Gothic UI", 10),
                 wraplength=620,
-            ).pack(side="left", fill="x", expand=True, padx=(0, 8))
+            ).pack(anchor="w", fill="x")
+            tk.Label(
+                left_col,
+                textvariable=pvar,
+                bg="#222834",
+                fg="#9aa4b2",
+                anchor="w",
+                justify="left",
+                font=("Yu Gothic UI", 9),
+                wraplength=620,
+            ).pack(anchor="w", fill="x", pady=(2, 0))
             btn = ttk.Button(
                 row_fr,
                 text="開発を進める",
@@ -3276,7 +3645,7 @@ class MainMenuView:
                 command=lambda p=pid: self._on_merch_advance(p),
             )
             btn.pack(side="right")
-            self._merch_rows.append((pid, var, btn))
+            self._merch_rows.append((pid, var, pvar, btn))
         tk.Label(
             merch_inner,
             text="売上・ランキング（ダミー）",
@@ -3394,6 +3763,15 @@ class MainMenuView:
             self._merch_rows = []
             self._merch_dummy_text = None
             self._merch_hist_text = None
+            self._management_dashboard_text = None
+            self._facility_preview_vars = {}
+            self._sponsor_preview_var = None
+            self._pr_selection_preview_var = None
+            self._pr_remaining_var = None
+            self._pr_sort_combo = None
+            self._pr_filter_combo = None
+            self._pr_comparison_listbox = None
+            self._pr_comparison_ids = []
             self._finance_scroll_canvas = None
             self._finance_inseason_log_text = None
 
@@ -3443,6 +3821,80 @@ class MainMenuView:
         self._refresh_finance_window()
         self.refresh()
 
+    def _sync_pr_comparison_row_to_chrome(self, index: int) -> None:
+        combo = getattr(self, "_pr_combo", None)
+        row_ids = getattr(self, "_pr_comparison_ids", [])
+        campaign_ids = getattr(self, "_pr_campaign_ids", [])
+        if combo is None or index < 0 or index >= len(row_ids):
+            return
+        cid = row_ids[index]
+        if not cid:
+            self._pr_comparison_selected_id = None
+            return
+        self._pr_comparison_selected_id = str(cid)
+        try:
+            j = campaign_ids.index(str(cid))
+            cur = combo.current()
+            if int(cur) != int(j):
+                combo.current(j)
+        except (ValueError, tk.TclError, TypeError):
+            pass
+        pv = getattr(self, "_pr_selection_preview_var", None)
+        if pv is not None:
+            pv.set(
+                build_pr_selection_preview_line(
+                    self.team,
+                    self.season,
+                    str(cid),
+                    format_money=self._format_money,
+                )
+            )
+
+    def _on_pr_comparison_pick(self, _event: Any = None) -> None:
+        lb = getattr(self, "_pr_comparison_listbox", None)
+        if lb is None:
+            return
+        sel = lb.curselection()
+        if not sel:
+            return
+        self._sync_pr_comparison_row_to_chrome(int(sel[0]))
+
+    def _on_pr_combo_pick_light(self, _event: Any = None) -> None:
+        combo = getattr(self, "_pr_combo", None)
+        campaign_ids = getattr(self, "_pr_campaign_ids", [])
+        if combo is None or not campaign_ids:
+            return
+        try:
+            ix = int(combo.current())
+            if ix < 0 or ix >= len(campaign_ids):
+                return
+        except (tk.TclError, ValueError, TypeError):
+            return
+        want = str(campaign_ids[ix])
+        self._pr_comparison_selected_id = want
+        lb = getattr(self, "_pr_comparison_listbox", None)
+        row_ids = getattr(self, "_pr_comparison_ids", [])
+        if lb is not None and row_ids:
+            for i, rid in enumerate(row_ids):
+                if rid == want:
+                    try:
+                        lb.selection_clear(0, tk.END)
+                        lb.selection_set(i)
+                        lb.see(i)
+                    except tk.TclError:
+                        pass
+                    break
+        pv = getattr(self, "_pr_selection_preview_var", None)
+        if pv is not None:
+            pv.set(
+                build_pr_selection_preview_line(
+                    self.team,
+                    self.season,
+                    want,
+                    format_money=self._format_money,
+                )
+            )
+
     def _on_pr_campaign_run(self) -> None:
         team = self.team
         if team is None:
@@ -3451,11 +3903,22 @@ class MainMenuView:
         ids = getattr(self, "_pr_campaign_ids", [])
         if combo is None or not ids:
             return
-        idx = combo.current()
-        if idx < 0 or idx >= len(ids):
-            messagebox.showwarning("広報・ファン", "施策を選択してください。")
-            return
-        ok, msg = commit_pr_campaign(team, ids[idx], self.season)
+        run_cid: Optional[str] = None
+        lb = getattr(self, "_pr_comparison_listbox", None)
+        comp_ids = getattr(self, "_pr_comparison_ids", [])
+        if lb is not None and comp_ids:
+            sel = lb.curselection()
+            if sel:
+                i = int(sel[0])
+                if 0 <= i < len(comp_ids) and comp_ids[i]:
+                    run_cid = str(comp_ids[i])
+        if not run_cid:
+            idx = combo.current()
+            if idx < 0 or idx >= len(ids):
+                messagebox.showwarning("広報・ファン", "施策を選択してください。")
+                return
+            run_cid = str(ids[idx])
+        ok, msg = commit_pr_campaign(team, run_cid, self.season)
         if ok:
             messagebox.showinfo("広報・ファン", msg)
         else:
@@ -3616,7 +4079,7 @@ class MainMenuView:
         if not rows:
             return
         if self.team is None:
-            for _pid, var, btn in rows:
+            for _pid, var, _pvar, btn in rows:
                 var.set("（チーム未接続）ライン状態は表示できません。")
                 try:
                     btn.state(["disabled"])
@@ -3641,7 +4104,7 @@ class MainMenuView:
             return
         ensure_merchandise_on_team(self.team)
         is_user = bool(getattr(self.team, "is_user_team", False))
-        for pid, var, btn in rows:
+        for pid, var, _pvar, btn in rows:
             item = get_merchandise_item(self.team, pid)
             if item is not None:
                 var.set(format_merchandise_row_display(item))
@@ -3691,10 +4154,6 @@ class MainMenuView:
 
         team_name = self._team_name()
         money = self._safe_get(self.team, "money", profile.get("money", 0))
-        budget = self._safe_get(self.team, "payroll_budget", profile.get("payroll_budget", 0))
-        popularity = self._safe_get(self.team, "popularity", profile.get("popularity", 0))
-        revenue = self._safe_get(self.team, "revenue_last_season", profile.get("revenue_last_season", 0))
-        expense = self._safe_get(self.team, "expense_last_season", profile.get("expense_last_season", 0))
         cashflow = self._safe_get(self.team, "cashflow_last_season", profile.get("cashflow_last_season", 0))
 
         if self.team is None:
@@ -3706,15 +4165,173 @@ class MainMenuView:
                 f"{team_name} 経営画面    所持金: {self._format_money(money)}    前季収支: {self._format_signed_money(cashflow)}"
             )
 
-        summary_lines = [
-            f"所持金: {self._format_money(money)}",
-            f"年俸予算: {self._format_money(budget)}",
-            f"人気: {self._safe_int_text(popularity)}",
-            f"前季収入: {self._format_money(revenue)}",
-            f"前季支出: {self._format_money(expense)}",
-            f"前季収支: {self._format_signed_money(cashflow)}",
-        ]
-        for var, line in zip(self.finance_summary_lines, summary_lines):
+        pr_sel: Optional[str] = None
+        pr_combo = getattr(self, "_pr_combo", None)
+        pr_ids = getattr(self, "_pr_campaign_ids", None)
+        if pr_combo is not None and pr_ids:
+            try:
+                pix = pr_combo.current()
+                if 0 <= int(pix) < len(pr_ids):
+                    pr_sel = str(pr_ids[int(pix)])
+            except (tk.TclError, TypeError, ValueError):
+                pr_sel = None
+
+        sp_sel: Optional[str] = None
+        sp_combo = getattr(self, "_sponsor_combo", None)
+        sp_ids = getattr(self, "_sponsor_type_ids", None)
+        if sp_combo is not None and sp_ids:
+            try:
+                six = sp_combo.current()
+                if 0 <= int(six) < len(sp_ids):
+                    sp_sel = str(sp_ids[int(six)])
+            except (tk.TclError, TypeError, ValueError):
+                sp_sel = None
+
+        pr_sort_key = _PR_FINANCE_SORT_ORDER[0]
+        psc = getattr(self, "_pr_sort_combo", None)
+        if psc is not None:
+            try:
+                sxi = int(psc.current())
+                if 0 <= sxi < len(_PR_FINANCE_SORT_ORDER):
+                    pr_sort_key = _PR_FINANCE_SORT_ORDER[sxi]
+            except (tk.TclError, TypeError, ValueError):
+                pass
+        pr_filter_key = _PR_FINANCE_FILTER_ORDER[0]
+        pfc = getattr(self, "_pr_filter_combo", None)
+        if pfc is not None:
+            try:
+                fxi = int(pfc.current())
+                if 0 <= fxi < len(_PR_FINANCE_FILTER_ORDER):
+                    pr_filter_key = _PR_FINANCE_FILTER_ORDER[fxi]
+            except (tk.TclError, TypeError, ValueError):
+                pass
+
+        snap = build_management_menu_snapshot(
+            self.team,
+            self.season,
+            format_money=self._format_money,
+            format_signed_money=self._format_signed_money,
+            selected_pr_campaign_id=pr_sel,
+            selected_sponsor_type_id=sp_sel,
+            pr_sort_mode=pr_sort_key,
+            pr_filter_mode=pr_filter_key,
+        )
+
+        dash_tw = getattr(self, "_management_dashboard_text", None)
+        if dash_tw is not None:
+            try:
+                dash_tw.configure(state="normal")
+                dash_tw.delete("1.0", tk.END)
+                fin_lines = getattr(snap, "dashboard_finance_lines", None)
+                if fin_lines:
+                    parts = snap.dashboard_text.split(
+                        _MANAGEMENT_FINANCE_BLOCK_SEPARATOR, 1
+                    )
+                    if len(parts) == 2:
+                        dash_tw.insert(
+                            "end",
+                            "■ 財務\n",
+                            ("finance_block_header",),
+                        )
+                        for ln in fin_lines:
+                            dash_tw.insert(
+                                "end",
+                                ln + "\n",
+                                _management_finance_dashboard_row_tags(ln),
+                            )
+                        sub_after_fin = parts[1]
+                        fac_lines_snap = getattr(snap, "facility_lines", None)
+                        fac_tail = sub_after_fin.split(
+                            _MANAGEMENT_FACILITY_PR_SEPARATOR, 1
+                        )
+                        if fac_lines_snap and len(fac_tail) == 2:
+                            dash_tw.insert(
+                                "end",
+                                "\n\n■ 施設\n",
+                                ("facility_block_header",),
+                            )
+                            for fln in fac_lines_snap:
+                                dash_tw.insert(
+                                    "end",
+                                    fln + "\n",
+                                    _management_facility_dashboard_row_tags(fln),
+                                )
+                            pr_owner = fac_tail[1].split(
+                                _MANAGEMENT_PR_OWNER_SEPARATOR, 1
+                            )
+                            if len(pr_owner) == 2:
+                                dash_tw.insert("end", "\n\n")
+                                pr_block = ("■ 広報" + pr_owner[0]).rstrip("\n")
+                                for pln in pr_block.split("\n"):
+                                    if pln == "":
+                                        continue
+                                    dash_tw.insert(
+                                        "end",
+                                        pln + "\n",
+                                        _management_pr_dashboard_row_tags(pln),
+                                    )
+                                oh_hist = pr_owner[1].split(
+                                    _MANAGEMENT_OWNER_HISTORY_SEPARATOR, 1
+                                )
+                                if len(oh_hist) == 2:
+                                    dash_tw.insert(
+                                        "end",
+                                        _MANAGEMENT_PR_OWNER_SEPARATOR + "\n",
+                                        ("owner_block_header",),
+                                    )
+                                    owner_body = oh_hist[0].lstrip("\n")
+                                    for oln in owner_body.split("\n"):
+                                        if oln == "":
+                                            continue
+                                        dash_tw.insert(
+                                            "end",
+                                            oln + "\n",
+                                            _management_owner_dashboard_row_tags(oln),
+                                        )
+                                    hist_body = oh_hist[1]
+                                    _hsep = _MANAGEMENT_OWNER_HISTORY_SEPARATOR
+                                    if hist_body == "":
+                                        dash_tw.insert("end", _hsep)
+                                    else:
+                                        dash_tw.insert(
+                                            "end",
+                                            _hsep,
+                                            ("history_block_header",),
+                                        )
+                                        for hln in hist_body.split("\n"):
+                                            if hln == "":
+                                                continue
+                                            dash_tw.insert(
+                                                "end",
+                                                hln + "\n",
+                                                _management_history_dashboard_row_tags(
+                                                    hln
+                                                ),
+                                            )
+                                else:
+                                    dash_tw.insert(
+                                        "end",
+                                        _MANAGEMENT_PR_OWNER_SEPARATOR + pr_owner[1],
+                                    )
+                            else:
+                                dash_tw.insert(
+                                    "end",
+                                    _MANAGEMENT_FACILITY_PR_SEPARATOR + fac_tail[1],
+                                )
+                        else:
+                            dash_tw.insert(
+                                "end",
+                                _MANAGEMENT_FINANCE_BLOCK_SEPARATOR + sub_after_fin,
+                            )
+                    else:
+                        dash_tw.insert("1.0", snap.dashboard_text)
+                else:
+                    dash_tw.insert("1.0", snap.dashboard_text)
+                dash_tw.configure(state="disabled")
+            except tk.TclError:
+                pass
+
+        for var, line in zip(self.finance_summary_lines, snap.finance_lines):
             var.set(line)
 
         cap_tw = getattr(self, "_finance_cap_text", None)
@@ -3753,36 +4370,90 @@ class MainMenuView:
             except tk.TclError:
                 pass
 
-        market_size = self._safe_get(self.team, "market_size", profile.get("market_size", 1.0))
-        fan_base = self._safe_get(self.team, "fan_base", profile.get("fan_base", 0))
-        season_tickets = self._safe_get(self.team, "season_ticket_base", profile.get("season_ticket_base", 0))
-        sponsor_power = self._safe_get(self.team, "sponsor_power", profile.get("sponsor_power", 0))
-
-        facility_lines: List[str] = []
-        if self.team is None:
-            for fk in FACILITY_ORDER:
-                flabel = FACILITY_LABELS.get(fk, fk)
-                facility_lines.append(f"{flabel}: （チーム未接続）Lv・次回費用は接続後に表示")
-            facility_lines.append(f"市場規模: {market_size}（未接続時は既定の参照値）")
-            facility_lines.append(
-                f"ファン基盤: {self._safe_int_text(fan_base)} ／ シーズン券: {self._safe_int_text(season_tickets)} ／ "
-                f"スポンサー力: {self._safe_int_text(sponsor_power)}（未接続時は 0 または既定）"
-            )
-        else:
-            for fk in FACILITY_ORDER:
-                lv = int(self._safe_get(self.team, fk, profile.get(fk, 1)))
-                flabel = FACILITY_LABELS.get(fk, fk)
-                if lv >= FACILITY_MAX_LEVEL:
-                    facility_lines.append(f"{flabel}: Lv{lv}（最大）")
-                else:
-                    nxt = get_facility_upgrade_cost(self.team, fk)
-                    facility_lines.append(f"{flabel}: Lv{lv} → 次回 {self._format_money(nxt)}")
-            facility_lines.append(f"市場規模: {market_size}")
-            facility_lines.append(
-                f"ファン基盤: {self._safe_int_text(fan_base)} / シーズン券: {self._safe_int_text(season_tickets)} / スポンサー力: {self._safe_int_text(sponsor_power)}"
-            )
-        for var, line in zip(self.facility_lines, facility_lines):
+        for var, line in zip(self.facility_lines, snap.facility_lines):
             var.set(line)
+
+        fp_vars = getattr(self, "_facility_preview_vars", None)
+        if isinstance(fp_vars, dict) and fp_vars:
+            fac_prev_map = dict(snap.facility_action_previews)
+            for fk, pv in fp_vars.items():
+                try:
+                    pv.set(fac_prev_map.get(fk, "—"))
+                except tk.TclError:
+                    pass
+
+        sp_preview = getattr(self, "_sponsor_preview_var", None)
+        if sp_preview is not None:
+            try:
+                sp_preview.set(snap.sponsor_apply_preview)
+            except tk.TclError:
+                pass
+
+        pr_preview = getattr(self, "_pr_selection_preview_var", None)
+        if pr_preview is not None:
+            try:
+                pr_preview.set(snap.pr_selection_preview)
+            except tk.TclError:
+                pass
+
+        pr_rem_v = getattr(self, "_pr_remaining_var", None)
+        if pr_rem_v is not None:
+            try:
+                pr_rem_v.set(snap.pr_remaining_summary)
+            except tk.TclError:
+                pass
+
+        lb = getattr(self, "_pr_comparison_listbox", None)
+        if lb is not None:
+            prev_pick = getattr(self, "_pr_comparison_selected_id", None)
+            try:
+                lb.delete(0, tk.END)
+            except tk.TclError:
+                pass
+            self._pr_comparison_ids = [c for c, _ in snap.pr_comparison_entries]
+            for _cid, line in snap.pr_comparison_entries:
+                try:
+                    lb.insert(tk.END, line)
+                except tk.TclError:
+                    pass
+            sel_i = -1
+            if prev_pick:
+                for i, cid in enumerate(self._pr_comparison_ids):
+                    if cid and cid == prev_pick:
+                        sel_i = i
+                        break
+            if sel_i < 0:
+                for i, cid in enumerate(self._pr_comparison_ids):
+                    if cid:
+                        sel_i = i
+                        break
+            if sel_i >= 0:
+                try:
+                    lb.selection_set(sel_i)
+                    lb.see(sel_i)
+                except tk.TclError:
+                    pass
+                self._sync_pr_comparison_row_to_chrome(sel_i)
+            if self.team is None:
+                try:
+                    psc2 = getattr(self, "_pr_sort_combo", None)
+                    pfc2 = getattr(self, "_pr_filter_combo", None)
+                    if psc2 is not None:
+                        psc2.configure(state="disabled")
+                    if pfc2 is not None:
+                        pfc2.configure(state="disabled")
+                except tk.TclError:
+                    pass
+            else:
+                try:
+                    psc2 = getattr(self, "_pr_sort_combo", None)
+                    pfc2 = getattr(self, "_pr_filter_combo", None)
+                    if psc2 is not None:
+                        psc2.configure(state="readonly")
+                    if pfc2 is not None:
+                        pfc2.configure(state="readonly")
+                except tk.TclError:
+                    pass
 
         btns = getattr(self, "_facility_upgrade_buttons", None)
         if isinstance(btns, dict) and btns:
@@ -3800,26 +4471,30 @@ class MainMenuView:
         owner_body = ""
         if self.team is None:
             owner_body = (
+                snap.owner_preamble
+                + "\n\n"
                 "（チームがメイン画面から未接続です）\n"
                 "オーナー期待・信頼・ミッションは、チーム接続後にここに表示されます。"
             )
         else:
             om_getter = getattr(self.team, "get_owner_mission_report_text", None)
+            core = ""
             if callable(om_getter):
                 try:
-                    owner_body = str(om_getter() or "")
+                    core = str(om_getter() or "")
                 except Exception:
-                    owner_body = ""
-            if not owner_body.strip():
+                    core = ""
+            if not core.strip():
                 owner_expectation = self._safe_get(
                     self.team, "owner_expectation", profile.get("owner_expectation", "-")
                 )
                 owner_trust = self._safe_get(self.team, "owner_trust", profile.get("owner_trust", "-"))
-                owner_body = (
+                core = (
                     f"オーナー期待値: {owner_expectation}\n"
                     f"オーナー信頼: {self._safe_int_text(owner_trust)} / 100\n"
                     "（詳細テキストを取得できませんでした）"
                 )
+            owner_body = snap.owner_preamble + "\n" + core
         ow = getattr(self, "owner_report_text", None)
         if ow is not None:
             try:
@@ -3861,6 +4536,15 @@ class MainMenuView:
         self._refresh_sponsor_finance_block()
         self._refresh_pr_finance_block()
         self._refresh_merchandise_finance_block()
+
+        merch_prev_map = dict(snap.merch_line_previews)
+        mrows = getattr(self, "_merch_rows", None)
+        if mrows:
+            for pid, _v, mpv, _btn in mrows:
+                try:
+                    mpv.set(merch_prev_map.get(pid, "—"))
+                except tk.TclError:
+                    pass
 
         self.finance_hint_var.set(
             "※この画面は現状確認・一部投資操作・案内を担当します。"

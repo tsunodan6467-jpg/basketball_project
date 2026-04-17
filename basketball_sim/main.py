@@ -18,6 +18,9 @@ from basketball_sim.systems.generator import (
     generate_single_player,
     sync_player_id_counter_from_world,
 )
+from basketball_sim.systems.opening_roster_salary_v11 import (
+    apply_user_team_opening_payroll_v11_if_roster_complete,
+)
 from basketball_sim.systems.helpers import print_separator
 from basketball_sim.systems.roster_fa_release import (
     apply_release_player_to_fa,
@@ -28,14 +31,23 @@ from basketball_sim.systems.season_transaction_rules import (
     INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
 )
+from basketball_sim.systems.club_profile import get_initial_team_money_cpu, get_initial_user_team_money
 from basketball_sim.systems.facility_investment import (
     FACILITY_LABELS,
     can_commit_facility_upgrade,
     commit_facility_upgrade,
+    format_cli_facility_screen_header_lines,
     format_facility_status_lines,
     get_facility_upgrade_cost,
 )
+from basketball_sim.systems.free_agent_cli_display import print_free_agent_pool_cli
+from basketball_sim.systems.finance_report_display import format_cli_finance_screen_header_lines
+from basketball_sim.systems.management_policy_cli_display import format_cli_management_policy_header_lines
+from basketball_sim.systems.player_development_cli_display import format_player_development_cli_hint
+from basketball_sim.systems.rotation_cli_display import format_rotation_cli_summary_lines
+from basketball_sim.systems.tactics_cli_display import format_tactic_cli_summary_lines
 from basketball_sim.systems.training_unlocks import player_drill_lock_reason
+from basketball_sim.systems.trade_cli_display import format_trade_cli_summary_lines
 from basketball_sim.systems.trade_logic import TradeSystem, MultiTradeOffer
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
@@ -43,6 +55,7 @@ from basketball_sim.systems.contract_logic import (
     get_team_payroll,
     normalize_initial_payrolls_for_teams,
 )
+from basketball_sim.systems.salary_cap_budget import league_level_for_team
 from basketball_sim.systems.gm_dashboard_text import (
     format_bench_order_text,
     format_gm_roster_text,
@@ -63,8 +76,6 @@ from basketball_sim.systems.gm_ui_constants import (
     STRATEGY_OPTIONS,
     USAGE_POLICY_OPTIONS,
 )
-
-TEMP_INITIAL_TEAM_MONEY = 2_000_000_000
 
 # 新規ゲーム開始時のみ `build_initial_game_world` 末尾から参照。save 読込では呼ばない。
 DEBUG_BOOST_USER_TEAM_ENV = "BASKETBALL_SIM_DEBUG_BOOST_USER_TEAM"
@@ -235,7 +246,7 @@ def apply_user_team_to_league(teams, team_name, home_city, market_size):
     target_team.market_size = market_size
     target_team.is_user_team = True
     target_team.popularity = 45
-    target_team.money = TEMP_INITIAL_TEAM_MONEY
+    target_team.money = int(get_initial_user_team_money(target_team))
 
     print_separator("プレイヤーチーム登録")
     print(f"{old_name} → {target_team.name} に置き換えました")
@@ -340,11 +351,17 @@ def create_icon_player(icon_data):
         player = source_player
     else:
         seed = icon_data.get("seed_data", icon_data) if isinstance(icon_data, dict) else icon_data
+        _icon_div = None
+        if isinstance(icon_data, dict):
+            _icon_team = icon_data.get("team")
+            if _icon_team is not None:
+                _icon_div = int(league_level_for_team(_icon_team))
         player = generate_single_player(
             age_override=27,
             base_ovr_override=seed["ovr"],
             position_override=seed["position"],
             nationality_override=seed["nationality"],
+            league_market_division=_icon_div,
         )
         player.name = seed["name"]
         player.age = 27
@@ -404,12 +421,18 @@ def get_nationality_bucket(player):
     return "Japan"
 
 
-def get_auto_roster_sort_key(player, counts, required_position=None):
+def get_auto_roster_sort_key(
+    player, counts, required_position=None, *, prefer_foreign_slots: bool = False
+):
     nat_bucket = get_nationality_bucket(player)
     nationality_penalty = 0
 
     if nat_bucket == "Foreign":
-        nationality_penalty = 6 + counts["Foreign"] * 4
+        if prefer_foreign_slots and counts["Foreign"] < LEAGUE_ROSTER_FOREIGN_CAP:
+            # 自動編成のみ: 枠未充足時は外国籍を先に埋める（手動編成は draft_players 側で変更なし）
+            nationality_penalty = -30
+        else:
+            nationality_penalty = 6 + counts["Foreign"] * 4
     elif nat_bucket == "AsiaNat":
         nationality_penalty = 5 + counts["AsiaNat"] * 8
 
@@ -427,13 +450,17 @@ def get_auto_roster_sort_key(player, counts, required_position=None):
     )
 
 
-def choose_best_auto_candidate(candidates, counts, required_position=None):
+def choose_best_auto_candidate(
+    candidates, counts, required_position=None, *, prefer_foreign_slots: bool = False
+):
     legal_players = [p for p in candidates if nationality_check(p, counts)]
     if not legal_players:
         return None
     return max(
         legal_players,
-        key=lambda p: get_auto_roster_sort_key(p, counts, required_position=required_position),
+        key=lambda p: get_auto_roster_sort_key(
+            p, counts, required_position=required_position, prefer_foreign_slots=prefer_foreign_slots
+        ),
     )
 
 
@@ -471,14 +498,16 @@ def auto_draft_players(pool, user_team, icon_player):
     for pos in ["PG", "SG", "SF", "PF", "C"]:
         while remaining_needs.get(pos, 0) > 0:
             position_candidates = [p for p in working_pool if getattr(p, "position", "") == pos]
-            chosen = choose_best_auto_candidate(position_candidates, counts, required_position=pos)
+            chosen = choose_best_auto_candidate(
+                position_candidates, counts, required_position=pos, prefer_foreign_slots=True
+            )
 
             if chosen is None:
                 fallback_pool = [
                     p for p in working_pool
                     if nationality_check(p, counts)
                 ]
-                chosen = choose_best_auto_candidate(fallback_pool, counts)
+                chosen = choose_best_auto_candidate(fallback_pool, counts, prefer_foreign_slots=True)
 
             if chosen is None:
                 raise ValueError(f"自動編成に失敗しました。{pos} の候補が不足しています。")
@@ -490,7 +519,7 @@ def auto_draft_players(pool, user_team, icon_player):
             remaining_needs[pos] -= 1
 
     while len(selected) < 12:
-        chosen = choose_best_auto_candidate(working_pool, counts)
+        chosen = choose_best_auto_candidate(working_pool, counts, prefer_foreign_slots=True)
         if chosen is None:
             raise ValueError("自動編成に失敗しました。国籍ルールを満たす候補が不足しています。")
 
@@ -716,7 +745,7 @@ def summarize_roster_nationality_counts(players):
     )
 
 
-def ensure_cpu_pool_viability(pool, team_count):
+def ensure_cpu_pool_viability(pool, team_count, *, league_market_division: Optional[int] = None):
     target_total_by_position = {pos: need * team_count for pos, need in ROSTER_TEMPLATE.items()}
     current_position_counts = Counter(getattr(p, "position", "") for p in pool)
 
@@ -725,7 +754,11 @@ def ensure_cpu_pool_viability(pool, team_count):
     for pos in ["PG", "SG", "SF", "PF", "C"]:
         shortage = max(0, target_total_by_position.get(pos, 0) - current_position_counts.get(pos, 0))
         for _ in range(shortage):
-            player = generate_single_player(position_override=pos, nationality_override="Japan")
+            player = generate_single_player(
+                position_override=pos,
+                nationality_override="Japan",
+                league_market_division=league_market_division,
+            )
             pool.append(player)
             added_players.append(player)
             current_position_counts[pos] = current_position_counts.get(pos, 0) + 1
@@ -753,7 +786,11 @@ def ensure_cpu_pool_viability(pool, team_count):
                     ["PG", "SG", "SF", "PF", "C"],
                     key=lambda p: current_position_counts.get(p, 0) / max(1, target_total_by_position.get(p, 1))
                 )
-            player = generate_single_player(position_override=pos, nationality_override="Japan")
+            player = generate_single_player(
+                position_override=pos,
+                nationality_override="Japan",
+                league_market_division=league_market_division,
+            )
             pool.append(player)
             added_players.append(player)
             current_position_counts[pos] = current_position_counts.get(pos, 0) + 1
@@ -819,7 +856,7 @@ def assign_fictional_teams_and_rival(teams, user_team, remaining_players, free_a
     rival_team.home_city = "さいたま"
     rival_team.market_size = 1.10
     rival_team.popularity = 52
-    rival_team.money = TEMP_INITIAL_TEAM_MONEY
+    rival_team.money = int(get_initial_team_money_cpu(rival_team))
     rival_team.is_rival_team = True
     rival_team.coach_style = "development"
 
@@ -827,7 +864,14 @@ def assign_fictional_teams_and_rival(teams, user_team, remaining_players, free_a
 
     pool = list(remaining_players)
 
-    added_players = ensure_cpu_pool_viability(pool, len(cpu_fictional_teams))
+    _cpu_pool_div = (
+        int(league_level_for_team(cpu_fictional_teams[0]))
+        if cpu_fictional_teams
+        else None
+    )
+    added_players = ensure_cpu_pool_viability(
+        pool, len(cpu_fictional_teams), league_market_division=_cpu_pool_div
+    )
 
     rival_roster = pick_balanced_roster_from_pool(pool, stronger=True)
     for p in rival_roster:
@@ -967,6 +1011,9 @@ def _youth_investment_label(invest_key: str) -> str:
 
 
 def set_team_strategy(user_team):
+    tactic_lines = format_tactic_cli_summary_lines(user_team)
+    if tactic_lines:
+        print("\n".join(tactic_lines))
     selected = choose_option_from_list("戦術変更", STRATEGY_OPTIONS)
     old_value = getattr(user_team, "strategy", "balanced")
     user_team.strategy = selected
@@ -1065,6 +1112,7 @@ def change_starting_lineup(user_team):
             return
 
         print_current_starting_five(user_team)
+        print("\n".join(format_rotation_cli_summary_lines(user_team)))
         print("\n変更したい枠を選んでください")
         print("1. PG枠")
         print("2. SG枠")
@@ -1135,6 +1183,7 @@ def change_starting_lineup(user_team):
 def change_sixth_man(user_team):
     while True:
         print_current_sixth_man(user_team)
+        print("\n".join(format_rotation_cli_summary_lines(user_team)))
 
         print("\n1. 6thマンを変更する")
         print("2. 自動6thマンに戻す")
@@ -1199,6 +1248,7 @@ def change_bench_order(user_team):
     while True:
         bench_players = get_current_bench_order(user_team)
         print_current_bench_order(user_team)
+        print("\n".join(format_rotation_cli_summary_lines(user_team)))
 
         print("\n1. 順位を入れ替える")
         print("2. 自動ベンチ序列に戻す")
@@ -1504,6 +1554,8 @@ def propose_trade(all_teams, user_team, season=None):
     if user_player is None:
         return
 
+    print("\n".join(format_trade_cli_summary_lines([ai_player], [user_player])))
+
     user_eval, ai_eval, accepted, reason, detail = one_for_one_trade_evaluate_and_ai_gate(
         trade_system,
         user_team,
@@ -1646,6 +1698,8 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
         rookie_budget_a_to_b=rb,
     )
 
+    print("\n".join(format_trade_cli_summary_lines(ai_receives, user_gives)))
+
     user_eval, ai_eval = trade_system.evaluate_multi_trade(
         team_a=user_team,
         team_b=ai_team,
@@ -1697,7 +1751,8 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
         print("1. 相手チーム一覧を見る")
         print("2. 選手のみのトレード（1対1）")
         print("3. トレード提案（複数人数＋現金＋RB）")
-        print("4. 戻る")
+        print("4. FA候補プール（閲覧）")
+        print("5. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -1714,6 +1769,8 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
                 continue
             propose_multi_trade(all_teams, user_team, free_agents, season=season)
         elif choice == "4":
+            print_free_agent_pool_cli(user_team, free_agents, season=season)
+        elif choice == "5":
             return
         else:
             print("正しい番号を入力してください。")
@@ -1721,6 +1778,7 @@ def run_trade_menu(all_teams, user_team, free_agents, season=None):
 
 def print_facility_status(user_team):
     print_separator("施設投資状況")
+    print("\n".join(format_cli_facility_screen_header_lines(user_team)))
     for line in format_facility_status_lines(user_team):
         print(line)
 
@@ -1801,6 +1859,7 @@ def run_player_training_focus_menu(user_team):
                 f"OVR:{int(getattr(p, 'ovr', 0)):<2} | 方針:{focus_labels.get(f, f)} | "
                 f"ドリル:{drill_labels.get(str(getattr(p, 'training_drill', 'balanced') or 'balanced'), 'バランス')}"
             )
+            print(f"    {format_player_development_cli_hint(p)}")
         print("0. 戻る")
         raw = input("選手番号: ").strip()
         if raw == "0":
@@ -2092,9 +2151,81 @@ def print_special_training_catalog(user_team):
     print("※ 将来、HC契約・施設投資の拡張でメニュー追加/効果強化を行う前提の一覧です。")
 
 
+_CLI_OWNER_EXPECTATION_LABEL: Dict[str, str] = {
+    "playoff_race": "プレーオフ争い",
+    "rebuild": "再建",
+    "title_challenge": "優勝挑戦",
+    "title_or_bust": "優勝一択",
+    "stay_competitive": "競争維持",
+}
+
+
+def _cli_money_yen(n: int) -> str:
+    try:
+        return f"{int(n):,}円"
+    except (TypeError, ValueError):
+        return "情報なし"
+
+
+def print_cli_management_menu_summary(team: Any, *, include_facility: bool = True) -> None:
+    """
+    CLI 経営系メニュー先頭用の現状サマリー（表示のみ・進行ロジックは変更しない）。
+    """
+    if team is None:
+        print("【現状】チーム未接続 — 情報なし")
+        return
+    try:
+        money = int(getattr(team, "money", 0) or 0)
+        rev = int(getattr(team, "revenue_last_season", 0) or 0)
+        exp = int(getattr(team, "expense_last_season", 0) or 0)
+        cf = int(getattr(team, "cashflow_last_season", 0) or 0)
+        fh = getattr(team, "finance_history", None) or []
+        n_fin = len(fh) if isinstance(fh, list) else 0
+        fin_hist = f"財務履歴 {n_fin}件" if n_fin else "財務履歴 履歴なし"
+
+        if rev == 0 and exp == 0 and cf == 0:
+            cf_note = "前季収支 未更新"
+        elif cf > 0:
+            cf_note = "前季 黒字傾向"
+        elif cf < 0:
+            cf_note = "前季 赤字傾向"
+        else:
+            cf_note = "前季収支 不明"
+
+        print(f"【現状・財務】所持金 {_cli_money_yen(money)} | {cf_note} | {fin_hist}")
+
+        if include_facility:
+            ar = int(getattr(team, "arena_level", 1) or 1)
+            tf = int(getattr(team, "training_facility_level", 1) or 1)
+            md = int(getattr(team, "medical_facility_level", 1) or 1)
+            fo = int(getattr(team, "front_office_level", 1) or 1)
+            print(
+                f"【現状・施設】アリーナLv{ar} / トレーニングLv{tf} / "
+                f"メディカルLv{md} / フロントLv{fo}"
+            )
+
+        trust = int(getattr(team, "owner_trust", 0) or 0)
+        raw_exp = str(getattr(team, "owner_expectation", "") or "").strip() or "未設定"
+        exp_lbl = _CLI_OWNER_EXPECTATION_LABEL.get(raw_exp, raw_exp)
+        missions = getattr(team, "owner_missions", None) or []
+        n_m = len(missions) if isinstance(missions, list) else 0
+        omh = getattr(team, "owner_mission_history", None) or []
+        n_omh = len(omh) if isinstance(omh, list) else 0
+        miss_note = f"進行中ミッション {n_m}件" if n_m else "進行中ミッション 未実行"
+        hist_note = f"ミッション履歴 {n_omh}件" if n_omh else "ミッション履歴 履歴なし"
+        print(f"【現状・オーナー】信頼度 {trust} | 期待 {exp_lbl} | {miss_note} | {hist_note}")
+
+        print("\n".join(format_cli_management_policy_header_lines(team)))
+        print("")
+    except Exception:
+        print("【現状】経営サマリー — 情報なし")
+        print("")
+
+
 def run_facility_investment_menu(user_team):
     while True:
         print_facility_status(user_team)
+        print_cli_management_menu_summary(user_team, include_facility=False)
         print("1. アリーナに投資")
         print("2. トレーニング施設に投資")
         print("3. メディカル施設に投資")
@@ -2116,12 +2247,16 @@ def run_facility_investment_menu(user_team):
         elif choice == "5":
             print_separator("財務レポート")
             if hasattr(user_team, "get_finance_report_text"):
+                print("\n".join(format_cli_finance_screen_header_lines(user_team)))
                 print(user_team.get_finance_report_text())
             else:
                 print("財務レポートはまだ利用できません。")
         elif choice == "6":
             print_separator("オーナーミッション")
             if hasattr(user_team, "get_owner_mission_report_text"):
+                from basketball_sim.models.team import format_cli_owner_mission_screen_header_lines
+
+                print("\n".join(format_cli_owner_mission_screen_header_lines(user_team)))
                 print(user_team.get_owner_mission_report_text())
             else:
                 print("オーナーミッションはまだ利用できません。")
@@ -2180,9 +2315,100 @@ def run_gm_contract_release_cli(user_team, season) -> None:
     print(f"{name} を契約解除しました。ロスターから外れ、FAプールに追加しました。")
 
 
+def run_main_sponsor_contract_cli_menu(user_team) -> None:
+    """CLI メインスポンサー契約（表示強化のみ。`commit_main_sponsor_contract` を再利用）。"""
+    from basketball_sim.systems.sponsor_management import (
+        MAIN_SPONSOR_TYPES,
+        commit_main_sponsor_contract,
+        format_cli_sponsor_management_screen_lines,
+    )
+
+    id_by_choice = {str(i): str(spec["id"]) for i, spec in enumerate(MAIN_SPONSOR_TYPES, start=1)}
+    while True:
+        print_separator("メインスポンサー契約")
+        print("\n".join(format_cli_sponsor_management_screen_lines(user_team)))
+        print("番号で契約を反映。0 で戻る。")
+        raw = input("番号: ").strip()
+        if raw == "0":
+            return
+        tid = id_by_choice.get(raw)
+        if tid is None:
+            print("正しい番号を入力してください。")
+            continue
+        ok, msg = commit_main_sponsor_contract(user_team, tid)
+        print(msg if msg else ("反映しました。" if ok else "反映できませんでした。"))
+
+
+def run_pr_campaign_cli_menu(user_team, season) -> None:
+    """CLI 広報施策（表示強化のみ。`commit_pr_campaign` を再利用）。"""
+    from basketball_sim.systems.pr_campaign_management import (
+        PR_CAMPAIGNS,
+        commit_pr_campaign,
+        format_cli_pr_campaign_management_screen_lines,
+    )
+
+    id_by_choice = {str(i): str(spec["id"]) for i, spec in enumerate(PR_CAMPAIGNS, start=1)}
+    while True:
+        print_separator("広報施策")
+        print("\n".join(format_cli_pr_campaign_management_screen_lines(user_team, season)))
+        print("番号で施策を実行。0 で戻る。")
+        raw = input("番号: ").strip()
+        if raw == "0":
+            return
+        tid = id_by_choice.get(raw)
+        if tid is None:
+            print("正しい番号を入力してください。")
+            continue
+        if season is None:
+            print("シーズンに接続されていないため実行できません。")
+            continue
+        ok, msg = commit_pr_campaign(user_team, tid, season)
+        print(msg if msg else ("実施しました。" if ok else "実施できませんでした。"))
+
+
+def run_merchandise_cli_menu(user_team) -> None:
+    """CLI グッズ開発（表示強化のみ。`advance_merchandise_phase` を再利用）。"""
+    from basketball_sim.systems.merchandise_management import (
+        MERCH_PRODUCTS,
+        advance_merchandise_phase,
+        format_cli_merchandise_management_screen_lines,
+    )
+
+    id_by_choice = {str(i): str(p["id"]) for i, p in enumerate(MERCH_PRODUCTS, start=1)}
+    while True:
+        print_separator("グッズ開発")
+        print("\n".join(format_cli_merchandise_management_screen_lines(user_team)))
+        print("番号で該当ラインを1段階進める。0 で戻る。")
+        raw = input("番号: ").strip()
+        if raw == "0":
+            return
+        pid = id_by_choice.get(raw)
+        if pid is None:
+            print("正しい番号を入力してください。")
+            continue
+        ok, msg = advance_merchandise_phase(user_team, pid)
+        print(msg if msg else ("進めました。" if ok else "進められませんでした。"))
+
+
 def run_gm_menu(all_teams, user_team, free_agents, season=None):
     while True:
         print_separator("GMメニュー")
+        try:
+            from basketball_sim.systems.club_dashboard_cli_display import (
+                format_club_dashboard_cli_lines,
+            )
+
+            for _db_ln in format_club_dashboard_cli_lines(
+                user_team=user_team,
+                season=season,
+                all_teams=all_teams,
+                free_agents=free_agents,
+            ):
+                print(_db_ln)
+            print("")
+        except Exception:
+            pass
+        print_cli_management_menu_summary(user_team, include_facility=True)
         trade_locked = season is not None and not inseason_roster_moves_unlocked(season)
         trade_label = "10. トレード（期限切れ）" if trade_locked else "10. トレード"
         print("0. 契約解除（FA送り）")
@@ -2202,7 +2428,10 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         print("14. ユース強化")
         print("15. 強化トップ（サマリー）")
         print("16. スペシャル練習一覧")
-        print("17. 戻る")
+        print("17. メインスポンサー契約")
+        print("18. 広報施策")
+        print("19. グッズ開発")
+        print("20. 戻る")
 
         choice = input("番号: ").strip()
 
@@ -2241,6 +2470,12 @@ def run_gm_menu(all_teams, user_team, free_agents, season=None):
         elif choice == "16":
             print_special_training_catalog(user_team)
         elif choice == "17":
+            run_main_sponsor_contract_cli_menu(user_team)
+        elif choice == "18":
+            run_pr_campaign_cli_menu(user_team, season)
+        elif choice == "19":
+            run_merchandise_cli_menu(user_team)
+        elif choice == "20":
             break
         else:
             print("正しい番号を入力してください。")
@@ -2455,6 +2690,18 @@ def run_interactive_season(
                 choice = input("番号: ").strip()
 
                 if choice == "1":
+                    try:
+                        from basketball_sim.systems.weekly_advance_cli_display import (
+                            format_weekly_advance_check_lines,
+                        )
+
+                        for _wk_ln in format_weekly_advance_check_lines(
+                            season=season, user_team=user_team, free_agents=free_agents
+                        ):
+                            print(_wk_ln)
+                        print("")
+                    except Exception:
+                        pass
                     season.simulate_next_round()
                 elif choice == "2":
                     season.simulate_multiple_rounds(5)
@@ -2580,6 +2827,8 @@ def build_initial_game_world():
     else:
         draft_players(fictional_pool, user_team, icon_player)
     print_user_roster(user_team)
+
+    apply_user_team_opening_payroll_v11_if_roster_complete(user_team)
 
     free_agents = []
     assign_fictional_teams_and_rival(teams, user_team, fictional_pool, free_agents)

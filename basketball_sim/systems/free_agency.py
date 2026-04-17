@@ -6,10 +6,14 @@ from basketball_sim.config.game_constants import CONTRACT_ROSTER_MAX
 from basketball_sim.models.team import Team
 from basketball_sim.models.player import Player
 from basketball_sim.systems.contract_logic import (
+    MIN_SALARY_DEFAULT,
     calculate_fa_retention_bonus,
+    clear_draft_rookie_contract_for_market_entry,
     fa_roll_accept_offer,
     get_team_payroll,
 )
+from basketball_sim.systems.opening_roster_salary_v11 import _MIN_SALARY_D1, _MIN_SALARY_D2_D3
+from basketball_sim.systems.resign_salary_anchor import fa_offer_base_salary
 from basketball_sim.systems.salary_cap_budget import (
     cap_status as shared_cap_status,
     compute_luxury_tax,
@@ -127,10 +131,23 @@ def _estimate_winning_score(team: Team) -> float:
     return league_component * 0.55 + win_component * 0.45
 
 
-def _estimate_salary_score(player: Player, salary: int) -> float:
+def _negotiation_salary_baseline_floor(team: Optional[Team]) -> int:
+    """
+    `_estimate_salary_score` の baseline 最低床（opening v1.1 の D1 / D2-D3 と整合）。
+    `team` が無い診断・単体テストでは `MIN_SALARY_DEFAULT` にフォールバックする。
+    """
+    if team is None:
+        return int(MIN_SALARY_DEFAULT)
+    div = int(max(1, min(3, int(league_level_for_team(team)))))
+    if div == 1:
+        return int(_MIN_SALARY_D1)
+    return int(_MIN_SALARY_D2_D3)
+
+
+def _estimate_salary_score(player: Player, salary: int, *, team: Optional[Team] = None) -> float:
     desired_salary = int(getattr(player, "desired_salary", 0) or 0)
     current_salary = int(getattr(player, "salary", 0) or 0)
-    baseline = max(300_000, desired_salary, current_salary)
+    baseline = max(_negotiation_salary_baseline_floor(team), desired_salary, current_salary)
     ratio = salary / max(1, baseline)
     score = max(15.0, min(100.0, 52.0 * ratio))
     # 希望年俸を下回るオファーは交渉スコアを下げる（差が大きいほど不満）
@@ -219,9 +236,7 @@ def _calculate_offer(team: Team, player: Player) -> int:
     if payroll_before >= soft_cap:
         return 0
 
-    base = int(getattr(player, "salary", 0))
-    if base <= 0:
-        base = max(int(getattr(player, "ovr", 60)) * 10_000, 300_000)
+    base = int(fa_offer_base_salary(team, player))
 
     surplus = max(0, int(getattr(team, "money", 0)) - base)
     bonus = int(surplus * 0.05)
@@ -289,9 +304,7 @@ def _calculate_offer_diagnostic(team: Team, player: Player) -> Dict[str, Any]:
         snap["room_to_budget"] = None
         return snap
 
-    base = int(getattr(player, "salary", 0))
-    if base <= 0:
-        base = max(int(getattr(player, "ovr", 60)) * 10_000, 300_000)
+    base = int(fa_offer_base_salary(team, player))
     snap["base"] = base
 
     surplus = max(0, int(getattr(team, "money", 0)) - base)
@@ -501,7 +514,7 @@ def _get_coach_fit(team: Team, player: Player) -> float:
 def _offer_score(player: Player, team: Team, salary: int, years: int) -> float:
     profile = _get_fa_profile(player)
 
-    salary_score = _estimate_salary_score(player, salary)
+    salary_score = _estimate_salary_score(player, salary, team=team)
     role_score = _estimate_role_opportunity(team, player)
     winning_score = _estimate_winning_score(team)
 
@@ -752,6 +765,8 @@ def conduct_free_agency(teams: List[Team], free_agents: List[Player]):
                     break
 
                 free_agents.remove(candidate)
+
+                clear_draft_rookie_contract_for_market_entry(candidate)
 
                 candidate.salary = offer
                 candidate.contract_years_left = contract_years
