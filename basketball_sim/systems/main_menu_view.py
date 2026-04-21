@@ -1186,10 +1186,9 @@ class MainMenuView:
         tx = self._roster_transaction_status_text()
         return (
             "【当面の運用】\n"
-            "・選手のみの 1対1 トレードは、本ウィンドウの「1対1トレード（選手のみ）」からも実行できます"
-            "（インシーズンの可否は CLI のトレードと同一ルール）。\n"
-            "・multi は人事の「multi（複数人）」で複数選手＋現金・RB（自分→相手）まで可能（CLI multi と同じ実行経路）。\n"
-            "CLI のトレードメニューからも同様の multi が実行できます（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "・トレードは本ウィンドウの「トレード」から（複数人＋双方向の現金・RB まで。1対1相当は人数1対1で同じウィザードを使えます）。"
+            "インシーズンの可否は CLI のトレードと同一ルールです。\n"
+            "・同じトレードはシーズンメニュー「8. GMメニュー」→「10. トレード」（CLI）からも実行できます。\n"
             "・FA プールからの手動契約は、人事の「インシーズンFA（1人）」で 1 名まで（交渉・金額入力なし）。"
             "レギュラー中の CPU 補強はシーズン進行に連動した自動処理が中心です。\n"
             "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、上記・CLI の案内を担当します。\n"
@@ -1202,7 +1201,7 @@ class MainMenuView:
             "・ロスター表での閲覧、契約の＋1年延長（条件あり）、契約解除による FA 送り（インシーズンは"
             "トレード／インシーズンFA と同じ期限でロック）。\n\n"
             "【まだターミナル（CLI）で行うこと】\n"
-            "・multi は人事で「multi（複数人）」または CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "・トレードは CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）でも実行できます。\n"
             "・レギュラー中のトレード期限切れ後は、CLI のトレードもブロックされます（上部の可否表示と同じルール）。\n\n"
             "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
         )
@@ -1535,7 +1534,7 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 8))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（表で選手選択→解除。1対1／multi（複数人＋現金・RB可）／インシーズンFAは横ボタン）",
+            text="トレード・FA（表で選手選択→解除。「トレード」＋インシーズンFAは横ボタン）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -1543,16 +1542,9 @@ class MainMenuView:
         tf_btn_row.pack(fill="x", anchor="w", pady=(0, 6))
         self._jpn_text_button(
             tf_btn_row,
-            "1対1トレード（選手のみ）",
-            self._on_roster_one_for_one_trade,
-            side="left",
-        )
-        self._jpn_text_button(
-            tf_btn_row,
-            "multi（複数人）",
+            "トレード",
             self._on_roster_multi_trade_players_only,
             side="left",
-            padx=(10, 0),
         )
         self._jpn_text_button(
             tf_btn_row,
@@ -2101,6 +2093,13 @@ class MainMenuView:
         free_agents: List[Any],
     ) -> None:
         from basketball_sim import main as bs_main
+        from basketball_sim.systems.trade_input_helpers import (
+            compose_cash_yen_from_oku_man,
+            max_oku_for_cash,
+            rb_man_choice_values_filtered,
+            rb_yen_from_man,
+            valid_cash_man_values_for_oku,
+        )
         from basketball_sim.systems.trade_logic import (
             TRADE_RB_TRANSFER_MAX_LEG_YEN,
             TRADE_RB_TRANSFER_STEP_YEN,
@@ -2110,14 +2109,14 @@ class MainMenuView:
 
         user_team = self.team
         top = tk.Toplevel(parent)
-        top.title("multi トレード（複数人＋現金・RB）")
+        top.title("トレード（複数人＋現金・RB）")
         top.configure(bg="#15171c")
         try:
             top.transient(parent)
         except Exception:
             pass
-        top.geometry("720x540")
-        top.minsize(560, 460)
+        top.geometry("780x620")
+        top.minsize(620, 500)
 
         outer = ttk.Frame(top, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
@@ -2126,7 +2125,7 @@ class MainMenuView:
             outer,
             text=(
                 "複数選手の入替に加え、現金・RB（ルーキー予算）を方向ごとに指定できます（自分→相手／相手→自分）。"
-                "入力は CLI と同じく整数（カンマ可・空欄は 0）。"
+                "現金は「億」＋「万円」、RB はプルダウン（万の数・CLI と同じ刻み）で入力します。"
                 f"RB は {format_money_yen_ja_readable(TRADE_RB_TRANSFER_STEP_YEN)} 刻み・"
                 f"片道最大 {format_money_yen_ja_readable(TRADE_RB_TRANSFER_MAX_LEG_YEN)}。"
                 "評価・成立は `TradeSystem` の multi 経路です。"
@@ -2205,13 +2204,18 @@ class MainMenuView:
         count_frame.grid_remove()
 
         money_rb_frame = tk.Frame(lb_frame, bg="#222834")
+        _trade_cash_max = {"a": 0, "b": 0}
         tk.Label(
             money_rb_frame,
-            text="各方向の上限は、そのクラブの所持金・RB 残高です（超過はパース時に拒否されます）。",
+            text=(
+                "現金は「億」＋「万円」（万は 0/1000/…/9000 の 1000万円刻み）。"
+                f"RB は万の数で {format_money_yen_ja_readable(TRADE_RB_TRANSFER_STEP_YEN)} 刻み（プルダウン）。"
+                "各方向の上限はクラブの所持金・RB 残高です。"
+            ),
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 9),
-            wraplength=620,
+            wraplength=700,
             justify="left",
         ).pack(anchor="w", padx=8, pady=(8, 6))
         cash_limit_var = tk.StringVar(value="")
@@ -2230,29 +2234,70 @@ class MainMenuView:
         row_cash.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_cash,
-            text="現金（自分→相手）:",
+            text="現金（自分→相手）",
             bg="#222834",
             fg="#e8ecf0",
-            font=("Yu Gothic UI", 10),
-            width=18,
+            font=("Yu Gothic UI", 10, "bold"),
+            width=16,
             anchor="w",
         ).pack(side="left")
-        cash_entry = tk.Entry(
+        cash_a_oku_var = tk.StringVar(value="0")
+        tk.Label(row_cash, text="億", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(
+            side="left", padx=(8, 2)
+        )
+        cash_a_oku_sp = tk.Spinbox(
             row_cash,
-            width=18,
+            from_=0,
+            to=0,
+            width=4,
+            textvariable=cash_a_oku_var,
             font=("Yu Gothic UI", 10),
             bg="#2a3140",
             fg="#e8ecf0",
-            insertbackground="#e8ecf0",
+            buttonbackground="#3d4f6f",
         )
-        cash_entry.pack(side="left", padx=(0, 8))
+        cash_a_oku_sp.pack(side="left", padx=(0, 6))
+        tk.Label(row_cash, text="万円", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(side="left")
+        cash_a_man_cb = ttk.Combobox(
+            row_cash,
+            width=10,
+            state="readonly",
+            font=("Yu Gothic UI", 10),
+            values=("0",),
+        )
+        cash_a_man_cb.set("0")
+        cash_a_man_cb.pack(side="left", padx=(6, 8))
         tk.Label(
             row_cash,
-            text="カンマ可・空欄は0",
+            text="（0/1000/…/9000）",
             bg="#222834",
             fg="#8899aa",
             font=("Yu Gothic UI", 8),
         ).pack(side="left")
+
+        def _sync_cash_a_side(*_args: Any) -> None:
+            max_y = int(_trade_cash_max["a"] or 0)
+            mo = max_oku_for_cash(max_y)
+            try:
+                oku = int(float(str(cash_a_oku_var.get()).strip() or "0"))
+            except (TypeError, ValueError):
+                oku = 0
+            oku = max(0, min(oku, mo))
+            if str(oku) != str(cash_a_oku_var.get()).strip():
+                cash_a_oku_var.set(str(oku))
+                return
+            cash_a_oku_sp.config(from_=0, to=mo)
+            ch = valid_cash_man_values_for_oku(max_y, oku)
+            vals = [str(x) for x in ch]
+            cash_a_man_cb["values"] = tuple(vals)
+            cur = str(cash_a_man_cb.get()).strip()
+            if cur not in vals and vals:
+                cash_a_man_cb.set(vals[0])
+
+        cash_a_oku_var.trace_add("write", lambda *_a: _sync_cash_a_side())
+        cash_a_oku_sp.bind("<FocusOut>", _sync_cash_a_side)
+        cash_a_oku_sp.bind("<ButtonRelease-1>", _sync_cash_a_side)
+
         tk.Label(
             money_rb_frame,
             textvariable=cash_b_limit_var,
@@ -2265,29 +2310,70 @@ class MainMenuView:
         row_cash_b.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_cash_b,
-            text="現金（相手→自分）:",
+            text="現金（相手→自分）",
             bg="#222834",
             fg="#e8ecf0",
-            font=("Yu Gothic UI", 10),
-            width=18,
+            font=("Yu Gothic UI", 10, "bold"),
+            width=16,
             anchor="w",
         ).pack(side="left")
-        cash_b_entry = tk.Entry(
+        cash_b_oku_var = tk.StringVar(value="0")
+        tk.Label(row_cash_b, text="億", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(
+            side="left", padx=(8, 2)
+        )
+        cash_b_oku_sp = tk.Spinbox(
             row_cash_b,
-            width=18,
+            from_=0,
+            to=0,
+            width=4,
+            textvariable=cash_b_oku_var,
             font=("Yu Gothic UI", 10),
             bg="#2a3140",
             fg="#e8ecf0",
-            insertbackground="#e8ecf0",
+            buttonbackground="#3d4f6f",
         )
-        cash_b_entry.pack(side="left", padx=(0, 8))
+        cash_b_oku_sp.pack(side="left", padx=(0, 6))
+        tk.Label(row_cash_b, text="万円", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(side="left")
+        cash_b_man_cb = ttk.Combobox(
+            row_cash_b,
+            width=10,
+            state="readonly",
+            font=("Yu Gothic UI", 10),
+            values=("0",),
+        )
+        cash_b_man_cb.set("0")
+        cash_b_man_cb.pack(side="left", padx=(6, 8))
         tk.Label(
             row_cash_b,
-            text="カンマ可・空欄は0",
+            text="（0/1000/…/9000）",
             bg="#222834",
             fg="#8899aa",
             font=("Yu Gothic UI", 8),
         ).pack(side="left")
+
+        def _sync_cash_b_side(*_args: Any) -> None:
+            max_y = int(_trade_cash_max["b"] or 0)
+            mo = max_oku_for_cash(max_y)
+            try:
+                oku = int(float(str(cash_b_oku_var.get()).strip() or "0"))
+            except (TypeError, ValueError):
+                oku = 0
+            oku = max(0, min(oku, mo))
+            if str(oku) != str(cash_b_oku_var.get()).strip():
+                cash_b_oku_var.set(str(oku))
+                return
+            cash_b_oku_sp.config(from_=0, to=mo)
+            ch = valid_cash_man_values_for_oku(max_y, oku)
+            vals = [str(x) for x in ch]
+            cash_b_man_cb["values"] = tuple(vals)
+            cur = str(cash_b_man_cb.get()).strip()
+            if cur not in vals and vals:
+                cash_b_man_cb.set(vals[0])
+
+        cash_b_oku_var.trace_add("write", lambda *_a: _sync_cash_b_side())
+        cash_b_oku_sp.bind("<FocusOut>", _sync_cash_b_side)
+        cash_b_oku_sp.bind("<ButtonRelease-1>", _sync_cash_b_side)
+
         tk.Label(
             money_rb_frame,
             textvariable=rb_limit_var,
@@ -2300,29 +2386,30 @@ class MainMenuView:
         row_rb.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_rb,
-            text="RB（自分→相手）:",
+            text="RB（自分→相手） 万の数",
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 10),
-            width=18,
+            width=22,
             anchor="w",
         ).pack(side="left")
-        rb_entry = tk.Entry(
+        rb_a_cb = ttk.Combobox(
             row_rb,
-            width=18,
+            width=12,
+            state="readonly",
             font=("Yu Gothic UI", 10),
-            bg="#2a3140",
-            fg="#e8ecf0",
-            insertbackground="#e8ecf0",
+            values=("0",),
         )
-        rb_entry.pack(side="left", padx=(0, 8))
+        rb_a_cb.set("0")
+        rb_a_cb.pack(side="left", padx=(0, 8))
         tk.Label(
             row_rb,
-            text="空欄は0",
+            text="（500万円刻み）",
             bg="#222834",
             fg="#8899aa",
             font=("Yu Gothic UI", 8),
         ).pack(side="left")
+
         tk.Label(
             money_rb_frame,
             textvariable=rb_b_limit_var,
@@ -2335,29 +2422,38 @@ class MainMenuView:
         row_rb_b.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_rb_b,
-            text="RB（相手→自分）:",
+            text="RB（相手→自分） 万の数",
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 10),
-            width=18,
+            width=22,
             anchor="w",
         ).pack(side="left")
-        rb_b_entry = tk.Entry(
+        rb_b_cb = ttk.Combobox(
             row_rb_b,
-            width=18,
+            width=12,
+            state="readonly",
             font=("Yu Gothic UI", 10),
-            bg="#2a3140",
-            fg="#e8ecf0",
-            insertbackground="#e8ecf0",
+            values=("0",),
         )
-        rb_b_entry.pack(side="left", padx=(0, 8))
+        rb_b_cb.set("0")
+        rb_b_cb.pack(side="left", padx=(0, 8))
         tk.Label(
             row_rb_b,
-            text="空欄は0",
+            text="（500万円刻み）",
             bg="#222834",
             fg="#8899aa",
             font=("Yu Gothic UI", 8),
         ).pack(side="left")
+
+        def _rebuild_rb_combo(cb: ttk.Combobox, max_rb_yen: int) -> None:
+            mans = rb_man_choice_values_filtered(max_rb_yen)
+            vals = tuple(str(m) for m in mans)
+            cb["values"] = vals
+            cur = str(cb.get()).strip()
+            if cur not in vals and vals:
+                cb.set(vals[0])
+
         money_rb_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
         money_rb_frame.grid_remove()
 
@@ -2606,22 +2702,28 @@ class MainMenuView:
                 max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
                 max_cash_b = max(0, int(getattr(at, "money", 0) or 0))
                 max_rb_b = max(0, int(getattr(at, "rookie_budget_remaining", 0) or 0))
+                _trade_cash_max["a"] = max_cash
+                _trade_cash_max["b"] = max_cash_b
                 cash_limit_var.set(
-                    f"自分側 現金上限: 0〜{format_money_yen_ja_readable(max_cash)}（空欄は送金なし）"
+                    f"自分側 現金上限: 0〜{format_money_yen_ja_readable(max_cash)}"
                 )
                 cash_b_limit_var.set(
                     f"相手側 現金上限: 0〜{format_money_yen_ja_readable(max_cash_b)}（相手→自分）"
                 )
-                rb_limit_var.set(f"自分側 RB 上限: 0〜{format_money_yen_ja_readable(max_rb)}（空欄は移転なし）")
+                rb_limit_var.set(f"自分側 RB 上限: 0〜{format_money_yen_ja_readable(max_rb)}")
                 rb_b_limit_var.set(f"相手側 RB 上限: 0〜{format_money_yen_ja_readable(max_rb_b)}（相手→自分）")
-                cash_entry.delete(0, tk.END)
-                cash_b_entry.delete(0, tk.END)
-                rb_entry.delete(0, tk.END)
-                rb_b_entry.delete(0, tk.END)
+                cash_a_oku_var.set("0")
+                cash_b_oku_var.set("0")
+                _sync_cash_a_side()
+                _sync_cash_b_side()
+                _rebuild_rb_combo(rb_a_cb, max_rb)
+                _rebuild_rb_combo(rb_b_cb, max_rb_b)
+                rb_a_cb.set("0")
+                rb_b_cb.set("0")
                 state["step"] = 4
                 set_center_pane("cash_rb")
                 hint_var.set(
-                    "4 つの欄に現金・RB を入力し、「評価する」を押してください（空欄は 0）。"
+                    "現金は億＋万円、RB はプルダウン（万の数）で指定し、「評価する」を押してください。"
                 )
                 next_caption_var.set("評価する")
                 return
@@ -2631,32 +2733,60 @@ class MainMenuView:
                 max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
                 max_cash_b = max(0, int(getattr(at, "money", 0) or 0))
                 max_rb_b = max(0, int(getattr(at, "rookie_budget_remaining", 0) or 0))
+                try:
+                    oku_a = int(float(str(cash_a_oku_var.get()).strip() or "0"))
+                except (TypeError, ValueError):
+                    oku_a = 0
+                try:
+                    man_a = int(float(str(cash_a_man_cb.get()).strip() or "0"))
+                except (TypeError, ValueError):
+                    man_a = 0
+                yen_a = compose_cash_yen_from_oku_man(oku_a, man_a)
                 ok_c, cash_v, msg_c = bs_main.parse_multi_trade_side_payment(
-                    cash_entry.get(),
+                    str(yen_a),
                     max_cash,
                     is_cash=True,
                 )
                 if not ok_c:
                     messagebox.showwarning("トレード", msg_c, parent=top)
                     return
+                try:
+                    oku_b = int(float(str(cash_b_oku_var.get()).strip() or "0"))
+                except (TypeError, ValueError):
+                    oku_b = 0
+                try:
+                    man_b = int(float(str(cash_b_man_cb.get()).strip() or "0"))
+                except (TypeError, ValueError):
+                    man_b = 0
+                yen_b = compose_cash_yen_from_oku_man(oku_b, man_b)
                 ok_cb, cash_b_v, msg_cb = bs_main.parse_multi_trade_side_payment(
-                    cash_b_entry.get(),
+                    str(yen_b),
                     max_cash_b,
                     is_cash=True,
                 )
                 if not ok_cb:
                     messagebox.showwarning("トレード", msg_cb, parent=top)
                     return
+                try:
+                    rb_man_a = int(float(str(rb_a_cb.get()).strip() or "0"))
+                except (TypeError, ValueError):
+                    rb_man_a = 0
+                yen_rb_a = rb_yen_from_man(rb_man_a)
                 ok_r, rb_v, msg_r = bs_main.parse_multi_trade_side_payment(
-                    rb_entry.get(),
+                    str(yen_rb_a),
                     max_rb,
                     is_cash=False,
                 )
                 if not ok_r:
                     messagebox.showwarning("トレード", msg_r, parent=top)
                     return
+                try:
+                    rb_man_b = int(float(str(rb_b_cb.get()).strip() or "0"))
+                except (TypeError, ValueError):
+                    rb_man_b = 0
+                yen_rb_b = rb_yen_from_man(rb_man_b)
                 ok_rb, rb_b_v, msg_rb = bs_main.parse_multi_trade_side_payment(
-                    rb_b_entry.get(),
+                    str(yen_rb_b),
                     max_rb_b,
                     is_cash=False,
                 )
@@ -3140,7 +3270,7 @@ class MainMenuView:
             "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
             "【今できる操作（人事画面）】閲覧。＋1年延長（年俸据え置き・残年数が 1 年以上かつ"
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
-            "【トレード】1対1・multi（複数人・現金・RB）はウィンドウ上部のボタンから。"
+            "【トレード】ウィンドウ上部の「トレード」から（複数人・双方向の現金・RB 可。1対1相当は人数1対1で指定）。"
             " CLI からも同様のトレードメニューで実行できます（「8. GMメニュー」→「10. トレード」）。"
             "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
             "期限はトレードと同じルールです（上部の案内を参照）。\n"
