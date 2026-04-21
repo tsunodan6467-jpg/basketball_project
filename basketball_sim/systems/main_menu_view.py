@@ -4602,9 +4602,8 @@ class MainMenuView:
         ttk.Label(
             nav,
             text=(
-                "【構成】左＝クイック（Team.strategy / HC / Team.usage_policy）。"
-                "上のボタン＝詳細（team_tactics・各サブ画面で保存）。"
-                "右＝チームに保存する先発・6th・ベンチ（上部「ローテ詳細」の先発マップとは別データです）。"
+                "【この画面】上のボタンから team_tactics の各詳細を開き、サブ画面で保存します。"
+                "下段は現在の Team 状態の確認のみです（基本三本柱・スタメンの編集UIはこのハブでは表示していません）。"
             ),
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
@@ -4706,13 +4705,13 @@ class MainMenuView:
         notes_panel = ttk.Frame(content, style="Panel.TFrame", padding=12)
         notes_panel.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
-        ttk.Label(strategy_panel, text="チーム概要とクイック設定", style="SectionTitle.TLabel").pack(
+        ttk.Label(strategy_panel, text="チーム概要（参照のみ）", style="SectionTitle.TLabel").pack(
             anchor="w", pady=(0, 8)
         )
-        ttk.Label(lineup_panel, text="スタメン・控え状況", style="SectionTitle.TLabel").pack(
+        ttk.Label(lineup_panel, text="スタメン・控え（参照のみ）", style="SectionTitle.TLabel").pack(
             anchor="w", pady=(0, 8)
         )
-        ttk.Label(notes_panel, text="補足", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Label(notes_panel, text="案内", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 8))
 
         self.strategy_lines = []
         for _ in range(6):
@@ -4733,77 +4732,13 @@ class MainMenuView:
         ttk.Separator(strategy_panel, orient="horizontal").pack(fill="x", pady=(12, 8))
         ttk.Label(
             strategy_panel,
-            text="クイック基本方針（保存）",
-            style="SectionTitle.TLabel",
-        ).pack(anchor="w", pady=(0, 4))
-        ttk.Label(
-            strategy_panel,
             text=(
-                "Team.strategy・coach_style・Team.usage_policy をここでまとめて反映します。"
-                "上部ボタンと同じ設定ではありません（上部は team_tactics の詳細です）。"
+                "Team.strategy / coach_style / Team.usage_policy の変更は、このハブでは行いません。"
+                "上段の「攻守詳細」など team_tactics の各画面で編集できる項目と別物です。"
             ),
             font=("Yu Gothic UI", 9),
+            wraplength=440,
         ).pack(anchor="w", pady=(0, 6))
-
-        self._gm_label_to_key_strategy = {lab: k for k, lab in STRATEGY_OPTIONS}
-        self._gm_label_to_key_coach = {lab: k for k, lab in COACH_STYLE_OPTIONS}
-        self._gm_label_to_key_usage = {lab: k for k, lab in USAGE_POLICY_OPTIONS}
-
-        pol_grid = ttk.Frame(strategy_panel, style="Panel.TFrame", padding=(0, 2))
-        pol_grid.pack(fill="x", pady=(0, 4))
-        pol_grid.columnconfigure(1, weight=1)
-
-        self._strat_combo_strategy = ttk.Combobox(
-            pol_grid,
-            state="readonly",
-            width=28,
-            values=[lab for _, lab in STRATEGY_OPTIONS],
-        )
-        self._strat_combo_coach = ttk.Combobox(
-            pol_grid,
-            state="readonly",
-            width=28,
-            values=[lab for _, lab in COACH_STYLE_OPTIONS],
-        )
-        self._strat_combo_usage = ttk.Combobox(
-            pol_grid,
-            state="readonly",
-            width=28,
-            values=[lab for _, lab in USAGE_POLICY_OPTIONS],
-        )
-        ttk.Label(pol_grid, text="基本戦術", font=("Yu Gothic UI", 9)).grid(row=0, column=0, sticky="w", pady=4)
-        self._strat_combo_strategy.grid(row=0, column=1, sticky="ew", pady=4, padx=(10, 0))
-        ttk.Label(pol_grid, text="HCスタイル", font=("Yu Gothic UI", 9)).grid(row=1, column=0, sticky="w", pady=4)
-        self._strat_combo_coach.grid(row=1, column=1, sticky="ew", pady=4, padx=(10, 0))
-        self._strat_combo_coach.bind("<<ComboboxSelected>>", self._on_strat_coach_selection_changed)
-        ttk.Label(pol_grid, text="基本起用", font=("Yu Gothic UI", 9)).grid(row=2, column=0, sticky="w", pady=4)
-        self._strat_combo_usage.grid(row=2, column=1, sticky="ew", pady=4, padx=(10, 0))
-
-        ttk.Label(
-            strategy_panel,
-            text="HC変更時の強化メニュー解放プレビュー（現在のHCと比較）",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(8, 4))
-        self._strat_coach_preview_text = tk.Text(
-            strategy_panel,
-            wrap="word",
-            bg="#222834",
-            fg="#e8ecf0",
-            insertbackground="#e8ecf0",
-            font=("Consolas", 10),
-            relief="flat",
-            height=7,
-            padx=10,
-            pady=8,
-        )
-        self._strat_coach_preview_text.pack(fill="x", pady=(0, 6))
-
-        ttk.Button(
-            strategy_panel,
-            text="基本方針を反映",
-            style="Primary.TButton",
-            command=lambda: self._on_apply_strat_team_policy(_strat_parent()),
-        ).pack(anchor="w", pady=(2, 0))
 
         self.lineup_lines = []
         for _ in range(10):
@@ -4851,100 +4786,13 @@ class MainMenuView:
 
         ttk.Label(
             lineup_panel,
-            text="起用の編集（Team の先発・6th・ベンチ）",
-            style="SectionTitle.TLabel",
-        ).pack(anchor="w", pady=(0, 6))
-        ttk.Label(
-            lineup_panel,
             text=(
-                "先発はポジ枠ごとに1人ずつ差し替え。6th・ベンチは控えの序列を変更できます。"
-                "ここで保存する先発は Team 側です。上部「ローテ詳細」の先発マップ（team_tactics.rotation）とは別系統です。"
+                "Team の先発・6th・ベンチの変更は、このハブでは行いません。"
+                "上段「ローテ詳細」「起用テンプレ」は team_tactics 側です（Team の起用手順とは別データ）。"
             ),
             font=("Yu Gothic UI", 9),
+            wraplength=440,
         ).pack(anchor="w", pady=(0, 6))
-
-        self._strat_candidate_players: List[Any] = []
-        self._strat_sixth_candidate_players: List[Any] = []
-        self._strat_bench_players: List[Any] = []
-
-        slot_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 4))
-        slot_row.pack(fill="x", pady=(0, 4))
-        ttk.Label(slot_row, text="差し替え枠", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
-        self._strat_combo_lineup_slot = ttk.Combobox(
-            slot_row,
-            state="readonly",
-            width=10,
-            values=list(self._LINEUP_SLOT_LABELS),
-        )
-        self._strat_combo_lineup_slot.pack(side="left", padx=(0, 10))
-        self._strat_combo_lineup_slot.bind(
-            "<<ComboboxSelected>>",
-            lambda _e: self._sync_strat_lineup_candidates(),
-        )
-        ttk.Label(slot_row, text="候補", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
-        self._strat_combo_lineup_candidate = ttk.Combobox(
-            slot_row,
-            state="readonly",
-            width=42,
-        )
-        self._strat_combo_lineup_candidate.pack(side="left", padx=(0, 10))
-        self._strat_btn_apply_lineup = ttk.Button(
-            slot_row,
-            text="反映（確認）",
-            style="Primary.TButton",
-            command=lambda: self._on_apply_strat_starting_slot(_strat_parent()),
-        )
-        self._strat_btn_apply_lineup.pack(side="left")
-
-        sixth_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 4))
-        sixth_row.pack(fill="x", pady=(0, 4))
-        ttk.Label(sixth_row, text="6thマン", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
-        self._strat_combo_sixth = ttk.Combobox(sixth_row, state="readonly", width=44)
-        self._strat_combo_sixth.pack(side="left", padx=(0, 10))
-        self._strat_btn_apply_sixth = ttk.Button(
-            sixth_row,
-            text="6thを反映（確認）",
-            style="Primary.TButton",
-            command=lambda: self._on_apply_strat_sixth_man(_strat_parent()),
-        )
-        self._strat_btn_apply_sixth.pack(side="left", padx=(0, 8))
-        ttk.Button(
-            sixth_row,
-            text="自動6thに戻す（確認）",
-            style="Menu.TButton",
-            command=lambda: self._on_reset_sixth_man_gui(_strat_parent()),
-        ).pack(side="left")
-
-        bench_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 4))
-        bench_row.pack(fill="x", pady=(0, 4))
-        ttk.Label(bench_row, text="ベンチ入替", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
-        self._strat_combo_bench_a = ttk.Combobox(bench_row, state="readonly", width=28)
-        self._strat_combo_bench_a.pack(side="left", padx=(0, 6))
-        ttk.Label(bench_row, text="⇔", font=("Yu Gothic UI", 9)).pack(side="left", padx=4)
-        self._strat_combo_bench_b = ttk.Combobox(bench_row, state="readonly", width=28)
-        self._strat_combo_bench_b.pack(side="left", padx=(0, 10))
-        self._strat_btn_bench_swap = ttk.Button(
-            bench_row,
-            text="入替（確認）",
-            style="Primary.TButton",
-            command=lambda: self._on_apply_strat_bench_swap(_strat_parent()),
-        )
-        self._strat_btn_bench_swap.pack(side="left", padx=(0, 8))
-        ttk.Button(
-            bench_row,
-            text="自動ベンチに戻す（確認）",
-            style="Menu.TButton",
-            command=lambda: self._on_reset_bench_order_gui(_strat_parent()),
-        ).pack(side="left")
-
-        reset_row = ttk.Frame(lineup_panel, style="Panel.TFrame", padding=(0, 6))
-        reset_row.pack(fill="x", pady=(0, 4))
-        ttk.Button(
-            reset_row,
-            text="自動スタメンに戻す（確認）",
-            style="Menu.TButton",
-            command=lambda: self._on_reset_starting_lineup_gui(_strat_parent()),
-        ).pack(side="left")
 
         tk.Label(
             notes_panel,
@@ -5022,7 +4870,7 @@ class MainMenuView:
         sixth_man = self._get_sixth_man_player()
         bench_order = self._get_bench_order_players()
 
-        self.strategy_header_var.set(f"{self._team_name()} 戦術メニュー（概要）")
+        self.strategy_header_var.set(f"{self._team_name()} 戦術メニュー（詳細ハブ）")
 
         strategy_lines = [
             f"基本戦術 (Team.strategy): {strategy_text}",
@@ -5030,7 +4878,7 @@ class MainMenuView:
             f"基本起用 (Team.usage_policy): {usage_text}",
             f"ロスター人数: {len(list(self._safe_get(self.team, 'players', []) or []))}",
             f"先発人数: {len(starters)} / ベンチ序列人数: {len(bench_order)}",
-            "詳細 (team_tactics): 上のボタンで各サブ画面を開き保存。試合で参照される項目と参照が限定的な項目が混在します。",
+            "詳細 (team_tactics): 上のボタンのみから編集。試合で参照される項目と参照が限定的な項目が混在します。",
         ]
         for var, line in zip(self.strategy_lines, strategy_lines):
             var.set(line)
@@ -5060,9 +4908,9 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "左の「クイック基本方針」はチーム全体の手早い設定（Team.strategy / coach_style / Team.usage_policy）。"
-            "上段ボタンは team_tactics の詳細（攻守詳細・ローテ詳細・起用テンプレなど。試合で参照されるキーは限定的です）。"
-            "右の先発・6th・ベンチは Team に保存します。上部「ローテ詳細」の先発マップとは別データです。"
+            "このハブは上段ボタンから team_tactics の各詳細を開くための画面です。"
+            "左右の一覧は Team の現在値の確認のみです（編集UIは表示していません）。"
+            "試合で参照される team_tactics のキーは限定的です。"
         )
 
         jp_blk = getattr(self, "strat_jp_block_var", None)
@@ -8103,7 +7951,7 @@ class MainMenuView:
             "ウィンドウ下のボタンはターミナル（CLI）へのショートカットです。\n\n"
             "先発・6th・ベンチの編集は左メニュー「戦術」（起用の編集）。"
             "当窓の「スタメン・ベンチ」は参照のみです。"
-            "戦術・HC・起用の編集は左メニュー「戦術」（クイック基本方針）。"
+            "戦術メニューでは上段の詳細ボタンから team_tactics を編集します（Team 三本柱の編集UIは省略）。"
             "当窓の「戦術・HC・起用」は参照のみです。"
             "サラリーキャップの数値は左メニュー「経営」の「財務サマリー」下部。当窓の「サラリーキャップ」は案内のみです。"
             "チーム属性は左メニュー「情報」の「概要」上部。当窓の「チーム情報」は案内のみです。"
@@ -8188,7 +8036,7 @@ class MainMenuView:
         ct = self.COACH_STYLE_LABELS.get(str(ck), str(ck))
         ut = self.USAGE_POLICY_LABELS.get(str(uk), str(uk))
         lines = [
-            "編集は左メニュー「戦術」ウィンドウの左パネル「クイック基本方針」から行ってください。",
+            "編集は左メニュー「戦術」ウィンドウの上段ボタン（各詳細）から行ってください。",
             "",
             f"基本戦術 (Team.strategy): {st}",
             f"HCスタイル: {ct}",
@@ -9190,7 +9038,7 @@ class MainMenuView:
         notice_st.grid(row=0, column=0, sticky="ew")
         ttk.Label(
             notice_st,
-            text="戦術・HCスタイル・起用の編集は、左メニュー「戦術」を開き、左パネル「クイック基本方針」から行ってください。",
+            text="戦術メニューでは上段の詳細ボタンから team_tactics を編集してください（Team 三本柱の編集UIは当該画面から外しています）。",
             wraplength=820,
             font=("Yu Gothic UI", 10),
         ).pack(anchor="w")
