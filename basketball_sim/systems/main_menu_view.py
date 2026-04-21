@@ -4601,7 +4601,11 @@ class MainMenuView:
         nav.pack(fill="x")
         ttk.Label(
             nav,
-            text="戦術設定（各画面で保存）。左パネルで戦術・HC・起用方針。右パネルで先発・6th・ベンチ。",
+            text=(
+                "【構成】左＝クイック（Team.strategy / HC / Team.usage_policy）。"
+                "上のボタン＝詳細（team_tactics・各サブ画面で保存）。"
+                "右＝チームに保存する先発・6th・ベンチ（上部「ローテーション管理」の先発マップとは別データです）。"
+            ),
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
         row_a = ttk.Frame(nav, style="Panel.TFrame")
@@ -4702,7 +4706,9 @@ class MainMenuView:
         notes_panel = ttk.Frame(content, style="Panel.TFrame", padding=12)
         notes_panel.grid(row=1, column=0, columnspan=2, sticky="nsew")
 
-        ttk.Label(strategy_panel, text="戦術設定", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Label(strategy_panel, text="チーム概要とクイック設定", style="SectionTitle.TLabel").pack(
+            anchor="w", pady=(0, 8)
+        )
         ttk.Label(lineup_panel, text="起用状況", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 8))
         ttk.Label(notes_panel, text="補足", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 8))
 
@@ -4730,7 +4736,10 @@ class MainMenuView:
         ).pack(anchor="w", pady=(0, 4))
         ttk.Label(
             strategy_panel,
-            text="Team.strategy・coach_style・usage_policy をまとめて反映します。",
+            text=(
+                "Team.strategy・coach_style・Team.usage_policy をここでまとめて反映します。"
+                "上部ボタンと同じ設定ではありません（上部は team_tactics の詳細です）。"
+            ),
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 6))
 
@@ -4840,12 +4849,15 @@ class MainMenuView:
 
         ttk.Label(
             lineup_panel,
-            text="起用の編集（試合に反映）",
+            text="起用の編集（Team の先発・6th・ベンチ）",
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
         ttk.Label(
             lineup_panel,
-            text="先発はポジ枠ごとに1人ずつ差し替え。6th・ベンチは控えの序列を変更できます。",
+            text=(
+                "先発はポジ枠ごとに1人ずつ差し替え。6th・ベンチは控えの序列を変更できます。"
+                "ここで保存する先発は Team 側です。上部「ローテーション管理」の先発マップ（team_tactics.rotation）とは別系統です。"
+            ),
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 6))
 
@@ -5016,7 +5028,7 @@ class MainMenuView:
             f"起用方針 (Team.usage_policy): {usage_text}",
             f"ロスター人数: {len(list(self._safe_get(self.team, 'players', []) or []))}",
             f"先発人数: {len(starters)} / ベンチ序列人数: {len(bench_order)}",
-            "詳細戦術 (team_tactics): 上のボタンから編集・保存（Phase A は試合未連携）",
+            "詳細 (team_tactics): 上のボタンで各サブ画面を開き保存。試合で参照される項目と参照が限定的な項目が混在します。",
         ]
         for var, line in zip(self.strategy_lines, strategy_lines):
             var.set(line)
@@ -5046,9 +5058,9 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "左パネル「試合に効く基本方針」で戦術・HC・起用方針を変更できます。"
-            "右パネル「起用の編集」で先発・6th・ベンチを変更できます。"
-            "上段ボタンから team_tactics の細かい設定（Phase A は試合未連携）。"
+            "左の「基本方針」はチーム全体の手早い設定（Team.strategy / coach_style / Team.usage_policy）。"
+            "上段ボタンは team_tactics の詳細（攻守の細部・ローテ・別枠の起用細部など。試合で参照されるキーは限定的です）。"
+            "右の先発・6th・ベンチは Team に保存します。上部「ローテーション管理」の先発マップとは別データです。"
         )
 
         jp_blk = getattr(self, "strat_jp_block_var", None)
@@ -5245,9 +5257,11 @@ class MainMenuView:
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
         wrap.pack(fill="both", expand=True)
 
-        ttk.Label(wrap, text="先発（ポジション別・Phase A は team_tactics のみ保存）", font=("Yu Gothic UI", 10, "bold")).pack(
-            anchor="w"
-        )
+        ttk.Label(
+            wrap,
+            text="先発（ポジション別・team_tactics.rotation へ保存。本ハブ右パネルの Team 先発とは別）",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(anchor="w")
         starter_combos: Dict[str, ttk.Combobox] = {}
         starters_state = rot.get("starters") or {}
         for pos in STARTER_POSITIONS:
@@ -5269,7 +5283,7 @@ class MainMenuView:
 
         ttk.Label(
             wrap,
-            text="控え順: Phase A では一覧編集は未実装（保存時は既存の team_tactics の値を維持）",
+            text="控え順: 一覧からの編集は未実装です（保存時は既存の team_tactics.rotation の値を維持します）",
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
         ).pack(anchor="w", pady=(6, 0))
