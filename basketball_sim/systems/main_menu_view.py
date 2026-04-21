@@ -2101,7 +2101,12 @@ class MainMenuView:
         free_agents: List[Any],
     ) -> None:
         from basketball_sim import main as bs_main
-        from basketball_sim.systems.trade_logic import MultiTradeOffer, TradeSystem
+        from basketball_sim.systems.trade_logic import (
+            TRADE_RB_TRANSFER_MAX_LEG_YEN,
+            TRADE_RB_TRANSFER_STEP_YEN,
+            MultiTradeOffer,
+            TradeSystem,
+        )
 
         user_team = self.team
         top = tk.Toplevel(parent)
@@ -2111,8 +2116,8 @@ class MainMenuView:
             top.transient(parent)
         except Exception:
             pass
-        top.geometry("640x480")
-        top.minsize(520, 400)
+        top.geometry("720x540")
+        top.minsize(560, 460)
 
         outer = ttk.Frame(top, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
@@ -2120,10 +2125,13 @@ class MainMenuView:
         ttk.Label(
             outer,
             text=(
-                "複数選手の入替に加え、自分→相手への現金・RB（ルーキー予算）移転を指定できます。"
-                "評価・成立は `TradeSystem` の multi 経路（CLI のトレード提案と同系）です。"
+                "複数選手の入替に加え、現金・RB（ルーキー予算）を方向ごとに指定できます（自分→相手／相手→自分）。"
+                "入力は CLI と同じく整数（カンマ可・空欄は 0）。"
+                f"RB は {format_money_yen_ja_readable(TRADE_RB_TRANSFER_STEP_YEN)} 刻み・"
+                f"片道最大 {format_money_yen_ja_readable(TRADE_RB_TRANSFER_MAX_LEG_YEN)}。"
+                "評価・成立は `TradeSystem` の multi 経路です。"
             ),
-            wraplength=600,
+            wraplength=640,
             font=("Yu Gothic UI", 9),
         ).pack(fill="x", pady=(0, 8))
 
@@ -2199,15 +2207,17 @@ class MainMenuView:
         money_rb_frame = tk.Frame(lb_frame, bg="#222834")
         tk.Label(
             money_rb_frame,
-            text="現金・RB はいずれも「自分のクラブ → 相手クラブ」への移転です（CLI STEP 5/6 と同趣旨）。",
+            text="各方向の上限は、そのクラブの所持金・RB 残高です（超過はパース時に拒否されます）。",
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 9),
-            wraplength=560,
+            wraplength=620,
             justify="left",
-        ).pack(anchor="w", padx=8, pady=(8, 10))
+        ).pack(anchor="w", padx=8, pady=(8, 6))
         cash_limit_var = tk.StringVar(value="")
+        cash_b_limit_var = tk.StringVar(value="")
         rb_limit_var = tk.StringVar(value="")
+        rb_b_limit_var = tk.StringVar(value="")
         tk.Label(
             money_rb_frame,
             textvariable=cash_limit_var,
@@ -2215,16 +2225,16 @@ class MainMenuView:
             fg="#c8d0dc",
             font=("Yu Gothic UI", 9),
             anchor="w",
-        ).pack(fill="x", padx=8, pady=(0, 4))
+        ).pack(fill="x", padx=8, pady=(0, 2))
         row_cash = tk.Frame(money_rb_frame, bg="#222834")
         row_cash.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_cash,
-            text="現金（円）:",
+            text="現金（自分→相手）:",
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 10),
-            width=14,
+            width=18,
             anchor="w",
         ).pack(side="left")
         cash_entry = tk.Entry(
@@ -2245,21 +2255,56 @@ class MainMenuView:
         ).pack(side="left")
         tk.Label(
             money_rb_frame,
+            textvariable=cash_b_limit_var,
+            bg="#222834",
+            fg="#c8d0dc",
+            font=("Yu Gothic UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(6, 2))
+        row_cash_b = tk.Frame(money_rb_frame, bg="#222834")
+        row_cash_b.pack(fill="x", padx=8, pady=4)
+        tk.Label(
+            row_cash_b,
+            text="現金（相手→自分）:",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+            width=18,
+            anchor="w",
+        ).pack(side="left")
+        cash_b_entry = tk.Entry(
+            row_cash_b,
+            width=18,
+            font=("Yu Gothic UI", 10),
+            bg="#2a3140",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+        )
+        cash_b_entry.pack(side="left", padx=(0, 8))
+        tk.Label(
+            row_cash_b,
+            text="カンマ可・空欄は0",
+            bg="#222834",
+            fg="#8899aa",
+            font=("Yu Gothic UI", 8),
+        ).pack(side="left")
+        tk.Label(
+            money_rb_frame,
             textvariable=rb_limit_var,
             bg="#222834",
             fg="#c8d0dc",
             font=("Yu Gothic UI", 9),
             anchor="w",
-        ).pack(fill="x", padx=8, pady=(8, 4))
+        ).pack(fill="x", padx=8, pady=(8, 2))
         row_rb = tk.Frame(money_rb_frame, bg="#222834")
         row_rb.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_rb,
-            text="RB 移転:",
+            text="RB（自分→相手）:",
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 10),
-            width=14,
+            width=18,
             anchor="w",
         ).pack(side="left")
         rb_entry = tk.Entry(
@@ -2278,6 +2323,41 @@ class MainMenuView:
             fg="#8899aa",
             font=("Yu Gothic UI", 8),
         ).pack(side="left")
+        tk.Label(
+            money_rb_frame,
+            textvariable=rb_b_limit_var,
+            bg="#222834",
+            fg="#c8d0dc",
+            font=("Yu Gothic UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(6, 2))
+        row_rb_b = tk.Frame(money_rb_frame, bg="#222834")
+        row_rb_b.pack(fill="x", padx=8, pady=4)
+        tk.Label(
+            row_rb_b,
+            text="RB（相手→自分）:",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+            width=18,
+            anchor="w",
+        ).pack(side="left")
+        rb_b_entry = tk.Entry(
+            row_rb_b,
+            width=18,
+            font=("Yu Gothic UI", 10),
+            bg="#2a3140",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+        )
+        rb_b_entry.pack(side="left", padx=(0, 8))
+        tk.Label(
+            row_rb_b,
+            text="空欄は0",
+            bg="#222834",
+            fg="#8899aa",
+            font=("Yu Gothic UI", 8),
+        ).pack(side="left")
         money_rb_frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
         money_rb_frame.grid_remove()
 
@@ -2289,7 +2369,9 @@ class MainMenuView:
             "ai_receives": [],
             "user_gives": [],
             "cash_a_to_b": 0,
+            "cash_b_to_a": 0,
             "rookie_budget_a_to_b": 0,
+            "rookie_budget_b_to_a": 0,
             "items": [],
             "player_source": [],
         }
@@ -2372,12 +2454,16 @@ class MainMenuView:
             user_gives: List[Any] = list(state["user_gives"])
             ai_receives: List[Any] = list(state["ai_receives"])
             cash_amt = int(state.get("cash_a_to_b", 0) or 0)
+            cash_b_amt = int(state.get("cash_b_to_a", 0) or 0)
             rb_amt = int(state.get("rookie_budget_a_to_b", 0) or 0)
+            rb_b_amt = int(state.get("rookie_budget_b_to_a", 0) or 0)
             offer = MultiTradeOffer(
                 team_a_gives_players=user_gives,
                 team_a_receives_players=ai_receives,
                 cash_a_to_b=cash_amt,
+                cash_b_to_a=cash_b_amt,
                 rookie_budget_a_to_b=rb_amt,
+                rookie_budget_b_to_a=rb_b_amt,
             )
             ts = TradeSystem()
             user_eval, ai_eval = ts.evaluate_multi_trade(user_team, at, offer)
@@ -2392,9 +2478,18 @@ class MainMenuView:
                 )
                 top.destroy()
                 return
+            pay_preview = ""
+            if cash_amt > 0:
+                pay_preview += f"\n現金（自分→相手）: {format_money_yen_ja_readable(cash_amt)}"
+            if cash_b_amt > 0:
+                pay_preview += f"\n現金（相手→自分）: {format_money_yen_ja_readable(cash_b_amt)}"
+            if rb_amt > 0:
+                pay_preview += f"\nRB（自分→相手）: {format_money_yen_ja_readable(rb_amt)}"
+            if rb_b_amt > 0:
+                pay_preview += f"\nRB（相手→自分）: {format_money_yen_ja_readable(rb_b_amt)}"
             if not messagebox.askyesno(
                 "トレード成立",
-                "この内容で multi トレードを成立させますか？",
+                "この内容で multi トレードを成立させますか？" + pay_preview,
                 parent=top,
             ):
                 top.destroy()
@@ -2411,8 +2506,12 @@ class MainMenuView:
                 pay_lines = ""
                 if cash_amt > 0:
                     pay_lines += f"\n現金（自分→相手）: {format_money_yen_ja_readable(cash_amt)}"
+                if cash_b_amt > 0:
+                    pay_lines += f"\n現金（相手→自分）: {format_money_yen_ja_readable(cash_b_amt)}"
                 if rb_amt > 0:
                     pay_lines += f"\nRB（自分→相手）: {format_money_yen_ja_readable(rb_amt)}"
+                if rb_b_amt > 0:
+                    pay_lines += f"\nRB（相手→自分）: {format_money_yen_ja_readable(rb_b_amt)}"
                 messagebox.showinfo(
                     "トレード",
                     f"成立: {ug} を放出 / {ar} を獲得{pay_lines}",
@@ -2502,22 +2601,36 @@ class MainMenuView:
                 if picked is None:
                     return
                 state["user_gives"] = picked
+                at = state["ai_team"]
                 max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
                 max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
+                max_cash_b = max(0, int(getattr(at, "money", 0) or 0))
+                max_rb_b = max(0, int(getattr(at, "rookie_budget_remaining", 0) or 0))
                 cash_limit_var.set(
-                    f"現金: 0〜{format_money_yen_ja_readable(max_cash)}（空欄は送金なし）"
+                    f"自分側 現金上限: 0〜{format_money_yen_ja_readable(max_cash)}（空欄は送金なし）"
                 )
-                rb_limit_var.set(f"RB: 0〜{format_money_yen_ja_readable(max_rb)}（空欄は移転なし）")
+                cash_b_limit_var.set(
+                    f"相手側 現金上限: 0〜{format_money_yen_ja_readable(max_cash_b)}（相手→自分）"
+                )
+                rb_limit_var.set(f"自分側 RB 上限: 0〜{format_money_yen_ja_readable(max_rb)}（空欄は移転なし）")
+                rb_b_limit_var.set(f"相手側 RB 上限: 0〜{format_money_yen_ja_readable(max_rb_b)}（相手→自分）")
                 cash_entry.delete(0, tk.END)
+                cash_b_entry.delete(0, tk.END)
                 rb_entry.delete(0, tk.END)
+                rb_b_entry.delete(0, tk.END)
                 state["step"] = 4
                 set_center_pane("cash_rb")
-                hint_var.set("現金・RB を入力し、「評価する」を押してください（空欄は 0）。")
+                hint_var.set(
+                    "4 つの欄に現金・RB を入力し、「評価する」を押してください（空欄は 0）。"
+                )
                 next_caption_var.set("評価する")
                 return
             if step == 4:
+                at = state["ai_team"]
                 max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
                 max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
+                max_cash_b = max(0, int(getattr(at, "money", 0) or 0))
+                max_rb_b = max(0, int(getattr(at, "rookie_budget_remaining", 0) or 0))
                 ok_c, cash_v, msg_c = bs_main.parse_multi_trade_side_payment(
                     cash_entry.get(),
                     max_cash,
@@ -2525,6 +2638,14 @@ class MainMenuView:
                 )
                 if not ok_c:
                     messagebox.showwarning("トレード", msg_c, parent=top)
+                    return
+                ok_cb, cash_b_v, msg_cb = bs_main.parse_multi_trade_side_payment(
+                    cash_b_entry.get(),
+                    max_cash_b,
+                    is_cash=True,
+                )
+                if not ok_cb:
+                    messagebox.showwarning("トレード", msg_cb, parent=top)
                     return
                 ok_r, rb_v, msg_r = bs_main.parse_multi_trade_side_payment(
                     rb_entry.get(),
@@ -2534,8 +2655,18 @@ class MainMenuView:
                 if not ok_r:
                     messagebox.showwarning("トレード", msg_r, parent=top)
                     return
+                ok_rb, rb_b_v, msg_rb = bs_main.parse_multi_trade_side_payment(
+                    rb_b_entry.get(),
+                    max_rb_b,
+                    is_cash=False,
+                )
+                if not ok_rb:
+                    messagebox.showwarning("トレード", msg_rb, parent=top)
+                    return
                 state["cash_a_to_b"] = cash_v
+                state["cash_b_to_a"] = cash_b_v
                 state["rookie_budget_a_to_b"] = rb_v
+                state["rookie_budget_b_to_a"] = rb_b_v
                 do_evaluate_and_finish_multi()
                 return
 
