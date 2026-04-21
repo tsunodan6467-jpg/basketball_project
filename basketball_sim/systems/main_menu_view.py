@@ -59,6 +59,10 @@ from basketball_sim.systems.season_transaction_rules import (
     INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
 )
+from basketball_sim.systems.money_display import (
+    format_money_yen_ja_readable,
+    format_signed_money_yen_ja_readable,
+)
 from basketball_sim.systems.training_unlocks import player_drill_lock_reason
 from basketball_sim.systems.team_tactics import (
     STARTER_POSITIONS,
@@ -1182,10 +1186,10 @@ class MainMenuView:
         tx = self._roster_transaction_status_text()
         return (
             "【当面の運用】\n"
-            "・選手のみの 1対1 トレードは、本ウィンドウの「1対1トレード（選手のみ）」からも実行できます"
-            "（インシーズンの可否は CLI のトレードと同一ルール）。\n"
-            "・multi は人事の「multi（複数人）」で複数選手＋現金・RB（自分→相手）まで可能（CLI multi と同じ実行経路）。\n"
-            "CLI のトレードメニューからも同様の multi が実行できます（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "・トレードは本ウィンドウ上部の「トレード」から。"
+            " 1対1（人数1対1）・複数人・現金・RB（双方向）までまとめて指定できます"
+            "（インシーズンの可否は CLI のトレードと同一ルール。実行経路は `TradeSystem` の multi と同系）。\n"
+            "・シーズンメニュー「8. GMメニュー」→「10. トレード」（CLI）でも同様のトレードが実行できます。\n"
             "・FA プールからの手動契約は、人事の「インシーズンFA（1人）」で 1 名まで（交渉・金額入力なし）。"
             "レギュラー中の CPU 補強はシーズン進行に連動した自動処理が中心です。\n"
             "・人事画面は「閲覧・一部操作（契約＋1年、契約解除）」と、上記・CLI の案内を担当します。\n"
@@ -1198,7 +1202,7 @@ class MainMenuView:
             "・ロスター表での閲覧、契約の＋1年延長（条件あり）、契約解除による FA 送り（インシーズンは"
             "トレード／インシーズンFA と同じ期限でロック）。\n\n"
             "【まだターミナル（CLI）で行うこと】\n"
-            "・multi は人事で「multi（複数人）」または CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "・トレードは人事の「トレード」または CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
             "・レギュラー中のトレード期限切れ後は、CLI のトレードもブロックされます（上部の可否表示と同じルール）。\n\n"
             "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
         )
@@ -1450,22 +1454,25 @@ class MainMenuView:
             }.get(st, st)
             room_soft = league_cap - payroll
             if room_soft >= 0:
-                room_str = f"キャップ余裕 {room_soft:,}円"
+                room_str = f"キャップ余裕 {format_money_yen_ja_readable(room_soft)}"
             else:
-                room_str = f"キャップ超過 {abs(room_soft):,}円"
+                room_str = f"キャップ超過 {format_money_yen_ja_readable(abs(room_soft))}"
             tax = int(compute_luxury_tax(payroll, league_level=lv))
-            tax_str = f" / 贅沢税 {tax:,}円" if tax > 0 else ""
+            tax_str = f" / 贅沢税 {format_money_yen_ja_readable(tax)}" if tax > 0 else ""
             bud = int(self._safe_get(team, "payroll_budget", 0) or 0)
             bud_str = ""
             if bud > 0:
                 mark = " ⚠" if payroll > bud else ""
-                bud_str = f" | クラブ目安 {bud:,}円{mark}"
+                bud_str = f" | クラブ目安 {format_money_yen_ja_readable(bud)}{mark}"
             floor = int(get_payroll_floor(lv))
             floor_str = ""
             if floor > 0 and payroll < floor:
-                floor_str = f" | ⚠ ペイロール下限未満（要 {floor:,}円以上・シーズン終了時は降格の対象）"
+                floor_str = (
+                    f" | ⚠ ペイロール下限未満（要 {format_money_yen_ja_readable(floor)}以上・"
+                    "シーズン終了時は降格の対象）"
+                )
             return (
-                f"給与合計 {payroll:,}円（サラリーキャップ {league_cap:,}円・全D共通12億）"
+                f"給与合計 {format_money_yen_ja_readable(payroll)}（サラリーキャップ {format_money_yen_ja_readable(league_cap)}・全D共通12億）"
                 f" | {status_ja} | {room_str}{tax_str}{bud_str}{floor_str}"
             )
         except Exception:
@@ -1487,7 +1494,7 @@ class MainMenuView:
 
         window = tk.Toplevel(self.root)
         window.title(f"人事・ロスター - {self._team_name()}")
-        window.geometry("980x800")
+        window.geometry("980x840")
         window.minsize(860, 620)
         window.configure(bg="#15171c")
         try:
@@ -1519,15 +1526,15 @@ class MainMenuView:
             anchor="w",
             font=("Yu Gothic UI", 9),
             padx=14,
-            pady=6,
+            pady=4,
             wraplength=900,
-        ).pack(fill="x", pady=(0, 8))
+        ).pack(fill="x", pady=(0, 6))
 
         trade_fa_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
-        trade_fa_wrap.pack(fill="x", pady=(0, 10))
+        trade_fa_wrap.pack(fill="x", pady=(0, 8))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（表で選手選択→解除。1対1／multi（複数人＋現金・RB可）／インシーズンFAは横ボタン）",
+            text="トレード・FA（表で選手選択→解除。「トレード」で1対1〜複数人・現金・RB／インシーズンFAは横ボタン）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -1535,16 +1542,9 @@ class MainMenuView:
         tf_btn_row.pack(fill="x", anchor="w", pady=(0, 6))
         self._jpn_text_button(
             tf_btn_row,
-            "1対1トレード（選手のみ）",
-            self._on_roster_one_for_one_trade,
-            side="left",
-        )
-        self._jpn_text_button(
-            tf_btn_row,
-            "multi（複数人）",
+            "トレード",
             self._on_roster_multi_trade_players_only,
             side="left",
-            padx=(10, 0),
         )
         self._jpn_text_button(
             tf_btn_row,
@@ -1567,7 +1567,7 @@ class MainMenuView:
         self.roster_trade_fa_text = tk.Text(
             tf_row,
             wrap="word",
-            height=9,
+            height=2,
             bg="#1d2129",
             fg="#d6dbe3",
             insertbackground="#d6dbe3",
@@ -1581,19 +1581,33 @@ class MainMenuView:
         self.roster_trade_fa_text.grid(row=0, column=0, sticky="nsew")
         tf_vsb.grid(row=0, column=1, sticky="ns")
 
-        columns = ("role", "name", "pos", "ovr", "pot", "age", "fatigue", "morale", "salary", "years")
+        columns = (
+            "role",
+            "name",
+            "pos",
+            "ovr",
+            "pot",
+            "age",
+            "nat_bucket",
+            "fatigue",
+            "morale",
+            "salary",
+            "years",
+        )
 
         roster_paned = ttk.Panedwindow(outer, orient="vertical")
         roster_paned.pack(fill="both", expand=True)
 
         tree_wrap = ttk.Frame(roster_paned, style="Panel.TFrame", padding=10)
-        roster_paned.add(tree_wrap, weight=3)
+        # ttk.Panedwindow.add は環境によって -minsize を受け付けず TclError になるため weight のみ渡し、
+        # 可能なら pane() で最小サイズを設定する（失敗時は sash 初期化のみで様子を見る）。
+        roster_paned.add(tree_wrap, weight=10)
 
         self.roster_tree = ttk.Treeview(
             tree_wrap,
             columns=columns,
             show="headings",
-            height=18,
+            height=16,
         )
         headings = {
             "role": "役割",
@@ -1602,6 +1616,7 @@ class MainMenuView:
             "ovr": "OVR",
             "pot": "POT",
             "age": "年齢",
+            "nat_bucket": "国籍区分",
             "fatigue": "疲労",
             "morale": "士気",
             "salary": "年俸",
@@ -1614,6 +1629,7 @@ class MainMenuView:
             "ovr": 70,
             "pot": 70,
             "age": 70,
+            "nat_bucket": 100,
             "fatigue": 70,
             "morale": 70,
             "salary": 130,
@@ -1622,7 +1638,7 @@ class MainMenuView:
 
         for key in columns:
             self.roster_tree.heading(key, text=headings[key])
-            anchor = "center" if key != "name" else "w"
+            anchor = "center" if key not in ("name", "nat_bucket") else "w"
             self.roster_tree.column(key, width=widths[key], anchor=anchor, stretch=(key == "name"))
 
         vsb = ttk.Scrollbar(tree_wrap, orient="vertical", command=self.roster_tree.yview)
@@ -1637,19 +1653,24 @@ class MainMenuView:
 
         detail_outer = ttk.Frame(roster_paned, style="Panel.TFrame", padding=(10, 6, 10, 10))
         roster_paned.add(detail_outer, weight=2)
+        try:
+            roster_paned.pane(tree_wrap, minsize=180)
+            roster_paned.pane(detail_outer, minsize=96)
+        except tk.TclError:
+            pass
         detail_outer.columnconfigure(0, weight=1)
         ttk.Label(
             detail_outer,
             text="詳細ロスター（テキスト一覧・閲覧専用）",
             style="TopBar.TLabel",
             anchor="w",
-        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         ttk.Label(
             detail_outer,
             text="表と同一ロスターです。並び・体裁は GM 表示ルール（docs/GM_ROSTER_DISPLAY_RULES.md）に沿います。",
             wraplength=900,
             font=("Yu Gothic UI", 9),
-        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 2))
         text_host = ttk.Frame(detail_outer, style="Panel.TFrame", padding=0)
         text_host.grid(row=2, column=0, columnspan=2, sticky="nsew")
         detail_outer.rowconfigure(2, weight=1)
@@ -1658,7 +1679,7 @@ class MainMenuView:
         self.roster_detail_text = tk.Text(
             text_host,
             wrap="none",
-            height=10,
+            height=3,
             bg="#222834",
             fg="#e8ecf0",
             insertbackground="#e8ecf0",
@@ -1673,6 +1694,24 @@ class MainMenuView:
         self.roster_detail_text.grid(row=0, column=0, sticky="nsew")
         rdt_vsb.grid(row=0, column=1, sticky="ns")
         rdt_hsb.grid(row=1, column=0, sticky="ew")
+
+        self._roster_vert_split_done = False
+
+        def _apply_roster_vertical_split(_event: Any = None) -> None:
+            if self._roster_vert_split_done:
+                return
+            try:
+                ph = int(roster_paned.winfo_height())
+                if ph < 200:
+                    return
+                roster_paned.sashpos(0, max(160, int(ph * 0.82)))
+                self._roster_vert_split_done = True
+            except tk.TclError:
+                pass
+
+        roster_paned.bind("<Map>", _apply_roster_vertical_split)
+        window.after_idle(_apply_roster_vertical_split)
+        window.after(200, _apply_roster_vertical_split)
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
@@ -1719,6 +1758,7 @@ class MainMenuView:
         finally:
             self._roster_window = None
             self._roster_item_to_player.clear()
+            self._roster_vert_split_done = False
 
     def _all_teams_for_trade_gui(self) -> List[Any]:
         """
@@ -1746,7 +1786,7 @@ class MainMenuView:
         return list(self._iter_league_teams())
 
     def _on_roster_one_for_one_trade(self) -> None:
-        """人事ウィンドウから GUI 1対1トレード（選手のみ）。評価・実行は main / TradeSystem の既存経路。"""
+        """旧・人事専用の選手のみ1対1ウィザード（ボタン廃止により未使用。互換のため温存）。"""
         parent = getattr(self, "_roster_window", None) or self.root
         if self.team is None:
             messagebox.showwarning("トレード", "チームが未接続です。", parent=parent)
@@ -1798,7 +1838,7 @@ class MainMenuView:
 
         ttk.Label(
             outer,
-            text="選手のみの 1 対 1 です。現金・RB を伴うトレードは CLI の multi 導線を使ってください。",
+            text="選手のみの 1 対 1 です。現金・RB 付きは人事の「トレード」から実行してください。",
             wraplength=480,
             font=("Yu Gothic UI", 9),
         ).pack(fill="x", pady=(0, 8))
@@ -1846,7 +1886,7 @@ class MainMenuView:
             return (
                 f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
                 f"OVR {int(getattr(p, 'ovr', 0) or 0)}  年齢 {int(getattr(p, 'age', 0) or 0)}  "
-                f"{nat_j}  年俸 {sal:,}円"
+                f"{nat_j}  年俸 {format_money_yen_ja_readable(sal)}"
             )
 
         def refresh_list() -> None:
@@ -2002,7 +2042,7 @@ class MainMenuView:
         refresh_list()
 
     def _on_roster_multi_trade_players_only(self) -> None:
-        """人事から multi 第1弾: 複数選手のみ（現金・RB なし）。評価・実行は `TradeSystem` 既存経路。"""
+        """人事の総合トレード入口（1対1〜複数人・現金・RB）。評価・実行は `TradeSystem` の multi 経路。"""
         parent = getattr(self, "_roster_window", None) or self.root
         if self.team is None:
             messagebox.showwarning("トレード", "チームが未接続です。", parent=parent)
@@ -2010,7 +2050,7 @@ class MainMenuView:
         if self.season is None:
             messagebox.showwarning(
                 "トレード",
-                "シーズン未接続のため FA プールを参照できず、multi トレードを実行できません。",
+                "シーズン未接続のため FA プールを参照できず、トレードを実行できません。",
                 parent=parent,
             )
             return
@@ -2025,7 +2065,7 @@ class MainMenuView:
         if fa_list is None:
             messagebox.showwarning(
                 "トレード",
-                "FA プールが未初期化のため multi トレードを実行できません。",
+                "FA プールが未初期化のためトレードを実行できません。",
                 parent=parent,
             )
             return
@@ -2056,18 +2096,32 @@ class MainMenuView:
         free_agents: List[Any],
     ) -> None:
         from basketball_sim import main as bs_main
-        from basketball_sim.systems.trade_logic import MultiTradeOffer, TradeSystem
+        from basketball_sim.systems.trade_input_helpers import (
+            cash_man_presets_all,
+            compose_cash_yen_from_oku_man,
+            max_oku_for_cash,
+            rb_man_choice_values_filtered,
+            rb_yen_from_man,
+            valid_cash_man_values_for_oku,
+        )
+        from basketball_sim.systems.trade_logic import (
+            TRADE_RB_TRANSFER_MAX_LEG_YEN,
+            TRADE_RB_TRANSFER_STEP_YEN,
+            MultiTradeOffer,
+            TradeSystem,
+            max_trade_rb_leg_for_team,
+        )
 
         user_team = self.team
         top = tk.Toplevel(parent)
-        top.title("multi トレード（複数人＋現金・RB）")
+        top.title("トレード（1対1可・複数人・現金・RB）")
         top.configure(bg="#15171c")
         try:
             top.transient(parent)
         except Exception:
             pass
-        top.geometry("640x480")
-        top.minsize(520, 400)
+        top.geometry("640x560")
+        top.minsize(520, 460)
 
         outer = ttk.Frame(top, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
@@ -2075,8 +2129,8 @@ class MainMenuView:
         ttk.Label(
             outer,
             text=(
-                "複数選手の入替に加え、自分→相手への現金・RB（ルーキー予算）移転を指定できます。"
-                "評価・成立は `TradeSystem` の multi 経路（CLI のトレード提案と同系）です。"
+                "人数は 1対1 から最大 3対3 まで。現金・RB（ルーキー予算）は自分→相手・相手→自分の双方向で指定できます。"
+                "評価・成立は `TradeSystem` のトレード経路（CLI の「トレード提案」と同系）です。"
             ),
             wraplength=600,
             font=("Yu Gothic UI", 9),
@@ -2154,7 +2208,11 @@ class MainMenuView:
         money_rb_frame = tk.Frame(lb_frame, bg="#222834")
         tk.Label(
             money_rb_frame,
-            text="現金・RB はいずれも「自分のクラブ → 相手クラブ」への移転です（CLI STEP 5/6 と同趣旨）。",
+            text=(
+                "現金は各クラブの所持の範囲内。RB は "
+                f"{format_money_yen_ja_readable(TRADE_RB_TRANSFER_STEP_YEN)}刻み・片道最大 "
+                f"{format_money_yen_ja_readable(TRADE_RB_TRANSFER_MAX_LEG_YEN)}（CLI と同一）。"
+            ),
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 9),
@@ -2162,7 +2220,9 @@ class MainMenuView:
             justify="left",
         ).pack(anchor="w", padx=8, pady=(8, 10))
         cash_limit_var = tk.StringVar(value="")
+        cash_b_limit_var = tk.StringVar(value="")
         rb_limit_var = tk.StringVar(value="")
+        rb_b_limit_var = tk.StringVar(value="")
         tk.Label(
             money_rb_frame,
             textvariable=cash_limit_var,
@@ -2170,30 +2230,89 @@ class MainMenuView:
             fg="#c8d0dc",
             font=("Yu Gothic UI", 9),
             anchor="w",
-        ).pack(fill="x", padx=8, pady=(0, 4))
+        ).pack(fill="x", padx=8, pady=(0, 2))
         row_cash = tk.Frame(money_rb_frame, bg="#222834")
         row_cash.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_cash,
-            text="現金（円）:",
+            text="現金（自分→相手）:",
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 10),
-            width=14,
+            width=18,
             anchor="w",
         ).pack(side="left")
-        cash_entry = tk.Entry(
+        cash_oku_sp = tk.Spinbox(
             row_cash,
-            width=18,
+            from_=0,
+            to=99,
+            width=5,
             font=("Yu Gothic UI", 10),
             bg="#2a3140",
             fg="#e8ecf0",
-            insertbackground="#e8ecf0",
+            buttonbackground="#3d4f6f",
         )
-        cash_entry.pack(side="left", padx=(0, 8))
+        cash_oku_sp.pack(side="left", padx=(4, 2))
+        tk.Label(row_cash, text="億", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(side="left")
+        cash_man_cb = ttk.Combobox(
+            row_cash,
+            width=8,
+            state="readonly",
+            font=("Yu Gothic UI", 10),
+            values=[str(x) for x in cash_man_presets_all()],
+        )
+        cash_man_cb.set("0")
+        cash_man_cb.pack(side="left", padx=(6, 4))
         tk.Label(
             row_cash,
-            text="カンマ可・空欄は0",
+            text="万（1000万刻み）",
+            bg="#222834",
+            fg="#8899aa",
+            font=("Yu Gothic UI", 8),
+        ).pack(side="left")
+        tk.Label(
+            money_rb_frame,
+            textvariable=cash_b_limit_var,
+            bg="#222834",
+            fg="#c8d0dc",
+            font=("Yu Gothic UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(6, 2))
+        row_cash_b = tk.Frame(money_rb_frame, bg="#222834")
+        row_cash_b.pack(fill="x", padx=8, pady=4)
+        tk.Label(
+            row_cash_b,
+            text="現金（相手→自分）:",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+            width=18,
+            anchor="w",
+        ).pack(side="left")
+        cash_b_oku_sp = tk.Spinbox(
+            row_cash_b,
+            from_=0,
+            to=99,
+            width=5,
+            font=("Yu Gothic UI", 10),
+            bg="#2a3140",
+            fg="#e8ecf0",
+            buttonbackground="#3d4f6f",
+        )
+        cash_b_oku_sp.pack(side="left", padx=(4, 2))
+        tk.Label(row_cash_b, text="億", bg="#222834", fg="#e8ecf0", font=("Yu Gothic UI", 10)).pack(side="left")
+        cash_b_man_cb = ttk.Combobox(
+            row_cash_b,
+            width=8,
+            state="readonly",
+            font=("Yu Gothic UI", 10),
+            values=[str(x) for x in cash_man_presets_all()],
+        )
+        cash_b_man_cb.set("0")
+        cash_b_man_cb.pack(side="left", padx=(6, 4))
+        tk.Label(
+            row_cash_b,
+            text="万（1000万刻み）",
             bg="#222834",
             fg="#8899aa",
             font=("Yu Gothic UI", 8),
@@ -2205,30 +2324,65 @@ class MainMenuView:
             fg="#c8d0dc",
             font=("Yu Gothic UI", 9),
             anchor="w",
-        ).pack(fill="x", padx=8, pady=(8, 4))
+        ).pack(fill="x", padx=8, pady=(8, 2))
         row_rb = tk.Frame(money_rb_frame, bg="#222834")
         row_rb.pack(fill="x", padx=8, pady=4)
         tk.Label(
             row_rb,
-            text="RB 移転:",
+            text="RB（自分→相手）:",
             bg="#222834",
             fg="#e8ecf0",
             font=("Yu Gothic UI", 10),
-            width=14,
+            width=18,
             anchor="w",
         ).pack(side="left")
-        rb_entry = tk.Entry(
+        rb_cb = ttk.Combobox(
             row_rb,
-            width=18,
+            width=10,
+            state="readonly",
             font=("Yu Gothic UI", 10),
-            bg="#2a3140",
-            fg="#e8ecf0",
-            insertbackground="#e8ecf0",
+            values=["0"],
         )
-        rb_entry.pack(side="left", padx=(0, 8))
+        rb_cb.set("0")
+        rb_cb.pack(side="left", padx=(0, 8))
         tk.Label(
             row_rb,
-            text="空欄は0",
+            text="万の数（500万刻み）",
+            bg="#222834",
+            fg="#8899aa",
+            font=("Yu Gothic UI", 8),
+        ).pack(side="left")
+        tk.Label(
+            money_rb_frame,
+            textvariable=rb_b_limit_var,
+            bg="#222834",
+            fg="#c8d0dc",
+            font=("Yu Gothic UI", 9),
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(6, 2))
+        row_rb_b = tk.Frame(money_rb_frame, bg="#222834")
+        row_rb_b.pack(fill="x", padx=8, pady=4)
+        tk.Label(
+            row_rb_b,
+            text="RB（相手→自分）:",
+            bg="#222834",
+            fg="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+            width=18,
+            anchor="w",
+        ).pack(side="left")
+        rb_b_cb = ttk.Combobox(
+            row_rb_b,
+            width=10,
+            state="readonly",
+            font=("Yu Gothic UI", 10),
+            values=["0"],
+        )
+        rb_b_cb.set("0")
+        rb_b_cb.pack(side="left", padx=(0, 8))
+        tk.Label(
+            row_rb_b,
+            text="万の数（500万刻み）",
             bg="#222834",
             fg="#8899aa",
             font=("Yu Gothic UI", 8),
@@ -2244,7 +2398,9 @@ class MainMenuView:
             "ai_receives": [],
             "user_gives": [],
             "cash_a_to_b": 0,
+            "cash_b_to_a": 0,
             "rookie_budget_a_to_b": 0,
+            "rookie_budget_b_to_a": 0,
             "items": [],
             "player_source": [],
         }
@@ -2263,7 +2419,7 @@ class MainMenuView:
             return (
                 f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
                 f"OVR {int(getattr(p, 'ovr', 0) or 0)}  年齢 {int(getattr(p, 'age', 0) or 0)}  "
-                f"{nat_j}  年俸 {sal:,}円"
+                f"{nat_j}  年俸 {format_money_yen_ja_readable(sal)}"
             )
 
         def set_center_pane(mode: str) -> None:
@@ -2327,12 +2483,16 @@ class MainMenuView:
             user_gives: List[Any] = list(state["user_gives"])
             ai_receives: List[Any] = list(state["ai_receives"])
             cash_amt = int(state.get("cash_a_to_b", 0) or 0)
+            cash_b_amt = int(state.get("cash_b_to_a", 0) or 0)
             rb_amt = int(state.get("rookie_budget_a_to_b", 0) or 0)
+            rb_b_amt = int(state.get("rookie_budget_b_to_a", 0) or 0)
             offer = MultiTradeOffer(
                 team_a_gives_players=user_gives,
                 team_a_receives_players=ai_receives,
                 cash_a_to_b=cash_amt,
+                cash_b_to_a=cash_b_amt,
                 rookie_budget_a_to_b=rb_amt,
+                rookie_budget_b_to_a=rb_b_amt,
             )
             ts = TradeSystem()
             user_eval, ai_eval = ts.evaluate_multi_trade(user_team, at, offer)
@@ -2349,7 +2509,7 @@ class MainMenuView:
                 return
             if not messagebox.askyesno(
                 "トレード成立",
-                "この内容で multi トレードを成立させますか？",
+                "この内容でトレードを成立させますか？",
                 parent=top,
             ):
                 top.destroy()
@@ -2365,9 +2525,13 @@ class MainMenuView:
                 ar = ", ".join(getattr(p, "name", "?") for p in ai_receives)
                 pay_lines = ""
                 if cash_amt > 0:
-                    pay_lines += f"\n現金（自分→相手）: {cash_amt:,} 円"
+                    pay_lines += f"\n現金（自分→相手）: {format_money_yen_ja_readable(cash_amt)}"
+                if cash_b_amt > 0:
+                    pay_lines += f"\n現金（相手→自分）: {format_money_yen_ja_readable(cash_b_amt)}"
                 if rb_amt > 0:
-                    pay_lines += f"\nRB（自分→相手）: {rb_amt:,}"
+                    pay_lines += f"\nRB（自分→相手）: {format_money_yen_ja_readable(rb_amt)}"
+                if rb_b_amt > 0:
+                    pay_lines += f"\nRB（相手→自分）: {format_money_yen_ja_readable(rb_b_amt)}"
                 messagebox.showinfo(
                     "トレード",
                     f"成立: {ug} を放出 / {ar} を獲得{pay_lines}",
@@ -2387,6 +2551,46 @@ class MainMenuView:
                 pass
 
         next_caption_var = tk.StringVar(value="次へ")
+
+        def _gui_read_cash_yen(
+            oku_sp: tk.Spinbox, man_cb: ttk.Combobox, max_yen: int
+        ) -> Tuple[Optional[int], str]:
+            try:
+                oku = int(str(oku_sp.get()).strip())
+            except ValueError:
+                return None, "億は整数で入力してください。"
+            try:
+                man = int(str(man_cb.get()).strip())
+            except ValueError:
+                return None, "万を選んでください。"
+            if oku < 0 or oku > max_oku_for_cash(max_yen):
+                return None, "億が上限を超えています。"
+            allowed = valid_cash_man_values_for_oku(max_yen, oku)
+            if man not in allowed:
+                return None, f"万は次のいずれか: {', '.join(map(str, allowed))}"
+            y = compose_cash_yen_from_oku_man(oku, man)
+            ok_p, val, msg = bs_main.parse_multi_trade_side_payment(
+                str(y), max_yen, is_cash=True
+            )
+            if not ok_p:
+                return None, msg
+            return val, ""
+
+        def _gui_read_rb_yen(cb: ttk.Combobox, max_yen: int) -> Tuple[Optional[int], str]:
+            try:
+                m = int(str(cb.get()).strip())
+            except ValueError:
+                return None, "RB を選んでください。"
+            opts = rb_man_choice_values_filtered(max_yen)
+            if m not in opts:
+                return None, f"RB は次のいずれか: {', '.join(map(str, opts))}"
+            y = rb_yen_from_man(m)
+            ok_p, val, msg = bs_main.parse_multi_trade_side_payment(
+                str(y), max_yen, is_cash=False
+            )
+            if not ok_p:
+                return None, msg
+            return val, ""
 
         def on_next() -> None:
             step = int(state["step"])
@@ -2457,38 +2661,78 @@ class MainMenuView:
                 if picked is None:
                     return
                 state["user_gives"] = picked
+                at = state["ai_team"]
                 max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
-                max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
-                cash_limit_var.set(f"現金: 0〜{max_cash:,} 円（空欄は送金なし）")
-                rb_limit_var.set(f"RB: 0〜{max_rb:,}（空欄は移転なし）")
-                cash_entry.delete(0, tk.END)
-                rb_entry.delete(0, tk.END)
+                max_cash_ai = max(0, int(getattr(at, "money", 0) or 0))
+                max_rb = max_trade_rb_leg_for_team(user_team)
+                max_rb_ai = max_trade_rb_leg_for_team(at)
+                cash_limit_var.set(
+                    f"自分→相手 現金: 最大 {format_money_yen_ja_readable(max_cash)}（億＋万、万は1000万刻み）"
+                )
+                cash_b_limit_var.set(
+                    f"相手→自分 現金: 最大 {format_money_yen_ja_readable(max_cash_ai)}（億＋万、万は1000万刻み）"
+                )
+                rb_limit_var.set(
+                    f"自分→相手 RB: 最大 {format_money_yen_ja_readable(max_rb)}（"
+                    f"{format_money_yen_ja_readable(TRADE_RB_TRANSFER_STEP_YEN)}刻み・プルダウン）"
+                )
+                rb_b_limit_var.set(
+                    f"相手→自分 RB: 最大 {format_money_yen_ja_readable(max_rb_ai)}（"
+                    f"{format_money_yen_ja_readable(TRADE_RB_TRANSFER_STEP_YEN)}刻み・プルダウン）"
+                )
+                cash_oku_sp.config(from_=0, to=max(0, max_oku_for_cash(max_cash)))
+                cash_b_oku_sp.config(from_=0, to=max(0, max_oku_for_cash(max_cash_ai)))
+                cash_oku_sp.delete(0, tk.END)
+                cash_oku_sp.insert(0, "0")
+                cash_b_oku_sp.delete(0, tk.END)
+                cash_b_oku_sp.insert(0, "0")
+                cash_man_cb.set("0")
+                cash_b_man_cb.set("0")
+                rb_vals_u = [str(x) for x in rb_man_choice_values_filtered(max_rb)]
+                if not rb_vals_u:
+                    rb_vals_u = ["0"]
+                rb_cb.configure(values=rb_vals_u)
+                rb_cb.set(rb_vals_u[0])
+                rb_vals_b = [str(x) for x in rb_man_choice_values_filtered(max_rb_ai)]
+                if not rb_vals_b:
+                    rb_vals_b = ["0"]
+                rb_b_cb.configure(values=rb_vals_b)
+                rb_b_cb.set(rb_vals_b[0])
                 state["step"] = 4
                 set_center_pane("cash_rb")
-                hint_var.set("現金・RB を入力し、「評価する」を押してください（空欄は 0）。")
+                hint_var.set(
+                    "億・万（1000万刻み）と RB（500万刻み）を選び、「評価する」を押してください。"
+                )
                 next_caption_var.set("評価する")
                 return
             if step == 4:
+                at = state["ai_team"]
                 max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
-                max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
-                ok_c, cash_v, msg_c = bs_main.parse_multi_trade_side_payment(
-                    cash_entry.get(),
-                    max_cash,
-                    is_cash=True,
-                )
-                if not ok_c:
+                max_cash_ai = max(0, int(getattr(at, "money", 0) or 0))
+                max_rb = max_trade_rb_leg_for_team(user_team)
+                max_rb_ai = max_trade_rb_leg_for_team(at)
+                cash_v, msg_c = _gui_read_cash_yen(cash_oku_sp, cash_man_cb, max_cash)
+                if cash_v is None:
                     messagebox.showwarning("トレード", msg_c, parent=top)
                     return
-                ok_r, rb_v, msg_r = bs_main.parse_multi_trade_side_payment(
-                    rb_entry.get(),
-                    max_rb,
-                    is_cash=False,
+                cash_bv, msg_cb = _gui_read_cash_yen(
+                    cash_b_oku_sp, cash_b_man_cb, max_cash_ai
                 )
-                if not ok_r:
+                if cash_bv is None:
+                    messagebox.showwarning("トレード", msg_cb, parent=top)
+                    return
+                rb_v, msg_r = _gui_read_rb_yen(rb_cb, max_rb)
+                if rb_v is None:
                     messagebox.showwarning("トレード", msg_r, parent=top)
                     return
+                rb_bv, msg_rb = _gui_read_rb_yen(rb_b_cb, max_rb_ai)
+                if rb_bv is None:
+                    messagebox.showwarning("トレード", msg_rb, parent=top)
+                    return
                 state["cash_a_to_b"] = cash_v
+                state["cash_b_to_a"] = cash_bv
                 state["rookie_budget_a_to_b"] = rb_v
+                state["rookie_budget_b_to_a"] = rb_bv
                 do_evaluate_and_finish_multi()
                 return
 
@@ -2646,7 +2890,7 @@ class MainMenuView:
                     int(getattr(p, "ovr", 0) or 0),
                     int(getattr(p, "age", 0) or 0),
                     nat_j,
-                    f"{est:,}",
+                    format_money_yen_ja_readable(est),
                 ),
             )
 
@@ -2680,10 +2924,10 @@ class MainMenuView:
                 messagebox.showinfo(
                     "インシーズンFA（制限確認）",
                     f"選手: {nm}\n"
-                    f"年俸目安: {sal:,} 円\n"
+                    f"年俸目安: {format_money_yen_ja_readable(sal)}\n"
                     f"契約年数: {yrs} 年\n"
-                    f"サラリー契約余地: {room:,} 円\n"
-                    f"所持金: {money:,} 円\n\n"
+                    f"サラリー契約余地: {format_money_yen_ja_readable(room)}\n"
+                    f"所持金: {format_money_yen_ja_readable(money)}\n\n"
                     "上記条件で契約できます。「契約する」で確定してください。",
                     parent=top,
                 )
@@ -2692,9 +2936,9 @@ class MainMenuView:
                 messagebox.showwarning(
                     "インシーズンFA（制限確認）",
                     f"選手: {nm}\n"
-                    f"年俸目安: {sal:,} 円\n"
-                    f"サラリー契約余地: {room:,} 円\n"
-                    f"所持金: {money:,} 円\n\n"
+                    f"年俸目安: {format_money_yen_ja_readable(sal)}\n"
+                    f"サラリー契約余地: {format_money_yen_ja_readable(room)}\n"
+                    f"所持金: {format_money_yen_ja_readable(money)}\n\n"
                     f"契約できません: {reason}",
                     parent=top,
                 )
@@ -2713,7 +2957,7 @@ class MainMenuView:
             yrs = int(estimate_fa_contract_years(player))
             if not messagebox.askyesno(
                 "インシーズンFA（最終確認）",
-                f"{nm} と契約しますか？\n\n年俸目安 {sal:,} 円 / {yrs} 年\n"
+                f"{nm} と契約しますか？\n\n年俸目安 {format_money_yen_ja_readable(sal)} / {yrs} 年\n"
                 "（標準の FA 契約処理で反映。所持金の即時減算はありません。）",
                 parent=top,
             ):
@@ -2926,11 +3170,12 @@ class MainMenuView:
             morale = str(self._safe_get(player, "morale", "-"))
             salary = self._format_money(self._safe_get(player, "salary", 0))
             years = str(self._safe_get(player, "contract_years_left", "-"))
+            nat_lbl = jp_reg_display.get_player_nationality_bucket_label(player)
 
             iid = tree.insert(
                 "",
                 "end",
-                values=(role, name, pos, ovr, pot, age, fatigue, morale, salary, years),
+                values=(role, name, pos, ovr, pot, age, nat_lbl, fatigue, morale, salary, years),
             )
             self._roster_item_to_player[iid] = player
 
@@ -2961,7 +3206,7 @@ class MainMenuView:
             "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
             "【今できる操作（人事画面）】閲覧。＋1年延長（年俸据え置き・残年数が 1 年以上かつ"
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
-            "【トレード】1対1・multi（複数人・現金・RB）はウィンドウ上部のボタンから。"
+            "【トレード】ウィンドウ上部の「トレード」から（1対1〜複数人・現金・RB）。"
             " CLI からも同様のトレードメニューで実行できます（「8. GMメニュー」→「10. トレード」）。"
             "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
             "期限はトレードと同じルールです（上部の案内を参照）。\n"
@@ -3047,8 +3292,72 @@ class MainMenuView:
             text="現況ダッシュボード（財務 / 施設 / オーナー / 直近施策）",
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
+        dash_body = ttk.Frame(dash_board, style="Panel.TFrame")
+        dash_body.pack(fill="both", expand=True)
+        dash_body.columnconfigure(0, weight=1)
+        dash_body.rowconfigure(0, weight=1)
+        self._management_dash_canvas = tk.Canvas(
+            dash_body,
+            bg="#222834",
+            highlightthickness=0,
+            height=260,
+        )
+        dash_dsb = ttk.Scrollbar(
+            dash_body,
+            orient="vertical",
+            command=self._management_dash_canvas.yview,
+        )
+        self._management_dash_canvas.configure(yscrollcommand=dash_dsb.set)
+        dash_inner = tk.Frame(self._management_dash_canvas, bg="#222834")
+        dash_win_id = self._management_dash_canvas.create_window(
+            (0, 0), window=dash_inner, anchor="nw"
+        )
+
+        def _dash_scrollregion(_event: Any = None) -> None:
+            try:
+                self._management_dash_canvas.update_idletasks()
+                bb = self._management_dash_canvas.bbox("all")
+                if bb:
+                    self._management_dash_canvas.configure(scrollregion=bb)
+            except tk.TclError:
+                pass
+
+        def _dash_canvas_width(event: Any) -> None:
+            try:
+                self._management_dash_canvas.itemconfigure(dash_win_id, width=event.width)
+            except tk.TclError:
+                pass
+
+        dash_inner.bind("<Configure>", lambda _e: _dash_scrollregion())
+        self._management_dash_canvas.bind("<Configure>", _dash_canvas_width)
+
+        def _dash_area_wheel(event: Any) -> str:
+            if getattr(event, "delta", 0):
+                self._management_dash_canvas.yview_scroll(
+                    int(-event.delta / 120), "units"
+                )
+            return "break"
+
+        def _dash_area_btn4(_event: Any) -> str:
+            self._management_dash_canvas.yview_scroll(-1, "units")
+            return "break"
+
+        def _dash_area_btn5(_event: Any) -> str:
+            self._management_dash_canvas.yview_scroll(1, "units")
+            return "break"
+
+        self._management_dash_canvas.bind("<MouseWheel>", _dash_area_wheel)
+        dash_inner.bind("<MouseWheel>", _dash_area_wheel)
+        self._management_dash_canvas.bind("<Button-4>", _dash_area_btn4)
+        dash_inner.bind("<Button-4>", _dash_area_btn4)
+        self._management_dash_canvas.bind("<Button-5>", _dash_area_btn5)
+        dash_inner.bind("<Button-5>", _dash_area_btn5)
+
+        self._management_dash_canvas.grid(row=0, column=0, sticky="nsew")
+        dash_dsb.grid(row=0, column=1, sticky="ns")
+
         self._management_dashboard_text = tk.Text(
-            dash_board,
+            dash_inner,
             height=20,
             wrap="word",
             bg="#222834",
@@ -3061,7 +3370,10 @@ class MainMenuView:
             padx=8,
             pady=8,
         )
-        self._management_dashboard_text.pack(fill="both", expand=False)
+        self._management_dashboard_text.pack(fill="both", expand=True)
+        self._management_dashboard_text.bind("<MouseWheel>", _dash_area_wheel)
+        self._management_dashboard_text.bind("<Button-4>", _dash_area_btn4)
+        self._management_dashboard_text.bind("<Button-5>", _dash_area_btn5)
         for _tag in (
             "finance_block_header",
             "finance_row_default",
@@ -3161,13 +3473,44 @@ class MainMenuView:
         content.bind("<Configure>", lambda _e: _finance_scrollregion())
         fin_canvas.bind("<Configure>", _finance_canvas_inner_width)
 
-        def _finance_hub_mousewheel(event: Any) -> None:
+        def _finance_wheel_steps(event: Any) -> int:
             if getattr(event, "delta", 0):
-                fin_canvas.yview_scroll(int(-event.delta / 120), "units")
+                return int(-event.delta / 120)
+            n = getattr(event, "num", 0)
+            if n == 4:
+                return -1
+            if n == 5:
+                return 1
+            return 0
 
-        window.bind("<MouseWheel>", _finance_hub_mousewheel)
-        window.bind("<Button-4>", lambda _e: fin_canvas.yview_scroll(-1, "units"))
-        window.bind("<Button-5>", lambda _e: fin_canvas.yview_scroll(1, "units"))
+        def _finance_root_mousewheel(event: Any) -> None:
+            steps = _finance_wheel_steps(event)
+            if not steps:
+                return
+            w = event.widget
+            fcan = getattr(self, "_finance_scroll_canvas", None)
+            while w is not None:
+                if w is window:
+                    return
+                if isinstance(w, scrolledtext.ScrolledText):
+                    return
+                if isinstance(w, tk.Text):
+                    return
+                if fcan is not None and (w is fin_canvas or w is fin_scroll_wrap):
+                    fcan.yview_scroll(steps, "units")
+                    return
+                w = getattr(w, "master", None)
+
+        window.bind("<MouseWheel>", _finance_root_mousewheel)
+
+        def _finance_root_btn4(event: Any) -> None:
+            _finance_root_mousewheel(event)
+
+        def _finance_root_btn5(event: Any) -> None:
+            _finance_root_mousewheel(event)
+
+        window.bind("<Button-4>", _finance_root_btn4)
+        window.bind("<Button-5>", _finance_root_btn5)
 
         fin_canvas.pack(side="left", fill="both", expand=True)
         fin_vsb.pack(side="right", fill="y")
@@ -3764,6 +4107,7 @@ class MainMenuView:
             self._merch_dummy_text = None
             self._merch_hist_text = None
             self._management_dashboard_text = None
+            self._management_dash_canvas = None
             self._facility_preview_vars = {}
             self._sponsor_preview_var = None
             self._pr_selection_preview_var = None
@@ -4327,7 +4671,22 @@ class MainMenuView:
                         dash_tw.insert("1.0", snap.dashboard_text)
                 else:
                     dash_tw.insert("1.0", snap.dashboard_text)
+                try:
+                    el = dash_tw.index("end-1c")
+                    nlines = int(str(el).split(".", 1)[0])
+                    dash_tw.configure(height=min(max(nlines + 2, 8), 90))
+                except (tk.TclError, ValueError, TypeError):
+                    pass
                 dash_tw.configure(state="disabled")
+                dcan = getattr(self, "_management_dash_canvas", None)
+                if dcan is not None:
+                    try:
+                        dcan.update_idletasks()
+                        bb = dcan.bbox("all")
+                        if bb:
+                            dcan.configure(scrollregion=bb)
+                    except tk.TclError:
+                        pass
             except tk.TclError:
                 pass
 
@@ -4601,7 +4960,7 @@ class MainMenuView:
         nav.pack(fill="x")
         ttk.Label(
             nav,
-            text="戦術設定（各画面で保存）。左パネルで戦術・HC・起用方針。右パネルで先発・6th・ベンチ。",
+            text="左パネルは試合に効く三本柱（保存で反映）。上のボタンは別ウィンドウの詳細テンプレ（各窓で保存）。右は先発・6th・ベンチ。",
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
         row_a = ttk.Frame(nav, style="Panel.TFrame")
@@ -4625,7 +4984,7 @@ class MainMenuView:
 
         _nav_btn(
             row_a,
-            "チーム戦術",
+            "攻守の細部",
             lambda: self._open_tactics_team_strategy_window(hub_ref),
         )
         _nav_btn(
@@ -4635,7 +4994,7 @@ class MainMenuView:
         )
         _nav_btn(
             row_a,
-            "起用方針",
+            "起用の細部",
             lambda: self._open_tactics_usage_policy_window(hub_ref),
         )
         _nav_btn(
@@ -4730,7 +5089,8 @@ class MainMenuView:
         ).pack(anchor="w", pady=(0, 4))
         ttk.Label(
             strategy_panel,
-            text="Team.strategy・coach_style・usage_policy をまとめて反映します。",
+            text="Team.strategy・coach_style・Team.usage_policy をまとめて反映します。"
+            "（上部「攻守の細部」「起用の細部」とは別データです）",
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 6))
 
@@ -4760,12 +5120,16 @@ class MainMenuView:
             width=28,
             values=[lab for _, lab in USAGE_POLICY_OPTIONS],
         )
-        ttk.Label(pol_grid, text="チーム戦術", font=("Yu Gothic UI", 9)).grid(row=0, column=0, sticky="w", pady=4)
+        ttk.Label(pol_grid, text="戦術スタンス（全体）", font=("Yu Gothic UI", 9)).grid(
+            row=0, column=0, sticky="w", pady=4
+        )
         self._strat_combo_strategy.grid(row=0, column=1, sticky="ew", pady=4, padx=(10, 0))
         ttk.Label(pol_grid, text="HCスタイル", font=("Yu Gothic UI", 9)).grid(row=1, column=0, sticky="w", pady=4)
         self._strat_combo_coach.grid(row=1, column=1, sticky="ew", pady=4, padx=(10, 0))
         self._strat_combo_coach.bind("<<ComboboxSelected>>", self._on_strat_coach_selection_changed)
-        ttk.Label(pol_grid, text="起用方針", font=("Yu Gothic UI", 9)).grid(row=2, column=0, sticky="w", pady=4)
+        ttk.Label(pol_grid, text="起用スタンス（全体）", font=("Yu Gothic UI", 9)).grid(
+            row=2, column=0, sticky="w", pady=4
+        )
         self._strat_combo_usage.grid(row=2, column=1, sticky="ew", pady=4, padx=(10, 0))
 
         ttk.Label(
@@ -5016,7 +5380,7 @@ class MainMenuView:
             f"起用方針 (Team.usage_policy): {usage_text}",
             f"ロスター人数: {len(list(self._safe_get(self.team, 'players', []) or []))}",
             f"先発人数: {len(starters)} / ベンチ序列人数: {len(bench_order)}",
-            "詳細戦術 (team_tactics): 上のボタンから編集・保存（Phase A は試合未連携）",
+            "詳細テンプレ (team_tactics): 上のボタンから編集・保存（先発マップ等は試合で参照、その他は段階的に反映）",
         ]
         for var, line in zip(self.strategy_lines, strategy_lines):
             var.set(line)
@@ -5046,9 +5410,9 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "左パネル「試合に効く基本方針」で戦術・HC・起用方針を変更できます。"
+            "左パネル「試合に効く基本方針」で戦術スタンス・HC・起用スタンスを変更できます。"
             "右パネル「起用の編集」で先発・6th・ベンチを変更できます。"
-            "上段ボタンから team_tactics の細かい設定（Phase A は試合未連携）。"
+            "上段ボタンは team_tactics の細かい設定（攻守の細部・起用の細部など。別ウィンドウで保存）。"
         )
 
         jp_blk = getattr(self, "strat_jp_block_var", None)
@@ -5147,7 +5511,7 @@ class MainMenuView:
             "transition_style": "トランジション方針",
         }
         w = tk.Toplevel(parent)
-        w.title("チーム戦術")
+        w.title("攻守の細部（team_tactics・保存）")
         w.geometry("520x420")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
@@ -5193,7 +5557,7 @@ class MainMenuView:
             raw = dict(get_safe_team_tactics(self.team))
             raw["team_strategy"] = _collect()
             self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "チーム戦術を保存しました。", parent=w)
+            messagebox.showinfo("保存", "攻守の細部を保存しました。", parent=w)
             self._refresh_strategy_window()
 
         def _reset() -> None:
@@ -8078,8 +8442,8 @@ class MainMenuView:
         return (
             "【クラブ案内】編集の正本は人事・戦術・経営・情報の各メニューです。"
             "ここは閲覧・案内・ターミナル（CLI）へのショートカットのみです（実行画面ではありません）。\n\n"
-            "【トレード・FA】1対1（選手のみ）は左メニュー「人事」から実行できます。\n"
-            "multi（複数人＋現金・RB）は人事または CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
+            "【トレード・FA】トレード（1対1〜複数人・現金・RB）は左メニュー「人事」または"
+            " CLI（シーズンメニュー「8. GMメニュー」→「10. トレード」）。\n"
             "レギュラー中の FA プールからの手動獲得は、人事の「インシーズンFA（1人）」から 1 名まで。"
             "期限・可否の詳細は「人事」ウィンドウ上部の案内を参照してください。\n"
             "再契約の確認は、GUIモードでオフシーズン処理の実行中にダイアログで表示されます。\n"
@@ -8790,10 +9154,13 @@ class MainMenuView:
         parent = getattr(self, "_development_window", None) or self.root
         w = tk.Toplevel(parent)
         w.title("個別練習を変更")
-        w.geometry("780x420")
+        w.geometry("980x580")
+        w.minsize(720, 480)
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
         wrap.pack(fill="both", expand=True)
+        wrap.rowconfigure(0, weight=1)
+        wrap.columnconfigure(0, weight=1)
 
         roster = list(getattr(self.team, "players", []) or [])
         roster = sorted(
@@ -8820,60 +9187,245 @@ class MainMenuView:
             ("speed_agility", "スピード&アジリティ", "physical"),
             ("iq_film", "映像分析（IQ）", "iq_handling"),
         ]
-        player_labels = [
-            f"{getattr(p, 'name', '-'):<16} {getattr(p, 'position', 'SF')} OVR:{int(getattr(p, 'ovr', 0))}"
-            for p in roster
-        ]
         drill_label_to_key = {label: (key, focus) for key, label, focus in drills}
+        key_to_drill_label = {key: label for key, label, _ in drills}
 
-        ttk.Label(wrap, text="選手", font=("Yu Gothic UI", 10, "bold")).grid(row=0, column=0, sticky="w")
-        player_combo = ttk.Combobox(wrap, state="readonly", values=player_labels, width=42)
-        player_combo.grid(row=1, column=0, sticky="ew", pady=(4, 10), padx=(0, 12))
-        player_combo.set(player_labels[0])
+        from basketball_sim.systems.draft import build_draft_candidate_role_shape_label
 
-        ttk.Label(wrap, text="練習", font=("Yu Gothic UI", 10, "bold")).grid(row=0, column=1, sticky="w")
-        drill_combo = ttk.Combobox(wrap, state="readonly", values=[label for _, label, _ in drills], width=32)
-        drill_combo.grid(row=1, column=1, sticky="ew", pady=(4, 10))
-        drill_combo.set(drills[0][1])
+        # 一覧の「現在練習」列のみ短縮（詳細・コンボは drills の正式名のまま）
+        _DRILL_TREE_SHORT: Dict[str, str] = {
+            "balanced": "バランス",
+            "dribble": "ドリブル",
+            "rebound": "リバ",
+            "stamina_run": "走り込み",
+            "shoot_form": "シュート",
+            "three_point": "3P",
+            "free_throw": "FT",
+            "drive_finish": "ドライブ",
+            "passing_read": "パス",
+            "defense_footwork": "守備Fw",
+            "strength": "筋力",
+            "speed_agility": "俊敏",
+            "iq_film": "IQ映像",
+        }
 
-        wrap.columnconfigure(0, weight=1)
-        wrap.columnconfigure(1, weight=1)
+        def _drill_label_for_key(dk: str) -> str:
+            k = str(dk or "balanced")
+            return key_to_drill_label.get(k, k)
+
+        def _drill_short_for_tree(dk: str) -> str:
+            k = str(dk or "balanced")
+            if k in _DRILL_TREE_SHORT:
+                return _DRILL_TREE_SHORT[k]
+            full = _drill_label_for_key(k)
+            return full if len(full) <= 6 else full[:6] + "…"
+
+        def _role_shape_label(p: Any) -> str:
+            try:
+                return str(build_draft_candidate_role_shape_label(p))
+            except Exception:
+                return "—"
+
+        def _row_values(p: Any) -> Tuple[Any, ...]:
+            cd = str(getattr(p, "training_drill", "balanced") or "balanced")
+            nat_lbl = jp_reg_display.get_player_nationality_bucket_label(p)
+            return (
+                str(getattr(p, "name", "-")),
+                str(getattr(p, "position", "SF")),
+                int(getattr(p, "ovr", 0)),
+                str(getattr(p, "potential", "-")),
+                int(getattr(p, "age", 0)),
+                nat_lbl,
+                _role_shape_label(p),
+                _drill_short_for_tree(cd),
+            )
+
+        pw = ttk.PanedWindow(wrap, orient=tk.VERTICAL)
+        pw.grid(row=0, column=0, sticky="nsew")
+
+        top_fr = ttk.Frame(pw, style="Panel.TFrame", padding=(0, 0, 0, 4))
+        bot_fr = ttk.Frame(pw, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        pw.add(top_fr, weight=3)
+        pw.add(bot_fr, weight=2)
+
+        ttk.Label(
+            top_fr,
+            text="ロスター一覧（行を選ぶと下部で能力・練習を編集）",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 4))
+
+        tree_fr = ttk.Frame(top_fr)
+        tree_fr.pack(fill="both", expand=True)
+        tree_fr.rowconfigure(0, weight=1)
+        tree_fr.columnconfigure(0, weight=1)
+        cols = ("name", "pos", "ovr", "pot", "age", "nat", "role", "drill")
+        tree = ttk.Treeview(
+            tree_fr,
+            columns=cols,
+            show="headings",
+            selectmode="browse",
+            height=12,
+        )
+        vsb = ttk.Scrollbar(tree_fr, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        tree.heading("name", text="選手名")
+        tree.heading("pos", text="POS")
+        tree.heading("ovr", text="OVR")
+        tree.heading("pot", text="POT")
+        tree.heading("age", text="年齢")
+        tree.heading("nat", text="国籍区分")
+        tree.heading("role", text="タイプ")
+        tree.heading("drill", text="現在練習")
+        tree.column("name", width=140, stretch=True)
+        tree.column("pos", width=40, stretch=False)
+        tree.column("ovr", width=40, stretch=False)
+        tree.column("pot", width=36, stretch=False)
+        tree.column("age", width=40, stretch=False)
+        tree.column("nat", width=88, stretch=False)
+        tree.column("role", width=72, stretch=False)
+        tree.column("drill", width=88, stretch=False)
+
+        for i, p in enumerate(roster):
+            tree.insert("", "end", iid=str(i), values=_row_values(p))
+
+        ttk.Label(bot_fr, text="選択中の選手", font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
+        head_var = tk.StringVar(value="")
+        ttk.Label(bot_fr, textvariable=head_var, wraplength=820, font=("Yu Gothic UI", 10)).pack(
+            anchor="w", pady=(2, 4)
+        )
+
+        attrs_fr = tk.Frame(bot_fr, bg="#1d2129", highlightthickness=0)
+        attrs_fr.pack(fill="x", pady=(0, 6))
+        _ATTR_GRID: List[List[Tuple[str, str]]] = [
+            [("3P", "three"), ("シュート", "shoot"), ("ドライブ", "drive")],
+            [("パス", "passing"), ("ハンドリング", "handling"), ("守備", "defense")],
+            [("リバウンド", "rebound"), ("FT", "ft"), ("スピード", "speed")],
+            [("パワー", "power"), ("スタミナ", "stamina"), ("IQ", "iq")],
+        ]
+        attr_value_lbl: Dict[str, tk.Label] = {}
+        _lbl_font = ("Yu Gothic UI", 9)
+        _val_font = ("Yu Gothic UI", 9, "bold")
+        for ri, row in enumerate(_ATTR_GRID):
+            for ci, (ja_nm, attr_key) in enumerate(row):
+                cell = tk.Frame(attrs_fr, bg="#1d2129")
+                cell.grid(row=ri, column=ci, sticky="ew", padx=6, pady=3)
+                attrs_fr.columnconfigure(ci, weight=1, uniform="attrcol")
+                tk.Label(
+                    cell,
+                    text=f"{ja_nm}:",
+                    width=11,
+                    anchor="e",
+                    bg="#1d2129",
+                    fg="#8899aa",
+                    font=_lbl_font,
+                ).pack(side="left")
+                vl = tk.Label(
+                    cell,
+                    text="—",
+                    width=3,
+                    anchor="e",
+                    bg="#1d2129",
+                    fg="#e8ecf0",
+                    font=_val_font,
+                )
+                vl.pack(side="left", padx=(8, 0))
+                attr_value_lbl[attr_key] = vl
+
+        drill_row = ttk.Frame(bot_fr)
+        drill_row.pack(fill="x", pady=(0, 4))
+        ttk.Label(drill_row, text="練習に変更", font=("Yu Gothic UI", 10, "bold")).pack(
+            side="left", padx=(0, 8)
+        )
+        drill_combo = ttk.Combobox(
+            drill_row,
+            state="readonly",
+            values=[label for _, label, _ in drills],
+            width=30,
+        )
+        drill_combo.pack(side="left")
 
         note_var = tk.StringVar(value="")
         tk.Label(
-            wrap,
+            bot_fr,
             textvariable=note_var,
             bg="#1d2129",
             fg="#d6dbe3",
             justify="left",
             anchor="w",
-            font=("Yu Gothic UI", 10),
+            font=("Yu Gothic UI", 9),
             padx=8,
             pady=6,
-            wraplength=740,
-        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+            wraplength=820,
+        ).pack(fill="x", pady=(0, 8))
 
-        def _selected_player() -> Any:
-            idx = max(0, player_combo.current())
+        def _selected_player() -> Optional[Any]:
+            sel = tree.selection()
+            if not sel:
+                return None
+            try:
+                idx = int(sel[0])
+            except (TypeError, ValueError):
+                return None
+            if idx < 0 or idx >= len(roster):
+                return None
             return roster[idx]
 
+        def _fill_detail_for_player(p: Any) -> None:
+            nm = str(getattr(p, "name", "-"))
+            pos = str(getattr(p, "position", "SF"))
+            ovr = int(getattr(p, "ovr", 0))
+            pot = str(getattr(p, "potential", "-"))
+            age = int(getattr(p, "age", 0))
+            cd = str(getattr(p, "training_drill", "balanced") or "balanced")
+            nat_l = jp_reg_display.get_player_nationality_bucket_label(p)
+            role_l = _role_shape_label(p)
+            head_var.set(
+                f"{nm}  /  {pos}  /  OVR {ovr}  /  POT {pot}  /  年齢 {age}  /  "
+                f"{nat_l}  /  タイプ: {role_l}  /  現在の練習: {_drill_label_for_key(cd)}"
+            )
+            for ak, lbl in attr_value_lbl.items():
+                lbl.config(text=str(int(getattr(p, ak, 0) or 0)))
+            drill_combo.set(_drill_label_for_key(cd))
+
         def _refresh_note(_event: Any = None) -> None:
+            p = _selected_player()
+            if p is None:
+                note_var.set("一覧から選手を選んでください。")
+                return
             key_focus = drill_label_to_key.get(drill_combo.get(), ("balanced", "balanced"))
             key = key_focus[0]
             reason = self._player_drill_lock_reason(self.team, key)
-            p = _selected_player()
             current_drill = str(getattr(p, "training_drill", "balanced") or "balanced")
+            cur_lab = _drill_label_for_key(current_drill)
             if reason:
-                note_var.set(f"現在ドリル: {current_drill} / 未解放（条件）: {reason}")
+                note_var.set(f"現在: {cur_lab} / 選択中の練習: 未解放（{reason}）")
             else:
-                note_var.set(f"現在ドリル: {current_drill} / 選択可能です。")
+                note_var.set(f"現在: {cur_lab} / 選択中の練習: 反映可能です。")
 
-        player_combo.bind("<<ComboboxSelected>>", _refresh_note)
+        def _on_tree_select(_event: Any = None) -> None:
+            p = _selected_player()
+            if p is None:
+                return
+            _fill_detail_for_player(p)
+            _refresh_note()
+
+        tree.bind("<<TreeviewSelect>>", _on_tree_select)
         drill_combo.bind("<<ComboboxSelected>>", _refresh_note)
+
+        first_iid = "0"
+        tree.selection_set(first_iid)
+        tree.focus(first_iid)
+        tree.see(first_iid)
+        _fill_detail_for_player(roster[0])
         _refresh_note()
 
         def _apply() -> None:
             p = _selected_player()
+            if p is None:
+                messagebox.showwarning("個別練習", "一覧から選手を選んでください。", parent=w)
+                return
             key, focus = drill_label_to_key.get(drill_combo.get(), ("", ""))
             if not key:
                 messagebox.showerror("エラー", "練習を選択してください。", parent=w)
@@ -8898,11 +9450,14 @@ class MainMenuView:
                 f"個別練習: {getattr(p, 'name', '-') } {old_drill} → {key}",
             )
             self._refresh_development_window()
+            idx = roster.index(p)
+            tree.item(str(idx), values=_row_values(p))
+            _fill_detail_for_player(p)
+            _refresh_note()
             messagebox.showinfo("完了", f"{getattr(p, 'name', '-') } の個別練習を更新しました。", parent=w)
-            w.destroy()
 
-        btn = ttk.Frame(wrap, style="Panel.TFrame")
-        btn.grid(row=3, column=0, columnspan=2, sticky="ew")
+        btn = ttk.Frame(bot_fr, style="Panel.TFrame")
+        btn.pack(fill="x")
         ttk.Button(btn, text="反映", style="Primary.TButton", command=_apply).pack(side="left")
         ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
 
@@ -8945,8 +9500,8 @@ class MainMenuView:
         messagebox.showinfo(
             "トレード・FA の案内",
             "ここは案内用で、編集実行の窓ではありません。\n"
-            "1対1（選手のみ）・multi（複数人・現金・RB）は左メニュー「人事」から実行できます。\n"
-            "同じ multi はシーズンメニュー「8. GMメニュー」→「10. トレード」からも実行できます。\n"
+            "トレード（1対1〜複数人・現金・RB）は左メニュー「人事」から実行できます。\n"
+            "同じ内容はシーズンメニュー「8. GMメニュー」→「10. トレード」からも実行できます。\n"
             "インシーズンFA（1人）は人事から。条件・期限は「人事」ウィンドウ上部の案内を参照してください。\n\n"
             "（左メニュー「クラブ案内」は編集窓ではありません。）",
             parent=parent,
@@ -9204,7 +9759,7 @@ class MainMenuView:
         bottom.pack(fill="x", pady=(10, 0))
         ttk.Button(
             bottom,
-            text="トレード・FAの案内（1対1・multiは人事／CLIでも可）",
+            text="トレード・FAの案内（人事／CLI）",
             style="Menu.TButton",
             command=self._on_gm_cli_trade_fa_hint,
         ).pack(side="left")
@@ -9333,8 +9888,7 @@ class MainMenuView:
 
     def _format_money(self, value: Any) -> str:
         try:
-            number = int(value)
-            return f"¥{number:,}"
+            return format_money_yen_ja_readable(int(value))
         except Exception:
             return str(value)
 
@@ -9356,8 +9910,7 @@ class MainMenuView:
 
     def _format_signed_money(self, value: Any) -> str:
         try:
-            number = int(value)
-            return f"{number:+,}円"
+            return format_signed_money_yen_ja_readable(int(value))
         except Exception:
             return str(value)
 
