@@ -4604,7 +4604,7 @@ class MainMenuView:
             text=(
                 "【構成】左＝クイック（Team.strategy / HC / Team.usage_policy）。"
                 "上のボタン＝詳細（team_tactics・各サブ画面で保存）。"
-                "右＝チームに保存する先発・6th・ベンチ（上部「ローテーション管理」の先発マップとは別データです）。"
+                "右＝チームに保存する先発・6th・ベンチ（上部「ローテの詳細」の先発マップとは別データです）。"
             ),
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
@@ -4629,27 +4629,27 @@ class MainMenuView:
 
         _nav_btn(
             row_a,
-            "チーム戦術",
+            "攻守の詳細",
             lambda: self._open_tactics_team_strategy_window(hub_ref),
         )
         _nav_btn(
             row_a,
-            "ローテーション管理",
+            "ローテの詳細",
             lambda: self._open_tactics_rotation_window(hub_ref),
         )
         _nav_btn(
             row_a,
-            "起用方針",
+            "起用テンプレ",
             lambda: self._open_tactics_usage_policy_window(hub_ref),
         )
         _nav_btn(
             row_b,
-            "役割設定",
+            "役割の詳細",
             lambda: self._open_tactics_roles_window(hub_ref),
         )
         _nav_btn(
             row_b,
-            "セットプレー方針",
+            "セットの詳細",
             lambda: self._open_tactics_playbook_window(hub_ref),
         )
 
@@ -4709,7 +4709,9 @@ class MainMenuView:
         ttk.Label(strategy_panel, text="チーム概要とクイック設定", style="SectionTitle.TLabel").pack(
             anchor="w", pady=(0, 8)
         )
-        ttk.Label(lineup_panel, text="起用状況", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 8))
+        ttk.Label(lineup_panel, text="スタメンと控えの状況", style="SectionTitle.TLabel").pack(
+            anchor="w", pady=(0, 8)
+        )
         ttk.Label(notes_panel, text="補足", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 8))
 
         self.strategy_lines = []
@@ -4731,7 +4733,7 @@ class MainMenuView:
         ttk.Separator(strategy_panel, orient="horizontal").pack(fill="x", pady=(12, 8))
         ttk.Label(
             strategy_panel,
-            text="試合に効く基本方針（保存）",
+            text="クイック：基本方針（保存）",
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 4))
         ttk.Label(
@@ -4769,12 +4771,12 @@ class MainMenuView:
             width=28,
             values=[lab for _, lab in USAGE_POLICY_OPTIONS],
         )
-        ttk.Label(pol_grid, text="チーム戦術", font=("Yu Gothic UI", 9)).grid(row=0, column=0, sticky="w", pady=4)
+        ttk.Label(pol_grid, text="基本戦術", font=("Yu Gothic UI", 9)).grid(row=0, column=0, sticky="w", pady=4)
         self._strat_combo_strategy.grid(row=0, column=1, sticky="ew", pady=4, padx=(10, 0))
         ttk.Label(pol_grid, text="HCスタイル", font=("Yu Gothic UI", 9)).grid(row=1, column=0, sticky="w", pady=4)
         self._strat_combo_coach.grid(row=1, column=1, sticky="ew", pady=4, padx=(10, 0))
         self._strat_combo_coach.bind("<<ComboboxSelected>>", self._on_strat_coach_selection_changed)
-        ttk.Label(pol_grid, text="起用方針", font=("Yu Gothic UI", 9)).grid(row=2, column=0, sticky="w", pady=4)
+        ttk.Label(pol_grid, text="基本起用", font=("Yu Gothic UI", 9)).grid(row=2, column=0, sticky="w", pady=4)
         self._strat_combo_usage.grid(row=2, column=1, sticky="ew", pady=4, padx=(10, 0))
 
         ttk.Label(
@@ -4856,7 +4858,7 @@ class MainMenuView:
             lineup_panel,
             text=(
                 "先発はポジ枠ごとに1人ずつ差し替え。6th・ベンチは控えの序列を変更できます。"
-                "ここで保存する先発は Team 側です。上部「ローテーション管理」の先発マップ（team_tactics.rotation）とは別系統です。"
+                "ここで保存する先発は Team 側です。上部「ローテの詳細」の先発マップ（team_tactics.rotation）とは別系統です。"
             ),
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 6))
@@ -5023,9 +5025,9 @@ class MainMenuView:
         self.strategy_header_var.set(f"{self._team_name()} 戦術メニュー（概要）")
 
         strategy_lines = [
-            f"試合反映中の戦術 (Team.strategy): {strategy_text}",
+            f"基本戦術 (Team.strategy): {strategy_text}",
             f"HCスタイル: {coach_text}",
-            f"起用方針 (Team.usage_policy): {usage_text}",
+            f"基本起用 (Team.usage_policy): {usage_text}",
             f"ロスター人数: {len(list(self._safe_get(self.team, 'players', []) or []))}",
             f"先発人数: {len(starters)} / ベンチ序列人数: {len(bench_order)}",
             "詳細 (team_tactics): 上のボタンで各サブ画面を開き保存。試合で参照される項目と参照が限定的な項目が混在します。",
@@ -5058,9 +5060,9 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "左の「基本方針」はチーム全体の手早い設定（Team.strategy / coach_style / Team.usage_policy）。"
-            "上段ボタンは team_tactics の詳細（攻守の細部・ローテ・別枠の起用細部など。試合で参照されるキーは限定的です）。"
-            "右の先発・6th・ベンチは Team に保存します。上部「ローテーション管理」の先発マップとは別データです。"
+            "左の「クイック：基本方針」はチーム全体の手早い設定（Team.strategy / coach_style / Team.usage_policy）。"
+            "上段ボタンは team_tactics の詳細（攻守の詳細・ローテの詳細・起用テンプレなど。試合で参照されるキーは限定的です）。"
+            "右の先発・6th・ベンチは Team に保存します。上部「ローテの詳細」の先発マップとは別データです。"
         )
 
         jp_blk = getattr(self, "strat_jp_block_var", None)
@@ -5159,7 +5161,7 @@ class MainMenuView:
             "transition_style": "トランジション方針",
         }
         w = tk.Toplevel(parent)
-        w.title("チーム戦術")
+        w.title("攻守の詳細")
         w.geometry("520x420")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
@@ -5205,7 +5207,7 @@ class MainMenuView:
             raw = dict(get_safe_team_tactics(self.team))
             raw["team_strategy"] = _collect()
             self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "チーム戦術を保存しました。", parent=w)
+            messagebox.showinfo("保存", "攻守の詳細を保存しました。", parent=w)
             self._refresh_strategy_window()
 
         def _reset() -> None:
@@ -5251,7 +5253,7 @@ class MainMenuView:
         ]
 
         w = tk.Toplevel(parent)
-        w.title("ローテーション管理")
+        w.title("ローテの詳細")
         w.geometry("640x620")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
@@ -5385,7 +5387,7 @@ class MainMenuView:
             raw = dict(get_safe_team_tactics(self.team))
             raw["rotation"] = _collect_rotation()
             self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "ローテーション設定を保存しました。", parent=w)
+            messagebox.showinfo("保存", "ローテの詳細を保存しました。", parent=w)
             self._refresh_strategy_window()
 
         def _reset() -> None:
@@ -5438,7 +5440,7 @@ class MainMenuView:
             "foreign_player_usage": "外国籍起用方針",
         }
         w = tk.Toplevel(parent)
-        w.title("起用方針（詳細・保存のみ）")
+        w.title("起用テンプレ（team_tactics・保存）")
         w.geometry("560x400")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
@@ -5476,7 +5478,7 @@ class MainMenuView:
             raw = dict(get_safe_team_tactics(self.team))
             raw["usage_policy"] = _collect()
             self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "起用方針（詳細）を保存しました。", parent=w)
+            messagebox.showinfo("保存", "起用テンプレを保存しました。", parent=w)
 
         def _reset() -> None:
             d = get_default_team_tactics()["usage_policy"]
@@ -5504,7 +5506,7 @@ class MainMenuView:
         ]
         level_pairs = [("low", "少ない"), ("standard", "標準"), ("high", "多い")]
         w = tk.Toplevel(parent)
-        w.title("セットプレー方針")
+        w.title("セットの詳細")
         w.geometry("480x360")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
@@ -5539,7 +5541,7 @@ class MainMenuView:
             raw = dict(get_safe_team_tactics(self.team))
             raw["playbook"] = _collect()
             self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "セットプレー方針を保存しました。", parent=w)
+            messagebox.showinfo("保存", "セットの詳細を保存しました。", parent=w)
 
         def _reset() -> None:
             d = get_default_team_tactics()["playbook"]
@@ -5585,7 +5587,7 @@ class MainMenuView:
         def_pairs = [("stopper", "相手主力担当"), ("standard", "標準"), ("light", "負担軽め")]
 
         w = tk.Toplevel(parent)
-        w.title("役割設定")
+        w.title("役割の詳細")
         w.geometry("720x460")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
@@ -5707,7 +5709,7 @@ class MainMenuView:
             raw = dict(get_safe_team_tactics(self.team))
             raw["roles"] = dict(roles)
             self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "役割設定を保存しました。", parent=w)
+            messagebox.showinfo("保存", "役割の詳細を保存しました。", parent=w)
 
         def _reset_player() -> None:
             sel = lb.curselection()
@@ -8101,7 +8103,7 @@ class MainMenuView:
             "ウィンドウ下のボタンはターミナル（CLI）へのショートカットです。\n\n"
             "先発・6th・ベンチの編集は左メニュー「戦術」（起用の編集）。"
             "当窓の「スタメン・ベンチ」は参照のみです。"
-            "戦術・HC・起用方針の編集は左メニュー「戦術」（試合に効く基本方針）。"
+            "戦術・HC・起用の編集は左メニュー「戦術」（クイック：基本方針）。"
             "当窓の「戦術・HC・起用」は参照のみです。"
             "サラリーキャップの数値は左メニュー「経営」の「財務サマリー」下部。当窓の「サラリーキャップ」は案内のみです。"
             "チーム属性は左メニュー「情報」の「概要」上部。当窓の「チーム情報」は案内のみです。"
@@ -8186,11 +8188,11 @@ class MainMenuView:
         ct = self.COACH_STYLE_LABELS.get(str(ck), str(ck))
         ut = self.USAGE_POLICY_LABELS.get(str(uk), str(uk))
         lines = [
-            "編集は左メニュー「戦術」ウィンドウの左パネル「試合に効く基本方針」から行ってください。",
+            "編集は左メニュー「戦術」ウィンドウの左パネル「クイック：基本方針」から行ってください。",
             "",
-            f"戦術 (Team.strategy): {st}",
+            f"基本戦術 (Team.strategy): {st}",
             f"HCスタイル: {ct}",
-            f"起用方針 (Team.usage_policy): {ut}",
+            f"基本起用 (Team.usage_policy): {ut}",
             "",
             "【強化メニューとの関連（現在のHC条件）】",
         ]
@@ -8521,7 +8523,7 @@ class MainMenuView:
             messagebox.showerror("反映できません", msg, parent=parent)
             return
         self.refresh()
-        lines = ["戦術・HC・起用方針を反映しました。"]
+        lines = ["基本戦術・HC・基本起用を反映しました。"]
         if old_coach != ck:
             lines.append("")
             lines.extend(self._build_coach_unlock_diff_lines(old_coach, ck))
@@ -9188,7 +9190,7 @@ class MainMenuView:
         notice_st.grid(row=0, column=0, sticky="ew")
         ttk.Label(
             notice_st,
-            text="戦術・HCスタイル・起用方針の編集は、左メニュー「戦術」を開き、左パネル「試合に効く基本方針」から行ってください。",
+            text="戦術・HCスタイル・起用の編集は、左メニュー「戦術」を開き、左パネル「クイック：基本方針」から行ってください。",
             wraplength=820,
             font=("Yu Gothic UI", 10),
         ).pack(anchor="w")
@@ -9654,7 +9656,7 @@ class MainMenuView:
             "【推奨アクション】\n"
             "・戦術メニュー（左「戦術①」）… 先発・6th・ベンチ順と「目標出場時間」を見直し、負傷者に負荷がかからないローテに組み替える。\n"
             "・人事メニュー（左「人事①」）… ロスター表で選手の状態を確認する。\n"
-            "・チーム戦術の injury_care（ケガ配慮）や交代方針は、戦術メニュー内の各設定画面から調整できます。\n\n"
+            "・team_tactics 側の起用テンプレ（例: injury_care）や交代方針は、戦術メニュー上部の詳細ボタンから調整できます。\n\n"
             "【選手一覧】\n"
         )
         player_lines: List[str] = []
