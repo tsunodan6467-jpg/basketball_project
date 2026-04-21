@@ -59,6 +59,10 @@ from basketball_sim.systems.season_transaction_rules import (
     INSEASON_ROSTER_MOVE_LOCK_MESSAGE_JA,
     inseason_roster_moves_unlocked,
 )
+from basketball_sim.systems.money_display import (
+    format_money_yen_ja_readable,
+    format_signed_money_yen_ja_readable,
+)
 from basketball_sim.systems.training_unlocks import player_drill_lock_reason
 from basketball_sim.systems.team_tactics import (
     STARTER_POSITIONS,
@@ -1450,22 +1454,26 @@ class MainMenuView:
             }.get(st, st)
             room_soft = league_cap - payroll
             if room_soft >= 0:
-                room_str = f"キャップ余裕 {room_soft:,}円"
+                room_str = f"キャップ余裕 {format_money_yen_ja_readable(room_soft)}"
             else:
-                room_str = f"キャップ超過 {abs(room_soft):,}円"
+                room_str = f"キャップ超過 {format_money_yen_ja_readable(abs(room_soft))}"
             tax = int(compute_luxury_tax(payroll, league_level=lv))
-            tax_str = f" / 贅沢税 {tax:,}円" if tax > 0 else ""
+            tax_str = f" / 贅沢税 {format_money_yen_ja_readable(tax)}" if tax > 0 else ""
             bud = int(self._safe_get(team, "payroll_budget", 0) or 0)
             bud_str = ""
             if bud > 0:
                 mark = " ⚠" if payroll > bud else ""
-                bud_str = f" | クラブ目安 {bud:,}円{mark}"
+                bud_str = f" | クラブ目安 {format_money_yen_ja_readable(bud)}{mark}"
             floor = int(get_payroll_floor(lv))
             floor_str = ""
             if floor > 0 and payroll < floor:
-                floor_str = f" | ⚠ ペイロール下限未満（要 {floor:,}円以上・シーズン終了時は降格の対象）"
+                floor_str = (
+                    f" | ⚠ ペイロール下限未満（要 {format_money_yen_ja_readable(floor)}以上・"
+                    "シーズン終了時は降格の対象）"
+                )
             return (
-                f"給与合計 {payroll:,}円（サラリーキャップ {league_cap:,}円・全D共通12億）"
+                f"給与合計 {format_money_yen_ja_readable(payroll)}（サラリーキャップ "
+                f"{format_money_yen_ja_readable(league_cap)}・全D共通12億）"
                 f" | {status_ja} | {room_str}{tax_str}{bud_str}{floor_str}"
             )
         except Exception:
@@ -1487,7 +1495,7 @@ class MainMenuView:
 
         window = tk.Toplevel(self.root)
         window.title(f"人事・ロスター - {self._team_name()}")
-        window.geometry("980x800")
+        window.geometry("980x840")
         window.minsize(860, 620)
         window.configure(bg="#15171c")
         try:
@@ -1519,12 +1527,12 @@ class MainMenuView:
             anchor="w",
             font=("Yu Gothic UI", 9),
             padx=14,
-            pady=6,
+            pady=4,
             wraplength=900,
-        ).pack(fill="x", pady=(0, 8))
+        ).pack(fill="x", pady=(0, 6))
 
         trade_fa_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
-        trade_fa_wrap.pack(fill="x", pady=(0, 10))
+        trade_fa_wrap.pack(fill="x", pady=(0, 8))
         ttk.Label(
             trade_fa_wrap,
             text="トレード・FA（表で選手選択→解除。1対1／multi（複数人＋現金・RB可）／インシーズンFAは横ボタン）",
@@ -1567,7 +1575,7 @@ class MainMenuView:
         self.roster_trade_fa_text = tk.Text(
             tf_row,
             wrap="word",
-            height=9,
+            height=2,
             bg="#1d2129",
             fg="#d6dbe3",
             insertbackground="#d6dbe3",
@@ -1581,19 +1589,31 @@ class MainMenuView:
         self.roster_trade_fa_text.grid(row=0, column=0, sticky="nsew")
         tf_vsb.grid(row=0, column=1, sticky="ns")
 
-        columns = ("role", "name", "pos", "ovr", "pot", "age", "fatigue", "morale", "salary", "years")
+        columns = (
+            "role",
+            "name",
+            "pos",
+            "ovr",
+            "pot",
+            "age",
+            "nat_bucket",
+            "fatigue",
+            "morale",
+            "salary",
+            "years",
+        )
 
         roster_paned = ttk.Panedwindow(outer, orient="vertical")
         roster_paned.pack(fill="both", expand=True)
 
         tree_wrap = ttk.Frame(roster_paned, style="Panel.TFrame", padding=10)
-        roster_paned.add(tree_wrap, weight=3)
+        roster_paned.add(tree_wrap, weight=10)
 
         self.roster_tree = ttk.Treeview(
             tree_wrap,
             columns=columns,
             show="headings",
-            height=18,
+            height=16,
         )
         headings = {
             "role": "役割",
@@ -1602,6 +1622,7 @@ class MainMenuView:
             "ovr": "OVR",
             "pot": "POT",
             "age": "年齢",
+            "nat_bucket": "国籍区分",
             "fatigue": "疲労",
             "morale": "士気",
             "salary": "年俸",
@@ -1614,6 +1635,7 @@ class MainMenuView:
             "ovr": 70,
             "pot": 70,
             "age": 70,
+            "nat_bucket": 100,
             "fatigue": 70,
             "morale": 70,
             "salary": 130,
@@ -1622,7 +1644,7 @@ class MainMenuView:
 
         for key in columns:
             self.roster_tree.heading(key, text=headings[key])
-            anchor = "center" if key != "name" else "w"
+            anchor = "center" if key not in ("name", "nat_bucket") else "w"
             self.roster_tree.column(key, width=widths[key], anchor=anchor, stretch=(key == "name"))
 
         vsb = ttk.Scrollbar(tree_wrap, orient="vertical", command=self.roster_tree.yview)
@@ -1637,19 +1659,24 @@ class MainMenuView:
 
         detail_outer = ttk.Frame(roster_paned, style="Panel.TFrame", padding=(10, 6, 10, 10))
         roster_paned.add(detail_outer, weight=2)
+        try:
+            roster_paned.pane(tree_wrap, minsize=180)
+            roster_paned.pane(detail_outer, minsize=96)
+        except tk.TclError:
+            pass
         detail_outer.columnconfigure(0, weight=1)
         ttk.Label(
             detail_outer,
             text="詳細ロスター（テキスト一覧・閲覧専用）",
             style="TopBar.TLabel",
             anchor="w",
-        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         ttk.Label(
             detail_outer,
             text="表と同一ロスターです。並び・体裁は GM 表示ルール（docs/GM_ROSTER_DISPLAY_RULES.md）に沿います。",
             wraplength=900,
             font=("Yu Gothic UI", 9),
-        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 2))
         text_host = ttk.Frame(detail_outer, style="Panel.TFrame", padding=0)
         text_host.grid(row=2, column=0, columnspan=2, sticky="nsew")
         detail_outer.rowconfigure(2, weight=1)
@@ -1658,7 +1685,7 @@ class MainMenuView:
         self.roster_detail_text = tk.Text(
             text_host,
             wrap="none",
-            height=10,
+            height=3,
             bg="#222834",
             fg="#e8ecf0",
             insertbackground="#e8ecf0",
@@ -1673,6 +1700,24 @@ class MainMenuView:
         self.roster_detail_text.grid(row=0, column=0, sticky="nsew")
         rdt_vsb.grid(row=0, column=1, sticky="ns")
         rdt_hsb.grid(row=1, column=0, sticky="ew")
+
+        self._roster_vert_split_done = False
+
+        def _apply_roster_vertical_split(_event: Any = None) -> None:
+            if self._roster_vert_split_done:
+                return
+            try:
+                ph = int(roster_paned.winfo_height())
+                if ph < 200:
+                    return
+                roster_paned.sashpos(0, max(160, int(ph * 0.82)))
+                self._roster_vert_split_done = True
+            except tk.TclError:
+                pass
+
+        roster_paned.bind("<Map>", _apply_roster_vertical_split)
+        window.after_idle(_apply_roster_vertical_split)
+        window.after(200, _apply_roster_vertical_split)
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
@@ -1846,7 +1891,7 @@ class MainMenuView:
             return (
                 f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
                 f"OVR {int(getattr(p, 'ovr', 0) or 0)}  年齢 {int(getattr(p, 'age', 0) or 0)}  "
-                f"{nat_j}  年俸 {sal:,}円"
+                f"{nat_j}  年俸 {format_money_yen_ja_readable(sal)}"
             )
 
         def refresh_list() -> None:
@@ -2263,7 +2308,7 @@ class MainMenuView:
             return (
                 f"{getattr(p, 'name', '?')}  {getattr(p, 'position', '?')}  "
                 f"OVR {int(getattr(p, 'ovr', 0) or 0)}  年齢 {int(getattr(p, 'age', 0) or 0)}  "
-                f"{nat_j}  年俸 {sal:,}円"
+                f"{nat_j}  年俸 {format_money_yen_ja_readable(sal)}"
             )
 
         def set_center_pane(mode: str) -> None:
@@ -2365,9 +2410,9 @@ class MainMenuView:
                 ar = ", ".join(getattr(p, "name", "?") for p in ai_receives)
                 pay_lines = ""
                 if cash_amt > 0:
-                    pay_lines += f"\n現金（自分→相手）: {cash_amt:,} 円"
+                    pay_lines += f"\n現金（自分→相手）: {format_money_yen_ja_readable(cash_amt)}"
                 if rb_amt > 0:
-                    pay_lines += f"\nRB（自分→相手）: {rb_amt:,}"
+                    pay_lines += f"\nRB（自分→相手）: {format_money_yen_ja_readable(rb_amt)}"
                 messagebox.showinfo(
                     "トレード",
                     f"成立: {ug} を放出 / {ar} を獲得{pay_lines}",
@@ -2459,8 +2504,10 @@ class MainMenuView:
                 state["user_gives"] = picked
                 max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
                 max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
-                cash_limit_var.set(f"現金: 0〜{max_cash:,} 円（空欄は送金なし）")
-                rb_limit_var.set(f"RB: 0〜{max_rb:,}（空欄は移転なし）")
+                cash_limit_var.set(
+                    f"現金: 0〜{format_money_yen_ja_readable(max_cash)}（空欄は送金なし）"
+                )
+                rb_limit_var.set(f"RB: 0〜{format_money_yen_ja_readable(max_rb)}（空欄は移転なし）")
                 cash_entry.delete(0, tk.END)
                 rb_entry.delete(0, tk.END)
                 state["step"] = 4
@@ -2646,7 +2693,7 @@ class MainMenuView:
                     int(getattr(p, "ovr", 0) or 0),
                     int(getattr(p, "age", 0) or 0),
                     nat_j,
-                    f"{est:,}",
+                    format_money_yen_ja_readable(est),
                 ),
             )
 
@@ -2680,10 +2727,10 @@ class MainMenuView:
                 messagebox.showinfo(
                     "インシーズンFA（制限確認）",
                     f"選手: {nm}\n"
-                    f"年俸目安: {sal:,} 円\n"
+                    f"年俸目安: {format_money_yen_ja_readable(sal)}\n"
                     f"契約年数: {yrs} 年\n"
-                    f"サラリー契約余地: {room:,} 円\n"
-                    f"所持金: {money:,} 円\n\n"
+                    f"サラリー契約余地: {format_money_yen_ja_readable(room)}\n"
+                    f"所持金: {format_money_yen_ja_readable(money)}\n\n"
                     "上記条件で契約できます。「契約する」で確定してください。",
                     parent=top,
                 )
@@ -2692,9 +2739,9 @@ class MainMenuView:
                 messagebox.showwarning(
                     "インシーズンFA（制限確認）",
                     f"選手: {nm}\n"
-                    f"年俸目安: {sal:,} 円\n"
-                    f"サラリー契約余地: {room:,} 円\n"
-                    f"所持金: {money:,} 円\n\n"
+                    f"年俸目安: {format_money_yen_ja_readable(sal)}\n"
+                    f"サラリー契約余地: {format_money_yen_ja_readable(room)}\n"
+                    f"所持金: {format_money_yen_ja_readable(money)}\n\n"
                     f"契約できません: {reason}",
                     parent=top,
                 )
@@ -2713,7 +2760,7 @@ class MainMenuView:
             yrs = int(estimate_fa_contract_years(player))
             if not messagebox.askyesno(
                 "インシーズンFA（最終確認）",
-                f"{nm} と契約しますか？\n\n年俸目安 {sal:,} 円 / {yrs} 年\n"
+                f"{nm} と契約しますか？\n\n年俸目安 {format_money_yen_ja_readable(sal)} / {yrs} 年\n"
                 "（標準の FA 契約処理で反映。所持金の即時減算はありません。）",
                 parent=top,
             ):
@@ -2926,11 +2973,12 @@ class MainMenuView:
             morale = str(self._safe_get(player, "morale", "-"))
             salary = self._format_money(self._safe_get(player, "salary", 0))
             years = str(self._safe_get(player, "contract_years_left", "-"))
+            nat_lbl = jp_reg_display.get_player_nationality_bucket_label(player)
 
             iid = tree.insert(
                 "",
                 "end",
-                values=(role, name, pos, ovr, pot, age, fatigue, morale, salary, years),
+                values=(role, name, pos, ovr, pot, age, nat_lbl, fatigue, morale, salary, years),
             )
             self._roster_item_to_player[iid] = player
 
@@ -9197,8 +9245,7 @@ class MainMenuView:
 
     def _format_money(self, value: Any) -> str:
         try:
-            number = int(value)
-            return f"¥{number:,}"
+            return format_money_yen_ja_readable(int(value))
         except Exception:
             return str(value)
 
@@ -9220,8 +9267,7 @@ class MainMenuView:
 
     def _format_signed_money(self, value: Any) -> str:
         try:
-            number = int(value)
-            return f"{number:+,}円"
+            return format_signed_money_yen_ja_readable(int(value))
         except Exception:
             return str(value)
 
