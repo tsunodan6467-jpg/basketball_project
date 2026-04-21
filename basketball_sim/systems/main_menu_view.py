@@ -8702,10 +8702,13 @@ class MainMenuView:
         parent = getattr(self, "_development_window", None) or self.root
         w = tk.Toplevel(parent)
         w.title("個別練習を変更")
-        w.geometry("780x420")
+        w.geometry("980x580")
+        w.minsize(720, 480)
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
         wrap.pack(fill="both", expand=True)
+        wrap.rowconfigure(0, weight=1)
+        wrap.columnconfigure(0, weight=1)
 
         roster = list(getattr(self.team, "players", []) or [])
         roster = sorted(
@@ -8732,60 +8735,245 @@ class MainMenuView:
             ("speed_agility", "スピード&アジリティ", "physical"),
             ("iq_film", "映像分析（IQ）", "iq_handling"),
         ]
-        player_labels = [
-            f"{getattr(p, 'name', '-'):<16} {getattr(p, 'position', 'SF')} OVR:{int(getattr(p, 'ovr', 0))}"
-            for p in roster
-        ]
         drill_label_to_key = {label: (key, focus) for key, label, focus in drills}
+        key_to_drill_label = {key: label for key, label, _ in drills}
 
-        ttk.Label(wrap, text="選手", font=("Yu Gothic UI", 10, "bold")).grid(row=0, column=0, sticky="w")
-        player_combo = ttk.Combobox(wrap, state="readonly", values=player_labels, width=42)
-        player_combo.grid(row=1, column=0, sticky="ew", pady=(4, 10), padx=(0, 12))
-        player_combo.set(player_labels[0])
+        from basketball_sim.systems.draft import build_draft_candidate_role_shape_label
 
-        ttk.Label(wrap, text="練習", font=("Yu Gothic UI", 10, "bold")).grid(row=0, column=1, sticky="w")
-        drill_combo = ttk.Combobox(wrap, state="readonly", values=[label for _, label, _ in drills], width=32)
-        drill_combo.grid(row=1, column=1, sticky="ew", pady=(4, 10))
-        drill_combo.set(drills[0][1])
+        # 一覧の「現在練習」列のみ短縮（詳細・コンボは drills の正式名のまま）
+        _DRILL_TREE_SHORT: Dict[str, str] = {
+            "balanced": "バランス",
+            "dribble": "ドリブル",
+            "rebound": "リバ",
+            "stamina_run": "走り込み",
+            "shoot_form": "シュート",
+            "three_point": "3P",
+            "free_throw": "FT",
+            "drive_finish": "ドライブ",
+            "passing_read": "パス",
+            "defense_footwork": "守備Fw",
+            "strength": "筋力",
+            "speed_agility": "俊敏",
+            "iq_film": "IQ映像",
+        }
 
-        wrap.columnconfigure(0, weight=1)
-        wrap.columnconfigure(1, weight=1)
+        def _drill_label_for_key(dk: str) -> str:
+            k = str(dk or "balanced")
+            return key_to_drill_label.get(k, k)
+
+        def _drill_short_for_tree(dk: str) -> str:
+            k = str(dk or "balanced")
+            if k in _DRILL_TREE_SHORT:
+                return _DRILL_TREE_SHORT[k]
+            full = _drill_label_for_key(k)
+            return full if len(full) <= 6 else full[:6] + "…"
+
+        def _role_shape_label(p: Any) -> str:
+            try:
+                return str(build_draft_candidate_role_shape_label(p))
+            except Exception:
+                return "—"
+
+        def _row_values(p: Any) -> Tuple[Any, ...]:
+            cd = str(getattr(p, "training_drill", "balanced") or "balanced")
+            nat_lbl = jp_reg_display.get_player_nationality_bucket_label(p)
+            return (
+                str(getattr(p, "name", "-")),
+                str(getattr(p, "position", "SF")),
+                int(getattr(p, "ovr", 0)),
+                str(getattr(p, "potential", "-")),
+                int(getattr(p, "age", 0)),
+                nat_lbl,
+                _role_shape_label(p),
+                _drill_short_for_tree(cd),
+            )
+
+        pw = ttk.PanedWindow(wrap, orient=tk.VERTICAL)
+        pw.grid(row=0, column=0, sticky="nsew")
+
+        top_fr = ttk.Frame(pw, style="Panel.TFrame", padding=(0, 0, 0, 4))
+        bot_fr = ttk.Frame(pw, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        pw.add(top_fr, weight=3)
+        pw.add(bot_fr, weight=2)
+
+        ttk.Label(
+            top_fr,
+            text="ロスター一覧（行を選ぶと下部で能力・練習を編集）",
+            font=("Yu Gothic UI", 9),
+        ).pack(anchor="w", pady=(0, 4))
+
+        tree_fr = ttk.Frame(top_fr)
+        tree_fr.pack(fill="both", expand=True)
+        tree_fr.rowconfigure(0, weight=1)
+        tree_fr.columnconfigure(0, weight=1)
+        cols = ("name", "pos", "ovr", "pot", "age", "nat", "role", "drill")
+        tree = ttk.Treeview(
+            tree_fr,
+            columns=cols,
+            show="headings",
+            selectmode="browse",
+            height=12,
+        )
+        vsb = ttk.Scrollbar(tree_fr, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        tree.heading("name", text="選手名")
+        tree.heading("pos", text="POS")
+        tree.heading("ovr", text="OVR")
+        tree.heading("pot", text="POT")
+        tree.heading("age", text="年齢")
+        tree.heading("nat", text="国籍区分")
+        tree.heading("role", text="タイプ")
+        tree.heading("drill", text="現在練習")
+        tree.column("name", width=140, stretch=True)
+        tree.column("pos", width=40, stretch=False)
+        tree.column("ovr", width=40, stretch=False)
+        tree.column("pot", width=36, stretch=False)
+        tree.column("age", width=40, stretch=False)
+        tree.column("nat", width=88, stretch=False)
+        tree.column("role", width=72, stretch=False)
+        tree.column("drill", width=88, stretch=False)
+
+        for i, p in enumerate(roster):
+            tree.insert("", "end", iid=str(i), values=_row_values(p))
+
+        ttk.Label(bot_fr, text="選択中の選手", font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
+        head_var = tk.StringVar(value="")
+        ttk.Label(bot_fr, textvariable=head_var, wraplength=820, font=("Yu Gothic UI", 10)).pack(
+            anchor="w", pady=(2, 4)
+        )
+
+        attrs_fr = tk.Frame(bot_fr, bg="#1d2129", highlightthickness=0)
+        attrs_fr.pack(fill="x", pady=(0, 6))
+        _ATTR_GRID: List[List[Tuple[str, str]]] = [
+            [("3P", "three"), ("シュート", "shoot"), ("ドライブ", "drive")],
+            [("パス", "passing"), ("ハンドリング", "handling"), ("守備", "defense")],
+            [("リバウンド", "rebound"), ("FT", "ft"), ("スピード", "speed")],
+            [("パワー", "power"), ("スタミナ", "stamina"), ("IQ", "iq")],
+        ]
+        attr_value_lbl: Dict[str, tk.Label] = {}
+        _lbl_font = ("Yu Gothic UI", 9)
+        _val_font = ("Yu Gothic UI", 9, "bold")
+        for ri, row in enumerate(_ATTR_GRID):
+            for ci, (ja_nm, attr_key) in enumerate(row):
+                cell = tk.Frame(attrs_fr, bg="#1d2129")
+                cell.grid(row=ri, column=ci, sticky="ew", padx=6, pady=3)
+                attrs_fr.columnconfigure(ci, weight=1, uniform="attrcol")
+                tk.Label(
+                    cell,
+                    text=f"{ja_nm}:",
+                    width=11,
+                    anchor="e",
+                    bg="#1d2129",
+                    fg="#8899aa",
+                    font=_lbl_font,
+                ).pack(side="left")
+                vl = tk.Label(
+                    cell,
+                    text="—",
+                    width=3,
+                    anchor="e",
+                    bg="#1d2129",
+                    fg="#e8ecf0",
+                    font=_val_font,
+                )
+                vl.pack(side="left", padx=(8, 0))
+                attr_value_lbl[attr_key] = vl
+
+        drill_row = ttk.Frame(bot_fr)
+        drill_row.pack(fill="x", pady=(0, 4))
+        ttk.Label(drill_row, text="練習に変更", font=("Yu Gothic UI", 10, "bold")).pack(
+            side="left", padx=(0, 8)
+        )
+        drill_combo = ttk.Combobox(
+            drill_row,
+            state="readonly",
+            values=[label for _, label, _ in drills],
+            width=30,
+        )
+        drill_combo.pack(side="left")
 
         note_var = tk.StringVar(value="")
         tk.Label(
-            wrap,
+            bot_fr,
             textvariable=note_var,
             bg="#1d2129",
             fg="#d6dbe3",
             justify="left",
             anchor="w",
-            font=("Yu Gothic UI", 10),
+            font=("Yu Gothic UI", 9),
             padx=8,
             pady=6,
-            wraplength=740,
-        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+            wraplength=820,
+        ).pack(fill="x", pady=(0, 8))
 
-        def _selected_player() -> Any:
-            idx = max(0, player_combo.current())
+        def _selected_player() -> Optional[Any]:
+            sel = tree.selection()
+            if not sel:
+                return None
+            try:
+                idx = int(sel[0])
+            except (TypeError, ValueError):
+                return None
+            if idx < 0 or idx >= len(roster):
+                return None
             return roster[idx]
 
+        def _fill_detail_for_player(p: Any) -> None:
+            nm = str(getattr(p, "name", "-"))
+            pos = str(getattr(p, "position", "SF"))
+            ovr = int(getattr(p, "ovr", 0))
+            pot = str(getattr(p, "potential", "-"))
+            age = int(getattr(p, "age", 0))
+            cd = str(getattr(p, "training_drill", "balanced") or "balanced")
+            nat_l = jp_reg_display.get_player_nationality_bucket_label(p)
+            role_l = _role_shape_label(p)
+            head_var.set(
+                f"{nm}  /  {pos}  /  OVR {ovr}  /  POT {pot}  /  年齢 {age}  /  "
+                f"{nat_l}  /  タイプ: {role_l}  /  現在の練習: {_drill_label_for_key(cd)}"
+            )
+            for ak, lbl in attr_value_lbl.items():
+                lbl.config(text=str(int(getattr(p, ak, 0) or 0)))
+            drill_combo.set(_drill_label_for_key(cd))
+
         def _refresh_note(_event: Any = None) -> None:
+            p = _selected_player()
+            if p is None:
+                note_var.set("一覧から選手を選んでください。")
+                return
             key_focus = drill_label_to_key.get(drill_combo.get(), ("balanced", "balanced"))
             key = key_focus[0]
             reason = self._player_drill_lock_reason(self.team, key)
-            p = _selected_player()
             current_drill = str(getattr(p, "training_drill", "balanced") or "balanced")
+            cur_lab = _drill_label_for_key(current_drill)
             if reason:
-                note_var.set(f"現在ドリル: {current_drill} / 未解放（条件）: {reason}")
+                note_var.set(f"現在: {cur_lab} / 選択中の練習: 未解放（{reason}）")
             else:
-                note_var.set(f"現在ドリル: {current_drill} / 選択可能です。")
+                note_var.set(f"現在: {cur_lab} / 選択中の練習: 反映可能です。")
 
-        player_combo.bind("<<ComboboxSelected>>", _refresh_note)
+        def _on_tree_select(_event: Any = None) -> None:
+            p = _selected_player()
+            if p is None:
+                return
+            _fill_detail_for_player(p)
+            _refresh_note()
+
+        tree.bind("<<TreeviewSelect>>", _on_tree_select)
         drill_combo.bind("<<ComboboxSelected>>", _refresh_note)
+
+        first_iid = "0"
+        tree.selection_set(first_iid)
+        tree.focus(first_iid)
+        tree.see(first_iid)
+        _fill_detail_for_player(roster[0])
         _refresh_note()
 
         def _apply() -> None:
             p = _selected_player()
+            if p is None:
+                messagebox.showwarning("個別練習", "一覧から選手を選んでください。", parent=w)
+                return
             key, focus = drill_label_to_key.get(drill_combo.get(), ("", ""))
             if not key:
                 messagebox.showerror("エラー", "練習を選択してください。", parent=w)
@@ -8810,11 +8998,14 @@ class MainMenuView:
                 f"個別練習: {getattr(p, 'name', '-') } {old_drill} → {key}",
             )
             self._refresh_development_window()
+            idx = roster.index(p)
+            tree.item(str(idx), values=_row_values(p))
+            _fill_detail_for_player(p)
+            _refresh_note()
             messagebox.showinfo("完了", f"{getattr(p, 'name', '-') } の個別練習を更新しました。", parent=w)
-            w.destroy()
 
-        btn = ttk.Frame(wrap, style="Panel.TFrame")
-        btn.grid(row=3, column=0, columnspan=2, sticky="ew")
+        btn = ttk.Frame(bot_fr, style="Panel.TFrame")
+        btn.pack(fill="x")
         ttk.Button(btn, text="反映", style="Primary.TButton", command=_apply).pack(side="left")
         ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
 
