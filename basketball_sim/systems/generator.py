@@ -7,6 +7,7 @@ from basketball_sim.models.team import Team
 from basketball_sim.systems.club_profile import get_initial_team_money_cpu
 from basketball_sim.systems.contract_logic import MIN_SALARY_DEFAULT
 from basketball_sim.systems.opening_roster_salary_v11 import (
+    OPENING_NATURALIZED_MIN_AGE,
     _MIN_SALARY_D1,
     _MIN_SALARY_D2_D3,
     apply_opening_roster_age_profile_v11,
@@ -300,6 +301,57 @@ def _get_weighted_base_ovr() -> int:
     return random.randint(selected_range[0], selected_range[1])
 
 
+def _adjust_base_ovr_for_foreign_opening_slot(slot: int, base_ovr: int) -> int:
+    """
+    開幕本契約の外国籍3人に役割帯を付与（shuffle 後の生成順で 0→1→2）。
+    slot0=主力 slot1=中堅寄せ slot2=補完だが底上げ。従来分布を完全には捨てず最小差分で落差を抑える。
+    """
+    b = int(base_ovr)
+    if slot == 0:
+        return max(65, b)
+    if slot == 1:
+        return max(58, b - random.randint(1, 5))
+    if slot == 2:
+        return max(62, b - random.randint(1, 5))
+    return b
+
+
+def _young_foreign_opening_ovr_penalty(nationality: str, age: int) -> int:
+    """
+    開幕ランダム生成（base_ovr 抽選経路）のみで使用。
+    若年外国籍の OVR 上振れだけを軽く抑える（帰化・アジア・日本人は対象外）。
+    """
+    if str(nationality or "") != "Foreign":
+        return 0
+    a = int(age)
+    if a <= 20:
+        return 4
+    if a <= 22:
+        return 2
+    return 0
+
+
+def _opening_league_ovr_adjust(league_market_division: Optional[int]) -> int:
+    """
+    generate_teams 本契約13人のみ league_market_division を渡す。
+    基準分布は共通のまま、D1 やや上方・D3 やや下方で平均 OVR の階層（D1 > D2 > D3）を補正する。
+    年俸の目標総額は opening v1.1 が別途決めるため、ここは能力値のみの最小差分。
+    """
+    if league_market_division is None:
+        return 0
+    try:
+        d = int(league_market_division)
+    except (TypeError, ValueError):
+        return 0
+    if d == 1:
+        return 2
+    if d == 2:
+        return 0
+    if d == 3:
+        return -3
+    return 0
+
+
 def _get_weighted_fictional_base_ovr() -> int:
     """
     架空D3選手向けの弱めOVR分布。
@@ -543,6 +595,7 @@ def generate_single_player(
     height_override: float = None,
     weight_override: float = None,
     league_market_division: Optional[int] = None,
+    foreign_opening_slot: Optional[int] = None,
 ) -> Player:
     """
     ランダムで実情に即した能力や特徴を持つ選手を1人生成します。
@@ -559,12 +612,30 @@ def generate_single_player(
 
     nationality = nationality_override if nationality_override is not None else _get_nationality()
 
+    if nationality == "Naturalized" and age < OPENING_NATURALIZED_MIN_AGE:
+        if age_override is not None:
+            age = max(OPENING_NATURALIZED_MIN_AGE, int(age_override))
+        else:
+            age = random.randint(OPENING_NATURALIZED_MIN_AGE, 35)
+
     if base_ovr_override is not None:
         final_ovr = min(99, max(40, base_ovr_override))
     else:
         base_ovr = _get_weighted_base_ovr()
+        if (
+            nationality == "Foreign"
+            and foreign_opening_slot is not None
+            and 0 <= int(foreign_opening_slot) <= 2
+        ):
+            base_ovr = _adjust_base_ovr_for_foreign_opening_slot(
+                int(foreign_opening_slot), base_ovr
+            )
         age_mod = _get_age_ovr_modifier(age)
-        final_ovr = min(99, max(53, base_ovr + age_mod))
+        div_adj = _opening_league_ovr_adjust(league_market_division)
+        final_ovr = min(99, max(53, base_ovr + age_mod + div_adj))
+        yf_pen = _young_foreign_opening_ovr_penalty(nationality, age)
+        if yf_pen:
+            final_ovr = min(99, max(53, final_ovr - yf_pen))
 
     potential = _get_potential(final_ovr, age)
     pop = _get_popularity(final_ovr)
@@ -697,6 +768,12 @@ def generate_fictional_player(
     pos = position_override if position_override is not None else random.choice(positions)
 
     nationality = nationality_override if nationality_override is not None else _get_nationality()
+
+    if nationality == "Naturalized" and age < OPENING_NATURALIZED_MIN_AGE:
+        if age_override is not None:
+            age = max(OPENING_NATURALIZED_MIN_AGE, int(age_override))
+        else:
+            age = random.randint(OPENING_NATURALIZED_MIN_AGE, 32)
 
     if base_ovr_override is not None:
         final_ovr = min(68, max(50, base_ovr_override))
@@ -1065,10 +1142,19 @@ def generate_teams() -> list[Team]:
             nationality_slots.extend(["Japan"] * 9)
             random.shuffle(nationality_slots)
 
+            foreign_slot_next = 0
             for nat in nationality_slots:
-                p = generate_single_player(
-                    nationality_override=nat, league_market_division=level
-                )
+                if nat == "Foreign":
+                    p = generate_single_player(
+                        nationality_override=nat,
+                        league_market_division=level,
+                        foreign_opening_slot=foreign_slot_next,
+                    )
+                    foreign_slot_next += 1
+                else:
+                    p = generate_single_player(
+                        nationality_override=nat, league_market_division=level
+                    )
                 p.years_pro = max(0, p.age - 18)
                 p.contract_years_left = random.randint(2, 4)
                 p.league_years = p.years_pro

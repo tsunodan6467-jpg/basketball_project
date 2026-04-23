@@ -11,6 +11,8 @@ from __future__ import annotations
 from typing import Any, List, Tuple
 
 from basketball_sim.systems.contract_logic import get_team_payroll
+from basketball_sim.systems.money_display import format_money_yen_ja_readable
+from basketball_sim.systems.japan_regulation_display import get_player_nationality_bucket_label
 from basketball_sim.systems.salary_cap_budget import (
     cap_status,
     get_soft_cap,
@@ -270,7 +272,7 @@ def format_lineup_snapshot_text(team: Any) -> str:
         "",
         format_bench_order_text(team),
         "",
-        "※ 1枠の差し替えは GUI の「スタメン・ベンチ」タブ（反映（確認））か、"
+        "※ スタメン枠の差し替えは、左メニュー「戦術」→ 上段「先発・6th・ベンチ」、または"
         "ターミナル「8. GMメニュー」のスタメン変更。カスタム解除は「自動スタメンに戻す」。",
     ]
     return "\n".join(parts)
@@ -290,7 +292,7 @@ def format_team_identity_text(team: Any) -> str:
         f"拠点地        : {getattr(team, 'home_city', 'Unknown')}",
         f"市場規模      : {float(getattr(team, 'market_size', 1.0)):.2f}",
         f"人気          : {getattr(team, 'popularity', 0)}",
-        f"資金          : {int(getattr(team, 'money', 0)):,}円",
+        f"資金          : {format_money_yen_ja_readable(int(getattr(team, 'money', 0) or 0))}",
         f"戦術          : {getattr(team, 'strategy', 'balanced')}",
         f"HCスタイル    : {getattr(team, 'coach_style', 'balanced')}",
         f"起用方針      : {usage_label}",
@@ -312,15 +314,18 @@ def format_salary_cap_text(team: Any) -> str:
     room = league_cap - payroll
 
     lines = [
-        f"チーム年俸合計   : {payroll:,}円",
-        f"サラリーキャップ : {league_cap:,}円（D{lv}・全ディビジョン同一・12億円）",
+        f"チーム年俸合計   : {format_money_yen_ja_readable(payroll)}",
+        f"サラリーキャップ : {format_money_yen_ja_readable(league_cap)}（D{lv}・全ディビジョン同一・12億円）",
         "",
         f"状態             : {status}",
     ]
     if room >= 0:
-        lines.append(f"キャップまでの余裕 : {room:,}円")
+        lines.append(f"キャップまでの余裕 : {format_money_yen_ja_readable(room)}")
     else:
-        lines.append(f"キャップ超過分     : {abs(room):,}円（贅沢税は年俸合計ベースで計算）")
+        lines.append(
+            f"キャップ超過分     : {format_money_yen_ja_readable(abs(room))}"
+            "（贅沢税は年俸合計ベースで計算）"
+        )
 
     return "\n".join(lines)
 
@@ -345,16 +350,19 @@ def format_gm_roster_text(team: Any) -> str:
         else:
             role_mark = " "
 
+        slot_lbl = get_player_nationality_bucket_label(p)
         lines_out.append(
             f"{i:>2}. {role_mark} {str(getattr(p, 'name', '-')):<15} "
             f"{str(getattr(p, 'position', '-')):<2} "
             f"OVR:{int(getattr(p, 'ovr', 0)):<2} "
             f"Age:{int(getattr(p, 'age', 0)):<2} "
             f"{str(getattr(p, 'nationality', 'Japan')):<12} "
-            f"Salary:{int(getattr(p, 'salary', 0)):,}円"
+            f"区分:{slot_lbl:<10} "
+            f"Salary:{format_money_yen_ja_readable(int(getattr(p, 'salary', 0) or 0))}"
         )
 
     lines_out.append("")
     lines_out.append("★ = スタメン")
     lines_out.append("6 = シックスマン")
+    lines_out.append("区分 = 本契約ロスター枠（外国籍／アジア・帰化／日本）")
     return "\n".join(lines_out)

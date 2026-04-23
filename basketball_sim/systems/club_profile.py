@@ -291,8 +291,8 @@ _INITIAL_OPENING_CASH_BY_BAND: Final[Dict[int, int]] = {
     5: 800_000_000,
 }
 
-# プレイヤークラブのみ（CPU 基準額に上乗せ）
-USER_TEAM_OPENING_CASH_BONUS_YEN: Final[int] = 70_000_000
+# プレイヤークラブのみ新規開始時に固定（CPU は帯テーブル据え置き）
+INITIAL_USER_TEAM_MONEY_NEW_GAME: Final[int] = 500_000_000
 
 
 def get_financial_power_band_1_to_5(team: Any) -> int:
@@ -315,5 +315,5 @@ def get_initial_team_money_cpu(team: Any) -> int:
 
 
 def get_initial_user_team_money(team: Any) -> int:
-    """プレイヤークラブの新規開始所持金（CPU 基準 + 上積み）。"""
-    return int(get_initial_team_money_cpu(team) + USER_TEAM_OPENING_CASH_BONUS_YEN)
+    """プレイヤークラブの新規開始所持金（固定額。`team` は API 互換のため未使用）。"""
+    return int(INITIAL_USER_TEAM_MONEY_NEW_GAME)

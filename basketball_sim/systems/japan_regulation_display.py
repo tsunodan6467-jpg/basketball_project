@@ -8,8 +8,41 @@ from typing import Any, List, Optional
 
 from basketball_sim.systems.competition_rules import get_competition_rule, normalize_competition_type
 from basketball_sim.systems.competition_display import competition_display_name
-from basketball_sim.systems.japan_regulation import count_regulation_slots, lineup_passes_on_court
+from basketball_sim.systems.japan_regulation import (
+    count_regulation_slots,
+    lineup_passes_on_court,
+    player_regulation_bucket_from_rule,
+)
 from basketball_sim.systems.competition_rules import league_contract_active_rule
+
+
+def get_player_nationality_bucket_label(player: Any, *, rule: Optional[Any] = None) -> str:
+    """
+    本契約ロスター枠（format_contract_roster_summary / Team.get_nationality_slot_summary）
+    と同じ player_regulation_bucket_from_rule 判定を日本語ラベルにする。
+    """
+    if player is None:
+        return "不明"
+    r = rule if rule is not None else league_contract_active_rule()
+    try:
+        b = player_regulation_bucket_from_rule(player, r)
+    except Exception:
+        return "不明"
+
+    if b == "foreign":
+        return "外国籍"
+    if b == "special":
+        return "アジア/帰化"
+
+    raw = getattr(player, "nationality", None)
+    if raw is None:
+        return "日本"
+    raw_s = str(raw).strip()
+    if raw_s == "":
+        return "不明"
+    if raw_s == "Japan" or raw_s.lower() in ("japan", "japanese", "jp"):
+        return "日本"
+    return "不明"
 
 
 def gui_next_competition_type(season: Any, user_team: Any) -> str:

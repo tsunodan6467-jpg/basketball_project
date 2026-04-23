@@ -12,6 +12,47 @@ from basketball_sim.systems.japan_regulation import count_regulation_slots
 from basketball_sim.systems.cpu_club_strategy import get_cpu_club_strategy
 from basketball_sim.systems.salary_cap_budget import get_soft_cap, league_level_for_team
 
+# トレード評価への現金・RB 換算（1対1 / multi 共通）
+TRADE_VALUE_BONUS_PER_MILLION_CASH = 0.10
+TRADE_VALUE_BONUS_PER_MILLION_RB = 0.18
+TRADE_RB_TRANSFER_STEP_YEN = 5_000_000
+TRADE_RB_TRANSFER_MAX_LEG_YEN = 40_000_000
+
+
+def trade_cash_value_bonus(cash_change_yen: int) -> float:
+    """チーム視点の現金増減（円）に対する評価加点（100万円あたり +0.10）。"""
+    return float(cash_change_yen) * TRADE_VALUE_BONUS_PER_MILLION_CASH / 1_000_000.0
+
+
+def trade_rb_value_bonus(rb_change_yen: int) -> float:
+    """チーム視点の RB 増減（円）に対する評価加点（100万円あたり +0.18）。"""
+    return float(rb_change_yen) * TRADE_VALUE_BONUS_PER_MILLION_RB / 1_000_000.0
+
+
+def compute_trade_asset_bonus(cash_change_yen: int, rb_change_yen: int) -> float:
+    return trade_cash_value_bonus(cash_change_yen) + trade_rb_value_bonus(rb_change_yen)
+
+
+def max_trade_rb_leg_for_team(team: Team) -> int:
+    """移転1方向あたりの RB 上限: min(残高, 4000万)。"""
+    rem = int(getattr(team, "rookie_budget_remaining", 0) or 0)
+    return max(0, min(rem, TRADE_RB_TRANSFER_MAX_LEG_YEN))
+
+
+def is_valid_trade_rb_leg_amount(amount: int, team: Team) -> bool:
+    """500万円刻み・上限内（0 可）。"""
+    a = int(amount)
+    if a < 0:
+        return False
+    if a == 0:
+        return True
+    cap = max_trade_rb_leg_for_team(team)
+    if a > cap:
+        return False
+    if a % TRADE_RB_TRANSFER_STEP_YEN != 0:
+        return False
+    return True
+
 
 @dataclass
 class TradeEvaluation:
@@ -217,7 +258,10 @@ class TradeSystem:
         self,
         team: Team,
         send_player: Player,
-        receive_player: Player
+        receive_player: Player,
+        *,
+        net_cash_yen: int = 0,
+        net_rb_yen: int = 0,
     ) -> TradeEvaluation:
         reasons: List[str] = []
 
@@ -241,6 +285,7 @@ class TradeSystem:
 
         score = receive_value - send_value
         score += self._get_position_need_score(team, send_player, receive_player)
+        score += compute_trade_asset_bonus(int(net_cash_yen), int(net_rb_yen))
 
         send_ovr = getattr(send_player, "ovr", 50)
         recv_ovr = getattr(receive_player, "ovr", 50)
@@ -275,17 +320,45 @@ class TradeSystem:
         user_team: Team,
         ai_team: Team,
         user_send_player: Player,
-        ai_send_player: Player
+        ai_send_player: Player,
+        *,
+        cash_a_to_b: int = 0,
+        cash_b_to_a: int = 0,
+        rookie_budget_a_to_b: int = 0,
+        rookie_budget_b_to_a: int = 0,
     ) -> Tuple[TradeEvaluation, TradeEvaluation]:
+        ca = int(cash_a_to_b or 0)
+        cb = int(cash_b_to_a or 0)
+        ra = int(rookie_budget_a_to_b or 0)
+        rb = int(rookie_budget_b_to_a or 0)
+        if min(ca, cb, ra, rb) < 0:
+            bad = TradeEvaluation(False, -999.0, ["invalid_side_payment"])
+            return bad, bad
+        if ca > int(getattr(user_team, "money", 0) or 0) or cb > int(getattr(ai_team, "money", 0) or 0):
+            bad = TradeEvaluation(False, -999.0, ["cash_insufficient"])
+            return bad, bad
+        if not is_valid_trade_rb_leg_amount(ra, user_team) or not is_valid_trade_rb_leg_amount(rb, ai_team):
+            bad = TradeEvaluation(False, -999.0, ["rookie_budget_invalid"])
+            return bad, bad
+
+        net_cash_user = cb - ca
+        net_rb_user = rb - ra
+        net_cash_ai = ca - cb
+        net_rb_ai = ra - rb
+
         user_eval = self.evaluate_trade_for_team(
             team=user_team,
             send_player=user_send_player,
-            receive_player=ai_send_player
+            receive_player=ai_send_player,
+            net_cash_yen=net_cash_user,
+            net_rb_yen=net_rb_user,
         )
         ai_eval = self.evaluate_trade_for_team(
             team=ai_team,
             send_player=ai_send_player,
-            receive_player=user_send_player
+            receive_player=user_send_player,
+            net_cash_yen=net_cash_ai,
+            net_rb_yen=net_rb_ai,
         )
         return user_eval, ai_eval
 
@@ -294,13 +367,22 @@ class TradeSystem:
         user_team: Team,
         ai_team: Team,
         user_send_player: Player,
-        ai_send_player: Player
+        ai_send_player: Player,
+        *,
+        cash_a_to_b: int = 0,
+        cash_b_to_a: int = 0,
+        rookie_budget_a_to_b: int = 0,
+        rookie_budget_b_to_a: int = 0,
     ) -> Tuple[bool, str, TradeEvaluation]:
         _, ai_eval = self.evaluate_one_for_one_trade(
             user_team=user_team,
             ai_team=ai_team,
             user_send_player=user_send_player,
-            ai_send_player=ai_send_player
+            ai_send_player=ai_send_player,
+            cash_a_to_b=cash_a_to_b,
+            cash_b_to_a=cash_b_to_a,
+            rookie_budget_a_to_b=rookie_budget_a_to_b,
+            rookie_budget_b_to_a=rookie_budget_b_to_a,
         )
 
         if ai_eval.accepts:
@@ -310,6 +392,12 @@ class TradeSystem:
             return False, "icon_locked", ai_eval
         if "nationality_rule_violation" in ai_eval.reasons:
             return False, "nationality_rule_violation", ai_eval
+        if "invalid_side_payment" in ai_eval.reasons:
+            return False, "invalid_side_payment", ai_eval
+        if "cash_insufficient" in ai_eval.reasons:
+            return False, "cash_insufficient", ai_eval
+        if "rookie_budget_invalid" in ai_eval.reasons:
+            return False, "rookie_budget_invalid", ai_eval
         return False, "rejected_value", ai_eval
 
     def execute_one_for_one_trade(
@@ -320,11 +408,19 @@ class TradeSystem:
         player_b: Player,
         *,
         cash_a_to_b: int = 0,
+        cash_b_to_a: int = 0,
+        rookie_budget_a_to_b: int = 0,
+        rookie_budget_b_to_a: int = 0,
     ) -> bool:
-        cash = int(cash_a_to_b or 0)
-        if cash < 0:
+        ca = int(cash_a_to_b or 0)
+        cb = int(cash_b_to_a or 0)
+        ra = int(rookie_budget_a_to_b or 0)
+        rb = int(rookie_budget_b_to_a or 0)
+        if min(ca, cb, ra, rb) < 0:
             return False
-        if cash > int(getattr(team_a, "money", 0) or 0):
+        if ca > int(getattr(team_a, "money", 0) or 0) or cb > int(getattr(team_b, "money", 0) or 0):
+            return False
+        if not is_valid_trade_rb_leg_amount(ra, team_a) or not is_valid_trade_rb_leg_amount(rb, team_b):
             return False
 
         if player_a not in getattr(team_a, "players", []):
@@ -346,35 +442,46 @@ class TradeSystem:
         team_a.add_player(player_b)
         team_b.add_player(player_a)
 
-        if cash > 0:
-            team_a.money = int(getattr(team_a, "money", 0) or 0) - cash
-            team_b.money = int(getattr(team_b, "money", 0) or 0) + cash
+        team_a.money = int(getattr(team_a, "money", 0) or 0) - ca + cb
+        team_b.money = int(getattr(team_b, "money", 0) or 0) + ca - cb
+        team_a.rookie_budget_remaining = int(getattr(team_a, "rookie_budget_remaining", 0) or 0) - ra + rb
+        team_b.rookie_budget_remaining = int(getattr(team_b, "rookie_budget_remaining", 0) or 0) + ra - rb
+
+        net_cash_a = -ca + cb
 
         if hasattr(team_a, "add_history_transaction"):
             team_a.add_history_transaction("trade", player_b, note=f"Acquired from {team_b.name}")
             team_a.add_history_transaction("trade", player_a, note=f"Traded to {team_b.name}")
-            if cash > 0:
+            if net_cash_a != 0:
                 team_a.add_history_transaction(
                     "trade",
                     None,
-                    note=f"Cash+{cash:,}円 to {team_b.name}",
-                    trade_cash_delta=-cash,
+                    note=f"Cash(net){net_cash_a:+,}円 vs {team_b.name}",
+                    trade_cash_delta=net_cash_a,
                     trade_counterparty_team_id=getattr(team_b, "team_id", None),
                     trade_counterparty_name=str(getattr(team_b, "name", "") or ""),
                 )
+            if ra > 0:
+                team_a.add_history_transaction("trade", None, note=f"RB+{ra:,}円 to {team_b.name}")
+            if rb > 0:
+                team_a.add_history_transaction("trade", None, note=f"RB-{rb:,}円 received from {team_b.name}")
 
         if hasattr(team_b, "add_history_transaction"):
             team_b.add_history_transaction("trade", player_a, note=f"Acquired from {team_a.name}")
             team_b.add_history_transaction("trade", player_b, note=f"Traded to {team_a.name}")
-            if cash > 0:
+            if net_cash_a != 0:
                 team_b.add_history_transaction(
                     "trade",
                     None,
-                    note=f"Cash-{cash:,}円 received from {team_a.name}",
-                    trade_cash_delta=cash,
+                    note=f"Cash(net){-net_cash_a:+,}円 vs {team_a.name}",
+                    trade_cash_delta=-net_cash_a,
                     trade_counterparty_team_id=getattr(team_a, "team_id", None),
                     trade_counterparty_name=str(getattr(team_a, "name", "") or ""),
                 )
+            if ra > 0:
+                team_b.add_history_transaction("trade", None, note=f"RB-{ra:,}円 received from {team_a.name}")
+            if rb > 0:
+                team_b.add_history_transaction("trade", None, note=f"RB+{rb:,}円 to {team_a.name}")
 
         return True
 
@@ -476,10 +583,7 @@ class TradeSystem:
         return self._league_roster_rule_ok(roster_after)
 
     def _calc_cash_rb_score(self, cash_change: int, rb_change: int) -> float:
-        # スコアスケール: 目標は “選手価値との差が極端にならない” こと
-        cash_score = cash_change / 2_500_000.0  # 2.5M = +1.0
-        rb_score = rb_change / 10_000_000.0  # 10M = +1.0
-        return cash_score + rb_score
+        return compute_trade_asset_bonus(int(cash_change), int(rb_change))
 
     def evaluate_multi_trade_for_team(
         self,
@@ -489,6 +593,9 @@ class TradeSystem:
         cash_change: int,
         rb_change: int,
         trim_to_13: bool = True,
+        *,
+        outgoing_cash: Optional[int] = None,
+        outgoing_rb: Optional[int] = None,
     ) -> TradeEvaluation:
         reasons: List[str] = []
 
@@ -503,11 +610,15 @@ class TradeSystem:
         if any(self._player_key(p) not in {self._player_key(tp) for tp in getattr(team, "players", [])} for p in gives_players):
             return TradeEvaluation(False, -999.0, ["gives_players_not_on_team"])
 
-        if cash_change < 0 and int(getattr(team, "money", 0) or 0) < abs(cash_change):
+        out_c = int(outgoing_cash) if outgoing_cash is not None else max(0, -int(cash_change))
+        out_rb = int(outgoing_rb) if outgoing_rb is not None else max(0, -int(rb_change))
+        if out_c > int(getattr(team, "money", 0) or 0):
             return TradeEvaluation(False, -999.0, ["cash_insufficient"])
 
-        if rb_change < 0 and int(getattr(team, "rookie_budget_remaining", 0) or 0) < abs(rb_change):
+        if out_rb > int(getattr(team, "rookie_budget_remaining", 0) or 0):
             return TradeEvaluation(False, -999.0, ["rookie_budget_insufficient"])
+        if out_rb > 0 and not is_valid_trade_rb_leg_amount(out_rb, team):
+            return TradeEvaluation(False, -999.0, ["rookie_budget_invalid"])
 
         stance = self._infer_negotiation_stance(team, gives_players)
         reasons.append(f"stance:{stance}")
@@ -615,21 +726,32 @@ class TradeSystem:
         offer: MultiTradeOffer,
         trim_to_13: bool = True,
     ) -> Tuple[TradeEvaluation, TradeEvaluation]:
+        ca = int(offer.cash_a_to_b or 0)
+        cb = int(offer.cash_b_to_a or 0)
+        ra = int(offer.rookie_budget_a_to_b or 0)
+        rb = int(offer.rookie_budget_b_to_a or 0)
+        net_cash_a = cb - ca
+        net_rb_a = rb - ra
+
         user_eval = self.evaluate_multi_trade_for_team(
             team=team_a,
             gives_players=offer.team_a_gives_players,
             receives_players=offer.team_a_receives_players,
-            cash_change=-int(offer.cash_a_to_b or 0),
-            rb_change=-int(offer.rookie_budget_a_to_b or 0),
+            cash_change=net_cash_a,
+            rb_change=net_rb_a,
             trim_to_13=trim_to_13,
+            outgoing_cash=ca,
+            outgoing_rb=ra,
         )
         ai_eval = self.evaluate_multi_trade_for_team(
             team=team_b,
             gives_players=offer.team_a_receives_players,
             receives_players=offer.team_a_gives_players,
-            cash_change=+int(offer.cash_a_to_b or 0),
-            rb_change=+int(offer.rookie_budget_a_to_b or 0),
+            cash_change=-net_cash_a,
+            rb_change=-net_rb_a,
             trim_to_13=trim_to_13,
+            outgoing_cash=cb,
+            outgoing_rb=rb,
         )
         return user_eval, ai_eval
 
@@ -661,6 +783,8 @@ class TradeSystem:
             return False, "cash_insufficient", ai_eval
         if "rookie_budget_insufficient" in hard_reason:
             return False, "rookie_budget_insufficient", ai_eval
+        if "rookie_budget_invalid" in hard_reason:
+            return False, "rookie_budget_invalid", ai_eval
         return False, "rejected_value", ai_eval
 
     def execute_multi_trade(
@@ -679,8 +803,10 @@ class TradeSystem:
         gives_b = receives_a
         receives_b = gives_a
 
-        cash = int(offer.cash_a_to_b or 0)
-        rb = int(offer.rookie_budget_a_to_b or 0)
+        ca = int(offer.cash_a_to_b or 0)
+        cb = int(offer.cash_b_to_a or 0)
+        ra = int(offer.rookie_budget_a_to_b or 0)
+        rb_amt = int(offer.rookie_budget_b_to_a or 0)
 
         # 基本検証
         if not gives_a or not receives_a:
@@ -689,12 +815,12 @@ class TradeSystem:
             return False
         if any(is_draft_rookie_contract_active(p) for p in (gives_a + gives_b)):
             return False
-        if cash < 0 or rb < 0:
+        if min(ca, cb, ra, rb_amt) < 0:
             return False
 
-        if cash > int(getattr(team_a, "money", 0) or 0):
+        if ca > int(getattr(team_a, "money", 0) or 0) or cb > int(getattr(team_b, "money", 0) or 0):
             return False
-        if rb > int(getattr(team_a, "rookie_budget_remaining", 0) or 0):
+        if not is_valid_trade_rb_leg_amount(ra, team_a) or not is_valid_trade_rb_leg_amount(rb_amt, team_b):
             return False
 
         team_a_players = list(getattr(team_a, "players", []) or [])
@@ -759,10 +885,11 @@ class TradeSystem:
             team_b.add_player(p, force=True)
 
         # 現金 / rookie budget 移転
-        team_a.money = int(getattr(team_a, "money", 0) or 0) - cash
-        team_b.money = int(getattr(team_b, "money", 0) or 0) + cash
-        team_a.rookie_budget_remaining = int(getattr(team_a, "rookie_budget_remaining", 0) or 0) - rb
-        team_b.rookie_budget_remaining = int(getattr(team_b, "rookie_budget_remaining", 0) or 0) + rb
+        team_a.money = int(getattr(team_a, "money", 0) or 0) - ca + cb
+        team_b.money = int(getattr(team_b, "money", 0) or 0) + ca - cb
+        team_a.rookie_budget_remaining = int(getattr(team_a, "rookie_budget_remaining", 0) or 0) - ra + rb_amt
+        team_b.rookie_budget_remaining = int(getattr(team_b, "rookie_budget_remaining", 0) or 0) + ra - rb_amt
+        net_cash_a = -ca + cb
 
         # 13人超過分の自動FA放出（incoming から最小 effective OVR）
         for p in dropped_a:
@@ -786,34 +913,38 @@ class TradeSystem:
                 team_a.add_history_transaction("trade", p, note=f"Acquired from {team_b.name}")
             for p in gives_a:
                 team_a.add_history_transaction("trade", p, note=f"Traded to {team_b.name}")
-            if cash > 0:
+            if net_cash_a != 0:
                 team_a.add_history_transaction(
                     "trade",
                     None,
-                    note=f"Cash+{cash:,}円 to {team_b.name}",
-                    trade_cash_delta=-cash,
+                    note=f"Cash(net){net_cash_a:+,}円 vs {team_b.name}",
+                    trade_cash_delta=net_cash_a,
                     trade_counterparty_team_id=getattr(team_b, "team_id", None),
                     trade_counterparty_name=str(getattr(team_b, "name", "") or ""),
                 )
-            if rb > 0:
-                team_a.add_history_transaction("trade", None, note=f"RB+{rb:,}円 to {team_b.name}")
+            if ra > 0:
+                team_a.add_history_transaction("trade", None, note=f"RB+{ra:,}円 to {team_b.name}")
+            if rb_amt > 0:
+                team_a.add_history_transaction("trade", None, note=f"RB-{rb_amt:,}円 received from {team_b.name}")
 
         if hasattr(team_b, "add_history_transaction"):
             for p in receives_b:
                 team_b.add_history_transaction("trade", p, note=f"Acquired from {team_a.name}")
             for p in gives_b:
                 team_b.add_history_transaction("trade", p, note=f"Traded to {team_a.name}")
-            if cash > 0:
+            if net_cash_a != 0:
                 team_b.add_history_transaction(
                     "trade",
                     None,
-                    note=f"Cash-{cash:,}円 received from {team_a.name}",
-                    trade_cash_delta=cash,
+                    note=f"Cash(net){-net_cash_a:+,}円 vs {team_a.name}",
+                    trade_cash_delta=-net_cash_a,
                     trade_counterparty_team_id=getattr(team_a, "team_id", None),
                     trade_counterparty_name=str(getattr(team_a, "name", "") or ""),
                 )
-            if rb > 0:
-                team_b.add_history_transaction("trade", None, note=f"RB-{rb:,}円 received from {team_a.name}")
+            if ra > 0:
+                team_b.add_history_transaction("trade", None, note=f"RB-{ra:,}円 received from {team_a.name}")
+            if rb_amt > 0:
+                team_b.add_history_transaction("trade", None, note=f"RB+{rb_amt:,}円 to {team_a.name}")
 
         return True
 
@@ -826,11 +957,15 @@ class MultiTradeOffer:
     - team_a_gives_players: team_a が放出する選手リスト
     - team_a_receives_players: team_a が獲得する選手リスト
     - cash_a_to_b: team_a から team_b へ渡す現金（0以上）
-    - rookie_budget_a_to_b: team_a の rookie_budget_remaining を team_b へ移す額（0以上）
+    - cash_b_to_a: team_b から team_a へ渡す現金（0以上）
+    - rookie_budget_a_to_b: team_a の rookie_budget_remaining を team_b へ移す額（0以上、500万刻み・片道最大4000万）
+    - rookie_budget_b_to_a: team_b から team_a へ移す RB（同上）
     """
 
     team_a_gives_players: List[Player]
     team_a_receives_players: List[Player]
     cash_a_to_b: int = 0
+    cash_b_to_a: int = 0
     rookie_budget_a_to_b: int = 0
+    rookie_budget_b_to_a: int = 0
 

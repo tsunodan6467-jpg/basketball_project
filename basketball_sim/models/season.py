@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 from .team import Team
 from .player import Player
 from .match import Match
+from .reg_slot import RegSlot
 from basketball_sim.systems.player_stats import PlayerStatsManager
 from basketball_sim.systems.free_agent_market import run_cpu_fa_market_cycle
 from basketball_sim.systems.match_postgame_cli_display import format_match_postgame_cli_lines
@@ -2804,6 +2805,14 @@ class Season:
 
         user_team = next((t for t in self.all_teams if bool(getattr(t, "is_user_team", False))), None)
 
+        reg_games_in_round: Dict[int, int] = {}
+
+        def _reg_slot_team_key(tm: Team) -> int:
+            t_id = getattr(tm, "team_id", None)
+            if t_id is not None:
+                return int(t_id)
+            return id(tm)
+
         for event in round_events:
             if event.event_type != "game":
                 continue
@@ -2834,11 +2843,30 @@ class Season:
                 except Exception:
                     pass
 
+            reg_slot_home = None
+            reg_slot_away = None
+            if event.competition_type == "regular_season":
+                htm = event.home_team
+                atm = event.away_team
+                kh = _reg_slot_team_key(htm)
+                ka = _reg_slot_team_key(atm)
+                reg_games_in_round[kh] = reg_games_in_round.get(kh, 0) + 1
+                reg_games_in_round[ka] = reg_games_in_round.get(ka, 0) + 1
+                dow = getattr(event, "day_of_week", None) or None
+                reg_slot_home = RegSlot(
+                    round_index=reg_games_in_round[kh], dow=dow
+                )
+                reg_slot_away = RegSlot(
+                    round_index=reg_games_in_round[ka], dow=dow
+                )
+
             match = Match(
                 home_team=event.home_team,
                 away_team=event.away_team,
                 is_playoff=event.is_playoff,
-                competition_type=event.competition_type
+                competition_type=event.competition_type,
+                reg_slot_home=reg_slot_home,
+                reg_slot_away=reg_slot_away,
             )
             _, home_score, away_score = match.simulate()
             if user_team is not None and (

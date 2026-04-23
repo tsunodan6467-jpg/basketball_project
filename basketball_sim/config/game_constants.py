@@ -36,7 +36,7 @@ LEAGUE_ROSTER_FOREIGN_CAP = 3
 LEAGUE_ROSTER_ASIA_NATURALIZED_CAP = 1
 
 # 合成 Team() の既定所持金（資金力帯なしのテスト用）および FA 欠損補完のフォールバック。
-# 本番の開幕所持金は `systems.club_profile.get_initial_team_money_cpu` 等を正本とする。
+# 本番の開幕所持金: CPU は `club_profile.get_initial_team_money_cpu`、ユーザーは `get_initial_user_team_money`（固定額）。
 INITIAL_TEAM_MONEY_NEW_GAME = 200_000_000  # 帯1（2億円）相当
 LEAGUE_ONCOURT_FOREIGN_CAP = 2
 LEAGUE_ONCOURT_ASIA_NATURALIZED_CAP = 1

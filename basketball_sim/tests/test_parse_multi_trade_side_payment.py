@@ -28,7 +28,18 @@ def test_parse_invalid_not_integer():
     assert not ok and "整数" in msg
 
 
-def test_parse_rb_over_limit_message_no_yen_suffix():
+def test_parse_rb_over_limit_message():
     ok, _v, msg = parse_multi_trade_side_payment("999", 10, is_cash=False)
     assert not ok
-    assert "円" not in msg
+    assert "上限" in msg
+
+
+def test_parse_rb_rejects_non_step_amount():
+    ok, _, msg = parse_multi_trade_side_payment("1000000", 50_000_000, is_cash=False)
+    assert not ok
+    assert "刻み" in msg
+
+
+def test_parse_rb_accepts_five_million_step():
+    ok, v, _ = parse_multi_trade_side_payment("15000000", 50_000_000, is_cash=False)
+    assert ok and v == 15_000_000

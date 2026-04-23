@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 from basketball_sim.systems.club_profile import (
+    INITIAL_USER_TEAM_MONEY_NEW_GAME,
     ClubBaseProfile,
     _PROFILE_TEMPLATES,
     _TEAM_ID_PROFILE_OVERRIDES,
@@ -14,6 +15,9 @@ from basketball_sim.systems.club_profile import (
     _club_profile_from_user_sheet_1_5,
     _v1_scale_1_to_5,
     get_club_base_profile,
+    get_financial_power_band_1_to_5,
+    get_initial_team_money_cpu,
+    get_initial_user_team_money,
 )
 
 
@@ -272,6 +276,41 @@ def test_team_id_not_in_overrides_falls_back_to_estimation() -> None:
     low = get_club_base_profile(SimpleNamespace(team_id=99, money=5_000_000, **base))
     high = get_club_base_profile(SimpleNamespace(team_id=99, money=80_000_000, **base))
     assert low.financial_power < high.financial_power
+
+
+def test_initial_user_team_money_fixed_five_hundred_million() -> None:
+    """プレイヤー新規開始所持金は帯に依らず 5 億円固定。"""
+    assert INITIAL_USER_TEAM_MONEY_NEW_GAME == 500_000_000
+    assert get_initial_user_team_money(SimpleNamespace(team_id=1)) == 500_000_000
+    assert get_initial_user_team_money(SimpleNamespace(team_id=48)) == 500_000_000
+
+
+def test_initial_team_money_cpu_band_1_and_5_examples() -> None:
+    """CPU 帯テーブル: 帯1=2億・帯5=8億（全48 override のうち該当帯の team_id を探索）。"""
+    common = dict(
+        league_level=1,
+        money=1,
+        market_size=1.0,
+        popularity=50,
+        arena_level=1,
+        training_facility_level=1,
+        youth_investment={"facility": 50},
+        owner_expectation="playoff_race",
+        owner_trust=50,
+    )
+    id1 = id5 = None
+    for tid in range(1, 49):
+        t = SimpleNamespace(team_id=tid, **common)
+        b = get_financial_power_band_1_to_5(t)
+        if b == 1 and id1 is None:
+            id1 = tid
+        if b == 5 and id5 is None:
+            id5 = tid
+        if id1 is not None and id5 is not None:
+            break
+    assert id1 is not None and id5 is not None
+    assert get_initial_team_money_cpu(SimpleNamespace(team_id=id1, **common)) == 200_000_000
+    assert get_initial_team_money_cpu(SimpleNamespace(team_id=id5, **common)) == 800_000_000
 
 
 def test_win_now_pressure_title_or_bust_high() -> None:

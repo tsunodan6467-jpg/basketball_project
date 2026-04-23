@@ -23,6 +23,9 @@ _MIN_SALARY_D2_D3 = 500_000
 # 若手の異常高額抑制（年齢 <= 20）
 _YOUNG_MAX_SALARY_BY_DIV = {1: 55_000_000, 2: 28_000_000, 3: 18_000_000}
 
+# 開幕本契約ロスターで帰化（Naturalized）として出す最低年齢（長期在籍後の帰化という前提）
+OPENING_NATURALIZED_MIN_AGE = 27
+
 # (division, nat_for_band, rank) -> (low, high) 円。nat_for_band は Asia / Naturalized 別表。
 _BANDS: Dict[Tuple[int, str, Rank], Tuple[int, int]] = {
     # D1 外国籍
@@ -332,6 +335,20 @@ def apply_opening_roster_age_profile_v11(team: Team) -> None:
     ordered = sorted(players, key=_opening_age_assign_priority)
     for p, a in zip(ordered, ages):
         aa = int(a)
+        setattr(p, "age", aa)
+        yp = max(0, aa - 18)
+        setattr(p, "years_pro", yp)
+        if hasattr(p, "league_years"):
+            setattr(p, "league_years", yp)
+
+    _min_nat = int(OPENING_NATURALIZED_MIN_AGE)
+    for p in players:
+        if str(getattr(p, "nationality", "") or "") != "Naturalized":
+            continue
+        aa = int(getattr(p, "age", 0) or 0)
+        if aa >= _min_nat:
+            continue
+        aa = random.randint(_min_nat, 37)
         setattr(p, "age", aa)
         yp = max(0, aa - 18)
         setattr(p, "years_pro", yp)

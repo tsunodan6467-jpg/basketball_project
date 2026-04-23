@@ -38,7 +38,7 @@ def main() -> int:
         fh.write(f"seed={args.seed}  (after generate_teams only; no user swap)\n\n")
         fh.write(
             f"{'team_id':>6}  {'team_name':<26}  {'div':>4}  {'band':>4}  "
-            f"{'cpu_start_money':>14}  {'+if_user':>14}\n"
+            f"{'cpu_start_money':>14}  {'user_start':>14}\n"
         )
         for t in sorted(teams, key=lambda x: int(getattr(x, "team_id", 0))):
             tid = int(getattr(t, "team_id", 0))
@@ -53,7 +53,7 @@ def main() -> int:
 
         fh.write("\nBand → CPU opening cash (yen)\n")
         fh.write("  1 → 200,000,000  2 → 280,000,000  3 → 380,000,000  4 → 550,000,000  5 → 800,000,000\n")
-        fh.write("  User team: CPU amount + 70,000,000\n")
+        fh.write("  User team: fixed 500,000,000 (see club_profile.INITIAL_USER_TEAM_MONEY_NEW_GAME)\n")
 
     print(f"Wrote {args.out.resolve()}")
     return 0

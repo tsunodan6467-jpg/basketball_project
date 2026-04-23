@@ -77,7 +77,7 @@ def test_format_inseason_cash_round_log_lines_shows_round_and_amount():
     text = "\n".join(format_inseason_cash_round_log_lines(t))
     assert "R12" in text
     assert "リーグ分配等" in text
-    assert "8,000,000" in text
+    assert "+800万円" in text
 
 
 def test_format_inseason_cash_round_log_lines_shows_matchday_label():
@@ -93,7 +93,7 @@ def test_format_inseason_cash_round_log_lines_shows_matchday_label():
     text = "\n".join(format_inseason_cash_round_log_lines(t))
     assert "R12" in text
     assert "主場・門前概算" in text
-    assert "500,000" in text
+    assert "+0万円" in text
 
 
 def test_format_cli_finance_screen_header_lines_fresh_team():
@@ -127,7 +127,7 @@ def test_format_cli_finance_screen_header_lines_with_breakdown_snapshot():
     text = "\n".join(lines)
     assert "（黒字）" in text
     assert "財務履歴: 1件" in text
-    assert "直近収入合計: 100円" in text
+    assert "直近収入合計: 0万円" in text
     assert "チケット・興行" in text
     assert "選手給与（年俸）" in text
 

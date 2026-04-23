@@ -48,7 +48,21 @@ from basketball_sim.systems.rotation_cli_display import format_rotation_cli_summ
 from basketball_sim.systems.tactics_cli_display import format_tactic_cli_summary_lines
 from basketball_sim.systems.training_unlocks import player_drill_lock_reason
 from basketball_sim.systems.trade_cli_display import format_trade_cli_summary_lines
-from basketball_sim.systems.trade_logic import TradeSystem, MultiTradeOffer
+from basketball_sim.systems.money_display import format_money_yen_ja_readable
+from basketball_sim.systems.trade_input_helpers import (
+    compose_cash_yen_from_oku_man,
+    max_oku_for_cash,
+    rb_man_choice_values_filtered,
+    rb_yen_from_man,
+    valid_cash_man_values_for_oku,
+)
+from basketball_sim.systems.trade_logic import (
+    MultiTradeOffer,
+    TradeSystem,
+    TRADE_RB_TRANSFER_MAX_LEG_YEN,
+    TRADE_RB_TRANSFER_STEP_YEN,
+    max_trade_rb_leg_for_team,
+)
 from basketball_sim.systems.contract_logic import (
     SALARY_CAP_DEFAULT,
     SALARY_SOFT_LIMIT_MULTIPLIER,
@@ -1361,7 +1375,7 @@ def print_tradeable_players(team, title):
             f"OVR:{getattr(p, 'ovr', 0):<2} "
             f"Age:{getattr(p, 'age', 0):<2} "
             f"{getattr(p, 'nationality', 'Japan'):<12} "
-            f"Salary:{getattr(p, 'salary', 0):,}円"
+            f"Salary:{format_money_yen_ja_readable(int(getattr(p, 'salary', 0) or 0))}"
         )
 
     sys.stdout.flush()
@@ -1457,8 +1471,9 @@ def parse_multi_trade_side_payment(
     is_cash: bool,
 ) -> Tuple[bool, int, str]:
     """
-    multi の自分→相手の現金または RB 入力を解釈（`propose_multi_trade` STEP 5/6 と同趣旨）。
+    multi / 1対1 の現金または RB 入力を解釈（トレード CLI と同趣旨）。
     カンマ・空白除去、空は 0。
+    RB は 500万円刻み・片道最大 4000万円（max_allowed はチーム残高と併せて渡すこと）。
     """
     cleaned = raw.replace(",", "").replace(" ", "").strip()
     try:
@@ -1467,11 +1482,85 @@ def parse_multi_trade_side_payment(
         return False, 0, "整数で入力してください。"
     if value < 0:
         return False, 0, "0以上の整数を入力してください。"
+    if not is_cash:
+        max_allowed = min(int(max_allowed), int(TRADE_RB_TRANSFER_MAX_LEG_YEN))
     if value > max_allowed:
         if is_cash:
-            return False, 0, f"上限を超えています。（現在の上限: {max_allowed:,} 円）"
-        return False, 0, f"上限を超えています。（現在の上限: {max_allowed:,}）"
+            return False, 0, f"上限を超えています。（現在の上限: {format_money_yen_ja_readable(max_allowed)}）"
+        return False, 0, f"上限を超えています。（現在の上限: {format_money_yen_ja_readable(max_allowed)}）"
+    if not is_cash and value > 0 and value % int(TRADE_RB_TRANSFER_STEP_YEN) != 0:
+        return (
+            False,
+            0,
+            f"RB は {format_money_yen_ja_readable(TRADE_RB_TRANSFER_STEP_YEN)}刻みで入力してください。（例: 5000000, 10000000）",
+        )
     return True, value, ""
+
+
+def _cli_read_trade_cash_yen(side_label: str, max_cash_yen: int) -> Optional[int]:
+    """億 + 万（1000万刻み）で現金を入力。b/q/back で None（中止）。"""
+    if max_cash_yen <= 0:
+        print(f"  {side_label}: 上限 0 のため 0 円固定。")
+        return 0
+    max_oku = max_oku_for_cash(max_cash_yen)
+    print(f"  {side_label} 上限: {format_money_yen_ja_readable(max_cash_yen)}")
+    print(f"  億は 0〜{max_oku}、万は 0/1000/…/9000（1000万円刻み）。b=中止")
+    while True:
+        r0 = input("  億: ").strip()
+        if r0.lower() in ("b", "q", "back"):
+            return None
+        try:
+            oku = int(r0 or "0")
+        except ValueError:
+            print("  億は 0 以上の整数で入力してください。")
+            continue
+        if oku < 0 or oku > max_oku:
+            print(f"  億は 0〜{max_oku} の範囲で入力してください。")
+            continue
+        choices = valid_cash_man_values_for_oku(max_cash_yen, oku)
+        print(f"  万（次のいずれか）: {', '.join(str(c) for c in choices)}")
+        r1 = input("  万: ").strip()
+        if r1.lower() in ("b", "q", "back"):
+            return None
+        try:
+            man = int(r1 or "0")
+        except ValueError:
+            print("  万は整数で入力してください。")
+            continue
+        if man not in choices:
+            print("  万は上記のいずれかを入力してください。")
+            continue
+        yen = compose_cash_yen_from_oku_man(oku, man)
+        ok_pay, parsed, msg = parse_multi_trade_side_payment(str(yen), max_cash_yen, is_cash=True)
+        if not ok_pay:
+            print(f"  {msg}")
+            continue
+        return parsed
+
+
+def _cli_read_trade_rb_yen(side_label: str, max_rb_yen: int) -> Optional[int]:
+    """万の数 0,500,…,4000（500万円刻み）で RB を入力。b/q/back で None。"""
+    choices_man = rb_man_choice_values_filtered(max_rb_yen)
+    print(f"  {side_label} 上限: {format_money_yen_ja_readable(max_rb_yen)}（500万円刻み）")
+    print(f"  万の数（次のいずれか）: {', '.join(str(c) for c in choices_man)}。b=中止")
+    while True:
+        raw = input("  万の数: ").strip()
+        if raw.lower() in ("b", "q", "back"):
+            return None
+        try:
+            m = int(raw or "0")
+        except ValueError:
+            print("  整数で入力してください。")
+            continue
+        if m not in choices_man:
+            print("  上記のいずれかを入力してください。")
+            continue
+        yen = rb_yen_from_man(m)
+        ok_r, parsed, msg = parse_multi_trade_side_payment(str(yen), max_rb_yen, is_cash=False)
+        if not ok_r:
+            print(f"  {msg}")
+            continue
+        return parsed
 
 
 def print_trade_evaluation_summary(user_eval, ai_eval):
@@ -1498,6 +1587,11 @@ def one_for_one_trade_evaluate_and_ai_gate(
     ai_team,
     user_send_player,
     ai_send_player,
+    *,
+    cash_a_to_b: int = 0,
+    cash_b_to_a: int = 0,
+    rookie_budget_a_to_b: int = 0,
+    rookie_budget_b_to_a: int = 0,
 ):
     """
     1対1トレードの評価と AI 承諾判定（CLI propose_trade と GUI 共用）。
@@ -1508,12 +1602,20 @@ def one_for_one_trade_evaluate_and_ai_gate(
         ai_team=ai_team,
         user_send_player=user_send_player,
         ai_send_player=ai_send_player,
+        cash_a_to_b=cash_a_to_b,
+        cash_b_to_a=cash_b_to_a,
+        rookie_budget_a_to_b=rookie_budget_a_to_b,
+        rookie_budget_b_to_a=rookie_budget_b_to_a,
     )
     accepted, reason, detail = trade_system.should_ai_accept_trade(
         user_team=user_team,
         ai_team=ai_team,
         user_send_player=user_send_player,
         ai_send_player=ai_send_player,
+        cash_a_to_b=cash_a_to_b,
+        cash_b_to_a=cash_b_to_a,
+        rookie_budget_a_to_b=rookie_budget_a_to_b,
+        rookie_budget_b_to_a=rookie_budget_b_to_a,
     )
     return user_eval, ai_eval, accepted, reason, detail
 
@@ -1531,15 +1633,15 @@ def propose_trade(all_teams, user_team, season=None):
         return
 
     print(
-        "※ この画面は選手のみの 1 対 1 です。"
-        " 現金・RB を伴うトレードは「トレード提案（複数人数＋現金＋RB）」の導線を使ってください。"
+        "※ 1 対 1 で選手に加え、現金・RB（ルーキーバジェット）の双方向移転を指定できます。"
+        " 金銭は所持の範囲内、RB は 500万円刻み・片道最大 4000万円です。"
     )
     sys.stdout.flush()
 
     ai_players = print_tradeable_players(ai_team, f"{ai_team.name} のトレード候補")
     if not ai_players:
         return
-    print("\n[1/2] 相手から獲得したい選手の番号（上の一覧）")
+    print("\n[1/8] 相手から獲得したい選手の番号（上の一覧）")
     sys.stdout.flush()
     ai_player = choose_player_from_list(ai_players, "  番号: ")
     if ai_player is None:
@@ -1548,7 +1650,7 @@ def propose_trade(all_teams, user_team, season=None):
     user_players = print_tradeable_players(user_team, "自チームの放出候補")
     if not user_players:
         return
-    print("\n[2/2] 自チームから放出する選手の番号（上の一覧）")
+    print("\n[2/8] 自チームから放出する選手の番号（上の一覧）")
     sys.stdout.flush()
     user_player = choose_player_from_list(user_players, "  番号: ")
     if user_player is None:
@@ -1556,12 +1658,57 @@ def propose_trade(all_teams, user_team, season=None):
 
     print("\n".join(format_trade_cli_summary_lines([ai_player], [user_player])))
 
+    max_cash_u = max(0, int(getattr(user_team, "money", 0) or 0))
+    max_cash_ai = max(0, int(getattr(ai_team, "money", 0) or 0))
+    max_rb_u = max_trade_rb_leg_for_team(user_team)
+    max_rb_ai = max_trade_rb_leg_for_team(ai_team)
+
+    print("\n[3/8] 現金（自分→相手）")
+    cash_ab = _cli_read_trade_cash_yen("現金（自分→相手）", max_cash_u)
+    if cash_ab is None:
+        print("トレード提案を中止しました。")
+        return
+
+    print("\n[4/8] 現金（相手→自分）")
+    cash_ba = _cli_read_trade_cash_yen("現金（相手→自分）", max_cash_ai)
+    if cash_ba is None:
+        print("トレード提案を中止しました。")
+        return
+
+    print("\n[5/8] RB 移転（自分→相手）")
+    rb_ab = _cli_read_trade_rb_yen("RB（自分→相手）", max_rb_u)
+    if rb_ab is None:
+        print("トレード提案を中止しました。")
+        return
+
+    print("\n[6/8] RB 移転（相手→自分）")
+    rb_ba = _cli_read_trade_rb_yen("RB（相手→自分）", max_rb_ai)
+    if rb_ba is None:
+        print("トレード提案を中止しました。")
+        return
+
+    if any((cash_ab, cash_ba, rb_ab, rb_ba)):
+        bits = []
+        if cash_ab:
+            bits.append(f"現金（自分→相手）{format_money_yen_ja_readable(cash_ab)}")
+        if cash_ba:
+            bits.append(f"現金（相手→自分）{format_money_yen_ja_readable(cash_ba)}")
+        if rb_ab:
+            bits.append(f"RB（自分→相手）{format_money_yen_ja_readable(rb_ab)}")
+        if rb_ba:
+            bits.append(f"RB（相手→自分）{format_money_yen_ja_readable(rb_ba)}")
+        print("\n付帯: " + " / ".join(bits))
+
     user_eval, ai_eval, accepted, reason, detail = one_for_one_trade_evaluate_and_ai_gate(
         trade_system,
         user_team,
         ai_team,
         user_player,
         ai_player,
+        cash_a_to_b=cash_ab,
+        cash_b_to_a=cash_ba,
+        rookie_budget_a_to_b=rb_ab,
+        rookie_budget_b_to_a=rb_ba,
     )
     print_trade_evaluation_summary(user_eval, ai_eval)
 
@@ -1582,7 +1729,11 @@ def propose_trade(all_teams, user_team, season=None):
         team_a=user_team,
         team_b=ai_team,
         player_a=user_player,
-        player_b=ai_player
+        player_b=ai_player,
+        cash_a_to_b=cash_ab,
+        cash_b_to_a=cash_ba,
+        rookie_budget_a_to_b=rb_ab,
+        rookie_budget_b_to_a=rb_ba,
     )
 
     print_separator("トレード結果")
@@ -1616,7 +1767,7 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
     sys.stdout.flush()
 
     while True:
-        print("\n[STEP 1/6] 自分が出す人数（1〜3）")
+        print("\n[STEP 1/8] 自分が出す人数（1〜3）")
         sys.stdout.flush()
         try:
             n_out = int(input("  入力: ").strip())
@@ -1624,7 +1775,7 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
             print("数字を正しく入力してください。")
             continue
 
-        print("\n[STEP 2/6] 自分が受け取る人数（1〜3）")
+        print("\n[STEP 2/8] 自分が受け取る人数（1〜3）")
         sys.stdout.flush()
         try:
             n_in = int(input("  入力: ").strip())
@@ -1644,7 +1795,7 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
             continue
         break
 
-    print(f"\n[STEP 3/6] 放出する選手（自チームから {n_out} 名）")
+    print(f"\n[STEP 3/8] 放出する選手（自チームから {n_out} 名）")
     print(f"  上の自チーム一覧の番号を {n_out} 個、カンマ区切りで入力（例: 1,3）")
     sys.stdout.flush()
     user_gives = choose_players_from_list(
@@ -1652,7 +1803,7 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
         prompt="  番号: ",
         count=n_out,
     )
-    print(f"\n[STEP 4/6] 獲得したい選手（相手から {n_in} 名）")
+    print(f"\n[STEP 4/8] 獲得したい選手（相手から {n_in} 名）")
     print(f"  上の相手チーム一覧の番号を {n_in} 個、カンマ区切りで入力（例: 1,3）")
     sys.stdout.flush()
     ai_receives = choose_players_from_list(
@@ -1662,40 +1813,40 @@ def propose_multi_trade(all_teams, user_team, free_agents, season=None):
     )
 
     max_cash = max(0, int(getattr(user_team, "money", 0) or 0))
-    print("\n[STEP 5/6] 現金移転（自分→相手）")
-    print(f"  0〜{max_cash:,} 円 / 0=送金なし / b=中止")
-    sys.stdout.flush()
-    while True:
-        raw = input("  入力: ").strip()
-        if raw.lower() in ("b", "q", "back"):
-            print("トレード提案を中止しました。")
-            return
-        ok_pay, cash, pay_msg = parse_multi_trade_side_payment(raw, max_cash, is_cash=True)
-        if not ok_pay:
-            print(pay_msg)
-            continue
-        break
+    max_cash_ai = max(0, int(getattr(ai_team, "money", 0) or 0))
+    print("\n[STEP 5/8] 現金移転（自分→相手）")
+    cash = _cli_read_trade_cash_yen("現金（自分→相手）", max_cash)
+    if cash is None:
+        print("トレード提案を中止しました。")
+        return
 
-    max_rb = max(0, int(getattr(user_team, "rookie_budget_remaining", 0) or 0))
-    print("\n[STEP 6/6] RB移転（自分→相手）")
-    print(f"  0〜{max_rb:,} / 0=移転なし / b=中止")
-    sys.stdout.flush()
-    while True:
-        raw = input("  入力: ").strip()
-        if raw.lower() in ("b", "q", "back"):
-            print("トレード提案を中止しました。")
-            return
-        ok_rb, rb, rb_msg = parse_multi_trade_side_payment(raw, max_rb, is_cash=False)
-        if not ok_rb:
-            print(rb_msg)
-            continue
-        break
+    print("\n[STEP 6/8] 現金移転（相手→自分）")
+    cash_ba = _cli_read_trade_cash_yen("現金（相手→自分）", max_cash_ai)
+    if cash_ba is None:
+        print("トレード提案を中止しました。")
+        return
+
+    max_rb = max_trade_rb_leg_for_team(user_team)
+    max_rb_ai = max_trade_rb_leg_for_team(ai_team)
+    print("\n[STEP 7/8] RB移転（自分→相手）")
+    rb_ab = _cli_read_trade_rb_yen("RB（自分→相手）", max_rb)
+    if rb_ab is None:
+        print("トレード提案を中止しました。")
+        return
+
+    print("\n[STEP 8/8] RB移転（相手→自分）")
+    rb_ba = _cli_read_trade_rb_yen("RB（相手→自分）", max_rb_ai)
+    if rb_ba is None:
+        print("トレード提案を中止しました。")
+        return
 
     offer = MultiTradeOffer(
         team_a_gives_players=user_gives,
         team_a_receives_players=ai_receives,
         cash_a_to_b=cash,
-        rookie_budget_a_to_b=rb,
+        cash_b_to_a=cash_ba,
+        rookie_budget_a_to_b=rb_ab,
+        rookie_budget_b_to_a=rb_ba,
     )
 
     print("\n".join(format_trade_cli_summary_lines(ai_receives, user_gives)))
@@ -1791,8 +1942,8 @@ def apply_facility_upgrade(user_team, facility_key):
 
     print_separator(f"{label} 投資")
     print(f"現在レベル : Lv.{current_level}")
-    print(f"必要資金   : {cost:,}円")
-    print(f"現在資金   : {money:,}円")
+    print(f"必要資金   : {format_money_yen_ja_readable(cost)}")
+    print(f"現在資金   : {format_money_yen_ja_readable(money)}")
 
     ok_pre, msg_pre = can_commit_facility_upgrade(user_team, facility_key)
     if not ok_pre:
@@ -1808,7 +1959,7 @@ def apply_facility_upgrade(user_team, facility_key):
     if ok:
         print_separator("投資完了")
         print(msg)
-        print(f"残り資金: {int(getattr(user_team, 'money', 0)):,}円")
+        print(f"残り資金: {format_money_yen_ja_readable(int(getattr(user_team, 'money', 0) or 0))}")
     else:
         print(msg)
 
@@ -2162,7 +2313,7 @@ _CLI_OWNER_EXPECTATION_LABEL: Dict[str, str] = {
 
 def _cli_money_yen(n: int) -> str:
     try:
-        return f"{int(n):,}円"
+        return format_money_yen_ja_readable(int(n))
     except (TypeError, ValueError):
         return "情報なし"
 

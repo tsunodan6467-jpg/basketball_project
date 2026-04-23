@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from basketball_sim.systems.money_display import (
+    format_money_yen_ja_readable,
+    format_signed_money_yen_ja_readable,
+)
+
 DEFAULT_FINANCE_HISTORY_DISPLAY_LIMIT = 5
 DEFAULT_INSEASON_CASH_LOG_DISPLAY_LIMIT = 40
 
@@ -181,7 +186,9 @@ def format_inseason_cash_round_log_lines(
     out: List[str] = [header, ""]
     for r in tail:
         label = INSEASON_CASH_KEY_LABELS_JA.get(str(r["key"]), "その他")
-        out.append(f"R{int(r['round_number'])}  {label}  +{int(r['amount']):,}円")
+        out.append(
+            f"R{int(r['round_number'])}  {label}  {format_signed_money_yen_ja_readable(int(r['amount']))}"
+        )
     out.append("")
     out.append("※年次の財務レポート（前季収支）とは別枠です。")
     return out
@@ -221,16 +228,16 @@ def format_cli_finance_screen_header_lines(team: Any) -> List[str]:
         n_fin = len(fh)
 
         lines.append("【財務サマリー】")
-        lines.append(f"所持金: {money:,}円")
+        lines.append(f"所持金: {format_money_yen_ja_readable(money)}")
 
         if rev == 0 and exp == 0 and cf == 0:
             lines.append("前季収支: 未更新")
         elif cf > 0:
-            lines.append(f"前季収支: {cf:+,}円（黒字）")
+            lines.append(f"前季収支: {format_signed_money_yen_ja_readable(cf)}（黒字）")
         elif cf < 0:
-            lines.append(f"前季収支: {cf:+,}円（赤字）")
+            lines.append(f"前季収支: {format_signed_money_yen_ja_readable(cf)}（赤字）")
         else:
-            lines.append(f"前季収支: {cf:+,}円（収支均衡）")
+            lines.append(f"前季収支: {format_signed_money_yen_ja_readable(cf)}（収支均衡）")
 
         lines.append(f"財務履歴: {n_fin}件" if n_fin else "財務履歴: 履歴なし")
         lines.append("")
@@ -242,8 +249,8 @@ def format_cli_finance_screen_header_lines(team: Any) -> List[str]:
             etot = int(snap.get("expense", 0))
             br = normalize_breakdown_dict(snap.get("breakdown_revenue"))
             be = normalize_breakdown_dict(snap.get("breakdown_expense"))
-            lines.append(f"直近収入合計: {rtot:,}円")
-            lines.append(f"直近支出合計: {etot:,}円")
+            lines.append(f"直近収入合計: {format_money_yen_ja_readable(rtot)}")
+            lines.append(f"直近支出合計: {format_money_yen_ja_readable(etot)}")
             if br and breakdown_matches_total(rtot, br):
                 top_r = sorted(br.items(), key=lambda x: -x[1])[:2]
                 r_labels = " / ".join(REV_LABELS_JA.get(str(k), str(k)) for k, _ in top_r)
@@ -262,8 +269,8 @@ def format_cli_finance_screen_header_lines(team: Any) -> List[str]:
                 try:
                     rtot = int(last.get("revenue", 0) or 0)
                     etot = int(last.get("expense", 0) or 0)
-                    lines.append(f"直近収入合計: {rtot:,}円")
-                    lines.append(f"直近支出合計: {etot:,}円")
+                    lines.append(f"直近収入合計: {format_money_yen_ja_readable(rtot)}")
+                    lines.append(f"直近支出合計: {format_money_yen_ja_readable(etot)}")
                     lines.append("主な収入: 情報なし")
                     lines.append("主な支出: 情報なし")
                 except (TypeError, ValueError):

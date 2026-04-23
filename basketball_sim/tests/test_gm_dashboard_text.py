@@ -14,6 +14,7 @@ from basketball_sim.systems.gm_dashboard_text import (
     get_current_sixth_man,
     get_sixth_man_candidates,
 )
+from basketball_sim.systems.japan_regulation_display import get_player_nationality_bucket_label
 
 
 def _player(pid: int, position: str = "PG") -> Player:
@@ -67,6 +68,21 @@ def test_format_gm_roster_lists_player():
     text = format_gm_roster_text(t)
     assert "P2" in text
     assert "スタメン" in text or "★" in text
+    assert "区分:" in text and "日本" in text
+
+
+def test_get_player_nationality_bucket_label_contract_buckets():
+    pj = _player(1)
+    assert get_player_nationality_bucket_label(pj) == "日本"
+    pf = _player(2)
+    pf.nationality = "Foreign"
+    assert get_player_nationality_bucket_label(pf) == "外国籍"
+    pa = _player(3)
+    pa.nationality = "Asia"
+    assert get_player_nationality_bucket_label(pa) == "アジア/帰化"
+    pn = _player(4)
+    pn.nationality = "Naturalized"
+    assert get_player_nationality_bucket_label(pn) == "アジア/帰化"
 
 
 def test_format_lineup_snapshot_contains_sections():

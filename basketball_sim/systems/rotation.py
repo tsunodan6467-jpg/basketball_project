@@ -1,10 +1,25 @@
 from typing import List, Optional, Dict, Tuple
 
 from basketball_sim.models.player import Player
+from basketball_sim.models.reg_slot import RegSlot
 from basketball_sim.models.team import Team
 from basketball_sim.systems.competition_rules import get_competition_rule, normalize_competition_type
 from basketball_sim.systems.japan_regulation import count_regulation_slots
-from basketball_sim.systems.team_tactics import get_rotation_target_minutes_by_player_id
+from basketball_sim.systems.team_tactics import (
+    get_age_balance_target_minutes_overlay,
+    get_schedule_care_target_minutes_overlay,
+    get_clutch_policy_substitute_overlay,
+    get_evaluation_focus_substitute_overlay,
+    get_fatigue_policy_sub_in_cooldown_adjustment,
+    get_foreign_player_usage_substitute_overlay,
+    get_form_weight_fatigue_substitute_overlay,
+    get_injury_care_substitute_overlay,
+    get_roles_offense_involvement_substitute_overlay,
+    get_roles_playmaking_role_substitute_overlay,
+    get_roles_shot_priority_substitute_overlay,
+    get_rotation_target_minutes_by_player_id,
+    get_sub_policy_sub_out_modifier,
+)
 
 
 class RotationSystem:
@@ -45,9 +60,11 @@ class RotationSystem:
         active_players: List[Player],
         starters: Optional[List[Player]] = None,
         competition_type: str = "regular_season",
+        reg_slot: RegSlot | None = None,
     ):
         self.team = team
         self._competition_type = normalize_competition_type(competition_type)
+        self.reg_slot = reg_slot
         self.active_players = [p for p in active_players if not p.is_injured() and not p.is_retired]
 
         sorted_players = sorted(
@@ -333,6 +350,12 @@ class RotationSystem:
                         target = max(target, 14.0)
                         target += 3.5
 
+            # 起用テンプレ usage_policy.age_balance: 年齢帯の極小上乗せ（本流の後、clamp 前）
+            target += get_age_balance_target_minutes_overlay(self.team, usage_policy, age)
+            # 起用テンプレ schedule_care × RegSlot: 同一 round 2 戦目以降の極小上乗せ（clamp 前）
+            target += get_schedule_care_target_minutes_overlay(
+                self.team, self.reg_slot, self._competition_type
+            )
             targets[key] = self._clamp_target_minutes(target)
 
         overlay = getattr(self, "_tactics_target_minutes", None) or {}
@@ -402,7 +425,18 @@ class RotationSystem:
         ):
             cooldown_possessions = min(cooldown_possessions, 6)
 
-        return (possession - last_out) >= cooldown_possessions
+        adj = get_fatigue_policy_sub_in_cooldown_adjustment(
+            self.team, int(getattr(player, "fatigue", 0) or 0)
+        )
+        if adj > 1:
+            adj = 1
+        elif adj < -1:
+            adj = -1
+        eff_cooldown = cooldown_possessions + adj
+        if eff_cooldown < 6:
+            eff_cooldown = 6
+
+        return (possession - last_out) >= eff_cooldown
 
     def _can_sub_out(self, player: Player, possession: int, total_possessions: int) -> bool:
         key = self._player_key(player)
@@ -423,9 +457,19 @@ class RotationSystem:
         if self._need_force_bench_exposure(possession, total_possessions):
             min_stint_possessions = max(6, min_stint_possessions - 2)
 
-        if possession - last_in < min_stint_possessions:
+        rk = self._get_rank_map().get(self._player_key(player), 99)
+        sub_mod = int(get_sub_policy_sub_out_modifier(self.team, player, roster_rank=rk))
+        if sub_mod > 1:
+            sub_mod = 1
+        elif sub_mod < -1:
+            sub_mod = -1
+        eff_min_stint = min_stint_possessions + sub_mod
+        if eff_min_stint < 6:
+            eff_min_stint = 6
+
+        if possession - last_in < eff_min_stint:
             return False
-        if stint_len < min_stint_possessions:
+        if stint_len < eff_min_stint:
             return False
 
         return True
@@ -700,6 +744,7 @@ class RotationSystem:
         best_score = -10**9
         blocked_pair_count = 0
         illegal_count = 0
+        on_court_rule = get_competition_rule(self._competition_type, "on_court")
 
         for p in in_candidates:
             if not self._is_lineup_legal_after_swap(self.current_lineup, out_player, p):
@@ -746,6 +791,27 @@ class RotationSystem:
                 score += 7.0
             elif is_closing and rank >= 8:
                 score -= 6.0
+
+            # 起用テンプレ form_weight: 疲労の見方（v1: fatigue ベース、極小）
+            score += get_form_weight_fatigue_substitute_overlay(
+                self.team, int(getattr(p, "fatigue", 0) or 0)
+            )
+
+            score += get_foreign_player_usage_substitute_overlay(self.team, p, on_court_rule)
+
+            score += get_evaluation_focus_substitute_overlay(self.team, p)
+            score += get_roles_shot_priority_substitute_overlay(self.team, p)
+            score += get_roles_offense_involvement_substitute_overlay(self.team, p)
+            score += get_roles_playmaking_role_substitute_overlay(self.team, p)
+
+            # 起用テンプレ injury_care: 疲労・スタミナ素地の慎重さ（form_weight とは別軸、極小）
+            score += get_injury_care_substitute_overlay(
+                self.team, int(getattr(p, "fatigue", 0) or 0), int(stamina)
+            )
+
+            score += get_clutch_policy_substitute_overlay(
+                self.team, p, is_late, is_closing, roster_rank=rank
+            )
 
             if score > best_score:
                 best_score = score

@@ -5,6 +5,7 @@ from typing import Tuple, List, Optional, Dict, Set, Any
 
 from .team import Team
 from .player import Player
+from .reg_slot import RegSlot
 import basketball_sim.config.game_constants as game_constants
 from basketball_sim.config.game_constants import (
     CLOCK_SECONDS_PER_REGULATION_QUARTER,
@@ -21,7 +22,14 @@ from basketball_sim.systems.rotation import RotationSystem
 from basketball_sim.systems.injury_lineup_autorepair import auto_repair_lineup_for_injuries
 from basketball_sim.systems.team_tactics import (
     STARTER_POSITIONS,
+    get_defense_style_shot_mix_deltas,
+    get_defense_style_steal_rate_delta,
     get_normalized_rotation_starters_map,
+    get_offense_creation_assist_delta,
+    get_offense_style_shot_mix_deltas,
+    get_offense_tempo_pace_adjustment,
+    get_rebound_style_offense_oreb_delta,
+    get_transition_style_pace_adjustment,
 )
 
 
@@ -82,7 +90,9 @@ class Match:
         home_team: Team,
         away_team: Team,
         is_playoff: bool = False,
-        competition_type: str = "regular_season"
+        competition_type: str = "regular_season",
+        reg_slot_home: RegSlot | None = None,
+        reg_slot_away: RegSlot | None = None,
     ):
         self.home_team = home_team
         self.away_team = away_team
@@ -90,6 +100,8 @@ class Match:
         self.away_score = 0
         self.is_playoff = is_playoff
         self.competition_type = normalize_competition_type(competition_type)
+        self.reg_slot_home = reg_slot_home
+        self.reg_slot_away = reg_slot_away
 
         self.current_possession = 0
         self.total_possessions = 0
@@ -110,10 +122,18 @@ class Match:
         self.away_current_lineup = list(self.away_starters)
 
         self.home_rotation = RotationSystem(
-            self.home_team, self.home_active_players, self.home_starters, competition_type=self.competition_type
+            self.home_team,
+            self.home_active_players,
+            self.home_starters,
+            competition_type=self.competition_type,
+            reg_slot=reg_slot_home,
         )
         self.away_rotation = RotationSystem(
-            self.away_team, self.away_active_players, self.away_starters, competition_type=self.competition_type
+            self.away_team,
+            self.away_active_players,
+            self.away_starters,
+            competition_type=self.competition_type,
+            reg_slot=reg_slot_away,
         )
 
         self._minutes_tracker = {}
@@ -1780,6 +1800,13 @@ class Match:
         elif away_training == "intense_defense":
             away_adj -= 2
 
+        # 攻守詳細: team_tactics.team_strategy.offense_tempo による弱い上乗せ（既存補正の後）
+        home_adj += get_offense_tempo_pace_adjustment(self.home_team)
+        away_adj += get_offense_tempo_pace_adjustment(self.away_team)
+        # 攻守詳細: transition_style（push / half_court）極小。offense_tempo 補正の直後、clamp 前
+        home_adj += get_transition_style_pace_adjustment(self.home_team, str(home_strategy))
+        away_adj += get_transition_style_pace_adjustment(self.away_team, str(away_strategy))
+
         total = base + home_adj + away_adj
         return max(140, min(180, total))
 
@@ -2185,6 +2212,10 @@ class Match:
         if is_second_chance:
             assist_rate -= 0.14
 
+        assist_rate += get_offense_creation_assist_delta(
+            offense_team, str(strategy)
+        )
+
         return max(0.28, min(0.82, assist_rate))
 
     def _get_shot_mix(
@@ -2242,6 +2273,20 @@ class Match:
             shot_rate_adjust -= 0.006
         elif defense_coach == "offense":
             shot_rate_adjust += 0.002
+
+        _d3, _d2, _dsr = get_offense_style_shot_mix_deltas(
+            offense_team, str(offense_strategy)
+        )
+        three_cutoff += _d3
+        two_cutoff += _d2
+        shot_rate_adjust += _dsr
+
+        _dd3, _dd2, _ddsr = get_defense_style_shot_mix_deltas(
+            defense_team, str(defense_strategy)
+        )
+        three_cutoff += _dd3
+        two_cutoff += _dd2
+        shot_rate_adjust += _ddsr
 
         three_push = (off_profile["three"] - 65.0) * 0.0025
         inside_push = ((off_profile["drive"] + off_profile["rebound"]) / 2 - 65.0) * 0.0018
@@ -2310,6 +2355,10 @@ class Match:
 
         if was_blocked:
             offense_reb_rate -= 0.03
+
+        offense_reb_rate += get_rebound_style_offense_oreb_delta(
+            offense_team, str(offense_strategy)
+        )
 
         return max(0.16, min(0.38, offense_reb_rate))
 
@@ -2986,6 +3035,10 @@ class Match:
 
         if offense_coach == "development":
             steal_rate += 0.001
+
+        steal_rate += get_defense_style_steal_rate_delta(
+            defense_team, str(defense_strategy)
+        )
 
         steal_rate = max(0.015, min(0.090, steal_rate))
 

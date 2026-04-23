@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any, List, Optional
 
+from basketball_sim.systems.money_display import format_money_yen_ja_readable
+
 _OWNER_EXPECTATION_LABELS = {
     "playoff_race": "PO争い",
     "rebuild": "再建",
@@ -25,7 +27,7 @@ def _safe_int(v: Any, default: int = 0) -> int:
 
 def _fmt_yen(n: int) -> str:
     try:
-        return f"{int(n):,}円"
+        return format_money_yen_ja_readable(int(n))
     except (TypeError, ValueError):
         return "情報なし"
 
