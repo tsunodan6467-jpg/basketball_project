@@ -76,7 +76,118 @@ PLAYBOOK_DEFAULTS: Dict[str, str] = {
     "transition": "standard",
 }
 
+# プレイスタイル用プリセット正典（v1）。ここでは dict のみ。apply / UI / preset_meta 更新は別タスク。
+# v1 範囲: Team.strategy + team_strategy + playbook のみ（coach_style / Team.usage_policy / roles は含めない）。
+PLAYSTYLE_PRESET_DEFS: Dict[str, Dict[str, Any]] = {
+    "balanced_v1": {
+        "label_ja": "バランス型",
+        "team": {"strategy": "balanced"},
+        "team_strategy": dict(TEAM_STRATEGY_DEFAULTS),
+        "playbook": dict(PLAYBOOK_DEFAULTS),
+    },
+    "run_and_gun_3p_v1": {
+        "label_ja": "ラン＆ガン3P型",
+        "team": {"strategy": "run_and_gun"},
+        "team_strategy": {
+            "offense_tempo": "fast",
+            "offense_style": "three_point",
+            "offense_creation": "ball_move",
+            "defense_style": "balanced",
+            "rebound_style": "get_back",
+            "transition_style": "push",
+        },
+        "playbook": {
+            "pick_and_roll": "standard",
+            "spain_pick_and_roll": "standard",
+            "handoff": "high",
+            "off_ball_screen": "high",
+            "post_up": "low",
+            "transition": "high",
+        },
+    },
+    "defense_first_v1": {
+        "label_ja": "堅守型",
+        "team": {"strategy": "defense"},
+        "team_strategy": {
+            "offense_tempo": "slow",
+            "offense_style": "inside",
+            "offense_creation": "pick_and_roll",
+            "defense_style": "protect_paint",
+            "rebound_style": "get_back",
+            "transition_style": "half_court",
+        },
+        "playbook": {
+            "pick_and_roll": "standard",
+            "spain_pick_and_roll": "standard",
+            "handoff": "low",
+            "off_ball_screen": "standard",
+            "post_up": "standard",
+            "transition": "low",
+        },
+    },
+}
+
+# ローテーション用プリセット正典（v1）。dict のみ。apply / UI / preset_meta は別タスク。
+# v1: Team.usage_policy + usage_policy + rotation。先発/6th/ベンチ・roles は含めない。rotation.starters は {} 固定。
+ROTATION_PRESET_DEFS: Dict[str, Dict[str, Any]] = {
+    "balanced_v1": {
+        "label_ja": "バランス型",
+        "team": {"usage_policy": "balanced"},
+        "usage_policy": dict(USAGE_POLICY_DEFAULTS),
+        "rotation": {**dict(ROTATION_DEFAULTS), "starters": {}},
+    },
+    "win_now_v1": {
+        "label_ja": "勝利優先型",
+        "team": {"usage_policy": "win_now"},
+        "usage_policy": {
+            "priority": "win",
+            "evaluation_focus": "overall",
+            "form_weight": "skill",
+            "age_balance": "veteran",
+            "injury_care": "standard",
+            "schedule_care": "win",
+            "foreign_player_usage": "stars",
+        },
+        "rotation": {
+            **dict(ROTATION_DEFAULTS),
+            "starters": {},
+            "sub_policy": "starters_long",
+            "fatigue_policy": "push",
+            "foul_policy": "ride",
+            "clutch_policy": "stars",
+        },
+    },
+    "development_v1": {
+        "label_ja": "育成優先型",
+        "team": {"usage_policy": "development"},
+        "usage_policy": {
+            "priority": "development",
+            "evaluation_focus": "potential",
+            "form_weight": "high",
+            "age_balance": "youth",
+            "injury_care": "high",
+            "schedule_care": "rest",
+            "foreign_player_usage": "balanced",
+        },
+        "rotation": {
+            **dict(ROTATION_DEFAULTS),
+            "starters": {},
+            "sub_policy": "youth_dev",
+            "fatigue_policy": "strict",
+            "foul_policy": "early_pull",
+            "clutch_policy": "hot_hand",
+        },
+    },
+}
+
 ALLOWED_PLAYBOOK_LEVEL = frozenset({"low", "standard", "high"})
+
+# team_tactics["preset_meta"]["version"] はプリセット表示メタ用（TACTICS_SCHEMA_VERSION とは別）
+PRESET_META_DEFAULT_V1: Dict[str, Any] = {
+    "version": 1,
+    "playstyle_preset_id": None,
+    "rotation_preset_id": None,
+}
 
 ROLE_DEFAULTS: Dict[str, str] = {
     "main_role": "none",
@@ -101,6 +212,31 @@ ALLOWED_MAIN_ROLE = frozenset(
         "energy",
     }
 )
+
+# 役割詳細「参考役割」コンボ用（内部キー main_role → 日本語）。表示タグの主役は auto_role_tag。ALLOWED_MAIN_ROLE + none
+MAIN_ROLE_COMBO_OPTIONS: Tuple[Tuple[str, str], ...] = (
+    ("none", "未設定"),
+    ("ace", "エース"),
+    ("second_scorer", "セカンドスコアラー"),
+    ("playmaker", "司令塔"),
+    ("shooter", "シューター"),
+    ("post_scorer", "ポスト得点役"),
+    ("defense_ace", "守備エース"),
+    ("rebounder", "リバウンド役"),
+    ("sixth_man", "シックスマン"),
+    ("energy", "エナジー役"),
+)
+_MAIN_ROLE_JA_BY_KEY: Dict[str, str] = {a: b for a, b in MAIN_ROLE_COMBO_OPTIONS}
+
+
+def japanese_label_for_main_role_key(key: Optional[str]) -> Optional[str]:
+    """
+    main_role（参考役割）内部キー → 日本語。none / 空 / 不明は None。
+    人事/GM の行末「タグ:」表示の主役は自動役割タグ（本関数は互換・他用途向けに残す）。
+    """
+    if not key or key == "none":
+        return None
+    return _MAIN_ROLE_JA_BY_KEY.get(key)
 ALLOWED_INVOLVEMENT = frozenset({"high", "standard", "low"})
 ALLOWED_SHOT_PRIORITY = frozenset({"aggressive", "standard", "passive"})
 ALLOWED_CLUTCH_PRIORITY = frozenset({"go_to", "standard", "limited"})
@@ -124,6 +260,39 @@ def get_default_team_tactics() -> Dict[str, Any]:
         "usage_policy": dict(USAGE_POLICY_DEFAULTS),
         "roles": {},
         "playbook": dict(PLAYBOOK_DEFAULTS),
+        "preset_meta": dict(PRESET_META_DEFAULT_V1),
+    }
+
+
+def _preset_meta_id_or_none(value: Any) -> Optional[str]:
+    """プリセット ID: 非空 str のみ通し、それ以外は None。"""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        s = value.strip()
+        return s if s else None
+    return None
+
+
+def _normalize_preset_meta(raw: Any) -> Dict[str, Any]:
+    """
+    team_tactics['preset_meta']（表示用メタの入れ物）。
+
+    トップレベルの team_tactics['version']（TACTICS_SCHEMA_VERSION）とは無関係な
+    サブスキーマ版を raw['version'] として持つ（キー名は履歴都合で同名だが別物）。
+    """
+    if not isinstance(raw, dict):
+        return dict(PRESET_META_DEFAULT_V1)
+    try:
+        meta_ver = int(raw.get("version", 1))
+        if meta_ver < 1:
+            meta_ver = 1
+    except (TypeError, ValueError):
+        meta_ver = 1
+    return {
+        "version": meta_ver,
+        "playstyle_preset_id": _preset_meta_id_or_none(raw.get("playstyle_preset_id")),
+        "rotation_preset_id": _preset_meta_id_or_none(raw.get("rotation_preset_id")),
     }
 
 
@@ -318,6 +487,7 @@ def normalize_team_tactics(raw: Any, valid_player_ids: Optional[AbstractSet[int]
         "usage_policy": _normalize_usage_policy(raw.get("usage_policy")),
         "roles": _normalize_roles(raw.get("roles"), valid_player_ids=valid_player_ids),
         "playbook": _normalize_playbook(raw.get("playbook")),
+        "preset_meta": _normalize_preset_meta(raw.get("preset_meta")),
     }
 
 
@@ -985,6 +1155,43 @@ def get_sub_policy_sub_out_modifier(team: Any, player: Any, *, roster_rank: int 
     return 0.0
 
 
+def get_roles_defense_assignment_sub_out_modifier(team: Any, player: Any) -> int:
+    """
+    team_tactics.roles[pid].defense_assignment → _can_sub_out の実効 min stint への加算（整数のみ）。
+
+    stopper: +1。light: -1。standard / 欠損 / 不正: 0。Rotation 側で sub_policy 補正と合算し clamp する想定。
+    """
+    try:
+        ensure_team_tactics_on_team(team)
+        raw = getattr(team, "team_tactics", None)
+        if not isinstance(raw, dict):
+            return 0
+        roles = raw.get("roles")
+        if not isinstance(roles, dict):
+            return 0
+        try:
+            pid = int(getattr(player, "player_id", 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+        if pid <= 0:
+            return 0
+        row = roles.get(str(pid))
+        if not isinstance(row, dict) or not row:
+            return 0
+        val = _pick_str(
+            row.get("defense_assignment"), ALLOWED_DEFENSE_ASSIGNMENT, ROLE_DEFAULTS["defense_assignment"]
+        )
+    except Exception:
+        return 0
+    if val not in ALLOWED_DEFENSE_ASSIGNMENT or val == ROLE_DEFAULTS["defense_assignment"]:
+        return 0
+    if val == "stopper":
+        return 1
+    if val == "light":
+        return -1
+    return 0
+
+
 # Rotation._can_sub_in: rotation.fatigue_policy（v1: 再投入クールダウン possession に最大 ±1）
 _FATIGUE_POLICY_SUB_IN_STRICT_THRESHOLD: int = 50
 
@@ -1104,6 +1311,53 @@ def get_clutch_policy_substitute_overlay(
         ax = _clamp_ax((m - _OFF_DEF_AXIS_CENTER) / _OFF_DEF_AXIS_SPREAD)
         return t1 * ax
 
+    return 0.0
+
+
+# Rotation._find_best_substitute: roles.clutch_priority（終盤のみ。clutch_policy より弱い T1）
+_ROLES_CLUTCH_PRIORITY_T1: float = 0.10
+
+
+def get_roles_clutch_priority_substitute_overlay(
+    team: Any, player: Any, is_late: bool, is_closing: bool
+) -> float:
+    """
+    team_tactics.roles[pid].clutch_priority → 交代候補スコアへ（合法通過後のみ想定）。
+
+    is_late / is_closing のいずれか真のときだけ。go_to: 微プラス。limited: 微マイナス。standard: 0。
+    能力の再定義はせず、チームの rotation.clutch_policy を上書きしない微調整。|overlay|≤0.10（clutch_policy 0.22 未満）。
+    """
+    if not is_late and not is_closing:
+        return 0.0
+    t1 = _ROLES_CLUTCH_PRIORITY_T1
+    try:
+        ensure_team_tactics_on_team(team)
+        raw = getattr(team, "team_tactics", None)
+        if not isinstance(raw, dict):
+            return 0.0
+        roles = raw.get("roles")
+        if not isinstance(roles, dict):
+            return 0.0
+        try:
+            pid = int(getattr(player, "player_id", 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+        if pid <= 0:
+            return 0.0
+        row = roles.get(str(pid))
+        if not isinstance(row, dict) or not row:
+            return 0.0
+        cp = _pick_str(
+            row.get("clutch_priority"), ALLOWED_CLUTCH_PRIORITY, ROLE_DEFAULTS["clutch_priority"]
+        )
+    except Exception:
+        return 0.0
+    if cp not in ALLOWED_CLUTCH_PRIORITY or cp == ROLE_DEFAULTS["clutch_priority"]:
+        return 0.0
+    if cp == "go_to":
+        return t1
+    if cp == "limited":
+        return -t1
     return 0.0
 
 
@@ -1402,3 +1656,143 @@ def get_safe_team_tactics(team: Any) -> Dict[str, Any]:
     """読み取り専用用途。正規化コピーを返す。"""
     ensure_team_tactics_on_team(team)
     return dict(getattr(team, "team_tactics", {}) or {})
+
+
+def apply_playstyle_preset(team: Any, preset_id: str) -> None:
+    """
+    PLAYSTYLE_PRESET_DEFS を Team.strategy と team_tactics（team_strategy / playbook）へ反映する。
+    preset_meta / coach_style / Team.usage_policy / roles は触らない。
+    """
+    if preset_id not in PLAYSTYLE_PRESET_DEFS:
+        raise KeyError(f"unknown playstyle preset: {preset_id!r}")
+    ensure_team_tactics_on_team(team)
+    defn = PLAYSTYLE_PRESET_DEFS[preset_id]
+    sk = defn["team"].get("strategy")
+    if sk is not None:
+        setattr(team, "strategy", str(sk))
+    raw = dict(getattr(team, "team_tactics", {}) or {})
+    raw["team_strategy"] = dict(defn["team_strategy"])
+    raw["playbook"] = dict(defn["playbook"])
+    valid = _roster_player_ids(team)
+    setattr(team, "team_tactics", normalize_team_tactics(raw, valid_player_ids=valid if valid else None))
+
+
+def apply_playstyle_preset_with_preset_meta(team: Any, preset_id: str) -> None:
+    """
+    apply_playstyle_preset の後に preset_meta['playstyle_preset_id'] のみを更新し再正規化する。
+    rotation_preset_id など preset_meta の他キーは維持する。未知 preset_id は apply 側で KeyError。
+    """
+    apply_playstyle_preset(team, preset_id)
+    raw = dict(getattr(team, "team_tactics", {}) or {})
+    pm = dict(raw.get("preset_meta") or {})
+    pm["playstyle_preset_id"] = _preset_meta_id_or_none(preset_id)
+    raw["preset_meta"] = pm
+    valid = _roster_player_ids(team)
+    setattr(team, "team_tactics", normalize_team_tactics(raw, valid_player_ids=valid if valid else None))
+
+
+def apply_rotation_preset(team: Any, preset_id: str) -> None:
+    """
+    ROTATION_PRESET_DEFS を Team.usage_policy と team_tactics（usage_policy / rotation）へ反映する。
+    preset_meta・Team 先発/6th/ベンチ・roles は触らない。rotation は正典どおり（starters は {} 等）。
+    """
+    if preset_id not in ROTATION_PRESET_DEFS:
+        raise KeyError(f"unknown rotation preset: {preset_id!r}")
+    ensure_team_tactics_on_team(team)
+    defn = ROTATION_PRESET_DEFS[preset_id]
+    uk = defn["team"].get("usage_policy")
+    if uk is not None:
+        if hasattr(team, "set_usage_policy") and callable(getattr(team, "set_usage_policy")):
+            team.set_usage_policy(str(uk))
+        else:
+            setattr(team, "usage_policy", str(uk))
+    raw = dict(getattr(team, "team_tactics", {}) or {})
+    raw["usage_policy"] = dict(defn["usage_policy"])
+    raw["rotation"] = dict(defn["rotation"])
+    valid = _roster_player_ids(team)
+    setattr(team, "team_tactics", normalize_team_tactics(raw, valid_player_ids=valid if valid else None))
+
+
+def apply_rotation_preset_with_preset_meta(team: Any, preset_id: str) -> None:
+    """
+    apply_rotation_preset の後に preset_meta['rotation_preset_id'] のみを更新し再正規化する。
+    playstyle_preset_id など preset_meta の他キーは維持する。未知 preset_id は apply 側で KeyError。
+    """
+    apply_rotation_preset(team, preset_id)
+    raw = dict(getattr(team, "team_tactics", {}) or {})
+    pm = dict(raw.get("preset_meta") or {})
+    pm["rotation_preset_id"] = _preset_meta_id_or_none(preset_id)
+    raw["preset_meta"] = pm
+    valid = _roster_player_ids(team)
+    setattr(team, "team_tactics", normalize_team_tactics(raw, valid_player_ids=valid if valid else None))
+
+
+def _team_tactics_dict_copy(team: Any) -> Dict[str, Any]:
+    cur = getattr(team, "team_tactics", None)
+    return dict(cur) if isinstance(cur, dict) else {}
+
+
+def get_current_playstyle_preset_state(team: Any) -> Dict[str, Any]:
+    """
+    preset_meta.playstyle_preset_id を基準に、Team.strategy / team_strategy / playbook が
+    正規化後に正典と一致するか判定する。team を変更しない。
+    """
+    raw_tt = _team_tactics_dict_copy(team)
+    pm = raw_tt.get("preset_meta")
+    pid: Optional[str] = None
+    if isinstance(pm, dict):
+        pid = _preset_meta_id_or_none(pm.get("playstyle_preset_id"))
+    if not pid:
+        return {"preset_id": None, "label_ja": "未設定", "is_custom": False}
+    if pid not in PLAYSTYLE_PRESET_DEFS:
+        return {"preset_id": pid, "label_ja": "カスタム", "is_custom": True}
+    valid = _roster_player_ids(team)
+    vp = valid if valid else None
+    norm_current = normalize_team_tactics(raw_tt, valid_player_ids=vp)
+    defn = PLAYSTYLE_PRESET_DEFS[pid]
+    raw_exp = get_default_team_tactics()
+    raw_exp["team_strategy"] = dict(defn["team_strategy"])
+    raw_exp["playbook"] = dict(defn["playbook"])
+    norm_exp = normalize_team_tactics(raw_exp, valid_player_ids=vp)
+    exp_sk = str(defn["team"].get("strategy", "") or "").strip()
+    cur_sk = str(getattr(team, "strategy", "") or "").strip()
+    if (
+        cur_sk == exp_sk
+        and norm_current["team_strategy"] == norm_exp["team_strategy"]
+        and norm_current["playbook"] == norm_exp["playbook"]
+    ):
+        return {"preset_id": pid, "label_ja": str(defn.get("label_ja", pid)), "is_custom": False}
+    return {"preset_id": pid, "label_ja": "カスタム", "is_custom": True}
+
+
+def get_current_rotation_preset_state(team: Any) -> Dict[str, Any]:
+    """
+    preset_meta.rotation_preset_id を基準に、Team.usage_policy / usage_policy / rotation が
+    正規化後に正典と一致するか判定する。team を変更しない。
+    """
+    raw_tt = _team_tactics_dict_copy(team)
+    pm = raw_tt.get("preset_meta")
+    pid: Optional[str] = None
+    if isinstance(pm, dict):
+        pid = _preset_meta_id_or_none(pm.get("rotation_preset_id"))
+    if not pid:
+        return {"preset_id": None, "label_ja": "未設定", "is_custom": False}
+    if pid not in ROTATION_PRESET_DEFS:
+        return {"preset_id": pid, "label_ja": "カスタム", "is_custom": True}
+    valid = _roster_player_ids(team)
+    vp = valid if valid else None
+    norm_current = normalize_team_tactics(raw_tt, valid_player_ids=vp)
+    defn = ROTATION_PRESET_DEFS[pid]
+    raw_exp = get_default_team_tactics()
+    raw_exp["usage_policy"] = dict(defn["usage_policy"])
+    raw_exp["rotation"] = dict(defn["rotation"])
+    norm_exp = normalize_team_tactics(raw_exp, valid_player_ids=vp)
+    exp_up = str(defn["team"].get("usage_policy", "") or "").strip()
+    cur_up = str(getattr(team, "usage_policy", "") or "").strip()
+    if (
+        cur_up == exp_up
+        and norm_current["usage_policy"] == norm_exp["usage_policy"]
+        and norm_current["rotation"] == norm_exp["rotation"]
+    ):
+        return {"preset_id": pid, "label_ja": str(defn.get("label_ja", pid)), "is_custom": False}
+    return {"preset_id": pid, "label_ja": "カスタム", "is_custom": True}
