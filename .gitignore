@@ -15,3 +15,15 @@ __pycache__/
 # エディタ
 .idea/
 .vscode/
+
+# 国内バスケGM開発用のローカル生成物
+
+# Local save/debug clips
+*.sav
+
+# Local pytest probe logs
+reports/pytest_*.txt
+
+# Local Steam build/upload artifacts
+steam_api64.dll
+steam_upload_content/
