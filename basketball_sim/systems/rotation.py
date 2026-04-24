@@ -16,6 +16,8 @@ from basketball_sim.systems.team_tactics import (
     get_injury_care_substitute_overlay,
     get_roles_offense_involvement_substitute_overlay,
     get_roles_playmaking_role_substitute_overlay,
+    get_roles_clutch_priority_substitute_overlay,
+    get_roles_defense_assignment_sub_out_modifier,
     get_roles_shot_priority_substitute_overlay,
     get_rotation_target_minutes_by_player_id,
     get_sub_policy_sub_out_modifier,
@@ -458,12 +460,14 @@ class RotationSystem:
             min_stint_possessions = max(6, min_stint_possessions - 2)
 
         rk = self._get_rank_map().get(self._player_key(player), 99)
-        sub_mod = int(get_sub_policy_sub_out_modifier(self.team, player, roster_rank=rk))
-        if sub_mod > 1:
-            sub_mod = 1
-        elif sub_mod < -1:
-            sub_mod = -1
-        eff_min_stint = min_stint_possessions + sub_mod
+        s = int(get_sub_policy_sub_out_modifier(self.team, player, roster_rank=rk))
+        if s > 1:
+            s = 1
+        elif s < -1:
+            s = -1
+        d = get_roles_defense_assignment_sub_out_modifier(self.team, player)
+        adj = max(-1, min(1, s + d))
+        eff_min_stint = min_stint_possessions + adj
         if eff_min_stint < 6:
             eff_min_stint = 6
 
@@ -811,6 +815,9 @@ class RotationSystem:
 
             score += get_clutch_policy_substitute_overlay(
                 self.team, p, is_late, is_closing, roster_rank=rank
+            )
+            score += get_roles_clutch_priority_substitute_overlay(
+                self.team, p, is_late, is_closing
             )
 
             if score > best_score:
