@@ -8,7 +8,7 @@ input() を使わない確認系の単一ソースにする。
 
 from __future__ import annotations
 
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from basketball_sim.systems.contract_logic import get_team_payroll
 from basketball_sim.systems.money_display import format_money_yen_ja_readable
@@ -18,6 +18,12 @@ from basketball_sim.systems.salary_cap_budget import (
     get_soft_cap,
     league_level_for_team,
 )
+from basketball_sim.systems.auto_role_tag import (
+    TAG_ROLE_PLAYER,
+    compute_auto_role_tags_for_team,
+    japanese_label_for_auto_role_tag_key,
+)
+from basketball_sim.systems.team_tactics import ensure_team_tactics_on_team
 
 
 def sort_roster_for_gm_view(players: List[Any]) -> List[Any]:
@@ -227,24 +233,40 @@ def _brief_player_line(p: Any) -> str:
     )
 
 
-def format_starting_lineup_text(team: Any) -> str:
+def _auto_role_tag_suffix(auto_tags: Dict[int, str], p: Any) -> str:
+    """表示専用の自動役割タグ（行末「タグ:」）。docs/AUTO_ROLE_TAG_PARAMS.md。全員1タグ。参考役割（main_role）とは別。"""
+    player_id = getattr(p, "player_id", None)
+    if player_id is None:
+        return ""
+    key = auto_tags.get(int(player_id), TAG_ROLE_PLAYER)
+    return f" ｜ タグ: {japanese_label_for_auto_role_tag_key(key)}"
+
+
+def _brief_lineup_line(p: Any, auto_tags: Dict[int, str]) -> str:
+    return _brief_player_line(p) + _auto_role_tag_suffix(auto_tags, p)
+
+
+def format_starting_lineup_text(team: Any, *, auto_tags: Optional[Dict[int, str]] = None) -> str:
+    tags = auto_tags if auto_tags is not None else compute_auto_role_tags_for_team(team)
     starters = get_current_starting_five(team)
     if not starters:
         return "スタメン候補が不足しているか、まだ設定されていません。"
     lines: List[str] = ["【スタメン】", ""]
     for i, p in enumerate(starters, 1):
-        lines.append(f"{i}. {_brief_player_line(p)}")
+        lines.append(f"{i}. {_brief_lineup_line(p, tags)}")
     return "\n".join(lines)
 
 
-def format_sixth_man_line_text(team: Any) -> str:
+def format_sixth_man_line_text(team: Any, *, auto_tags: Optional[Dict[int, str]] = None) -> str:
+    tags = auto_tags if auto_tags is not None else compute_auto_role_tags_for_team(team)
     sm = get_current_sixth_man(team)
     if sm is None:
         return "6thマンが未設定です。"
-    return "【6thマン】\n\n" + _brief_player_line(sm)
+    return "【6thマン】\n\n" + _brief_lineup_line(sm, tags)
 
 
-def format_bench_order_text(team: Any) -> str:
+def format_bench_order_text(team: Any, *, auto_tags: Optional[Dict[int, str]] = None) -> str:
+    tags = auto_tags if auto_tags is not None else compute_auto_role_tags_for_team(team)
     bench = get_current_bench_order(team)
     if not bench:
         return "ベンチ候補が存在しません。"
@@ -253,7 +275,7 @@ def format_bench_order_text(team: Any) -> str:
     lines: List[str] = ["【ベンチ序列】（先頭が7番手）", ""]
     for i, p in enumerate(bench, 1):
         mark = "6" if getattr(p, "player_id", None) == sid else " "
-        lines.append(f"{i}. {mark} {_brief_player_line(p)}")
+        lines.append(f"{i}. {mark} {_brief_lineup_line(p, tags)}")
     lines.append("")
     lines.append("6 = 現在のシックスマン")
     return "\n".join(lines)
@@ -261,16 +283,17 @@ def format_bench_order_text(team: Any) -> str:
 
 def format_lineup_snapshot_text(team: Any) -> str:
     """スタメン・6th・ベンチを1画面用にまとめる（読み取り専用）。"""
+    tags = compute_auto_role_tags_for_team(team)
     parts = [
-        format_starting_lineup_text(team),
+        format_starting_lineup_text(team, auto_tags=tags),
         "",
         "─" * 40,
         "",
-        format_sixth_man_line_text(team),
+        format_sixth_man_line_text(team, auto_tags=tags),
         "",
         "─" * 40,
         "",
-        format_bench_order_text(team),
+        format_bench_order_text(team, auto_tags=tags),
         "",
         "※ スタメン枠の差し替えは、左メニュー「戦術」→ 上段「先発・6th・ベンチ」、または"
         "ターミナル「8. GMメニュー」のスタメン変更。カスタム解除は「自動スタメンに戻す」。",
@@ -335,6 +358,10 @@ def format_gm_roster_text(team: Any) -> str:
     if not roster:
         return "ロスターが存在しません。"
 
+    ensure_team_tactics_on_team(team)
+    auto_tags = compute_auto_role_tags_for_team(team)
+    # 行末「タグ:」は自動役割タグのみ。手動 main_role（参考役割）はこの表示に使わない。
+
     starter_ids = get_starting_player_ids(team)
     sixth_man = get_current_sixth_man(team)
     sixth_man_id = getattr(sixth_man, "player_id", None) if sixth_man is not None else None
@@ -351,7 +378,7 @@ def format_gm_roster_text(team: Any) -> str:
             role_mark = " "
 
         slot_lbl = get_player_nationality_bucket_label(p)
-        lines_out.append(
+        base = (
             f"{i:>2}. {role_mark} {str(getattr(p, 'name', '-')):<15} "
             f"{str(getattr(p, 'position', '-')):<2} "
             f"OVR:{int(getattr(p, 'ovr', 0)):<2} "
@@ -360,6 +387,10 @@ def format_gm_roster_text(team: Any) -> str:
             f"区分:{slot_lbl:<10} "
             f"Salary:{format_money_yen_ja_readable(int(getattr(p, 'salary', 0) or 0))}"
         )
+        if player_id is not None:
+            tag_key = auto_tags.get(int(player_id), TAG_ROLE_PLAYER)
+            base = f"{base} ｜ タグ: {japanese_label_for_auto_role_tag_key(tag_key)}"
+        lines_out.append(base)
 
     lines_out.append("")
     lines_out.append("★ = スタメン")

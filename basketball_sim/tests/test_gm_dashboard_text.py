@@ -71,6 +71,22 @@ def test_format_gm_roster_lists_player():
     assert "区分:" in text and "日本" in text
 
 
+def test_format_gm_roster_uses_auto_tag_not_manual_main_role():
+    t = Team(team_id=1, name="T", league_level=1)
+    for i in range(8):
+        t.add_player(_player(100 + i))
+    t.team_tactics = {"roles": {"107": {"main_role": "ace"}}}
+    text = format_gm_roster_text(t)
+    assert "P107" in text
+    assert text.count("タグ:") >= 8
+    for line in text.splitlines():
+        if "P107" in line and "Salary" in line:
+            assert "タグ: エース" not in line
+            break
+    else:
+        raise AssertionError("P107 line missing")
+
+
 def test_get_player_nationality_bucket_label_contract_buckets():
     pj = _player(1)
     assert get_player_nationality_bucket_label(pj) == "日本"
@@ -94,6 +110,28 @@ def test_format_lineup_snapshot_contains_sections():
     assert "【ベンチ序列】" in snap
     assert "GMメニュー" in snap or "スタメン・ベンチ" in snap
     assert "自動スタメン" in snap
+
+
+def test_format_lineup_snapshot_shows_auto_tag_lines():
+    t = Team(team_id=1, name="T", league_level=1)
+    players = [_player(i, pos) for i, pos in zip(range(1, 8), ("PG", "SG", "SF", "PF", "C", "PG", "SG"))]
+    for p in players:
+        t.add_player(p)
+    t.set_starting_lineup_by_players(players[:5])
+    t.team_tactics = {"roles": {"1": {"main_role": "ace"}}}
+    snap = format_lineup_snapshot_text(t)
+    assert "タグ:" in snap
+    assert snap.count("タグ:") >= 7
+    assert "P1" in snap
+
+
+def test_format_lineup_snapshot_always_shows_auto_tag():
+    t = Team(team_id=1, name="T", league_level=1)
+    for i in range(8):
+        t.add_player(_player(100 + i))
+    t.team_tactics = {"roles": {"100": {"main_role": "none"}}}
+    snap = format_lineup_snapshot_text(t)
+    assert snap.count("タグ:") >= 8
 
 
 def test_apply_starting_slot_change_swaps_pg():

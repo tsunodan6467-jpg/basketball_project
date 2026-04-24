@@ -30,3 +30,7 @@
 - **6thマン**は同タブの候補＋**6thを反映**、または CLI。候補は `get_sixth_man_candidates`。解除は **自動6thに戻す**（`Team.clear_sixth_man`）。
 - **ベンチ序列の2人入替**は同タブの **入替（確認）** または CLI。解除は **自動ベンチに戻す**（`Team.clear_bench_order`）。入替の適用は `apply_bench_order_swap` が CLI の2番指定入替と同じ結果になる。
 - **カスタムスタメン全体の解除**は **「自動スタメンに戻す（確認）」**。`Team.clear_starting_lineup()` を実行し、自動選出に戻す（`askokcancel`）。6th はそのまま。
+
+## 役割タグ（人事ロスター全文 / GM スタメン・ベンチ）の表示
+
+人事 → ロスター下部の `format_gm_roster_text` と、GM ダッシュ「スタメン・ベンチ」の `format_lineup_snapshot_text` 系の行末 **「タグ: ○○」** は、**手動 `main_role` ではなく** `basketball_sim/systems/auto_role_tag.py` の **自動役割タグ**（正本: `docs/AUTO_ROLE_TAG_PARAMS.md`）を表示する。全員 1 タグ（フォールバックはロールプレイヤー）。`team_tactics["roles"]` の **main_role** は役割詳細 UI では **「参考役割」** として編集でき、表示用の主役ではないが、**上記 2 画面の「タグ:」表示には使わない**（数値ロジックの正本にもしない）。先発・6th・控え・Treeview「役割」列の起用正本とは混同されないよう **タグ** 名義を維持する。
