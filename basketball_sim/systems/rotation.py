@@ -23,6 +23,13 @@ from basketball_sim.systems.team_tactics import (
     get_sub_policy_sub_out_modifier,
 )
 
+# ローテプリセット別: IN 候補の shortage 項だけに乗せる小さな係数（T1 帯。本流 ovr/終盤は不変更）
+_ROTATION_PRESET_SHORTAGE_MULT_WIN_NOW: float = 1.06
+_ROTATION_PRESET_SHORTAGE_MULT_DEV: float = 1.06
+# 勝利寄り: 目標分が高い＝主要ローテ帯（ベンチの 6th 寄り等）にだけ shortage 補正
+_WIN_NOW_SHORTAGE_MIN_TARGET: float = 19.0
+_DEV_YOUTH_MAX_AGE: int = 23
+
 
 class RotationSystem:
     """
@@ -654,6 +661,40 @@ class RotationSystem:
         candidates.sort(key=lambda x: x[1], reverse=True)
         return [p for p, _ in candidates]
 
+    def _get_rotation_preset_shortage_multiplier(self, player: Player, target: float) -> float:
+        """
+        team_tactics 由来のローテ方針に応じ、IN 候補の shortage * 係数 だけを薄く寄せる。
+        win_now / starters_long: 目標分が高い帯（主力ローテ想定）のみ。
+        development / youth_dev: 若手のみ。それ以外 1.0。
+        """
+        up = str(self._get_usage_policy() or "balanced")
+        sub_mode = "standard"
+        try:
+            raw = getattr(self.team, "team_tactics", None)
+            if isinstance(raw, dict):
+                rot = raw.get("rotation")
+                if isinstance(rot, dict):
+                    sub_mode = str(rot.get("sub_policy") or "standard").strip()
+        except Exception:
+            sub_mode = "standard"
+
+        is_win = up == "win_now" or sub_mode == "starters_long"
+        is_dev = up == "development" or sub_mode == "youth_dev"
+
+        if is_win and not is_dev:
+            if float(target) >= _WIN_NOW_SHORTAGE_MIN_TARGET:
+                return _ROTATION_PRESET_SHORTAGE_MULT_WIN_NOW
+            return 1.0
+        if is_dev and not is_win:
+            try:
+                ag = int(getattr(player, "age", 99) or 99)
+            except (TypeError, ValueError):
+                ag = 99
+            if ag <= _DEV_YOUTH_MAX_AGE:
+                return _ROTATION_PRESET_SHORTAGE_MULT_DEV
+            return 1.0
+        return 1.0
+
     def _get_in_candidates(
         self,
         possession: int,
@@ -683,7 +724,8 @@ class RotationSystem:
             shortage = max(0.0, target - played)
 
             score = 0.0
-            score += shortage * 1.0
+            sm = self._get_rotation_preset_shortage_multiplier(p, target)
+            score += shortage * sm
             score += stamina * 0.33
             score += ovr * 0.50
 
