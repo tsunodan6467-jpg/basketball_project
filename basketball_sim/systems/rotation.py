@@ -33,6 +33,8 @@ _WIN_NOW_TARGET_TOP_BIAS_MINUTES: float = 0.6
 _WIN_NOW_TARGET_DEEP_BENCH_BIAS_MINUTES: float = -0.4
 _WIN_NOW_TARGET_TOP_RANK_MAX: int = 2
 _WIN_NOW_TARGET_DEEP_BENCH_RANK_MIN: int = 7
+_WIN_NOW_OUT_CANDIDATE_CORE_BIAS: float = -0.40
+_WIN_NOW_OUT_CANDIDATE_MIN_TARGET: float = 19.0
 
 
 class RotationSystem:
@@ -281,6 +283,17 @@ class RotationSystem:
             return _WIN_NOW_TARGET_TOP_BIAS_MINUTES
         if rank >= _WIN_NOW_TARGET_DEEP_BENCH_RANK_MIN:
             return _WIN_NOW_TARGET_DEEP_BENCH_BIAS_MINUTES
+        return 0.0
+
+    def _get_win_now_out_candidate_bias(self, target: float) -> float:
+        """
+        第3段階: win_now 系で主力帯（高 target）を OUT 候補から少し下げにくくする微小補正。
+        _can_sub_out / min_stint には触らず、_get_out_candidates の score のみを調整する。
+        """
+        if not self._is_win_now_target_bias_active():
+            return 0.0
+        if float(target) >= _WIN_NOW_OUT_CANDIDATE_MIN_TARGET:
+            return _WIN_NOW_OUT_CANDIDATE_CORE_BIAS
         return 0.0
 
     def _build_target_minutes_map(self) -> Dict[int, float]:
@@ -594,6 +607,9 @@ class RotationSystem:
                 score += 2.5
             elif over_target >= 1.0:
                 score += 1.0
+
+            # 第3段階: win_now/starters_long かつ高 target 帯のみを微小に下げにくくする
+            score += self._get_win_now_out_candidate_bias(target)
 
             if stamina <= 45:
                 score += 4.0
