@@ -29,6 +29,10 @@ _ROTATION_PRESET_SHORTAGE_MULT_DEV: float = 1.06
 # 勝利寄り: 目標分が高い＝主要ローテ帯（ベンチの 6th 寄り等）にだけ shortage 補正
 _WIN_NOW_SHORTAGE_MIN_TARGET: float = 19.0
 _DEV_YOUTH_MAX_AGE: int = 23
+_WIN_NOW_TARGET_TOP_BIAS_MINUTES: float = 0.6
+_WIN_NOW_TARGET_DEEP_BENCH_BIAS_MINUTES: float = -0.4
+_WIN_NOW_TARGET_TOP_RANK_MAX: int = 2
+_WIN_NOW_TARGET_DEEP_BENCH_RANK_MIN: int = 7
 
 
 class RotationSystem:
@@ -248,6 +252,37 @@ class RotationSystem:
     def _clamp_target_minutes(self, minutes: float) -> float:
         return max(4.0, min(38.0, float(minutes)))
 
+    def _is_win_now_target_bias_active(self) -> bool:
+        """
+        target minutes 微調整の有効条件（第2段階）。
+        win_now または starters_long で有効。development は常に無効。
+        """
+        usage = self._get_usage_policy()
+        if usage == "development":
+            return False
+        if usage == "win_now":
+            return True
+        try:
+            raw = getattr(self.team, "team_tactics", None)
+            if not isinstance(raw, dict):
+                return False
+            rot = raw.get("rotation")
+            if not isinstance(rot, dict):
+                return False
+            sub_mode = str(rot.get("sub_policy") or "standard").strip()
+            return sub_mode == "starters_long"
+        except Exception:
+            return False
+
+    def _get_win_now_target_bias_minutes(self, rank: int) -> float:
+        if not self._is_win_now_target_bias_active():
+            return 0.0
+        if rank <= _WIN_NOW_TARGET_TOP_RANK_MAX:
+            return _WIN_NOW_TARGET_TOP_BIAS_MINUTES
+        if rank >= _WIN_NOW_TARGET_DEEP_BENCH_RANK_MIN:
+            return _WIN_NOW_TARGET_DEEP_BENCH_BIAS_MINUTES
+        return 0.0
+
     def _build_target_minutes_map(self) -> Dict[int, float]:
         sorted_players = sorted(
             self.active_players,
@@ -358,6 +393,9 @@ class RotationSystem:
                     else:
                         target = max(target, 14.0)
                         target += 3.5
+
+            # 第2段階: win_now 系だけを小さく主力寄りに（balanced/development は不変）。
+            target += self._get_win_now_target_bias_minutes(rank)
 
             # 起用テンプレ usage_policy.age_balance: 年齢帯の極小上乗せ（本流の後、clamp 前）
             target += get_age_balance_target_minutes_overlay(self.team, usage_policy, age)
