@@ -5364,7 +5364,7 @@ class MainMenuView:
         self.team.team_tactics = normalize_team_tactics(merged, valid_player_ids=pids if pids else None)
 
     def _open_tactics_core_policy_window(self, parent: tk.Misc) -> None:
-        """試合・ローテが参照する Team.strategy / coach_style / usage_policy を編集する。"""
+        """プレイスタイル 0.戦術プリセット、および Team 側（strategy / coach / usage）の手動方針を扱う。"""
         if self.team is None:
             return
         lab_to_s = {lab: k for k, lab in STRATEGY_OPTIONS}
@@ -5373,8 +5373,8 @@ class MainMenuView:
 
         w = tk.Toplevel(parent)
         w.title("プレイスタイル：基本方針（Team）")
-        w.geometry("540x400")
-        w.minsize(480, 360)
+        w.geometry("540x520")
+        w.minsize(480, 400)
         w.configure(bg="#15171c")
         try:
             w.transient(parent)
@@ -5386,38 +5386,40 @@ class MainMenuView:
         ttk.Label(
             wrap,
             text=(
-                "プレイスタイル枠。保存先は従来どおり Team（strategy / coach_style / usage_policy）。"
-                " team_tactics の画面とは別窓のまま併用します（いま統合はしていません）。"
+                "プリセット適用：Team.strategy と team_tactics（攻守・セット等）をまとめて更新します"
+                "（HCスタイル・基本起用はプリセットからは変わりません）。\n"
+                "Team保存：基本戦術・HCスタイル・基本起用を手動で Team に保存します。 "
+                "攻守の傾向・セット傾向など他窓と併用します。"
             ),
             wraplength=500,
-        ).pack(anchor="w", pady=(0, 10))
+        ).pack(anchor="w", pady=(0, 8))
 
-        row_s = ttk.Frame(wrap, style="Panel.TFrame")
+        lf_team = ttk.LabelFrame(wrap, text="補助: Team基本方針（手動）", padding=8)
+        row_s = ttk.Frame(lf_team, style="Panel.TFrame")
         row_s.pack(fill="x", pady=4)
         ttk.Label(row_s, text="基本戦術 (Team.strategy)", width=26).pack(side="left")
         combo_s = ttk.Combobox(row_s, state="readonly", width=28)
         combo_s["values"] = [lab for _, lab in STRATEGY_OPTIONS]
         combo_s.pack(side="left", padx=6)
 
-        row_c = ttk.Frame(wrap, style="Panel.TFrame")
+        row_c = ttk.Frame(lf_team, style="Panel.TFrame")
         row_c.pack(fill="x", pady=4)
         ttk.Label(row_c, text="HCスタイル (coach_style)", width=26).pack(side="left")
         combo_c = ttk.Combobox(row_c, state="readonly", width=28)
         combo_c["values"] = [lab for _, lab in COACH_STYLE_OPTIONS]
         combo_c.pack(side="left", padx=6)
 
-        row_u = ttk.Frame(wrap, style="Panel.TFrame")
+        row_u = ttk.Frame(lf_team, style="Panel.TFrame")
         row_u.pack(fill="x", pady=4)
         ttk.Label(row_u, text="基本起用 (Team.usage_policy)", width=26).pack(side="left")
         combo_u = ttk.Combobox(row_u, state="readonly", width=28)
         combo_u["values"] = [lab for _, lab in USAGE_POLICY_OPTIONS]
         combo_u.pack(side="left", padx=6)
 
-        self._sync_strategy_policy_combos(combo_s, combo_c, combo_u)
-
-        row_ps_stat = ttk.Frame(wrap, style="Panel.TFrame")
-        row_ps_stat.pack(fill="x", pady=(10, 2))
-        lbl_ps_state = ttk.Label(row_ps_stat, text="", wraplength=500)
+        lf_ps = ttk.LabelFrame(wrap, text="0. 戦術プリセット", padding=8)
+        row_ps_stat = ttk.Frame(lf_ps, style="Panel.TFrame")
+        row_ps_stat.pack(fill="x", pady=(0, 2))
+        lbl_ps_state = ttk.Label(row_ps_stat, text="", wraplength=480)
 
         def _sync_ps_state() -> None:
             if self.team is None:
@@ -5428,9 +5430,8 @@ class MainMenuView:
         lbl_ps_state.pack(anchor="w")
         _sync_ps_state()
 
-        row_preset = ttk.Frame(wrap, style="Panel.TFrame")
+        row_preset = ttk.Frame(lf_ps, style="Panel.TFrame")
         row_preset.pack(fill="x", pady=(4, 4))
-        ttk.Label(row_preset, text="戦術プリセット (team_tactics)", width=26).pack(side="left")
         combo_ps = ttk.Combobox(row_preset, state="readonly", width=28)
         _playstyle_preset_ids: Tuple[str, ...] = tuple(PLAYSTYLE_PRESET_DEFS.keys())
         _playstyle_label_by_id = {
@@ -5439,7 +5440,7 @@ class MainMenuView:
         _playstyle_id_by_label = {lab: pid for pid, lab in _playstyle_label_by_id.items()}
         combo_ps["values"] = tuple(_playstyle_label_by_id[pid] for pid in _playstyle_preset_ids)
 
-        lbl_ps_desc = ttk.Label(wrap, text="", wraplength=500, justify="left")
+        lbl_ps_desc = ttk.Label(lf_ps, text="", wraplength=500, justify="left")
 
         def _refresh_playstyle_preset_desc() -> None:
             lab = ""
@@ -5473,9 +5474,6 @@ class MainMenuView:
                 combo_ps.current(0)
             _refresh_playstyle_preset_desc()
 
-        _sync_playstyle_combo_from_meta()
-        combo_ps.pack(side="left", padx=6)
-
         def _on_apply_playstyle_preset() -> None:
             if self.team is None:
                 return
@@ -5497,16 +5495,6 @@ class MainMenuView:
                 f"preset_meta.playstyle_preset_id = {preset_id!r}",
                 parent=w,
             )
-
-        ttk.Button(
-            row_preset,
-            text="プリセット適用",
-            style="Menu.TButton",
-            command=_on_apply_playstyle_preset,
-            width=14,
-        ).pack(side="left", padx=4)
-        lbl_ps_desc.pack(anchor="w", pady=(2, 6))
-        combo_ps.bind("<<ComboboxSelected>>", lambda _e: _refresh_playstyle_preset_desc())
 
         def _on_save() -> None:
             if self.team is None:
@@ -5532,11 +5520,32 @@ class MainMenuView:
             messagebox.showinfo("保存", "\n".join(lines), parent=w)
             _sync_ps_state()
 
-        btn_row = ttk.Frame(wrap, style="Panel.TFrame")
-        btn_row.pack(fill="x", pady=(16, 0))
-        ttk.Button(btn_row, text="保存", style="Menu.TButton", command=_on_save, width=16).pack(
+        _sync_playstyle_combo_from_meta()
+        combo_ps.pack(side="left", padx=6)
+        ttk.Button(
+            row_preset,
+            text="プリセット適用",
+            style="Menu.TButton",
+            command=_on_apply_playstyle_preset,
+            width=14,
+        ).pack(side="left", padx=4)
+        lbl_ps_desc.pack(anchor="w", pady=(2, 0))
+        combo_ps.bind("<<ComboboxSelected>>", lambda _e: _refresh_playstyle_preset_desc())
+
+        # 表示順：上段 0.戦術プリセット → 下段 Team 補助
+        lf_ps.pack(fill="x", pady=(0, 8))
+        lf_team.pack(fill="x", pady=(0, 8))
+        self._sync_strategy_policy_combos(combo_s, combo_c, combo_u)
+        _sync_ps_state()
+        _sync_playstyle_combo_from_meta()
+
+        team_btn_row = ttk.Frame(lf_team, style="Panel.TFrame")
+        team_btn_row.pack(fill="x", pady=(8, 0))
+        ttk.Button(team_btn_row, text="保存", style="Menu.TButton", command=_on_save, width=16).pack(
             side="right", padx=4
         )
+        btn_row = ttk.Frame(wrap, style="Panel.TFrame")
+        btn_row.pack(fill="x", pady=(0, 0))
         ttk.Button(btn_row, text="閉じる", style="Menu.TButton", command=w.destroy, width=16).pack(
             side="right", padx=4
         )
