@@ -5075,8 +5075,8 @@ class MainMenuView:
             strategy_panel,
             text=(
                 "Team.strategy / coach_style / Team.usage_policy（試合・ローテに反映）は、"
-                "「プレイスタイル」統合画面の暫定ボタン「基本方針（Team）」から。"
-                "攻守の傾向・セット傾向は team_tactics（同画面の別暫定ボタン、別設定）。"
+                "「プレイスタイル」統合画面の補助ボタン「補助設定を開く（Team基本方針・HC）」から。"
+                "攻守の傾向・セット傾向は team_tactics（同統合画面の 1〜6・7 で直接編集、別設定）。"
             ),
             font=("Yu Gothic UI", 9),
             wraplength=440,
@@ -5129,8 +5129,9 @@ class MainMenuView:
         ttk.Label(
             lineup_panel,
             text=(
-                "Team の先発・6th・ベンチは、「ローテーション」統合画面の暫定ボタンから編集します。"
-                "交代・目標出場・起用方針テンプレ等は同画面の別暫定ボタン（team_tactics、Team 先発と分離のまま）。"
+                "Team の先発・6th・ベンチは、「ローテーション」統合画面の「2. 起用序列」で編集します。"
+                "交代・疲労・終盤・戦術先発・目標出場などの細部は、同画面の補助ボタン「ローテ詳細」から"
+                "（team_tactics、Team 先発と分離のまま）。"
             ),
             font=("Yu Gothic UI", 9),
             wraplength=440,
@@ -5251,8 +5252,9 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "プレイスタイル… 統合画面から暫定ボタンで基本方針（Team）・攻守・セットへ。"
-            "ローテーション… 統合画面から起用・先発・役割へ。人事の自動「タグ:」ではない。下段は参照のみ。"
+            "プレイスタイル… 統合画面内で 0〜7 を編集。Team 側の補助は「補助設定を開く（Team基本方針・HC）」から。"
+            "ローテーション… 統合画面内で起用プリセット・起用方針・起用序列を編集。"
+            "人事の自動「タグ:」ではない。下段は参照のみ。"
         )
 
         jp_blk = getattr(self, "strat_jp_block_var", None)
@@ -5939,7 +5941,7 @@ class MainMenuView:
         return _sync_ps_state, _sync_playstyle_combo_from_meta
 
     def _open_tactics_playstyle_overview_window(self, parent: tk.Misc) -> None:
-        """プレイスタイル統合画面の土台（0〜7の見出し・説明・既存子窓への暫定導線）。"""
+        """プレイスタイル統合画面の土台（0〜7の見出し・説明・補助導線）。"""
         if self.team is None:
             return
         try:
@@ -5970,7 +5972,9 @@ class MainMenuView:
             intro_fr,
             text=(
                 "完成形に向けた統合画面。0 のプリセット設定と 1〜6 の攻守の傾向・7 のセット傾向は"
-                "この画面で直接操作できます（1〜6・7 は保存で確定）。"
+                "この画面で直接操作できます（1〜6・7 は保存で確定）。\n"
+                "Team の基本戦術・HCスタイル・基本起用（粗い3項目）は、0〜7 の主設定とは別系統の補助です。"
+                "必要なときは下の「補助設定を開く（Team基本方針・HC）」から変更します。"
             ),
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
@@ -6055,7 +6059,7 @@ class MainMenuView:
             lf0,
             text=(
                 "※ プリセット適用時はセット傾向（playbook）も更新されます。"
-                "この画面の 7 でも確認・編集できます（別窓からも可能）。"
+                "この画面のブロック 7 でも確認・編集できます。"
             ),
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
@@ -6070,7 +6074,7 @@ class MainMenuView:
         )
         ttk.Button(
             lf0,
-            text="Team基本方針を別窓で開く（戦術・HC・起用）",
+            text="補助設定を開く（Team基本方針・HC）",
             style="Menu.TButton",
             command=lambda: self._open_tactics_core_policy_window(w),
         ).pack(anchor="w", pady=(8, 0))
@@ -6129,12 +6133,6 @@ class MainMenuView:
         ttk.Button(btn_ov, text="保存", style="Primary.TButton", command=_save_ov).pack(side="left", padx=(0, 6))
         ttk.Button(btn_ov, text="標準に戻す", style="Menu.TButton", command=_reset_ov).pack(side="left", padx=(0, 6))
         ttk.Button(btn_ov, text="最新状態を読み込み", style="Menu.TButton", command=_reload_ov).pack(side="left", padx=0)
-        ttk.Button(
-            lf16,
-            text="別窓で攻守の傾向を開く",
-            style="Menu.TButton",
-            command=lambda: self._open_tactics_team_strategy_window(w),
-        ).pack(anchor="w", pady=(4, 0))
 
         lf7 = ttk.LabelFrame(scroll_content, text="7. セット傾向", padding=10)
         lf7.pack(fill="x", pady=(0, 8))
@@ -6195,12 +6193,6 @@ class MainMenuView:
         ttk.Button(btn_pb_ov, text="最新状態を読み込み", style="Menu.TButton", command=_reload_pb_ov).pack(
             side="left", padx=0
         )
-        ttk.Button(
-            inner7,
-            text="別窓でセット傾向を開く",
-            style="Menu.TButton",
-            command=lambda: self._open_tactics_playbook_window(w),
-        ).pack(anchor="w", pady=(4, 0))
 
         def _toggle_pb_inner() -> None:
             if inner7.winfo_manager():
@@ -6225,7 +6217,7 @@ class MainMenuView:
             _mw_host.bind("<Button-5>", lambda _e: ps_canvas.yview_scroll(1, "units"))
 
     def _open_tactics_rotation_overview_window(self, parent: tk.Misc) -> None:
-        """ローテーション統合画面の土台（0〜2の見出し・説明・既存子窓への暫定導線）。"""
+        """ローテーション統合画面の土台（0〜2の見出し・説明・補助導線）。"""
         if self.team is None:
             return
         try:
@@ -6362,12 +6354,6 @@ class MainMenuView:
             wraplength=640,
             justify="left",
         ).pack(anchor="w", pady=(0, 6))
-        ttk.Button(
-            lf0,
-            text="起用テンプレを別窓で開く（0・1）",
-            style="Menu.TButton",
-            command=lambda: self._open_tactics_usage_policy_window(w),
-        ).pack(anchor="w", pady=(0, 0))
 
         lf1 = ttk.LabelFrame(scroll_content, text="1. チーム起用方針", padding=10)
         lf1.pack(fill="x", pady=(0, 8))
@@ -6440,13 +6426,13 @@ class MainMenuView:
         r1.pack(fill="x")
         ttk.Button(
             r1,
-            text="起用テンプレを別窓で開く（0・1）",
+            text="ローテ詳細を別窓で開く（交代・疲労・終盤）",
             style="Menu.TButton",
-            command=lambda: self._open_tactics_usage_policy_window(w),
+            command=lambda: self._open_tactics_rotation_window(w),
         ).pack(side="left", padx=(0, 8))
         ttk.Button(
             r1,
-            text="ローテ詳細を開く（rotation・細部）",
+            text="ローテ詳細を別窓で開く（戦術先発・目標出場）",
             style="Menu.TButton",
             command=lambda: self._open_tactics_rotation_window(w),
         ).pack(side="left")
@@ -6480,20 +6466,14 @@ class MainMenuView:
             wraplength=640,
             justify="left",
         ).pack(anchor="w", pady=(0, 6))
-        r2 = ttk.Frame(lf2, style="Panel.TFrame")
-        r2.pack(fill="x")
-        ttk.Button(
-            r2,
-            text="先発・6th・ベンチを別窓で開く（Team）",
-            style="Menu.TButton",
-            command=lambda: self._open_tactics_team_lineup_window(w),
-        ).pack(side="left", padx=(0, 8))
-        ttk.Button(
-            r2,
-            text="ローテ詳細を別窓で開く（戦術先発・目標出場）",
-            style="Menu.TButton",
-            command=lambda: self._open_tactics_rotation_window(w),
-        ).pack(side="left")
+        ttk.Label(
+            lf2,
+            text="※ ローテ詳細窓は、上の「1. チーム起用方針」内のボタンから開けます（同一窓）。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 0))
 
         _rot_bind_wheel(scroll_content)
 
@@ -9993,9 +9973,10 @@ class MainMenuView:
             "再契約の確認は、GUIモードでオフシーズン処理の実行中にダイアログで表示されます。\n"
             f"消化ラウンド: {cr}/{tr}\n"
             "ウィンドウ下のボタンはターミナル（CLI）へのショートカットです。\n\n"
-            "先発・6th・ベンチ（Team）の編集は、左「戦術」→ ローテーション枠の「先発・6th・ベンチ」から。"
+            "先発・6th・ベンチ（Team）の編集は、左「戦術」→「ローテーション」→「2. 起用序列」から。"
             "当窓の「スタメン・ベンチ」タブは参照のみです。"
-            "戦術・HC・起用（3項目）はプレイスタイル枠の「基本方針（Team）」。team_tactics 系はプレイスタイル／ローテーション枠の各ボタンから。"
+            "戦術・HC・起用（3項目）の補助編集は「戦術」→「プレイスタイル」→「補助設定を開く（Team基本方針・HC）」。"
+            "team_tactics 系はプレイスタイル／ローテーションの統合画面から。"
             "当窓の「戦術・HC・起用」タブは参照のみです。"
             "サラリーキャップの数値は左メニュー「経営」の「財務サマリー」下部。当窓の「サラリーキャップ」は案内のみです。"
             "チーム属性は左メニュー「情報」の「概要」上部。当窓の「チーム情報」は案内のみです。"
@@ -10080,8 +10061,8 @@ class MainMenuView:
         ct = self.COACH_STYLE_LABELS.get(str(ck), str(ck))
         ut = self.USAGE_POLICY_LABELS.get(str(uk), str(uk))
         lines = [
-            "編集は左「戦術」→ プレイスタイル枠「基本方針（Team）」／ローテーション枠「先発・6th・ベンチ」"
-            "（スタメン・6th・ベンチ序列・いずれも従来どおりの保存先）。",
+            "編集は左「戦術」→「プレイスタイル」内「補助設定を開く（Team基本方針・HC）」／"
+            "「ローテーション」内「2. 起用序列」（スタメン・6th・ベンチ序列・いずれも従来どおりの保存先）。",
             "",
             f"基本戦術 (Team.strategy): {st}",
             f"HCスタイル: {ct}",
@@ -11096,7 +11077,7 @@ class MainMenuView:
             notice.grid(row=0, column=0, sticky="ew")
             ttk.Label(
                 notice,
-                text="先発・6th・ベンチ（Team）の編集は、左「戦術」→ ローテーション枠の「先発・6th・ベンチ」から。",
+                text="先発・6th・ベンチ（Team）の編集は、左「戦術」→「ローテーション」→「2. 起用序列」から。",
                 wraplength=820,
                 font=("Yu Gothic UI", 10),
             ).pack(anchor="w")
@@ -11227,7 +11208,10 @@ class MainMenuView:
         notice_st.grid(row=0, column=0, sticky="ew")
         ttk.Label(
             notice_st,
-            text="編集は左「戦術」。プレイスタイル枠＝基本方針（Team）・攻守の傾向・セット傾向。ローテーション枠＝起用プリセット・起用方針・起用序列、交代・目標出場、先発/6th/ベンチ 等。",
+            text=(
+                "編集は左「戦術」。プレイスタイル＝0〜7 の直接編集と「補助設定を開く（Team基本方針・HC）」。"
+                "ローテーション＝起用プリセット・起用方針・起用序列の直接編集と「ローテ詳細」別窓（交代・目標出場など）。"
+            ),
             wraplength=820,
             font=("Yu Gothic UI", 10),
         ).pack(anchor="w")
@@ -11690,9 +11674,9 @@ class MainMenuView:
             "【状態】各選手は負傷中（モデル上 injury_games_left > 0）で、試合への登録・出場が制限されやすい状態です。\n\n"
             "【復帰の目安】「残り約N」はチームの試合が消化されるたびに減っていくカウンタです（現実の日数ではありません）。\n\n"
             "【推奨アクション】\n"
-            "・左「戦術」… ローテーション枠「先発・6th・ベンチ」でスタメン等。目標出場・戦術先発枠は同枠「ローテ詳細」（交代・目標出場）から。\n"
+            "・左「戦術」→「ローテーション」→「2. 起用序列」でスタメン等。目標出場・戦術先発は「ローテ詳細を別窓で開く」から。\n"
             "・人事メニュー（左「人事」）… ロスター表で選手の状態を確認する。\n"
-            "・交代方針や起用の補正は、ローテーション枠（起用方針テンプレ等）を。\n\n"
+            "・交代方針や起用の補正は、ローテーション統合画面（起用プリセット・起用方針）やローテ詳細窓を。\n\n"
             "【選手一覧】\n"
         )
         player_lines: List[str] = []
