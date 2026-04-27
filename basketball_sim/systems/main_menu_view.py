@@ -6464,12 +6464,12 @@ class MainMenuView:
         ensure_team_tactics_on_team(self.team)
         pb = get_safe_team_tactics(self.team)["playbook"]
         keys = [
-            ("pick_and_roll", "Pick & Roll 頻度"),
-            ("spain_pick_and_roll", "Spain P&R 頻度"),
-            ("handoff", "ハンドオフ頻度"),
-            ("off_ball_screen", "オフボールスクリーン頻度"),
-            ("post_up", "ポストアップ頻度"),
-            ("transition", "速攻頻度"),
+            ("pick_and_roll", "P&R"),
+            ("handoff", "ハンドオフ"),
+            ("off_ball_screen", "オフボールスクリーン"),
+            ("post_up", "ポストアップ"),
+            ("spain_pick_and_roll", "Spain P&R"),
+            ("transition", "速攻頻度（playbook）"),
         ]
         level_pairs = [("low", "少ない"), ("standard", "標準"), ("high", "多い")]
         w = tk.Toplevel(parent)
@@ -6483,11 +6483,10 @@ class MainMenuView:
         ttk.Label(
             pb_note_fr,
             text=(
-                "プレイスタイル枠の「7. セット傾向（詳細設定）」です。"
-                "P&R、ハンドオフ、オフボール、ポスト、速攻などセット系の傾向を調整します。"
-                "保存先は従来どおり team_tactics[\"playbook\"] です。\n\n"
-                "ここでの速攻頻度は playbook 上の詳細で、試合全体のトランジション方針"
-                "（team_strategy.transition_style）とは別です。現状、試合シミュレーションには未反映です。"
+                "7. セット傾向（各項目の頻度）。保存先は team_tactics[\"playbook\"] です。\n"
+                "速攻頻度（playbook）は試合全体のトランジション方針（team_strategy.transition_style）"
+                "とは別です。現状、一部は試合シミュレーションに未反映です。\n"
+                "※ アイソレーションは攻撃の起点、カッティングは今後の拡張対象です。"
             ),
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
@@ -6497,7 +6496,7 @@ class MainMenuView:
         for key, jlabel in keys:
             row = ttk.Frame(wrap, style="Panel.TFrame")
             row.pack(fill="x", pady=3)
-            ttk.Label(row, text=jlabel, width=22).pack(side="left")
+            ttk.Label(row, text=jlabel, width=24).pack(side="left")
             cb = ttk.Combobox(row, state="readonly", width=12)
             vals = [b for _, b in level_pairs]
             cb["values"] = vals
