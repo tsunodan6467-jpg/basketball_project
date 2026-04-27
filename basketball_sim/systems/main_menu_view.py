@@ -5868,43 +5868,43 @@ class MainMenuView:
         ensure_team_tactics_on_team(self.team)
         data = get_safe_team_tactics(self.team)["team_strategy"]
         pairs_map = {
-            "offense_tempo": [("slow", "遅め"), ("standard", "標準"), ("fast", "速め")],
+            "offense_tempo": [("slow", "スロー"), ("standard", "標準"), ("fast", "アップテンポ")],
             "offense_style": [
                 ("balanced", "バランス"),
-                ("inside", "インサイド重視"),
+                ("inside", "ペイント重視"),
                 ("three_point", "3P重視"),
                 ("drive", "ドライブ重視"),
             ],
             "offense_creation": [
-                ("ball_move", "ボールムーブ重視"),
-                ("pick_and_roll", "Pick & Roll重視"),
-                ("iso", "アイソ重視"),
-                ("post", "ポスト活用"),
+                ("ball_move", "ボールムーブ"),
+                ("pick_and_roll", "P&R中心"),
+                ("iso", "アイソレーション中心"),
+                ("post", "ポスト起点"),
             ],
             "defense_style": [
                 ("balanced", "バランス"),
-                ("protect_paint", "ペイント保護"),
                 ("protect_three", "3P警戒"),
+                ("protect_paint", "ペイント保護"),
                 ("pressure", "プレッシャー強め"),
             ],
             "rebound_style": [
                 ("get_back", "戻り優先"),
                 ("balanced", "バランス"),
-                ("crash_offense", "攻撃リバウンド重視"),
+                ("crash_offense", "積極参加"),
             ],
             "transition_style": [
-                ("push", "速攻を狙う"),
-                ("situational", "状況次第"),
+                ("push", "速攻重視"),
+                ("situational", "状況判断"),
                 ("half_court", "ハーフコート優先"),
             ],
         }
         labels = {
-            "offense_tempo": "試合テンポ",
-            "offense_style": "攻撃の狙い",
-            "offense_creation": "攻撃の起点",
-            "defense_style": "守備の狙い",
-            "rebound_style": "オフェンスリバウンド",
-            "transition_style": "トランジション",
+            "offense_tempo": "1. 試合テンポ",
+            "offense_style": "2. 攻撃の狙い",
+            "offense_creation": "3. 攻撃の起点",
+            "defense_style": "4. 守備の狙い",
+            "rebound_style": "5. オフェンスリバウンド",
+            "transition_style": "6. トランジション",
         }
         w = tk.Toplevel(parent)
         w.title("プレイスタイル：攻守の傾向（team_tactics）")
@@ -5915,11 +5915,9 @@ class MainMenuView:
         ttk.Label(
             wrap,
             text=(
-                "プレイスタイル枠の中核です。試合テンポ、攻撃の狙い・起点、守備の狙い、"
-                "オフェンスリバウンド（攻撃側のリバウンド姿勢）、トランジションを調整します。\n"
-                "保存先は従来どおり team_tactics[\"team_strategy\"] です。セット傾向（playbook）は別画面。"
-                "トランジションは試合全体の速攻姿勢で、playbook の速攻頻度とは別です。"
-                "他画面と完全統合したわけではありません。"
+                "1〜6のプレイスタイル項目を調整します。保存先は team_tactics[\"team_strategy\"] です。\n"
+                "セット傾向（playbook）は別画面。トランジションは全体の速攻姿勢で、"
+                "playbook の速攻頻度とは別です。※ 一部候補は今後の拡張対象です。"
             ),
             wraplength=480,
         ).pack(anchor="w", pady=(0, 10))
@@ -5941,7 +5939,7 @@ class MainMenuView:
         ):
             row = ttk.Frame(wrap, style="Panel.TFrame")
             row.pack(fill="x", pady=3)
-            ttk.Label(row, text=labels[key], width=20).pack(side="left")
+            ttk.Label(row, text=labels[key], width=24).pack(side="left")
             cb = ttk.Combobox(row, state="readonly", width=28)
             cb.pack(side="left", padx=6)
             _set_combo(cb, pairs_map[key], str(data.get(key, "")))
