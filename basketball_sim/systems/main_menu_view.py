@@ -4988,6 +4988,18 @@ class MainMenuView:
             text="チーム全体の戦い方を決めます",
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            play_lf,
+            text=(
+                "完成形0〜7対応：0.プリセット→「基本方針」／"
+                "1〜6.テンポ・攻撃/守備・リバウンド・速攻→「攻守の傾向」／"
+                "7.セット傾向→「セット傾向」\n"
+                "※ 未実装候補はまだ選択肢に出していません。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
         row_play = ttk.Frame(play_lf, style="Panel.TFrame")
         row_play.pack(fill="x")
         _nav_btn(
