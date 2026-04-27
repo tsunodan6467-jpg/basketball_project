@@ -5457,6 +5457,24 @@ class MainMenuView:
         "schedule_care",
         "foreign_player_usage",
     )
+    # foreign_player_usage は GUI に出さない。保存時に既存 team_tactics.usage_policy をマージし維持。
+    # evaluation_focus の potential は候補から外し、表示上は overall に寄せる（保存で overall として確定可）。
+    _USAGE_POLICY_EDITOR_DISPLAY_KEYS: Tuple[str, ...] = (
+        "priority",
+        "evaluation_focus",
+        "form_weight",
+        "age_balance",
+        "injury_care",
+        "schedule_care",
+    )
+
+    @staticmethod
+    def _usage_policy_value_for_combo_display(data: Dict[str, str], key: str) -> str:
+        """候補にない内部値（例: potential）は表示用に置き換える。"""
+        v = str(data.get(key, "") or "")
+        if key == "evaluation_focus" and v == "potential":
+            return "overall"
+        return v
 
     def _usage_policy_pairs_map_and_labels(
         self,
@@ -5467,7 +5485,6 @@ class MainMenuView:
                 ("overall", "総合力重視"),
                 ("offense", "攻撃力重視"),
                 ("defense", "守備力重視"),
-                ("potential", "将来性重視"),
             ],
             "form_weight": [("high", "調子を強く反映"), ("standard", "標準"), ("skill", "実力を優先")],
             "age_balance": [("veteran", "ベテラン優先"), ("balanced", "バランス"), ("youth", "若手優先")],
@@ -5561,7 +5578,7 @@ class MainMenuView:
             ).pack(anchor="w")
             ttk.Label(
                 note,
-                text="攻撃・守備・将来性をわずかに重く見る補正で、OVRそのものを上書きするものではありません。",
+                text="攻撃寄り / 守備寄り / 平均の好み補正で、OVRそのものを上書きするものではありません。",
                 wraplength=wraplength,
             ).pack(anchor="w", pady=(2, 0))
 
@@ -5577,7 +5594,7 @@ class MainMenuView:
         label_width: int = 20,
     ) -> Dict[str, ttk.Combobox]:
         combos: Dict[str, ttk.Combobox] = {}
-        for key in self._USAGE_POLICY_EDITOR_KEYS:
+        for key in self._USAGE_POLICY_EDITOR_DISPLAY_KEYS:
             if include_notes:
                 self._usage_policy_editor_add_notes(parent, key, wraplength=note_wraplength)
             row = ttk.Frame(parent, style="Panel.TFrame")
@@ -5585,7 +5602,9 @@ class MainMenuView:
             ttk.Label(row, text=labels[key], width=label_width).pack(side="left")
             cb = ttk.Combobox(row, state="readonly", width=28)
             cb.pack(side="left", padx=6)
-            self._usage_policy_editor_set_combo(cb, pairs_map[key], str(data.get(key, "")))
+            self._usage_policy_editor_set_combo(
+                cb, pairs_map[key], self._usage_policy_value_for_combo_display(data, key)
+            )
             combos[key] = cb
         return combos
 
@@ -5610,7 +5629,9 @@ class MainMenuView:
             return
         data = get_safe_team_tactics(self.team)["usage_policy"]
         for key, cb in combos.items():
-            self._usage_policy_editor_set_combo(cb, pairs_map[key], str(data.get(key, "")))
+            self._usage_policy_editor_set_combo(
+                cb, pairs_map[key], self._usage_policy_value_for_combo_display(data, key)
+            )
 
     def _usage_policy_editor_reset_display(
         self, combos: Dict[str, ttk.Combobox], pairs_map: Dict[str, List[Tuple[str, str]]]
@@ -5631,8 +5652,13 @@ class MainMenuView:
     ) -> None:
         if self.team is None:
             return
+        # GUI 非表示のキー（foreign_player_usage 等）を消さないよう、既存 usage_policy に上書きマージする。
+        # evaluation_focus=potential は候補にないため表示は overall 寄せ、保存内容はコンボ通り（通常 overall）。
         raw = dict(get_safe_team_tactics(self.team))
-        raw["usage_policy"] = self._usage_policy_editor_collect(combos, pairs_map)
+        base_up: Dict[str, str] = dict((raw.get("usage_policy") or {}))
+        collected = self._usage_policy_editor_collect(combos, pairs_map)
+        base_up.update(collected)
+        raw["usage_policy"] = base_up
         self._tactics_commit_payload(raw)
         messagebox.showinfo(message_title, message_body, parent=message_parent)
         if after_save is not None:
@@ -6360,9 +6386,17 @@ class MainMenuView:
         ttk.Label(
             lf1,
             text=(
-                "このブロックは、起用方針・評価・調子・年齢/ケガ/連戦/外国籍の基本方針（usage_policy）を保存します。"
+                "この画面では、起用方針・評価・調子・コンディションなどの基本方針（usage_policy）を調整します。"
             ),
             font=("Yu Gothic UI", 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            lf1,
+            text="※ 外国籍枠や細かな国籍起用の微調整は、現在の主操作からは外しています（既存値は保存時に維持）。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
             wraplength=640,
             justify="left",
         ).pack(anchor="w", pady=(0, 6))
@@ -7303,6 +7337,18 @@ class MainMenuView:
         help_fr.pack(fill="x", pady=(0, 8))
 
         lf_up = ttk.LabelFrame(wrap, text="1. チーム起用方針（手動）", padding=8)
+        ttk.Label(
+            lf_up,
+            text="この画面では、起用方針・評価・調子・コンディションなどの基本方針を調整します。",
+            wraplength=500,
+        ).pack(anchor="w", pady=(0, 2))
+        ttk.Label(
+            lf_up,
+            text="※ 外国籍枠や細かな国籍起用の微調整は、現在の主操作からは外しています（既存値は保存時に維持）。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=500,
+        ).pack(anchor="w", pady=(0, 6))
         usage_data = get_safe_team_tactics(self.team)["usage_policy"]
         combos = self._usage_policy_editor_build_row_combos(
             lf_up,
