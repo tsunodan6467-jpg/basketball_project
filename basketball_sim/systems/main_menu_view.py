@@ -78,6 +78,48 @@ from basketball_sim.systems.team_tactics import (
     get_safe_team_tactics,
     normalize_team_tactics,
 )
+
+# 戦術メニュー用: preset_id ベースの短い説明（label_ja 重複に依存しない）
+_PLAYSTYLE_PRESET_DESC_JA: Dict[str, str] = {
+    "balanced_v1": "攻守のバランスを重視する標準型。迷ったときの基本設定。",
+    "run_and_gun_3p_v1": "速い展開と3Pを重視する攻撃型。得点力を狙うが、試合は荒れやすい。",
+    "defense_first_v1": "守備と失点抑制を重視する型。得点は伸びにくいが、粘り強く戦う。",
+}
+_PLAYSTYLE_PRESET_TOOLTIP_JA: Dict[str, str] = {
+    "balanced_v1": "標準的な攻守・起用バランス。",
+    "run_and_gun_3p_v1": "速攻と3Pを増やす攻撃型。",
+    "defense_first_v1": "ペースを落として守備を重視。",
+}
+_ROTATION_PRESET_DESC_JA: Dict[str, str] = {
+    "balanced_v1": "勝利と育成のバランスを取る標準型。極端に偏らない起用。",
+    "win_now_v1": "主力をやや長めに起用する型。短期的な勝ち星を狙う。",
+    "development_v1": "若手や控えの出場機会をやや重視する型。長期育成に向く。",
+}
+_ROTATION_PRESET_TOOLTIP_JA: Dict[str, str] = {
+    "balanced_v1": "標準的な攻守・起用バランス。",
+    "win_now_v1": "主力をやや長めに起用。",
+    "development_v1": "若手・控えをやや使いやすくする。",
+}
+
+
+def _tactics_preset_desc_ui_text(
+    preset_id: Optional[str],
+    desc_map: Dict[str, str],
+    tip_map: Dict[str, str],
+    valid_ids: Tuple[str, ...],
+    fallback_id: str = "balanced_v1",
+) -> str:
+    """未知ID・未設定時はバランス型の説明にフォールバック。"""
+    pid = (preset_id or "").strip() if isinstance(preset_id, str) else None
+    if not pid or pid not in valid_ids:
+        pid = fallback_id
+    desc = desc_map.get(pid) or desc_map.get(fallback_id, "プリセットの説明がありません。")
+    tip = tip_map.get(pid) or tip_map.get(fallback_id, "")
+    if tip:
+        return f"{desc}\n（{tip}）"
+    return desc
+
+
 from basketball_sim.systems.facility_investment import (
     FACILITY_LABELS,
     FACILITY_ORDER,
@@ -5385,6 +5427,24 @@ class MainMenuView:
         _playstyle_id_by_label = {lab: pid for pid, lab in _playstyle_label_by_id.items()}
         combo_ps["values"] = tuple(_playstyle_label_by_id[pid] for pid in _playstyle_preset_ids)
 
+        lbl_ps_desc = ttk.Label(wrap, text="", wraplength=500, justify="left")
+
+        def _refresh_playstyle_preset_desc() -> None:
+            lab = ""
+            try:
+                lab = combo_ps.get()
+            except tk.TclError:
+                pass
+            pid = _playstyle_id_by_label.get(lab, "balanced_v1")
+            lbl_ps_desc.configure(
+                text=_tactics_preset_desc_ui_text(
+                    pid,
+                    _PLAYSTYLE_PRESET_DESC_JA,
+                    _PLAYSTYLE_PRESET_TOOLTIP_JA,
+                    _playstyle_preset_ids,
+                )
+            )
+
         def _sync_playstyle_combo_from_meta() -> None:
             if self.team is None:
                 return
@@ -5399,6 +5459,7 @@ class MainMenuView:
                 combo_ps.set(lab)
             except tk.TclError:
                 combo_ps.current(0)
+            _refresh_playstyle_preset_desc()
 
         _sync_playstyle_combo_from_meta()
         combo_ps.pack(side="left", padx=6)
@@ -5416,6 +5477,7 @@ class MainMenuView:
             self._sync_strategy_policy_combos(combo_s, combo_c, combo_u)
             self.refresh()
             self._refresh_strategy_window()
+            _sync_playstyle_combo_from_meta()
             _sync_ps_state()
             messagebox.showinfo(
                 "適用",
@@ -5431,6 +5493,8 @@ class MainMenuView:
             command=_on_apply_playstyle_preset,
             width=14,
         ).pack(side="left", padx=4)
+        lbl_ps_desc.pack(anchor="w", pady=(2, 6))
+        combo_ps.bind("<<ComboboxSelected>>", lambda _e: _refresh_playstyle_preset_desc())
 
         def _on_save() -> None:
             if self.team is None:
@@ -6283,6 +6347,24 @@ class MainMenuView:
         _rotation_id_by_label = {lab: pid for pid, lab in _rotation_label_by_id.items()}
         combo_rp["values"] = tuple(_rotation_label_by_id[pid] for pid in _rotation_preset_ids)
 
+        lbl_rp_desc = ttk.Label(wrap, text="", wraplength=520, justify="left")
+
+        def _refresh_rotation_preset_desc() -> None:
+            lab = ""
+            try:
+                lab = combo_rp.get()
+            except tk.TclError:
+                pass
+            pid = _rotation_id_by_label.get(lab, "balanced_v1")
+            lbl_rp_desc.configure(
+                text=_tactics_preset_desc_ui_text(
+                    pid,
+                    _ROTATION_PRESET_DESC_JA,
+                    _ROTATION_PRESET_TOOLTIP_JA,
+                    _rotation_preset_ids,
+                )
+            )
+
         def _sync_rotation_combo_from_meta() -> None:
             if self.team is None:
                 return
@@ -6297,6 +6379,7 @@ class MainMenuView:
                 combo_rp.set(lab)
             except tk.TclError:
                 combo_rp.current(0)
+            _refresh_rotation_preset_desc()
 
         _sync_rotation_combo_from_meta()
         combo_rp.pack(side="left", padx=6)
@@ -6332,6 +6415,8 @@ class MainMenuView:
             command=_on_apply_rotation_preset,
             width=14,
         ).pack(side="left", padx=4)
+        lbl_rp_desc.pack(anchor="w", pady=(2, 6))
+        combo_rp.bind("<<ComboboxSelected>>", lambda _e: _refresh_rotation_preset_desc())
 
         def _collect() -> Dict[str, str]:
             out: Dict[str, str] = {}
