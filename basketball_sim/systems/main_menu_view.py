@@ -4960,9 +4960,9 @@ class MainMenuView:
         ttk.Label(
             nav,
             text=(
-                "【この画面】ナビを「プレイスタイル」と「ローテーション」に分けています。"
-                "チームの戦い方はプレイスタイル、起用はローテーションで調整します。"
-                "（参考役割はローテーション枠。人事の「タグ:」とは別。）下段は Team 状態の参照のみです。"
+                "戦術は大きく「プレイスタイル」と「ローテーション」に分けて設定します。\n"
+                "プレイスタイルは試合の戦い方、ローテーションは起用と役割を調整します。\n"
+                "下段は Team 状態の参照のみです。詳細編集は上の2ボタンから開きます。"
             ),
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
@@ -4976,95 +4976,22 @@ class MainMenuView:
                 pass
             return self.root
 
-        def _nav_btn(fr: ttk.Frame, label: str, opener: Any) -> None:
-            ttk.Button(fr, text=label, style="Menu.TButton", command=opener, width=20).pack(
-                side="left", padx=4, pady=2
-            )
-
-        play_lf = ttk.LabelFrame(nav, text="プレイスタイル", padding=8)
-        play_lf.pack(fill="x", pady=(0, 8))
-        ttk.Label(
-            play_lf,
-            text="チーム全体の戦い方を決めます",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(0, 4))
-        ttk.Label(
-            play_lf,
-            text=(
-                "完成形0〜7対応：0.プリセット→「基本方針」／"
-                "1〜6.テンポ・攻撃/守備・リバウンド・速攻→「攻守の傾向」／"
-                "7.セット傾向→「セット傾向」\n"
-                "※ 未実装候補はまだ選択肢に出していません。"
-            ),
-            font=("Yu Gothic UI", 9),
-            wraplength=900,
-            justify="left",
-        ).pack(anchor="w", pady=(0, 6))
-        row_play = ttk.Frame(play_lf, style="Panel.TFrame")
-        row_play.pack(fill="x")
-        _nav_btn(
-            row_play,
-            "基本方針",
-            lambda: self._open_tactics_core_policy_window(hub_ref),
-        )
-        _nav_btn(
-            row_play,
-            "攻守の傾向",
-            lambda: self._open_tactics_team_strategy_window(hub_ref),
-        )
-        _nav_btn(
-            row_play,
-            "セット傾向",
-            lambda: self._open_tactics_playbook_window(hub_ref),
-        )
-
-        rot_lf = ttk.LabelFrame(nav, text="ローテーション", padding=8)
-        rot_lf.pack(fill="x", pady=(0, 0))
-        ttk.Label(
-            rot_lf,
-            text=(
-                "試合の土台は「先発・6th・ベンチ」の Team（最終案の 2. 起用序列）。\n"
-                "ローテ詳細は rotation（1 と 2 寄り）、起用テンプレは usage_policy（0 と 1）、役割詳細は roles（3 と 4）。\n"
-                "保存先は Team と分かれたままです（未統合）。"
-            ),
-            font=("Yu Gothic UI", 9),
-            wraplength=900,
-            justify="left",
-        ).pack(anchor="w", pady=(0, 4))
-        ttk.Label(
-            rot_lf,
-            text=(
-                "完成形0〜3対応：0.起用プリセット→起用テンプレ / 1.起用方針→起用テンプレ＋ローテ詳細\n"
-                "2.起用序列→先発・6th・ベンチ＋目標出場時間\n"
-                "3.個別役割→役割詳細\n"
-                "※ 未実装プリセットはまだ表示していません。"
-            ),
-            font=("Yu Gothic UI", 9),
-            wraplength=900,
-            justify="left",
-        ).pack(anchor="w", pady=(0, 6))
-        row_rot = ttk.Frame(rot_lf, style="Panel.TFrame")
-        row_rot.pack(fill="x")
-        _nav_btn(
-            row_rot,
-            "ローテ詳細",
-            lambda: self._open_tactics_rotation_window(hub_ref),
-        )
-        _nav_btn(
-            row_rot,
-            "起用テンプレ",
-            lambda: self._open_tactics_usage_policy_window(hub_ref),
-        )
-        _nav_btn(
-            row_rot,
-            "先発・6th・ベンチ",
-            lambda: self._open_tactics_team_lineup_window(hub_ref),
-        )
-        _nav_btn(
-            row_rot,
-            "役割詳細",
-            lambda: self._open_tactics_roles_window(hub_ref),
-        )
+        row_hub = ttk.Frame(nav, style="Panel.TFrame")
+        row_hub.pack(fill="x", pady=(0, 4))
+        ttk.Button(
+            row_hub,
+            text="プレイスタイル",
+            style="Menu.TButton",
+            width=22,
+            command=lambda: self._open_tactics_playstyle_overview_window(hub_ref),
+        ).pack(side="left", padx=(0, 8), pady=2)
+        ttk.Button(
+            row_hub,
+            text="ローテーション",
+            style="Menu.TButton",
+            width=22,
+            command=lambda: self._open_tactics_rotation_overview_window(hub_ref),
+        ).pack(side="left", padx=0, pady=2)
 
         scroll_wrap = ttk.Frame(outer, style="Root.TFrame")
         scroll_wrap.pack(fill="both", expand=True)
@@ -5148,7 +5075,8 @@ class MainMenuView:
             strategy_panel,
             text=(
                 "Team.strategy / coach_style / Team.usage_policy（試合・ローテに反映）は、"
-                "プレイスタイル枠の「基本方針（Team）」から。攻守の傾向・セット傾向は team_tactics（同枠の別ボタン、別設定）。"
+                "「プレイスタイル」統合画面の暫定ボタン「基本方針（Team）」から。"
+                "攻守の傾向・セット傾向は team_tactics（同画面の別暫定ボタン、別設定）。"
             ),
             font=("Yu Gothic UI", 9),
             wraplength=440,
@@ -5201,8 +5129,8 @@ class MainMenuView:
         ttk.Label(
             lineup_panel,
             text=(
-                "Team の先発・6th・ベンチは、ローテーション枠の「先発・6th・ベンチ」から編集します。"
-                "交代・目標出場・起用方針テンプレ等は同枠の team_tactics 系（Team 先発とデータは分離のまま）。"
+                "Team の先発・6th・ベンチは、「ローテーション」統合画面の暫定ボタンから編集します。"
+                "交代・目標出場・起用方針テンプレ等は同画面の別暫定ボタン（team_tactics、Team 先発と分離のまま）。"
             ),
             font=("Yu Gothic UI", 9),
             wraplength=440,
@@ -5292,8 +5220,8 @@ class MainMenuView:
             f"基本起用 (Team.usage_policy): {usage_text}",
             f"ロスター人数: {len(list(self._safe_get(self.team, 'players', []) or []))}",
             f"先発人数: {len(starters)} / ベンチ序列人数: {len(bench_order)}",
-            "team_tactics: プレイスタイル／ローテーション枠の各ボタンから（試合参照は項目による）。"
-            "参考役割・各度はローテ枠。人事「タグ:」自動役割タグの表示とは別。",
+            "team_tactics: 「プレイスタイル」「ローテーション」統合画面の暫定ボタンから（試合参照は項目による）。"
+            "参考役割はローテーション側。人事「タグ:」自動役割タグの表示とは別。",
         ]
         for var, line in zip(self.strategy_lines, strategy_lines):
             var.set(line)
@@ -5323,8 +5251,8 @@ class MainMenuView:
             var.set(line)
 
         self.strategy_hint_var.set(
-            "プレイスタイル枠… 基本方針（Team）で戦術・HC・起用。ローテーション枠… 先発・6th・ベンチ（Team）と team_tactics 系。"
-            " 参考役割等は同枠（手動）。人事の自動「タグ:」ではない。下段は参照のみ。"
+            "プレイスタイル… 統合画面から暫定ボタンで基本方針（Team）・攻守・セットへ。"
+            "ローテーション… 統合画面から起用・先発・役割へ。人事の自動「タグ:」ではない。下段は参照のみ。"
         )
 
         jp_blk = getattr(self, "strat_jp_block_var", None)
@@ -5376,6 +5304,203 @@ class MainMenuView:
             if isinstance(prev, dict) and isinstance(prev.get("preset_meta"), dict):
                 merged["preset_meta"] = dict(prev["preset_meta"])
         self.team.team_tactics = normalize_team_tactics(merged, valid_player_ids=pids if pids else None)
+
+    def _open_tactics_playstyle_overview_window(self, parent: tk.Misc) -> None:
+        """プレイスタイル統合画面の土台（0〜7の見出し・説明・既存子窓への暫定導線）。"""
+        if self.team is None:
+            return
+        try:
+            ensure_team_tactics_on_team(self.team)
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("戦術：プレイスタイル")
+        w.geometry("720x640")
+        w.minsize(560, 480)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+
+        ttk.Label(
+            wrap,
+            text=(
+                "完成形に向けた統合画面（第1段階）。0〜7の並びをこの1画面で把握できます。"
+                "各項目の編集UIの完全統合は未着手のため、暫定ボタンから従来の子窓を開いてください。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=660,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
+
+        def _section(title: str, body: str, btn_label: str, opener: Any) -> None:
+            lf = ttk.LabelFrame(wrap, text=title, padding=10)
+            lf.pack(fill="x", pady=(0, 8))
+            ttk.Label(
+                lf,
+                text=body,
+                font=("Yu Gothic UI", 9),
+                wraplength=640,
+                justify="left",
+            ).pack(anchor="w", pady=(0, 6))
+            ttk.Button(lf, text=btn_label, style="Menu.TButton", command=opener).pack(anchor="w")
+
+        _section(
+            "0. プリセット設定",
+            "プリセットを選ぶと、1〜7のおすすめ設定が反映されます。\n"
+            "※ HCスタイル（coach_style）は主導線には出していませんが、削除もしていません。"
+            "「基本方針（Team）」窓内で従来どおり編集できます。",
+            "プリセット設定を開く（基本方針・Team）",
+            lambda: self._open_tactics_core_policy_window(w),
+        )
+        _section(
+            "1〜6. 攻守の傾向",
+            "1.試合テンポ / 2.攻撃の狙い / 3.攻撃の起点 / 4.守備の狙い / "
+            "5.オフェンスリバウンド / 6.トランジション（保存先 team_tactics[\"team_strategy\"]）。",
+            "攻守の傾向を開く",
+            lambda: self._open_tactics_team_strategy_window(w),
+        )
+        _section(
+            "7. セット傾向",
+            "P&R / ハンドオフ / オフボールスクリーン / ポストアップ / Spain P&R / 速攻頻度など"
+            "（保存先 team_tactics[\"playbook\"]）。折り畳みは未実装です。",
+            "セット傾向を開く",
+            lambda: self._open_tactics_playbook_window(w),
+        )
+
+        bf = ttk.Frame(wrap, style="Panel.TFrame")
+        bf.pack(fill="x", pady=(12, 0))
+        ttk.Button(bf, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
+
+    def _open_tactics_rotation_overview_window(self, parent: tk.Misc) -> None:
+        """ローテーション統合画面の土台（0〜3の見出し・説明・既存子窓への暫定導線）。"""
+        if self.team is None:
+            return
+        try:
+            ensure_team_tactics_on_team(self.team)
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("戦術：ローテーション")
+        w.geometry("720x700")
+        w.minsize(560, 520)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
+        wrap.pack(fill="both", expand=True)
+
+        ttk.Label(
+            wrap,
+            text=(
+                "完成形に向けた統合画面（第1段階）。0〜3の並びをこの1画面で把握できます。"
+                "編集UIの完全統合は未着手のため、各ブロックの暫定ボタンから従来の子窓を開いてください。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=660,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
+
+        lf0 = ttk.LabelFrame(wrap, text="0. 起用プリセット", padding=10)
+        lf0.pack(fill="x", pady=(0, 8))
+        ttk.Label(
+            lf0,
+            text="起用プリセットと手動の起用方針テンプレは「起用テンプレ」窓にあります（usage_policy 等）。",
+            font=("Yu Gothic UI", 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        ttk.Button(
+            lf0,
+            text="起用テンプレを開く",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_usage_policy_window(w),
+        ).pack(anchor="w")
+
+        lf1 = ttk.LabelFrame(wrap, text="1. チーム起用方針", padding=10)
+        lf1.pack(fill="x", pady=(0, 8))
+        ttk.Label(
+            lf1,
+            text=(
+                "手動の起用方針（usage_policy）と、交代・疲労・終盤など rotation 側の細部が分かれています。"
+                "どちらもここから開けます。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        r1 = ttk.Frame(lf1, style="Panel.TFrame")
+        r1.pack(fill="x")
+        ttk.Button(
+            r1,
+            text="起用テンプレを開く（0・1）",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_usage_policy_window(w),
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            r1,
+            text="ローテ詳細を開く（rotation・細部）",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_rotation_window(w),
+        ).pack(side="left")
+
+        lf2 = ttk.LabelFrame(wrap, text="2. 起用序列", padding=10)
+        lf2.pack(fill="x", pady=(0, 8))
+        ttk.Label(
+            lf2,
+            text=(
+                "試合起用の正本は Team の先発・6th・ベンチ。戦術用先発と目標出場は rotation。"
+                "データは別のままです。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        r2 = ttk.Frame(lf2, style="Panel.TFrame")
+        r2.pack(fill="x")
+        ttk.Button(
+            r2,
+            text="先発・6th・ベンチを開く（Team）",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_team_lineup_window(w),
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            r2,
+            text="ローテ詳細を開く（戦術先発・目標出場）",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_rotation_window(w),
+        ).pack(side="left")
+
+        lf3 = ttk.LabelFrame(wrap, text="3. 個別役割", padding=10)
+        lf3.pack(fill="x", pady=(0, 8))
+        ttk.Label(
+            lf3,
+            text="team_tactics[\"roles\"]。人事の「タグ:」自動分類とは別の手動設定です。",
+            font=("Yu Gothic UI", 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        ttk.Button(
+            lf3,
+            text="役割詳細を開く",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_roles_window(w),
+        ).pack(anchor="w")
+
+        bf = ttk.Frame(wrap, style="Panel.TFrame")
+        bf.pack(fill="x", pady=(12, 0))
+        ttk.Button(bf, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
 
     def _open_tactics_core_policy_window(self, parent: tk.Misc) -> None:
         """プレイスタイル 0.戦術プリセット、および Team 側（strategy / coach / usage）の手動方針を扱う。"""
