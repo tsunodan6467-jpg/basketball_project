@@ -32,7 +32,7 @@ from copy import deepcopy
 import tkinter as tk
 from tkinter import scrolledtext, ttk, messagebox
 from datetime import datetime, date
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from basketball_sim.systems.gm_dashboard_text import (
     apply_bench_order_swap,
@@ -5305,6 +5305,333 @@ class MainMenuView:
                 merged["preset_meta"] = dict(prev["preset_meta"])
         self.team.team_tactics = normalize_team_tactics(merged, valid_player_ids=pids if pids else None)
 
+    _TEAM_STRATEGY_EDITOR_KEYS: Tuple[str, ...] = (
+        "offense_tempo",
+        "offense_style",
+        "offense_creation",
+        "defense_style",
+        "rebound_style",
+        "transition_style",
+    )
+
+    _PLAYBOOK_LEVEL_PAIRS: Tuple[Tuple[str, str], ...] = (
+        ("low", "少ない"),
+        ("standard", "標準"),
+        ("high", "多い"),
+    )
+    _PLAYBOOK_EDITOR_KEYS: Tuple[Tuple[str, str], ...] = (
+        ("pick_and_roll", "P&R"),
+        ("handoff", "ハンドオフ"),
+        ("off_ball_screen", "オフボールスクリーン"),
+        ("post_up", "ポストアップ"),
+        ("spain_pick_and_roll", "Spain P&R"),
+        ("transition", "速攻頻度"),
+    )
+
+    def _team_strategy_pairs_map_and_labels(
+        self,
+    ) -> Tuple[Dict[str, List[Tuple[str, str]]], Dict[str, str]]:
+        pairs_map: Dict[str, List[Tuple[str, str]]] = {
+            "offense_tempo": [("slow", "スロー"), ("standard", "標準"), ("fast", "アップテンポ")],
+            "offense_style": [
+                ("balanced", "バランス"),
+                ("inside", "ペイント重視"),
+                ("three_point", "3P重視"),
+                ("drive", "ドライブ重視"),
+            ],
+            "offense_creation": [
+                ("ball_move", "ボールムーブ"),
+                ("pick_and_roll", "P&R中心"),
+                ("iso", "アイソレーション中心"),
+                ("post", "ポスト起点"),
+            ],
+            "defense_style": [
+                ("balanced", "バランス"),
+                ("protect_three", "3P警戒"),
+                ("protect_paint", "ペイント保護"),
+                ("pressure", "プレッシャー強め"),
+            ],
+            "rebound_style": [
+                ("get_back", "戻り優先"),
+                ("balanced", "バランス"),
+                ("crash_offense", "積極参加"),
+            ],
+            "transition_style": [
+                ("push", "速攻重視"),
+                ("situational", "状況判断"),
+                ("half_court", "ハーフコート優先"),
+            ],
+        }
+        labels: Dict[str, str] = {
+            "offense_tempo": "1. 試合テンポ",
+            "offense_style": "2. 攻撃の狙い",
+            "offense_creation": "3. 攻撃の起点",
+            "defense_style": "4. 守備の狙い",
+            "rebound_style": "5. オフェンスリバウンド",
+            "transition_style": "6. トランジション",
+        }
+        return pairs_map, labels
+
+    def _team_strategy_editor_set_combo(
+        self, combo: ttk.Combobox, pairs: List[Tuple[str, str]], cur: str
+    ) -> None:
+        vals = [b for _, b in pairs]
+        combo["values"] = vals
+        internals = [a for a, _ in pairs]
+        combo.set(vals[internals.index(cur)] if cur in internals else vals[0])
+
+    def _team_strategy_editor_build_row_combos(
+        self,
+        parent: ttk.Frame,
+        data: Dict[str, str],
+        pairs_map: Dict[str, List[Tuple[str, str]]],
+        labels: Dict[str, str],
+    ) -> Dict[str, ttk.Combobox]:
+        combos: Dict[str, ttk.Combobox] = {}
+        for key in self._TEAM_STRATEGY_EDITOR_KEYS:
+            row = ttk.Frame(parent, style="Panel.TFrame")
+            row.pack(fill="x", pady=3)
+            ttk.Label(row, text=labels[key], width=24).pack(side="left")
+            cb = ttk.Combobox(row, state="readonly", width=28)
+            cb.pack(side="left", padx=6)
+            self._team_strategy_editor_set_combo(cb, pairs_map[key], str(data.get(key, "")))
+            combos[key] = cb
+        return combos
+
+    def _team_strategy_editor_collect(
+        self, combos: Dict[str, ttk.Combobox], pairs_map: Dict[str, List[Tuple[str, str]]]
+    ) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        for key, cb in combos.items():
+            pairs = pairs_map[key]
+            disp = cb.get()
+            for a, b in pairs:
+                if b == disp:
+                    out[key] = a
+                    break
+            else:
+                out[key] = pairs[0][0]
+        return out
+
+    def _team_strategy_editor_reset_display(
+        self, combos: Dict[str, ttk.Combobox], pairs_map: Dict[str, List[Tuple[str, str]]]
+    ) -> None:
+        d = get_default_team_tactics()["team_strategy"]
+        for k, cb in combos.items():
+            self._team_strategy_editor_set_combo(cb, pairs_map[k], str(d.get(k, "")))
+
+    def _team_strategy_editor_reload_from_team(
+        self, combos: Dict[str, ttk.Combobox], pairs_map: Dict[str, List[Tuple[str, str]]]
+    ) -> None:
+        if self.team is None:
+            return
+        data = get_safe_team_tactics(self.team)["team_strategy"]
+        for k, cb in combos.items():
+            self._team_strategy_editor_set_combo(cb, pairs_map[k], str(data.get(k, "")))
+
+    def _team_strategy_editor_save(
+        self,
+        combos: Dict[str, ttk.Combobox],
+        pairs_map: Dict[str, List[Tuple[str, str]]],
+        *,
+        message_parent: tk.Misc,
+        message_title: str = "保存",
+        message_body: str = "プレイスタイル（攻守の傾向）を保存しました。",
+    ) -> None:
+        if self.team is None:
+            return
+        raw = dict(get_safe_team_tactics(self.team))
+        raw["team_strategy"] = self._team_strategy_editor_collect(combos, pairs_map)
+        self._tactics_commit_payload(raw)
+        messagebox.showinfo(message_title, message_body, parent=message_parent)
+        self._refresh_strategy_window()
+
+    def _playbook_editor_set_combo(
+        self, cb: ttk.Combobox, level_pairs: Sequence[Tuple[str, str]], cur: str
+    ) -> None:
+        vals = [b for _, b in level_pairs]
+        internals = [a for a, _ in level_pairs]
+        cb["values"] = vals
+        cb.set(vals[internals.index(cur)] if cur in internals else vals[1])
+
+    def _playbook_editor_build_row_combos(
+        self, parent: ttk.Frame, data_pb: Dict[str, Any]
+    ) -> Dict[str, ttk.Combobox]:
+        level_pairs = self._PLAYBOOK_LEVEL_PAIRS
+        combos: Dict[str, ttk.Combobox] = {}
+        for key, jlabel in self._PLAYBOOK_EDITOR_KEYS:
+            row = ttk.Frame(parent, style="Panel.TFrame")
+            row.pack(fill="x", pady=3)
+            ttk.Label(row, text=jlabel, width=24).pack(side="left")
+            cb = ttk.Combobox(row, state="readonly", width=12)
+            cb.pack(side="left", padx=6)
+            self._playbook_editor_set_combo(cb, level_pairs, str(data_pb.get(key, "standard")))
+            combos[key] = cb
+        return combos
+
+    def _playbook_editor_collect(
+        self, combos: Dict[str, ttk.Combobox], level_pairs: Sequence[Tuple[str, str]]
+    ) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        for key, cb in combos.items():
+            disp = cb.get()
+            for a, b in level_pairs:
+                if b == disp:
+                    out[key] = a
+                    break
+            else:
+                out[key] = "standard"
+        return out
+
+    def _playbook_editor_reload_from_team(
+        self, combos: Dict[str, ttk.Combobox], level_pairs: Sequence[Tuple[str, str]]
+    ) -> None:
+        if self.team is None:
+            return
+        pb = get_safe_team_tactics(self.team)["playbook"]
+        for k, cb in combos.items():
+            self._playbook_editor_set_combo(cb, level_pairs, str(pb.get(k, "standard")))
+
+    def _playbook_editor_reset_display(
+        self, combos: Dict[str, ttk.Combobox], level_pairs: Sequence[Tuple[str, str]]
+    ) -> None:
+        d = get_default_team_tactics()["playbook"]
+        for k, cb in combos.items():
+            self._playbook_editor_set_combo(cb, level_pairs, str(d.get(k, "standard")))
+
+    def _playbook_editor_save(
+        self,
+        combos: Dict[str, ttk.Combobox],
+        level_pairs: Sequence[Tuple[str, str]],
+        *,
+        message_parent: tk.Misc,
+    ) -> None:
+        if self.team is None:
+            return
+        raw = dict(get_safe_team_tactics(self.team))
+        raw["playbook"] = self._playbook_editor_collect(combos, level_pairs)
+        self._tactics_commit_payload(raw)
+        messagebox.showinfo("保存", "セット傾向（playbook）を保存しました。", parent=message_parent)
+
+    def _build_playstyle_preset_editor_ui(
+        self,
+        parent: ttk.Frame,
+        *,
+        message_parent: tk.Misc,
+        after_apply: Optional[Callable[[], None]] = None,
+        strategy_policy_combos: Optional[Tuple[ttk.Combobox, ttk.Combobox, ttk.Combobox]] = None,
+    ) -> Tuple[Callable[[], None], Callable[[], None]]:
+        """
+        0. 戦術プリセット（PLAYSTYLE_PRESET_DEFS 3種）の共通 UI。
+        戻り値: (状態ラベル更新, preset_meta からコンボ同期) 用コールバック。
+        """
+        row_ps_stat = ttk.Frame(parent, style="Panel.TFrame")
+        row_ps_stat.pack(fill="x", pady=(0, 2))
+        lbl_ps_state = ttk.Label(row_ps_stat, text="", wraplength=480)
+
+        def _sync_ps_state() -> None:
+            if self.team is None:
+                return
+            st = get_current_playstyle_preset_state(self.team)
+            lbl_ps_state.configure(text=f"現在の戦術プリセット状態: {st['label_ja']}")
+
+        lbl_ps_state.pack(anchor="w")
+        _sync_ps_state()
+
+        row_preset = ttk.Frame(parent, style="Panel.TFrame")
+        row_preset.pack(fill="x", pady=(4, 4))
+        combo_ps = ttk.Combobox(row_preset, state="readonly", width=28)
+        # UI は実装済み v1 の3種のみ（将来 defs が増えても候補に自動で増やさない）
+        _ui_playstyle_preset_order: Tuple[str, ...] = (
+            "balanced_v1",
+            "run_and_gun_3p_v1",
+            "defense_first_v1",
+        )
+        _playstyle_preset_ids: Tuple[str, ...] = tuple(
+            pid for pid in _ui_playstyle_preset_order if pid in PLAYSTYLE_PRESET_DEFS
+        )
+        _playstyle_label_by_id = {
+            pid: str(PLAYSTYLE_PRESET_DEFS[pid].get("label_ja", pid)) for pid in _playstyle_preset_ids
+        }
+        _playstyle_id_by_label = {lab: pid for pid, lab in _playstyle_label_by_id.items()}
+        combo_ps["values"] = tuple(_playstyle_label_by_id[pid] for pid in _playstyle_preset_ids)
+
+        lbl_ps_desc = ttk.Label(parent, text="", wraplength=500, justify="left")
+
+        def _refresh_playstyle_preset_desc() -> None:
+            lab = ""
+            try:
+                lab = combo_ps.get()
+            except tk.TclError:
+                pass
+            pid = _playstyle_id_by_label.get(lab, "balanced_v1")
+            lbl_ps_desc.configure(
+                text=_tactics_preset_desc_ui_text(
+                    pid,
+                    _PLAYSTYLE_PRESET_DESC_JA,
+                    _PLAYSTYLE_PRESET_TOOLTIP_JA,
+                    _playstyle_preset_ids,
+                )
+            )
+
+        def _sync_playstyle_combo_from_meta() -> None:
+            if self.team is None:
+                return
+            ensure_team_tactics_on_team(self.team)
+            pm = (self.team.team_tactics or {}).get("preset_meta") or {}
+            raw_pid = pm.get("playstyle_preset_id")
+            pid = raw_pid.strip() if isinstance(raw_pid, str) and raw_pid.strip() else None
+            if pid not in PLAYSTYLE_PRESET_DEFS:
+                pid = "balanced_v1"
+            if pid not in _playstyle_label_by_id:
+                pid = _playstyle_preset_ids[0] if _playstyle_preset_ids else "balanced_v1"
+            lab = _playstyle_label_by_id.get(pid, _playstyle_label_by_id["balanced_v1"])
+            try:
+                combo_ps.set(lab)
+            except tk.TclError:
+                combo_ps.current(0)
+            _refresh_playstyle_preset_desc()
+
+        def _on_apply_playstyle_preset() -> None:
+            if self.team is None:
+                return
+            lab = combo_ps.get()
+            preset_id = _playstyle_id_by_label.get(lab, "balanced_v1")
+            try:
+                apply_playstyle_preset_with_preset_meta(self.team, preset_id)
+            except KeyError as e:
+                messagebox.showerror("エラー", str(e), parent=message_parent)
+                return
+            if strategy_policy_combos is not None:
+                cs, cc, cu = strategy_policy_combos
+                self._sync_strategy_policy_combos(cs, cc, cu)
+            self.refresh()
+            self._refresh_strategy_window()
+            _sync_playstyle_combo_from_meta()
+            _sync_ps_state()
+            messagebox.showinfo(
+                "適用",
+                "戦術プリセットを反映しました（team_strategy / playbook / Team.strategy）。\n"
+                f"preset_meta.playstyle_preset_id = {preset_id!r}",
+                parent=message_parent,
+            )
+            if after_apply is not None:
+                after_apply()
+
+        _sync_playstyle_combo_from_meta()
+        combo_ps.pack(side="left", padx=6)
+        ttk.Button(
+            row_preset,
+            text="プリセット適用",
+            style="Menu.TButton",
+            command=_on_apply_playstyle_preset,
+            width=14,
+        ).pack(side="left", padx=4)
+        lbl_ps_desc.pack(anchor="w", pady=(2, 0))
+        combo_ps.bind("<<ComboboxSelected>>", lambda _e: _refresh_playstyle_preset_desc())
+
+        return _sync_ps_state, _sync_playstyle_combo_from_meta
+
     def _open_tactics_playstyle_overview_window(self, parent: tk.Misc) -> None:
         """プレイスタイル統合画面の土台（0〜7の見出し・説明・既存子窓への暫定導線）。"""
         if self.team is None:
@@ -5316,67 +5643,280 @@ class MainMenuView:
 
         w = tk.Toplevel(parent)
         w.title("戦術：プレイスタイル")
-        w.geometry("720x640")
-        w.minsize(560, 480)
+        w.geometry("760x840")
+        w.minsize(720, 600)
         w.configure(bg="#15171c")
         try:
             w.transient(parent)
         except Exception:
             pass
 
-        wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
-        wrap.pack(fill="both", expand=True)
+        outer = ttk.Frame(w, style="Root.TFrame")
+        outer.pack(fill="both", expand=True)
 
+        bf = ttk.Frame(outer, style="Root.TFrame", padding=(12, 8, 12, 12))
+        bf.pack(side="bottom", fill="x")
+        ttk.Button(bf, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
+
+        intro_fr = ttk.Frame(outer, style="Root.TFrame", padding=(12, 12, 12, 0))
+        intro_fr.pack(side="top", fill="x")
         ttk.Label(
-            wrap,
+            intro_fr,
             text=(
-                "完成形に向けた統合画面（第1段階）。0〜7の並びをこの1画面で把握できます。"
-                "各項目の編集UIの完全統合は未着手のため、暫定ボタンから従来の子窓を開いてください。"
+                "完成形に向けた統合画面。0 のプリセット設定と 1〜6 の攻守の傾向・7 のセット傾向は"
+                "この画面で直接操作できます（1〜6・7 は保存で確定）。"
             ),
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
             wraplength=660,
             justify="left",
-        ).pack(anchor="w", pady=(0, 10))
+        ).pack(anchor="w", pady=(0, 6))
 
-        def _section(title: str, body: str, btn_label: str, opener: Any) -> None:
-            lf = ttk.LabelFrame(wrap, text=title, padding=10)
-            lf.pack(fill="x", pady=(0, 8))
-            ttk.Label(
-                lf,
-                text=body,
-                font=("Yu Gothic UI", 9),
-                wraplength=640,
-                justify="left",
-            ).pack(anchor="w", pady=(0, 6))
-            ttk.Button(lf, text=btn_label, style="Menu.TButton", command=opener).pack(anchor="w")
+        scroll_wrap = ttk.Frame(outer, style="Root.TFrame")
+        scroll_wrap.pack(fill="both", expand=True)
 
-        _section(
-            "0. プリセット設定",
-            "プリセットを選ぶと、1〜7のおすすめ設定が反映されます。\n"
-            "※ HCスタイル（coach_style）は主導線には出していませんが、削除もしていません。"
-            "「基本方針（Team）」窓内で従来どおり編集できます。",
-            "プリセット設定を開く（基本方針・Team）",
-            lambda: self._open_tactics_core_policy_window(w),
-        )
-        _section(
-            "1〜6. 攻守の傾向",
-            "1.試合テンポ / 2.攻撃の狙い / 3.攻撃の起点 / 4.守備の狙い / "
-            "5.オフェンスリバウンド / 6.トランジション（保存先 team_tactics[\"team_strategy\"]）。",
-            "攻守の傾向を開く",
-            lambda: self._open_tactics_team_strategy_window(w),
-        )
-        _section(
-            "7. セット傾向",
-            "P&R / ハンドオフ / オフボールスクリーン / ポストアップ / Spain P&R / 速攻頻度など"
-            "（保存先 team_tactics[\"playbook\"]）。折り畳みは未実装です。",
-            "セット傾向を開く",
-            lambda: self._open_tactics_playbook_window(w),
-        )
+        ps_canvas = tk.Canvas(scroll_wrap, bg="#15171c", highlightthickness=0)
+        ps_vsb = ttk.Scrollbar(scroll_wrap, orient="vertical", command=ps_canvas.yview)
+        ps_canvas.configure(yscrollcommand=ps_vsb.set)
+        scroll_content = ttk.Frame(ps_canvas, style="Root.TFrame", padding=12)
+        ps_win_id = ps_canvas.create_window((0, 0), window=scroll_content, anchor="nw")
 
-        bf = ttk.Frame(wrap, style="Panel.TFrame")
-        bf.pack(fill="x", pady=(12, 0))
-        ttk.Button(bf, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right")
+        def _playstyle_scrollregion(_event: Any = None) -> None:
+            ps_canvas.update_idletasks()
+            bbox = ps_canvas.bbox("all")
+            if bbox:
+                ps_canvas.configure(scrollregion=bbox)
+
+        def _playstyle_canvas_width(event: Any) -> None:
+            try:
+                ps_canvas.itemconfigure(ps_win_id, width=event.width)
+            except tk.TclError:
+                pass
+
+        scroll_content.bind("<Configure>", lambda _e: _playstyle_scrollregion())
+
+        ps_canvas.bind("<Configure>", _playstyle_canvas_width)
+
+        def _playstyle_wheel(event: Any) -> None:
+            if getattr(event, "delta", 0):
+                ps_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        for _mw_target in (w, ps_canvas, scroll_content):
+            _mw_target.bind("<MouseWheel>", _playstyle_wheel)
+            _mw_target.bind("<Button-4>", lambda _e: ps_canvas.yview_scroll(-1, "units"))
+            _mw_target.bind("<Button-5>", lambda _e: ps_canvas.yview_scroll(1, "units"))
+
+        ps_canvas.pack(side="left", fill="both", expand=True)
+        ps_vsb.pack(side="right", fill="y")
+
+        pairs_ov, labels_ov = self._team_strategy_pairs_map_and_labels()
+        combos_holder: Dict[str, Any] = {}
+        playbook_combos_holder: Dict[str, Any] = {}
+        level_pairs_pb = self._PLAYBOOK_LEVEL_PAIRS
+
+        def _after_playstyle_preset_apply() -> None:
+            c = combos_holder.get("combos")
+            if isinstance(c, dict):
+                self._team_strategy_editor_reload_from_team(c, pairs_ov)
+            pb_c = playbook_combos_holder.get("combos")
+            if isinstance(pb_c, dict):
+                self._playbook_editor_reload_from_team(pb_c, level_pairs_pb)
+
+        lf0 = ttk.LabelFrame(scroll_content, text="0. プリセット設定", padding=10)
+        lf0.pack(fill="x", pady=(0, 8))
+        ttk.Label(
+            lf0,
+            text=(
+                "プリセットを選んで「プリセット適用」すると、1〜6（攻守の傾向）と 7（セット傾向）の"
+                "おすすめ設定が team_tactics に反映されます（HCスタイル・Team基本起用は変わりません）。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            lf0,
+            text=(
+                "※ 「カスタム」はプリセットのコンボ候補には出しません。"
+                "現在の戦術プリセット状態の表示としてのみ使います。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 2))
+        ttk.Label(
+            lf0,
+            text=(
+                "※ プリセット適用時はセット傾向（playbook）も更新されます。"
+                "この画面の 7 でも確認・編集できます（別窓からも可能）。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        self._build_playstyle_preset_editor_ui(
+            lf0,
+            message_parent=w,
+            after_apply=_after_playstyle_preset_apply,
+            strategy_policy_combos=None,
+        )
+        ttk.Button(
+            lf0,
+            text="Team基本方針を別窓で開く（戦術・HC・起用）",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_core_policy_window(w),
+        ).pack(anchor="w", pady=(8, 0))
+
+        lf16 = ttk.LabelFrame(scroll_content, text="1〜6. 攻守の傾向", padding=10)
+        lf16.pack(fill="x", pady=(0, 8))
+        ttk.Label(
+            lf16,
+            text=(
+                "保存先は team_tactics[\"team_strategy\"]。セット傾向（playbook）は別ブロックです。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        data_ov = get_safe_team_tactics(self.team)["team_strategy"]
+        combos_ov = self._team_strategy_editor_build_row_combos(lf16, data_ov, pairs_ov, labels_ov)
+        combos_holder["combos"] = combos_ov
+        ttk.Label(
+            lf16,
+            text="※ 「標準に戻す」は表示だけ戻します。保存を押すと確定します。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 2))
+        ttk.Label(
+            lf16,
+            text=(
+                "※ ブロック0でプリセット適用すると、この 1〜6 の表示も自動で更新されます。"
+                "別画面から手動変更した場合は「最新状態を読み込み」を押してください。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        btn_ov = ttk.Frame(lf16, style="Panel.TFrame")
+        btn_ov.pack(fill="x", pady=(0, 6))
+
+        def _save_ov() -> None:
+            self._team_strategy_editor_save(
+                combos_ov,
+                pairs_ov,
+                message_parent=w,
+                message_title="保存",
+                message_body="プレイスタイル（攻守の傾向）を保存しました。",
+            )
+
+        def _reset_ov() -> None:
+            self._team_strategy_editor_reset_display(combos_ov, pairs_ov)
+
+        def _reload_ov() -> None:
+            self._team_strategy_editor_reload_from_team(combos_ov, pairs_ov)
+
+        ttk.Button(btn_ov, text="保存", style="Primary.TButton", command=_save_ov).pack(side="left", padx=(0, 6))
+        ttk.Button(btn_ov, text="標準に戻す", style="Menu.TButton", command=_reset_ov).pack(side="left", padx=(0, 6))
+        ttk.Button(btn_ov, text="最新状態を読み込み", style="Menu.TButton", command=_reload_ov).pack(side="left", padx=0)
+        ttk.Button(
+            lf16,
+            text="別窓で攻守の傾向を開く",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_team_strategy_window(w),
+        ).pack(anchor="w", pady=(4, 0))
+
+        lf7 = ttk.LabelFrame(scroll_content, text="7. セット傾向", padding=10)
+        lf7.pack(fill="x", pady=(0, 8))
+        hdr7 = ttk.Frame(lf7, style="Panel.TFrame")
+        hdr7.pack(fill="x", anchor="w")
+        inner7 = ttk.Frame(lf7, style="Panel.TFrame")
+        ttk.Label(
+            inner7,
+            text=(
+                "※ P&R / ハンドオフ / オフボールスクリーン / ポストアップ / Spain P&R / 速攻頻度を調整します。\n"
+                "※ 「速攻頻度」は 6. トランジション方針とは別の playbook 項目です。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        pb_data_ov = get_safe_team_tactics(self.team)["playbook"]
+        combos_pb_ov = self._playbook_editor_build_row_combos(inner7, pb_data_ov)
+        playbook_combos_holder["combos"] = combos_pb_ov
+        ttk.Label(
+            inner7,
+            text="※ 「標準に戻す」は表示だけ戻します。保存を押すと確定します。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 2))
+        ttk.Label(
+            inner7,
+            text=(
+                "※ ブロック0でプリセット適用すると、この 7 の表示も自動で更新されます。"
+                "別画面から手動変更した場合は「最新状態を読み込み」を押してください。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        btn_pb_ov = ttk.Frame(inner7, style="Panel.TFrame")
+        btn_pb_ov.pack(fill="x", pady=(0, 6))
+
+        def _save_pb_ov() -> None:
+            self._playbook_editor_save(combos_pb_ov, level_pairs_pb, message_parent=w)
+
+        def _reset_pb_ov() -> None:
+            self._playbook_editor_reset_display(combos_pb_ov, level_pairs_pb)
+
+        def _reload_pb_ov() -> None:
+            self._playbook_editor_reload_from_team(combos_pb_ov, level_pairs_pb)
+
+        ttk.Button(btn_pb_ov, text="保存", style="Primary.TButton", command=_save_pb_ov).pack(
+            side="left", padx=(0, 6)
+        )
+        ttk.Button(btn_pb_ov, text="標準に戻す", style="Menu.TButton", command=_reset_pb_ov).pack(
+            side="left", padx=(0, 6)
+        )
+        ttk.Button(btn_pb_ov, text="最新状態を読み込み", style="Menu.TButton", command=_reload_pb_ov).pack(
+            side="left", padx=0
+        )
+        ttk.Button(
+            inner7,
+            text="別窓でセット傾向を開く",
+            style="Menu.TButton",
+            command=lambda: self._open_tactics_playbook_window(w),
+        ).pack(anchor="w", pady=(4, 0))
+
+        def _toggle_pb_inner() -> None:
+            if inner7.winfo_manager():
+                inner7.pack_forget()
+                toggle_pb.configure(text="開く")
+            else:
+                inner7.pack(fill="x", pady=(8, 0))
+                toggle_pb.configure(text="閉じる")
+            _playstyle_scrollregion()
+
+        toggle_pb = ttk.Button(
+            hdr7,
+            text="開く",
+            style="Menu.TButton",
+            command=_toggle_pb_inner,
+        )
+        toggle_pb.pack(anchor="w")
+
+        for _mw_host in (scroll_content, lf0, lf16, lf7, hdr7, inner7):
+            _mw_host.bind("<MouseWheel>", _playstyle_wheel)
+            _mw_host.bind("<Button-4>", lambda _e: ps_canvas.yview_scroll(-1, "units"))
+            _mw_host.bind("<Button-5>", lambda _e: ps_canvas.yview_scroll(1, "units"))
 
     def _open_tactics_rotation_overview_window(self, parent: tk.Misc) -> None:
         """ローテーション統合画面の土台（0〜3の見出し・説明・既存子窓への暫定導線）。"""
@@ -5556,84 +6096,12 @@ class MainMenuView:
         combo_u.pack(side="left", padx=6)
 
         lf_ps = ttk.LabelFrame(wrap, text="0. 戦術プリセット", padding=8)
-        row_ps_stat = ttk.Frame(lf_ps, style="Panel.TFrame")
-        row_ps_stat.pack(fill="x", pady=(0, 2))
-        lbl_ps_state = ttk.Label(row_ps_stat, text="", wraplength=480)
-
-        def _sync_ps_state() -> None:
-            if self.team is None:
-                return
-            st = get_current_playstyle_preset_state(self.team)
-            lbl_ps_state.configure(text=f"現在の戦術プリセット状態: {st['label_ja']}")
-
-        lbl_ps_state.pack(anchor="w")
-        _sync_ps_state()
-
-        row_preset = ttk.Frame(lf_ps, style="Panel.TFrame")
-        row_preset.pack(fill="x", pady=(4, 4))
-        combo_ps = ttk.Combobox(row_preset, state="readonly", width=28)
-        _playstyle_preset_ids: Tuple[str, ...] = tuple(PLAYSTYLE_PRESET_DEFS.keys())
-        _playstyle_label_by_id = {
-            pid: str(PLAYSTYLE_PRESET_DEFS[pid].get("label_ja", pid)) for pid in _playstyle_preset_ids
-        }
-        _playstyle_id_by_label = {lab: pid for pid, lab in _playstyle_label_by_id.items()}
-        combo_ps["values"] = tuple(_playstyle_label_by_id[pid] for pid in _playstyle_preset_ids)
-
-        lbl_ps_desc = ttk.Label(lf_ps, text="", wraplength=500, justify="left")
-
-        def _refresh_playstyle_preset_desc() -> None:
-            lab = ""
-            try:
-                lab = combo_ps.get()
-            except tk.TclError:
-                pass
-            pid = _playstyle_id_by_label.get(lab, "balanced_v1")
-            lbl_ps_desc.configure(
-                text=_tactics_preset_desc_ui_text(
-                    pid,
-                    _PLAYSTYLE_PRESET_DESC_JA,
-                    _PLAYSTYLE_PRESET_TOOLTIP_JA,
-                    _playstyle_preset_ids,
-                )
-            )
-
-        def _sync_playstyle_combo_from_meta() -> None:
-            if self.team is None:
-                return
-            ensure_team_tactics_on_team(self.team)
-            pm = (self.team.team_tactics or {}).get("preset_meta") or {}
-            raw_pid = pm.get("playstyle_preset_id")
-            pid = raw_pid.strip() if isinstance(raw_pid, str) and raw_pid.strip() else None
-            if pid not in PLAYSTYLE_PRESET_DEFS:
-                pid = "balanced_v1"
-            lab = _playstyle_label_by_id.get(pid, _playstyle_label_by_id["balanced_v1"])
-            try:
-                combo_ps.set(lab)
-            except tk.TclError:
-                combo_ps.current(0)
-            _refresh_playstyle_preset_desc()
-
-        def _on_apply_playstyle_preset() -> None:
-            if self.team is None:
-                return
-            lab = combo_ps.get()
-            preset_id = _playstyle_id_by_label.get(lab, "balanced_v1")
-            try:
-                apply_playstyle_preset_with_preset_meta(self.team, preset_id)
-            except KeyError as e:
-                messagebox.showerror("エラー", str(e), parent=w)
-                return
-            self._sync_strategy_policy_combos(combo_s, combo_c, combo_u)
-            self.refresh()
-            self._refresh_strategy_window()
-            _sync_playstyle_combo_from_meta()
-            _sync_ps_state()
-            messagebox.showinfo(
-                "適用",
-                "戦術プリセットを反映しました（team_strategy / playbook / Team.strategy）。\n"
-                f"preset_meta.playstyle_preset_id = {preset_id!r}",
-                parent=w,
-            )
+        sync_ps, sync_combo = self._build_playstyle_preset_editor_ui(
+            lf_ps,
+            message_parent=w,
+            after_apply=None,
+            strategy_policy_combos=(combo_s, combo_c, combo_u),
+        )
 
         def _on_save() -> None:
             if self.team is None:
@@ -5657,26 +6125,14 @@ class MainMenuView:
                 lines.append("")
                 lines.extend(self._build_coach_unlock_diff_lines(old_coach, ck))
             messagebox.showinfo("保存", "\n".join(lines), parent=w)
-            _sync_ps_state()
-
-        _sync_playstyle_combo_from_meta()
-        combo_ps.pack(side="left", padx=6)
-        ttk.Button(
-            row_preset,
-            text="プリセット適用",
-            style="Menu.TButton",
-            command=_on_apply_playstyle_preset,
-            width=14,
-        ).pack(side="left", padx=4)
-        lbl_ps_desc.pack(anchor="w", pady=(2, 0))
-        combo_ps.bind("<<ComboboxSelected>>", lambda _e: _refresh_playstyle_preset_desc())
+            sync_ps()
 
         # 表示順：上段 0.戦術プリセット → 下段 Team 補助
         lf_ps.pack(fill="x", pady=(0, 8))
         lf_team.pack(fill="x", pady=(0, 8))
         self._sync_strategy_policy_combos(combo_s, combo_c, combo_u)
-        _sync_ps_state()
-        _sync_playstyle_combo_from_meta()
+        sync_ps()
+        sync_combo()
 
         team_btn_row = ttk.Frame(lf_team, style="Panel.TFrame")
         team_btn_row.pack(fill="x", pady=(8, 0))
@@ -6027,46 +6483,8 @@ class MainMenuView:
         if self.team is None:
             return
         ensure_team_tactics_on_team(self.team)
+        pairs_map, labels = self._team_strategy_pairs_map_and_labels()
         data = get_safe_team_tactics(self.team)["team_strategy"]
-        pairs_map = {
-            "offense_tempo": [("slow", "スロー"), ("standard", "標準"), ("fast", "アップテンポ")],
-            "offense_style": [
-                ("balanced", "バランス"),
-                ("inside", "ペイント重視"),
-                ("three_point", "3P重視"),
-                ("drive", "ドライブ重視"),
-            ],
-            "offense_creation": [
-                ("ball_move", "ボールムーブ"),
-                ("pick_and_roll", "P&R中心"),
-                ("iso", "アイソレーション中心"),
-                ("post", "ポスト起点"),
-            ],
-            "defense_style": [
-                ("balanced", "バランス"),
-                ("protect_three", "3P警戒"),
-                ("protect_paint", "ペイント保護"),
-                ("pressure", "プレッシャー強め"),
-            ],
-            "rebound_style": [
-                ("get_back", "戻り優先"),
-                ("balanced", "バランス"),
-                ("crash_offense", "積極参加"),
-            ],
-            "transition_style": [
-                ("push", "速攻重視"),
-                ("situational", "状況判断"),
-                ("half_court", "ハーフコート優先"),
-            ],
-        }
-        labels = {
-            "offense_tempo": "1. 試合テンポ",
-            "offense_style": "2. 攻撃の狙い",
-            "offense_creation": "3. 攻撃の起点",
-            "defense_style": "4. 守備の狙い",
-            "rebound_style": "5. オフェンスリバウンド",
-            "transition_style": "6. トランジション",
-        }
         w = tk.Toplevel(parent)
         w.title("プレイスタイル：攻守の傾向（team_tactics）")
         w.geometry("520x420")
@@ -6082,54 +6500,27 @@ class MainMenuView:
             ),
             wraplength=480,
         ).pack(anchor="w", pady=(0, 10))
-        combos: Dict[str, ttk.Combobox] = {}
-
-        def _set_combo(combo: ttk.Combobox, pairs: List[Tuple[str, str]], cur: str) -> None:
-            vals = [b for _, b in pairs]
-            combo["values"] = vals
-            internals = [a for a, _ in pairs]
-            combo.set(vals[internals.index(cur)] if cur in internals else vals[0])
-
-        for key in (
-            "offense_tempo",
-            "offense_style",
-            "offense_creation",
-            "defense_style",
-            "rebound_style",
-            "transition_style",
-        ):
-            row = ttk.Frame(wrap, style="Panel.TFrame")
-            row.pack(fill="x", pady=3)
-            ttk.Label(row, text=labels[key], width=24).pack(side="left")
-            cb = ttk.Combobox(row, state="readonly", width=28)
-            cb.pack(side="left", padx=6)
-            _set_combo(cb, pairs_map[key], str(data.get(key, "")))
-            combos[key] = cb
-
-        def _collect() -> Dict[str, str]:
-            out: Dict[str, str] = {}
-            for key, cb in combos.items():
-                pairs = pairs_map[key]
-                disp = cb.get()
-                for a, b in pairs:
-                    if b == disp:
-                        out[key] = a
-                        break
-                else:
-                    out[key] = pairs[0][0]
-            return out
+        combos = self._team_strategy_editor_build_row_combos(wrap, data, pairs_map, labels)
+        ttk.Label(
+            wrap,
+            text="※ 「標準に戻す」は表示だけ戻します。保存を押すと確定します。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=480,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
 
         def _save() -> None:
-            raw = dict(get_safe_team_tactics(self.team))
-            raw["team_strategy"] = _collect()
-            self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "プレイスタイル（攻守の傾向）を保存しました。", parent=w)
-            self._refresh_strategy_window()
+            self._team_strategy_editor_save(
+                combos,
+                pairs_map,
+                message_parent=w,
+                message_title="保存",
+                message_body="プレイスタイル（攻守の傾向）を保存しました。",
+            )
 
         def _reset() -> None:
-            d = get_default_team_tactics()["team_strategy"]
-            for k, cb in combos.items():
-                _set_combo(cb, pairs_map[k], str(d.get(k, "")))
+            self._team_strategy_editor_reset_display(combos, pairs_map)
 
         btn = ttk.Frame(wrap, style="Panel.TFrame")
         btn.pack(fill="x", pady=(12, 0))
@@ -6624,16 +7015,8 @@ class MainMenuView:
         if self.team is None:
             return
         ensure_team_tactics_on_team(self.team)
+        level_pairs = self._PLAYBOOK_LEVEL_PAIRS
         pb = get_safe_team_tactics(self.team)["playbook"]
-        keys = [
-            ("pick_and_roll", "P&R"),
-            ("handoff", "ハンドオフ"),
-            ("off_ball_screen", "オフボールスクリーン"),
-            ("post_up", "ポストアップ"),
-            ("spain_pick_and_roll", "Spain P&R"),
-            ("transition", "速攻頻度（playbook）"),
-        ]
-        level_pairs = [("low", "少ない"), ("standard", "標準"), ("high", "多い")]
         w = tk.Toplevel(parent)
         w.title("プレイスタイル：セット傾向（playbook）")
         w.geometry("480x390")
@@ -6654,45 +7037,13 @@ class MainMenuView:
             foreground="#9aa3b2",
             wraplength=440,
         ).pack(anchor="w")
-        combos: Dict[str, ttk.Combobox] = {}
-        for key, jlabel in keys:
-            row = ttk.Frame(wrap, style="Panel.TFrame")
-            row.pack(fill="x", pady=3)
-            ttk.Label(row, text=jlabel, width=24).pack(side="left")
-            cb = ttk.Combobox(row, state="readonly", width=12)
-            vals = [b for _, b in level_pairs]
-            cb["values"] = vals
-            ints = [a for a, _ in level_pairs]
-            cur = str(pb.get(key, "standard"))
-            cb.set(vals[ints.index(cur)] if cur in ints else vals[1])
-            cb.pack(side="left", padx=6)
-            combos[key] = cb
-
-        def _collect() -> Dict[str, str]:
-            out: Dict[str, str] = {}
-            for key, cb in combos.items():
-                d = cb.get()
-                for a, b in level_pairs:
-                    if b == d:
-                        out[key] = a
-                        break
-                else:
-                    out[key] = "standard"
-            return out
+        combos = self._playbook_editor_build_row_combos(wrap, pb)
 
         def _save() -> None:
-            raw = dict(get_safe_team_tactics(self.team))
-            raw["playbook"] = _collect()
-            self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "セット傾向（playbook）を保存しました。", parent=w)
+            self._playbook_editor_save(combos, level_pairs, message_parent=w)
 
         def _reset() -> None:
-            d = get_default_team_tactics()["playbook"]
-            for k, cb in combos.items():
-                cur = str(d.get(k, "standard"))
-                vals = [b for _, b in level_pairs]
-                ints = [a for a, _ in level_pairs]
-                cb.set(vals[ints.index(cur)] if cur in ints else vals[1])
+            self._playbook_editor_reset_display(combos, level_pairs)
 
         btn = ttk.Frame(wrap, style="Panel.TFrame")
         btn.pack(fill="x", pady=(12, 0))
