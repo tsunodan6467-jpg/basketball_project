@@ -5023,17 +5023,20 @@ class MainMenuView:
         ttk.Label(
             rot_lf,
             text=(
-                "試合の土台は「先発・6th・ベンチ」の Team（最終案の 2. 起用序列）。"
-                "ローテ詳細は rotation（1 と 2 寄り）、起用テンプレは usage_policy（0 と 1）、役割詳細は roles（3 と 4）。"
+                "試合の土台は「先発・6th・ベンチ」の Team（最終案の 2. 起用序列）。\n"
+                "ローテ詳細は rotation（1 と 2 寄り）、起用テンプレは usage_policy（0 と 1）、役割詳細は roles（3 と 4）。\n"
                 "保存先は Team と分かれたままです（未統合）。"
             ),
             font=("Yu Gothic UI", 9),
+            wraplength=900,
+            justify="left",
         ).pack(anchor="w", pady=(0, 4))
         ttk.Label(
             rot_lf,
             text=(
-                "完成形0〜3対応：0.起用プリセット→起用テンプレ / 1.起用方針→起用テンプレ＋ローテ詳細 / "
-                "2.起用序列→先発・6th・ベンチ＋目標出場時間 / 3.個別役割→役割詳細\n"
+                "完成形0〜3対応：0.起用プリセット→起用テンプレ / 1.起用方針→起用テンプレ＋ローテ詳細\n"
+                "2.起用序列→先発・6th・ベンチ＋目標出場時間\n"
+                "3.個別役割→役割詳細\n"
                 "※ 未実装プリセットはまだ表示していません。"
             ),
             font=("Yu Gothic UI", 9),
@@ -5587,10 +5590,16 @@ class MainMenuView:
 
         ttk.Label(
             outer,
+            text="2. 起用序列（Team正本）",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            outer,
             text=(
-                "最終案の「2. 起用序列」。試合の起用の基本になる先発・6th・ベンチ順を Team に保存します（先発ID・6th・ベンチ序列）。\n"
-                "「ローテ詳細」の戦術先発・目標出場などは team_tactics.rotation の別レーンで、ここでは編集しません。"
-                "チーム寄りの補正は「起用テンプレ」、選手ごとの弱い寄せは「役割詳細」（3／4）で扱います。"
+                "Team正本の先発・6th・ベンチ順を編集します（試合起用の基本）。"
+                " 「ローテ詳細」の team_tactics.rotation（戦術用先発・目標出場など）とは別データです。\n"
+                "※ 目標出場時間（0〜40分）は「ローテ詳細」で調整します。"
+                " チーム寄りの補正は「起用テンプレ」、選手ごとの弱い寄せは「役割詳細」で扱います。"
             ),
             wraplength=680,
             font=("Yu Gothic UI", 9),
@@ -5671,8 +5680,15 @@ class MainMenuView:
             _after_mutation()
             messagebox.showinfo("完了", "先発を自動選出に戻しました。", parent=w)
 
-        lf_s = ttk.LabelFrame(outer, text="2. 起用序列 — 先発（1枠ずつ差し替え）", padding=8)
+        lf_s = ttk.LabelFrame(outer, text="2-1. 先発（枠1〜5）", padding=8)
         lf_s.pack(fill="x", pady=(0, 8))
+        ttk.Label(
+            lf_s,
+            text="※ 枠1〜5は現在の先発順です。ポジション固定ではありません。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+        ).pack(anchor="w", pady=(0, 6))
         starter_combos: List[ttk.Combobox] = []
         starter_btns: List[ttk.Button] = []
         slot_labels: List[Tuple[ttk.Label, ttk.Combobox]] = []
@@ -5749,7 +5765,7 @@ class MainMenuView:
             _after_mutation()
             messagebox.showinfo("完了", "6thを自動選出に戻しました。", parent=w)
 
-        lf_6 = ttk.LabelFrame(outer, text="2. 起用序列 — 6thマン", padding=8)
+        lf_6 = ttk.LabelFrame(outer, text="2-2. 6thマン", padding=8)
         lf_6.pack(fill="x", pady=(0, 8))
         r6 = ttk.Frame(lf_6, style="Panel.TFrame")
         r6.pack(fill="x")
@@ -5764,7 +5780,7 @@ class MainMenuView:
         )
 
         def _bench_slot_labels(players: List[Any]) -> List[str]:
-            return [f"{i + 1}. {self._gm_candidate_label_for_player(p)}" for i, p in enumerate(players)]
+            return [f"{i + 7}番手 {self._gm_candidate_label_for_player(p)}" for i, p in enumerate(players)]
 
         def _reload_bench() -> None:
             bench = list(get_current_bench_order(self.team) or [])
@@ -5805,8 +5821,8 @@ class MainMenuView:
             try:
                 ok = messagebox.askokcancel(
                     "ベンチ入替",
-                    f"控え{idx_a + 1}（{getattr(pa, 'name', '')}）と "
-                    f"控え{idx_b + 1}（{getattr(pb, 'name', '')}）の順序を入れ替えますか？",
+                    f"{idx_a + 7}番手（{getattr(pa, 'name', '')}）と "
+                    f"{idx_b + 7}番手（{getattr(pb, 'name', '')}）の順序を入れ替えますか？",
                     parent=w,
                 )
             except Exception:
@@ -5843,7 +5859,7 @@ class MainMenuView:
             _after_mutation()
             messagebox.showinfo("完了", "ベンチ序列を自動に戻しました。", parent=w)
 
-        lf_b = ttk.LabelFrame(outer, text="2. 起用序列 — ベンチ順（2人を選んで入れ替え）", padding=8)
+        lf_b = ttk.LabelFrame(outer, text="2-3. ベンチ順（7〜12番手）", padding=8)
         lf_b.pack(fill="x", pady=(0, 8))
         rb = ttk.Frame(lf_b, style="Panel.TFrame")
         rb.pack(fill="x", pady=2)
@@ -6029,28 +6045,70 @@ class MainMenuView:
 
         w = tk.Toplevel(parent)
         w.title("ローテーション：交代・目標出場（team_tactics）")
-        w.geometry("640x635")
+        w.geometry("640x700")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
         wrap.pack(fill="both", expand=True)
         ttk.Label(
             wrap,
             text=(
-                "team_tactics[\"rotation\"] に保存します。"
-                "「2. 起用序列」寄り（戦術先発・目標出場・控え順の表示）と「1. チーム起用方針」寄り（交代・疲労・ファウル・終盤）がこの窓にまとまっています。\n"
-                "試合の先発・6th・ベンチの正本は「先発・6th・ベンチ」の Team。rotation と同一データにまとめたわけではありません。"
+                "この窓では team_tactics[\"rotation\"] の細部を保存します。"
+                " 1は交代・疲労/ファウル配慮・終盤、2は戦術用先発と目標出場です。\n"
+                "本流の先発/6th/ベンチ（Team）とは別データです。"
             ),
             wraplength=600,
         ).pack(anchor="w", pady=(0, 6))
+
+        def _policy_combo(
+            row_parent: ttk.Frame, label: str, pairs: List[Tuple[str, str]], cur: str
+        ) -> ttk.Combobox:
+            r = ttk.Frame(row_parent, style="Panel.TFrame")
+            r.pack(fill="x", pady=2)
+            ttk.Label(r, text=label, width=24).pack(side="left")
+            cb = ttk.Combobox(r, state="readonly", width=28)
+            vals = [b for _, b in pairs]
+            cb["values"] = vals
+            ints = [a for a, _ in pairs]
+            cb.set(vals[ints.index(cur)] if cur in ints else vals[0])
+            cb.pack(side="left", padx=6)
+            return cb
+
+        lf1 = ttk.LabelFrame(wrap, text="1. チーム起用方針（rotation・細部）", padding=8)
+        pol_frame = ttk.Frame(lf1, style="Panel.TFrame")
+        pol_frame.pack(fill="x")
+        cb_sub = _policy_combo(pol_frame, "選手起用の幅（交代・ローテ）", sub_pairs, str(rot.get("sub_policy", "standard")))
+        cb_fat = _policy_combo(pol_frame, "疲労・スタミナ配慮", fat_pairs, str(rot.get("fatigue_policy", "standard")))
+        foul_note_fr = ttk.Frame(pol_frame, style="Panel.TFrame")
+        foul_note_fr.pack(fill="x", pady=(2, 0))
         ttk.Label(
-            wrap,
-            text="2. 起用序列 — 戦術先発（ポジション別・rotation へ保存。Team「先発・6th・ベンチ」窓の先発とは別）",
+            foul_note_fr,
+            text="※ ファウル配慮は保存のみ。試合シミュには未反映です。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=520,
+        ).pack(anchor="w", pady=(0, 2))
+        cb_foul = _policy_combo(pol_frame, "ファウル配慮", foul_pairs, str(rot.get("foul_policy", "standard")))
+        cb_clutch = _policy_combo(pol_frame, "終盤起用方針", clutch_pairs, str(rot.get("clutch_policy", "stars")))
+
+        lf2 = ttk.LabelFrame(wrap, text="2. 起用序列（rotation・補助）", padding=8)
+        ttk.Label(
+            lf2,
+            text=(
+                "本流の先発・6th・ベンチ順は「先発・6th・ベンチ」窓で編集します。"
+                " この窓では戦術用先発と目標出場時間を調整します。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=560,
+        ).pack(anchor="w", pady=(0, 6))
+        ttk.Label(
+            lf2,
+            text="戦術用先発（ポジション別・rotation へ保存）",
             font=("Yu Gothic UI", 10, "bold"),
         ).pack(anchor="w")
         starter_combos: Dict[str, ttk.Combobox] = {}
         starters_state = rot.get("starters") or {}
         for pos in STARTER_POSITIONS:
-            row = ttk.Frame(wrap, style="Panel.TFrame")
+            row = ttk.Frame(lf2, style="Panel.TFrame")
             row.pack(fill="x", pady=2)
             ttk.Label(row, text=pos, width=4).pack(side="left")
             cb = ttk.Combobox(row, state="readonly", width=42)
@@ -6065,55 +6123,19 @@ class MainMenuView:
             cb.current(sel)
             cb.pack(side="left", padx=6)
             starter_combos[pos] = cb
-
         ttk.Label(
-            wrap,
-            text="2. 起用序列 — 控え順: 一覧からの編集は未実装です（保存時は既存の team_tactics.rotation の値を維持します）",
-            font=("Yu Gothic UI", 9),
-            foreground="#9aa3b2",
-        ).pack(anchor="w", pady=(6, 0))
-        ttk.Label(
-            wrap,
-            text="1. チーム起用方針（寄り） — 交代・疲労・ファウル・終盤",
-            font=("Yu Gothic UI", 10, "bold"),
-        ).pack(anchor="w", pady=(10, 4))
-
-        def _policy_combo(
-            row_parent: ttk.Frame, label: str, pairs: List[Tuple[str, str]], cur: str
-        ) -> ttk.Combobox:
-            r = ttk.Frame(row_parent, style="Panel.TFrame")
-            r.pack(fill="x", pady=2)
-            ttk.Label(r, text=label, width=18).pack(side="left")
-            cb = ttk.Combobox(r, state="readonly", width=28)
-            vals = [b for _, b in pairs]
-            cb["values"] = vals
-            ints = [a for a, _ in pairs]
-            cb.set(vals[ints.index(cur)] if cur in ints else vals[0])
-            cb.pack(side="left", padx=6)
-            return cb
-
-        pol_frame = ttk.Frame(wrap, style="Panel.TFrame")
-        pol_frame.pack(fill="x")
-        cb_sub = _policy_combo(pol_frame, "交代方針", sub_pairs, str(rot.get("sub_policy", "standard")))
-        cb_fat = _policy_combo(pol_frame, "疲労対応", fat_pairs, str(rot.get("fatigue_policy", "standard")))
-        foul_note_fr = ttk.Frame(pol_frame, style="Panel.TFrame")
-        foul_note_fr.pack(fill="x", pady=(2, 0))
-        ttk.Label(
-            foul_note_fr,
-            text="ファウル対応: 現状は試合シミュレーションに未反映です。チーム方針として team_tactics.rotation へ保存のみ行います。",
+            lf2,
+            text="控え順は現在この窓では編集せず、既存値を保存時に維持します。",
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
             wraplength=520,
-        ).pack(anchor="w", pady=(0, 2))
-        cb_foul = _policy_combo(pol_frame, "ファウル対応", foul_pairs, str(rot.get("foul_policy", "standard")))
-        cb_clutch = _policy_combo(pol_frame, "終盤起用", clutch_pairs, str(rot.get("clutch_policy", "stars")))
-
+        ).pack(anchor="w", pady=(8, 4))
         ttk.Label(
-            wrap,
-            text="2. 起用序列 — 目標出場時間（分・0〜40）",
+            lf2,
+            text="目標出場時間（分・0〜40）",
             font=("Yu Gothic UI", 10, "bold"),
-        ).pack(anchor="w", pady=(10, 4))
-        minutes_frame = ttk.Frame(wrap, style="Panel.TFrame")
+        ).pack(anchor="w", pady=(4, 4))
+        minutes_frame = ttk.Frame(lf2, style="Panel.TFrame")
         minutes_frame.pack(fill="both", expand=True)
         canvas = tk.Canvas(minutes_frame, bg="#1d2129", highlightthickness=0, height=220)
         vsb = ttk.Scrollbar(minutes_frame, orient="vertical", command=canvas.yview)
@@ -6152,6 +6174,9 @@ class MainMenuView:
             sc.set(init_v)
             sc.pack(side="left", padx=8)
             scales[pid] = sc
+
+        lf1.pack(fill="x", pady=(0, 8))
+        lf2.pack(fill="both", expand=True, pady=(0, 8))
 
         def _collect_rotation() -> Dict[str, Any]:
             starters: Dict[str, Any] = {}
@@ -6235,34 +6260,35 @@ class MainMenuView:
             ],
         }
         labels_j = {
-            "priority": "0.起用プリセット寄り — 起用方針（補助）",
-            "evaluation_focus": "1.チーム起用方針 — 評価の軸",
-            "form_weight": "1.チーム起用方針 — 柔軟性（調子）",
-            "age_balance": "1.チーム起用方針 — 時間軸（年齢帯）",
-            "injury_care": "1.チーム起用方針 — 柔軟性（慎重さ）",
-            "schedule_care": "1.チーム起用方針 — 時間軸（連戦）",
-            "foreign_player_usage": "1.チーム起用方針 — 外国籍起用",
+            "priority": "起用方針",
+            "evaluation_focus": "評価基準",
+            "form_weight": "調子の反映",
+            "age_balance": "年齢/育成寄り補助",
+            "injury_care": "ケガ配慮",
+            "schedule_care": "連戦配慮",
+            "foreign_player_usage": "外国籍起用補助",
         }
         w = tk.Toplevel(parent)
         w.title("ローテーション：起用方針テンプレ（team_tactics）")
-        w.geometry("560x760")
+        w.geometry("560x860")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
         wrap.pack(fill="both", expand=True)
         combos: Dict[str, ttk.Combobox] = {}
 
         help_fr = ttk.Frame(wrap, style="Panel.TFrame")
-        help_fr.pack(fill="x", pady=(0, 8))
         ttk.Label(
             help_fr,
             text=(
-                "team_tactics[\"usage_policy\"] に保存します。"
-                "「0. 起用プリセット」寄りと「1. チーム起用方針」寄りの項目がこの窓に同居しています。\n"
-                "プレイスタイルの Team.usage_policy（基本方針）とは別レーンです。"
-                "先発・6th・ベンチの並びは「先発・6th・ベンチ」の Team で決めます。"
+                "プリセット適用：Team.usage_policy・起用方針（usage_policy）・ローテ詳細（rotation）をまとめて更新します。"
+                " 手動保存：下段のチーム起用方針だけを team_tactics[\"usage_policy\"] として保存します（rotation 本体は更新しません）。\n"
+                "プレイスタイル基本方針（Team）とは別レーンです。"
+                " 先発・6th・ベンチの並びは「先発・6th・ベンチ」窓の Team で決めます。\n"
+                "※ 起用幅・疲労/ファウル・終盤方針の細かい数値は「ローテ詳細」で扱います。"
             ),
             wraplength=500,
         ).pack(anchor="w")
+        help_fr.pack(fill="x", pady=(0, 8))
 
         def _set_combo(cb: ttk.Combobox, pairs: List[Tuple[str, str]], cur: str) -> None:
             vals = [b for _, b in pairs]
@@ -6270,9 +6296,10 @@ class MainMenuView:
             ints = [a for a, _ in pairs]
             cb.set(vals[ints.index(cur)] if cur in ints else vals[0])
 
+        lf_up = ttk.LabelFrame(wrap, text="1. チーム起用方針（手動）", padding=8)
         for key in pairs_map:
             if key == "form_weight":
-                fw_note = ttk.Frame(wrap, style="Panel.TFrame")
+                fw_note = ttk.Frame(lf_up, style="Panel.TFrame")
                 fw_note.pack(fill="x", pady=(4, 0))
                 ttk.Label(
                     fw_note,
@@ -6285,7 +6312,7 @@ class MainMenuView:
                     wraplength=500,
                 ).pack(anchor="w", pady=(2, 0))
             if key == "age_balance":
-                ab_note = ttk.Frame(wrap, style="Panel.TFrame")
+                ab_note = ttk.Frame(lf_up, style="Panel.TFrame")
                 ab_note.pack(fill="x", pady=(4, 0))
                 ttk.Label(
                     ab_note,
@@ -6293,7 +6320,7 @@ class MainMenuView:
                     wraplength=500,
                 ).pack(anchor="w")
             if key == "injury_care":
-                ic_note = ttk.Frame(wrap, style="Panel.TFrame")
+                ic_note = ttk.Frame(lf_up, style="Panel.TFrame")
                 ic_note.pack(fill="x", pady=(4, 0))
                 ttk.Label(
                     ic_note,
@@ -6301,7 +6328,7 @@ class MainMenuView:
                     wraplength=500,
                 ).pack(anchor="w")
             if key == "foreign_player_usage":
-                fpu_note = ttk.Frame(wrap, style="Panel.TFrame")
+                fpu_note = ttk.Frame(lf_up, style="Panel.TFrame")
                 fpu_note.pack(fill="x", pady=(4, 0))
                 ttk.Label(
                     fpu_note,
@@ -6314,7 +6341,7 @@ class MainMenuView:
                     wraplength=500,
                 ).pack(anchor="w", pady=(2, 0))
             if key == "evaluation_focus":
-                ev_note = ttk.Frame(wrap, style="Panel.TFrame")
+                ev_note = ttk.Frame(lf_up, style="Panel.TFrame")
                 ev_note.pack(fill="x", pady=(4, 0))
                 ttk.Label(
                     ev_note,
@@ -6326,37 +6353,52 @@ class MainMenuView:
                     text="攻撃・守備・将来性をわずかに重く見る補正で、OVRそのものを上書きするものではありません。",
                     wraplength=500,
                 ).pack(anchor="w", pady=(2, 0))
-            row = ttk.Frame(wrap, style="Panel.TFrame")
+            row = ttk.Frame(lf_up, style="Panel.TFrame")
             row.pack(fill="x", pady=3)
-            if key == "priority":
-                ttk.Label(
-                    row,
-                    text=(
-                        "0.起用プリセット寄り — 起用方針（補助）\n"
-                        "正：Team.usage_policy（プレイスタイル「基本方針」）\n"
-                        "※別データ・未統合"
-                    ),
-                    width=26,
-                    justify="left",
-                ).pack(side="left", anchor="nw")
-            else:
-                ttk.Label(row, text=labels_j[key], width=26).pack(side="left")
-            cb = ttk.Combobox(row, state="readonly", width=26)
+            ttk.Label(row, text=labels_j[key], width=20).pack(side="left")
+            cb = ttk.Combobox(row, state="readonly", width=28)
             _set_combo(cb, pairs_map[key], str(u.get(key, "")))
             cb.pack(side="left", padx=6)
             combos[key] = cb
 
-        preset_hint = ttk.Frame(wrap, style="Panel.TFrame")
-        preset_hint.pack(fill="x", pady=(10, 4))
+        def _collect() -> Dict[str, str]:
+            out: Dict[str, str] = {}
+            for key, cb in combos.items():
+                d = cb.get()
+                for a, b in pairs_map[key]:
+                    if b == d:
+                        out[key] = a
+                        break
+                else:
+                    out[key] = pairs_map[key][0][0]
+            return out
+
+        def _save() -> None:
+            raw = dict(get_safe_team_tactics(self.team))
+            raw["usage_policy"] = _collect()
+            self._tactics_commit_payload(raw)
+            messagebox.showinfo("保存", "起用方針テンプレ（usage_policy）を保存しました。", parent=w)
+            _sync_rot_state()
+
+        def _reset() -> None:
+            d = get_default_team_tactics()["usage_policy"]
+            for k, cb in combos.items():
+                _set_combo(cb, pairs_map[k], str(d.get(k, "")))
+
+        btn_up = ttk.Frame(lf_up, style="Panel.TFrame")
+        btn_up.pack(fill="x", pady=(12, 0))
+        ttk.Button(btn_up, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
+        ttk.Button(btn_up, text="標準に戻す", style="Menu.TButton", command=_reset).pack(side="left", padx=4)
+
+        lf_ps = ttk.LabelFrame(wrap, text="0. 起用プリセット", padding=8)
+        preset_top = ttk.Frame(lf_ps, style="Panel.TFrame")
+        preset_top.pack(fill="x", pady=(0, 4))
         ttk.Label(
-            preset_hint,
-            text=(
-                "ローテーションプリセット: ROTATION_PRESET_DEFS を Team.usage_policy と "
-                "team_tactics[\"usage_policy\"] / [\"rotation\"] に一括反映。Team 先発・6th・ベンチ順は変更しません。"
-            ),
-            wraplength=520,
+            preset_top,
+            text="正典プリセット3種。適用で Team 起用・起用方針・ローテ詳細を一括反映。Team 先発・6th・ベンチ順は変えません。",
+            wraplength=500,
         ).pack(anchor="w")
-        lbl_rot_state = ttk.Label(preset_hint, text="", wraplength=520)
+        lbl_rot_state = ttk.Label(lf_ps, text="", wraplength=520)
 
         def _sync_rot_state() -> None:
             if self.team is None:
@@ -6364,12 +6406,9 @@ class MainMenuView:
             st = get_current_rotation_preset_state(self.team)
             lbl_rot_state.configure(text=f"現在のローテプリセット状態: {st['label_ja']}")
 
-        lbl_rot_state.pack(anchor="w", pady=(4, 0))
-        _sync_rot_state()
-        row_rp = ttk.Frame(wrap, style="Panel.TFrame")
-        row_rp.pack(fill="x", pady=(2, 6))
-        ttk.Label(row_rp, text="プリセット", width=26).pack(side="left")
-        combo_rp = ttk.Combobox(row_rp, state="readonly", width=26)
+        row_rp = ttk.Frame(lf_ps, style="Panel.TFrame")
+        ttk.Label(row_rp, text="候補", width=8).pack(side="left")
+        combo_rp = ttk.Combobox(row_rp, state="readonly", width=28)
         _rotation_preset_ids: Tuple[str, ...] = tuple(ROTATION_PRESET_DEFS.keys())
         _rotation_label_by_id = {
             pid: str(ROTATION_PRESET_DEFS[pid].get("label_ja", pid)) for pid in _rotation_preset_ids
@@ -6377,7 +6416,7 @@ class MainMenuView:
         _rotation_id_by_label = {lab: pid for pid, lab in _rotation_label_by_id.items()}
         combo_rp["values"] = tuple(_rotation_label_by_id[pid] for pid in _rotation_preset_ids)
 
-        lbl_rp_desc = ttk.Label(wrap, text="", wraplength=520, justify="left")
+        lbl_rp_desc = ttk.Label(lf_ps, text="", wraplength=520, justify="left")
 
         def _refresh_rotation_preset_desc() -> None:
             lab = ""
@@ -6411,9 +6450,6 @@ class MainMenuView:
                 combo_rp.current(0)
             _refresh_rotation_preset_desc()
 
-        _sync_rotation_combo_from_meta()
-        combo_rp.pack(side="left", padx=6)
-
         def _on_apply_rotation_preset() -> None:
             if self.team is None:
                 return
@@ -6438,6 +6474,11 @@ class MainMenuView:
                 parent=w,
             )
 
+        lbl_rot_state.pack(anchor="w", pady=(4, 0))
+        _sync_rot_state()
+        row_rp.pack(fill="x", pady=(2, 4))
+        _sync_rotation_combo_from_meta()
+        combo_rp.pack(side="left", padx=6)
         ttk.Button(
             row_rp,
             text="プリセット適用",
@@ -6445,38 +6486,14 @@ class MainMenuView:
             command=_on_apply_rotation_preset,
             width=14,
         ).pack(side="left", padx=4)
-        lbl_rp_desc.pack(anchor="w", pady=(2, 6))
         combo_rp.bind("<<ComboboxSelected>>", lambda _e: _refresh_rotation_preset_desc())
+        lbl_rp_desc.pack(anchor="w", pady=(2, 0))
 
-        def _collect() -> Dict[str, str]:
-            out: Dict[str, str] = {}
-            for key, cb in combos.items():
-                d = cb.get()
-                for a, b in pairs_map[key]:
-                    if b == d:
-                        out[key] = a
-                        break
-                else:
-                    out[key] = pairs_map[key][0][0]
-            return out
-
-        def _save() -> None:
-            raw = dict(get_safe_team_tactics(self.team))
-            raw["usage_policy"] = _collect()
-            self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "起用方針テンプレ（usage_policy）を保存しました。", parent=w)
-            _sync_rot_state()
-
-        def _reset() -> None:
-            d = get_default_team_tactics()["usage_policy"]
-            for k, cb in combos.items():
-                _set_combo(cb, pairs_map[k], str(d.get(k, "")))
-
-        btn = ttk.Frame(wrap, style="Panel.TFrame")
-        btn.pack(fill="x", pady=(12, 0))
-        ttk.Button(btn, text="保存", style="Primary.TButton", command=_save).pack(side="left", padx=4)
-        ttk.Button(btn, text="標準に戻す", style="Menu.TButton", command=_reset).pack(side="left", padx=4)
-        ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
+        lf_ps.pack(fill="x", pady=(0, 8))
+        lf_up.pack(fill="both", expand=True, pady=(0, 8))
+        btn_close = ttk.Frame(wrap, style="Panel.TFrame")
+        btn_close.pack(fill="x", pady=(0, 0))
+        ttk.Button(btn_close, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
 
     def _open_tactics_playbook_window(self, parent: tk.Toplevel) -> None:
         if self.team is None:
@@ -6577,7 +6594,7 @@ class MainMenuView:
         def_pairs = [("stopper", "相手主力担当"), ("standard", "標準"), ("light", "負担軽め")]
 
         w = tk.Toplevel(parent)
-        w.title("ローテーション：参考役割・個別起用度（team_tactics）")
+        w.title("ローテーション：3. 個別役割（手動）")
         w.geometry("720x580")
         w.configure(bg="#15171c")
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
@@ -6586,20 +6603,41 @@ class MainMenuView:
         roles_note_fr.pack(fill="x", pady=(0, 8))
         ttk.Label(
             roles_note_fr,
-            text=(
-                "team_tactics[\"roles\"] に保存する「3. 個別起用」と「4. 参考役割（main_role）」です。"
-                "参考役割は手動メモのみで、人事の行末「タグ:」＝自動役割タグの代わりにはなりません。"
-                "個別起用も含め試合は弱い補正にとどまります。"
-            ),
-            font=("Yu Gothic UI", 9),
-            foreground="#9aa3b2",
-            wraplength=620,
+            text="3. 個別役割（手動）",
+            font=("Yu Gothic UI", 10, "bold"),
+            foreground="#eef2f7",
         ).pack(anchor="w")
         ttk.Label(
             roles_note_fr,
             text=(
-                "個別起用の段階は交代候補の評価などへの影響が小さいです。"
-                "いずれも先発・6th など起用の正本（「先発・6th・ベンチ」の Team）や自動タグの代替ではありません。"
+                "3. 個別役割（手動）を選手ごとに設定します。\n"
+                "人事画面の「タグ:」は自動分類、ここは戦術用の手動設定です。\n"
+                "試合では主に交代候補の弱い補正として使います。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=620,
+            justify="left",
+        ).pack(anchor="w", pady=(4, 0))
+        ttk.Label(
+            roles_note_fr,
+            text="※ 人事の「タグ:」は自動分類、ここは手動の戦術役割です。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=620,
+        ).pack(anchor="w", pady=(4, 0))
+        ttk.Label(
+            roles_note_fr,
+            text="※ 攻撃での優先度は「関与度」と「シュート」の2軸で保存します。",
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=620,
+        ).pack(anchor="w", pady=(2, 0))
+        ttk.Label(
+            roles_note_fr,
+            text=(
+                "保存先は team_tactics[\"roles\"]。起用の正本は「先発・6th・ベンチ」（Team）、"
+                "人事の「タグ:」や自動タグの代替ではありません。"
             ),
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
@@ -6626,7 +6664,7 @@ class MainMenuView:
         def _mk_combo(parent_f: ttk.Frame, label: str, pairs: List[Tuple[str, str]], cur: str) -> ttk.Combobox:
             r = ttk.Frame(parent_f, style="Panel.TFrame")
             r.pack(fill="x", pady=2)
-            ttk.Label(r, text=label, width=28).pack(side="left")
+            ttk.Label(r, text=label, width=34).pack(side="left")
             cb = ttk.Combobox(r, state="readonly", width=22)
             vals = [b for _, b in pairs]
             cb["values"] = vals
@@ -6636,12 +6674,12 @@ class MainMenuView:
             return cb
 
         editors: Dict[str, ttk.Combobox] = {}
-        editors["main_role"] = _mk_combo(right, "4. 参考役割", main_pairs, "none")
-        editors["offense_involvement"] = _mk_combo(right, "3. 個別起用 — 攻撃関与度", inv_pairs, "standard")
-        editors["shot_priority"] = _mk_combo(right, "3. 個別起用 — 攻撃での優先度（シュート）", shot_pairs, "standard")
-        editors["clutch_priority"] = _mk_combo(right, "3. 個別起用 — 終盤優先度", clutch_pairs_r, "standard")
-        editors["playmaking_role"] = _mk_combo(right, "3. 個別起用 — プレーメイク関与", pm_pairs, "secondary")
-        editors["defense_assignment"] = _mk_combo(right, "3. 個別起用 — 守備負担", def_pairs, "standard")
+        editors["main_role"] = _mk_combo(right, "メイン役割（手動・参考）", main_pairs, "none")
+        editors["offense_involvement"] = _mk_combo(right, "攻撃での優先度：関与度", inv_pairs, "standard")
+        editors["shot_priority"] = _mk_combo(right, "攻撃での優先度：シュート", shot_pairs, "standard")
+        editors["clutch_priority"] = _mk_combo(right, "終盤優先度", clutch_pairs_r, "standard")
+        editors["playmaking_role"] = _mk_combo(right, "ボール保持（プレーメイク）", pm_pairs, "secondary")
+        editors["defense_assignment"] = _mk_combo(right, "守備負担", def_pairs, "standard")
 
         role_defaults = {
             "main_role": "none",
@@ -6722,7 +6760,7 @@ class MainMenuView:
             raw = dict(get_safe_team_tactics(self.team))
             raw["roles"] = dict(roles)
             self._tactics_commit_payload(raw)
-            messagebox.showinfo("保存", "参考役割・個別起用度（roles）を保存しました。", parent=w)
+            messagebox.showinfo("保存", "3. 個別役割（roles）を保存しました。", parent=w)
 
         def _reset_player() -> None:
             sel = lb.curselection()
