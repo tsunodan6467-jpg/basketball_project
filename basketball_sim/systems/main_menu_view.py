@@ -5029,6 +5029,17 @@ class MainMenuView:
             ),
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            rot_lf,
+            text=(
+                "完成形0〜3対応：0.起用プリセット→起用テンプレ / 1.起用方針→起用テンプレ＋ローテ詳細 / "
+                "2.起用序列→先発・6th・ベンチ＋目標出場時間 / 3.個別役割→役割詳細\n"
+                "※ 未実装プリセットはまだ表示していません。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
         row_rot = ttk.Frame(rot_lf, style="Panel.TFrame")
         row_rot.pack(fill="x")
         _nav_btn(
