@@ -1176,6 +1176,27 @@ def get_sub_policy_sub_out_modifier(team: Any, player: Any, *, roster_rank: int 
     return 0.0
 
 
+def get_rotation_foul_policy(team: Any) -> str:
+    """
+    team_tactics.rotation.foul_policy → early_pull / standard / ride。
+    不正・欠損は standard（ROTATION_DEFAULTS）。
+    RotationSystem の foul トラブル OUT 補正などで使用。
+    """
+    try:
+        ensure_team_tactics_on_team(team)
+        raw = getattr(team, "team_tactics", None)
+        if not isinstance(raw, dict):
+            return str(ROTATION_DEFAULTS["foul_policy"])
+        rot = raw.get("rotation")
+        if not isinstance(rot, dict):
+            return str(ROTATION_DEFAULTS["foul_policy"])
+        return str(
+            _pick_str(rot.get("foul_policy"), ALLOWED_FOUL_POLICY, ROTATION_DEFAULTS["foul_policy"])
+        )
+    except Exception:
+        return str(ROTATION_DEFAULTS["foul_policy"])
+
+
 def get_roles_defense_assignment_sub_out_modifier(team: Any, player: Any) -> int:
     """
     team_tactics.roles[pid].defense_assignment → _can_sub_out の実効 min stint への加算（整数のみ）。

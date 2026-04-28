@@ -19,6 +19,7 @@ from basketball_sim.systems.team_tactics import (
     get_roles_clutch_priority_substitute_overlay,
     get_roles_defense_assignment_sub_out_modifier,
     get_roles_shot_priority_substitute_overlay,
+    get_rotation_foul_policy,
     get_rotation_target_minutes_by_player_id,
     get_sub_policy_sub_out_modifier,
 )
@@ -35,6 +36,32 @@ _WIN_NOW_TARGET_TOP_RANK_MAX: int = 2
 _WIN_NOW_TARGET_DEEP_BENCH_RANK_MIN: int = 7
 _WIN_NOW_OUT_CANDIDATE_CORE_BIAS: float = -0.40
 _WIN_NOW_OUT_CANDIDATE_MIN_TARGET: float = 19.0
+
+# foul_policy × 個人ファウル: OUT 候補スコアへの T1 補正（Match 由来の pf 正本は未接続でも外部 dict で駆動可能）
+_FOUL_TROUBLE_OUT_BONUS: Dict[str, Dict[str, float]] = {
+    "early_pull": {"2": 0.8, "3": 1.6, "4p": 2.6},
+    "standard": {"2": 0.3, "3": 1.0, "4p": 2.0},
+    "ride": {"2": 0.0, "3": 0.4, "4p": 1.2},
+}
+
+
+def foul_trouble_out_candidate_bonus(foul_count: int, policy: str) -> float:
+    """
+    個人ファウル数と foul_policy に応じた OUT 候補スコア加算（小さめ）。
+    0〜1 ファウルは 0。5 ファウル以上は 4+ 帯と同じ。
+    """
+    try:
+        fc = int(foul_count)
+    except (TypeError, ValueError):
+        fc = 0
+    fc = max(0, fc)
+    if fc <= 1:
+        return 0.0
+    p = str(policy or "standard").strip()
+    if p not in ("early_pull", "standard", "ride"):
+        p = "standard"
+    tier = "4p" if fc >= 4 else ("3" if fc == 3 else "2")
+    return float(_FOUL_TROUBLE_OUT_BONUS[p][tier])
 
 
 class RotationSystem:
@@ -76,6 +103,7 @@ class RotationSystem:
         starters: Optional[List[Player]] = None,
         competition_type: str = "regular_season",
         reg_slot: RegSlot | None = None,
+        personal_fouls_by_player_id: Optional[Dict[int, int]] = None,
     ):
         self.team = team
         self._competition_type = normalize_competition_type(competition_type)
@@ -121,6 +149,46 @@ class RotationSystem:
             self._tactics_target_minutes = get_rotation_target_minutes_by_player_id(team)
         except Exception:
             self._tactics_target_minutes = {}
+
+        self._personal_fouls_by_player_id: Optional[Dict[int, int]] = self._normalize_personal_fouls_map(
+            personal_fouls_by_player_id
+        )
+        try:
+            self._rotation_foul_policy: str = get_rotation_foul_policy(team)
+        except Exception:
+            self._rotation_foul_policy = "standard"
+
+    @staticmethod
+    def _normalize_personal_fouls_map(raw: Optional[Dict]) -> Optional[Dict[int, int]]:
+        if raw is None:
+            return None
+        out: Dict[int, int] = {}
+        for k, v in raw.items():
+            try:
+                pk = int(k)
+            except (TypeError, ValueError):
+                continue
+            if pk < 0:
+                continue
+            try:
+                fv = int(v)
+            except (TypeError, ValueError):
+                fv = 0
+            out[pk] = max(0, fv)
+        return out
+
+    def _foul_trouble_out_score_bonus(self, player: Player) -> float:
+        if self._personal_fouls_by_player_id is None:
+            return 0.0
+        try:
+            pid = getattr(player, "player_id", None)
+            if pid is None:
+                return 0.0
+            pid_i = int(pid)
+        except (TypeError, ValueError):
+            return 0.0
+        fouls = int(self._personal_fouls_by_player_id.get(pid_i, 0))
+        return foul_trouble_out_candidate_bonus(fouls, self._rotation_foul_policy)
 
     def _debug(self, message: str):
         if self.DEBUG_ROTATION:
@@ -656,6 +724,8 @@ class RotationSystem:
             if is_closing and ovr >= 78:
                 score -= 1.0
 
+            score += self._foul_trouble_out_score_bonus(p)
+
             threshold = 0.6
             if bench_zero_count >= 1 and not is_late:
                 threshold = 0.1
@@ -708,6 +778,8 @@ class RotationSystem:
 
             if stamina <= 70:
                 score += 0.5
+
+            score += self._foul_trouble_out_score_bonus(p)
 
             if score > 0:
                 candidates.append((p, score))
