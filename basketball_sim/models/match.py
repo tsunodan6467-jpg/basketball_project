@@ -2134,6 +2134,38 @@ class Match:
             weights.append(max(1, int(weight)))
         return random.choices(lineup, weights=weights, k=1)[0]
 
+    def _pick_fouler(self, defense_lineup: List[Player]) -> Optional[Player]:
+        """守備ラインナップから個人ファウル付与対象を1人選ぶ（最小実装: 等確率）。"""
+        candidates: List[Player] = []
+        for p in defense_lineup:
+            if p is None:
+                continue
+            if bool(getattr(p, "is_retired", False)):
+                continue
+            candidates.append(p)
+        if not candidates:
+            return None
+        return random.choice(candidates)
+
+    def _add_personal_foul(self, defense_team: Team, fouler: Optional[Player]) -> None:
+        """Match内の個人ファウル正本(dict)へ +1 する。"""
+        if fouler is None:
+            return
+        try:
+            player_id = int(getattr(fouler, "player_id", None))
+        except (TypeError, ValueError):
+            return
+        if player_id < 0:
+            return
+        if defense_team == self.home_team:
+            target = self.home_personal_fouls_by_player_id
+        elif defense_team == self.away_team:
+            target = self.away_personal_fouls_by_player_id
+        else:
+            return
+        current = int(target.get(player_id, 0) or 0)
+        target[player_id] = max(0, current) + 1
+
     def _get_lineup_profile(self, lineup: List[Player]) -> dict:
         if not lineup:
             return {
@@ -2919,6 +2951,9 @@ class Match:
             shot_profile = "ft"
             final_rate = 0.53 + (ft_attr * 0.0040)
 
+        if is_ft:
+            self._add_personal_foul(defense_team, self._pick_fouler(defense_lineup))
+
         final_rate = max(0.08, min(0.84, final_rate))
 
         assister = None
@@ -3120,6 +3155,9 @@ class Match:
             is_ft = True
             shot_profile = "ft"
             final_rate = 0.51 + (ft_attr * 0.0040)
+
+        if is_ft:
+            self._add_personal_foul(defense_team, self._pick_fouler(defense_lineup))
 
         final_rate = max(0.05, min(0.82, final_rate))
 

@@ -1,4 +1,4 @@
-"""Match 個人ファウル正本 → RotationSystem 同期の土台（発生処理なし）。"""
+"""Match 個人ファウル正本 → RotationSystem 同期/FT最小加算テスト。"""
 
 import pytest
 
@@ -90,9 +90,22 @@ def test_set_personal_fouls_by_player_id_none_uses_empty_map():
     assert r._personal_fouls_by_player_id == {}
 
 
-def test_full_simulate_does_not_increase_fouls():
+def test_non_ft_possession_does_not_increase_personal_fouls(monkeypatch: pytest.MonkeyPatch):
     m = _build_match()
-    _ = m.simulate()
+
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    random_values = iter([1.0, 0.0, 0.0, 1.0])  # no steal, 3P branch, make, no assist
+    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+
+    _ = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
     assert m.home_personal_fouls_by_player_id == {}
     assert m.away_personal_fouls_by_player_id == {}
 
@@ -102,3 +115,75 @@ def test_set_personal_fouls_accepts_string_keys_in_dict():
     r = m.home_rotation
     r.set_personal_fouls_by_player_id({"201": 3, "bad": 1})
     assert r._personal_fouls_by_player_id.get(201) == 3
+
+
+def test_ft_make_adds_one_personal_foul_to_defense(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    random_values = iter([1.0, 0.8, 0.0])  # no steal, ft branch, make
+    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+
+    points = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+
+    assert points == 1
+    assert m.away_personal_fouls_by_player_id.get(defender.player_id) == 1
+    assert m.home_personal_fouls_by_player_id == {}
+
+
+def test_ft_miss_adds_one_personal_foul_to_defense(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.home_current_lineup[0]
+
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(m, "_get_offense_rebound_rate", lambda *_args, **_kwargs: 0.0)
+    random_values = iter([1.0, 0.8, 0.99, 0.99])  # no steal, ft branch, miss, no oreb
+    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+
+    points = m._simulate_possession(
+        m.away_team,
+        m.home_team,
+        m.away_current_lineup,
+        m.home_current_lineup,
+        70.0,
+        70.0,
+    )
+
+    assert points == 0
+    assert m.home_personal_fouls_by_player_id.get(defender.player_id) == 1
+    assert m.away_personal_fouls_by_player_id == {}
+
+
+def test_foul_addition_syncs_to_rotation_on_next_update(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    random_values = iter([1.0, 0.8, 0.0])  # no steal, ft branch, make
+    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+
+    _ = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+    m._maybe_update_rotations(1)
+
+    assert m.away_rotation._personal_fouls_by_player_id.get(defender.player_id) == 1
