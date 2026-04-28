@@ -7659,6 +7659,7 @@ class MainMenuView:
         bench_a: Optional[ttk.Combobox] = None
         bench_b: Optional[ttk.Combobox] = None
         bench_swap: Optional[ttk.Button] = None
+        bench_order_list_lbl: Optional[ttk.Label] = None
 
         def _maybe_scroll() -> None:
             if scroll_update is not None:
@@ -7815,12 +7816,45 @@ class MainMenuView:
         def _bench_slot_labels(players: List[Any]) -> List[str]:
             return [f"{i + 7}番手 {self._gm_candidate_label_for_player(p)}" for i, p in enumerate(players)]
 
+        def _player_ovr_for_bench_list(p: Any) -> int:
+            if hasattr(p, "get_effective_ovr") and callable(getattr(p, "get_effective_ovr")):
+                try:
+                    return int(p.get_effective_ovr())
+                except (TypeError, ValueError, AttributeError):
+                    pass
+            try:
+                return int(getattr(p, "ovr", 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def _format_bench_order_list_text(bench_players: List[Any]) -> str:
+            """7番手〜の読み取り表示（先発・6thは含めない。get_current_bench_order 由来）。"""
+            if not bench_players:
+                return "ベンチ順は未設定です。\n（先発・6thを除く控えに、表示できる選手がいません。）"
+            max_rows = 6
+            lines: List[str] = []
+            for i, p in enumerate(bench_players[:max_rows]):
+                slot = i + 7
+                nm = str(getattr(p, "name", "?"))
+                pos = str(getattr(p, "position", "?"))
+                ovr = _player_ovr_for_bench_list(p)
+                lines.append(f"{slot}番手　{nm}　{pos}　OVR {ovr}")
+            if len(bench_players) > max_rows:
+                rest = len(bench_players) - max_rows
+                lines.append(f"… 他 {rest} 名（表示は12番手まで）")
+            return "\n".join(lines)
+
         def _reload_bench() -> None:
             nonlocal bench_a, bench_b, bench_swap
             if bench_a is None or bench_b is None or bench_swap is None:
                 return
             bench = list(get_current_bench_order(self.team) or [])
             setattr(bch, "_tactics_bench_players_cache", bench)
+            if bench_order_list_lbl is not None:
+                try:
+                    bench_order_list_lbl.configure(text=_format_bench_order_list_text(bench))
+                except tk.TclError:
+                    pass
             labels = _bench_slot_labels(bench)
             if len(bench) < 2:
                 bench_a.configure(values=[], state="disabled")
@@ -7946,9 +7980,24 @@ class MainMenuView:
             )
 
         def _build_bench_block(into: ttk.Frame) -> None:
-            nonlocal bench_a, bench_b, bench_swap
+            nonlocal bench_a, bench_b, bench_swap, bench_order_list_lbl
             lf_b = ttk.LabelFrame(into, text="2-3. ベンチ順（7〜12番手）", padding=8)
             lf_b.pack(fill="x", pady=(0, 8))
+            ttk.Label(
+                lf_b,
+                text="現在のベンチ順",
+                font=("Yu Gothic UI", 9, "bold"),
+                foreground="#1a1d23",
+            ).pack(anchor="w", pady=(0, 2))
+            bench_order_list_lbl = ttk.Label(
+                lf_b,
+                text="",
+                font=("Yu Gothic UI", 9),
+                foreground="#111111",
+                wraplength=640,
+                justify="left",
+            )
+            bench_order_list_lbl.pack(anchor="w", pady=(0, 8))
             rb = ttk.Frame(lf_b, style="Panel.TFrame")
             rb.pack(fill="x", pady=2)
             ttk.Label(rb, text="枠A", width=4).pack(side="left")
