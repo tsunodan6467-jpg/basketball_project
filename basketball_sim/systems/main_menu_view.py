@@ -5814,6 +5814,225 @@ class MainMenuView:
             "※ 必要に応じて下の「2. 起用序列」や「ローテ詳細」で調整してください。"
         )
 
+    def _rotation_target_minutes_preview_text(self) -> str:
+        """起用序列とローテプリセットに基づく目標出場の目安（保存しない読み取り専用）。"""
+        if self.team is None:
+            return ""
+        try:
+            ensure_team_tactics_on_team(self.team)
+        except Exception:
+            pass
+
+        st = get_current_rotation_preset_state(self.team)
+        pid = st.get("preset_id")
+        is_custom = bool(st.get("is_custom"))
+        if (not pid) or is_custom or (pid not in ROTATION_PRESET_DEFS):
+            eff = "balanced_v1"
+            head = "※ プリセットが未設定、または手動で変えた「カスタム」状態のときは、目安をバランス基準で表示しています。\n\n"
+        else:
+            eff = str(pid)
+            head = ""
+
+        def _cur_tm(tm_raw: Any, p_id: int) -> str:
+            if not isinstance(tm_raw, dict):
+                return "未設定"
+            for k, v in tm_raw.items():
+                try:
+                    if int(k) != int(p_id):
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                try:
+                    return f"{float(v):.0f}分"
+                except (TypeError, ValueError):
+                    return "未設定"
+            return "未設定"
+
+        def _ovr(p: Any) -> int:
+            try:
+                if hasattr(p, "get_effective_ovr") and callable(getattr(p, "get_effective_ovr")):
+                    return int(p.get_effective_ovr())
+            except (TypeError, ValueError, AttributeError):
+                pass
+            try:
+                return int(getattr(p, "ovr", 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def _age(p: Any) -> Optional[int]:
+            try:
+                a = getattr(p, "age", None)
+                if a is None:
+                    return None
+                return int(a)
+            except (TypeError, ValueError):
+                return None
+
+        def _fat(p: Any) -> int:
+            try:
+                return int(getattr(p, "fatigue", 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def _development_preview_memo(p: Any, _slot: str) -> str:
+            a = _age(p)
+            bits: List[str] = []
+            if a is not None and a <= 22:
+                bits.append("若手は時間を取りやすい目安")
+            if a is not None and a >= 30:
+                bits.append("ベテランは抑えめ目安")
+            return " ".join(bits)
+
+        def _condition_preview_memo(p: Any) -> str:
+            bits: List[str] = []
+            if hasattr(p, "is_injured") and callable(getattr(p, "is_injured")):
+                try:
+                    if p.is_injured():
+                        bits.append("負傷中は実際短めになりやすい")
+                except Exception:
+                    pass
+            if _fat(p) >= 60:
+                bits.append("疲労高め：交代を意識")
+            return " ".join(bits)
+
+        rot = get_safe_team_tactics(self.team).get("rotation")
+        if not isinstance(rot, dict):
+            rot = {}
+        tm = rot.get("target_minutes") if isinstance(rot.get("target_minutes"), dict) else {}
+
+        starters = list(get_current_starting_five(self.team) or [])
+        if len(starters) < 5:
+            return (
+                head
+                + "先発登録が5人に満たないため、目安一覧は出せません。\n"
+                + "（契約中の選手で先発5人を揃えてから見てください。）\n\n"
+                "※ この一覧は保存しません。ローテ詳細で手動の目標出場を設定できます。"
+            )
+
+        st_rows: List[Tuple[int, int]] = []  # (player_id, ovr)
+        for p in starters:
+            try:
+                p_id = int(getattr(p, "player_id", -1) or -1)
+            except (TypeError, ValueError):
+                p_id = -1
+            st_rows.append((p_id, _ovr(p)))
+        sorted_pids = {
+            t[0] for t in sorted([x for x in st_rows if x[0] >= 0], key=lambda t: t[1], reverse=True)[:2]
+        }
+
+        out_lines: List[str] = [head + "（列）選手 / 序列 / 保存 / おすすめ / メモ"]
+        n_shown = 0
+        for pos, p in zip(STARTER_POSITIONS, starters):
+            if n_shown >= 12:
+                break
+            try:
+                p_id = int(getattr(p, "player_id", -1) or -1)
+            except (TypeError, ValueError):
+                p_id = -1
+            name = str(getattr(p, "name", "?"))[:14]
+            role = f"先発{pos}"
+            cur = _cur_tm(tm, p_id) if p_id >= 0 else "未設定"
+            is_top2 = p_id in sorted_pids and p_id >= 0
+            if eff == "win_now_v1" and is_top2:
+                rec, memo = ("32分前後", "主力寄り（勝利優先）")
+            elif eff == "win_now_v1" and not is_top2:
+                rec, memo = ("28分前後", "先発枠")
+            elif eff == "balanced_v1":
+                rec, memo = ("28分前後", "バランス先発")
+            elif eff == "development_v1":
+                rec, memo = ("27分前後", "先発枠")
+                a = _age(p)
+                if a is not None and a <= 22:
+                    memo = "先発枠（若手は目安やや上）"
+                elif a is not None and a >= 30:
+                    memo = "先発枠（ベテランは目安やさめ）"
+            elif eff == "condition_care_v1":
+                rec, memo = ("27分前後", "休養意識の先発枠")
+            else:
+                rec, memo = ("28分前後", "標準的な目安")
+            ex = _condition_preview_memo(p) if eff == "condition_care_v1" else ""
+            if ex:
+                memo = f"{memo} {ex}".strip()
+            out_lines.append(f"{name} / {role} / {cur} / {rec} / {memo}")
+            n_shown += 1
+
+        sm = get_current_sixth_man(self.team)
+        if sm is not None and n_shown < 12:
+            try:
+                p_id = int(getattr(sm, "player_id", -1) or -1)
+            except (TypeError, ValueError):
+                p_id = -1
+            name = str(getattr(sm, "name", "?"))[:14]
+            cur = _cur_tm(tm, p_id) if p_id >= 0 else "未設定"
+            if eff == "win_now_v1":
+                rec, memo = ("22分前後", "控えの柱")
+            elif eff == "balanced_v1":
+                rec, memo = ("22分前後", "6th 起用")
+            elif eff == "development_v1":
+                rec, memo = ("21分前後", "6th 起用")
+                a = _age(sm)
+                if a is not None and a <= 22:
+                    memo = "6th 起用（育成枠）"
+            elif eff == "condition_care_v1":
+                rec, memo = ("21分前後", "無理を避けたい枠")
+            else:
+                rec, memo = ("22分前後", "6th 起用")
+            ex = _condition_preview_memo(sm) if eff == "condition_care_v1" else (
+                _development_preview_memo(sm, "sixth") if eff == "development_v1" else ""
+            )
+            if ex:
+                memo = f"{memo} {ex}".strip()
+            out_lines.append(f"{name} / 6th / {cur} / {rec} / {memo}")
+            n_shown += 1
+
+        bench = [b for b in (get_current_bench_order(self.team) or []) if b is not None]
+        n_b = len(bench)
+        for bi, p in enumerate(bench):
+            if n_shown >= 12:
+                rem = n_b - bi
+                if rem > 0:
+                    out_lines.append(f"… 他 {rem} 名（ベンチ以降は省略）")
+                break
+            try:
+                p_id = int(getattr(p, "player_id", -1) or -1)
+            except (TypeError, ValueError):
+                p_id = -1
+            name = str(getattr(p, "name", "?"))[:14]
+            is_hi = bi < 2
+            role = "ベンチ上位" if is_hi else "ベンチ下位"
+            pos_label = f"{bi + 1}番手" if n_b else ""
+            if pos_label and role.startswith("ベンチ"):
+                role = f"{role}（{pos_label}）"
+            cur = _cur_tm(tm, p_id) if p_id >= 0 else "未設定"
+            if eff == "win_now_v1":
+                rec, memo = (("11分前後", "控え短め") if is_hi else ("4分前後", "出番は限定的"))
+            elif eff == "balanced_v1":
+                rec, memo = (("15分前後", "ローテ寄与") if is_hi else ("7分前後", "短い出番"))
+            elif eff == "development_v1":
+                rec, memo = (("18分前後", "育成枠") if is_hi else ("11分前後", "出番を重視しやすい"))
+                a = _age(p)
+                if a is not None and a <= 22 and is_hi:
+                    memo = "育成枠（若手に時間を割きやすい）"
+            elif eff == "condition_care_v1":
+                rec, memo = (("15分前後", "深めのローテ") if is_hi else ("9分前後", "省エネ起用目安"))
+            else:
+                rec, memo = ("12分前後", "控え目安")
+            ex = _condition_preview_memo(p) if eff == "condition_care_v1" else _development_preview_memo(
+                p, "bench"
+            ) if eff == "development_v1" else ""
+            if ex:
+                memo = f"{memo} {ex}".strip()
+            out_lines.append(f"{name} / {role} / {cur} / {rec} / {memo}")
+            n_shown += 1
+
+        foot = (
+            "\n"
+            "※ この一覧は「おすすめ表示」のみで、目標出場（team_tactics）へ自動保存しません。\n"
+            "※ 実際に目標出場を変えるときは「ローテ詳細」で、スライダーを手動調整してください。\n"
+            "※ 先発・6th・ベンチ順の Team 正本は、この一覧からは変わりません（下の2で手動）。"
+        )
+        return "\n".join(out_lines) + foot
+
     def _build_rotation_preset_editor_ui(
         self,
         parent: ttk.Frame,
@@ -6456,13 +6675,29 @@ class MainMenuView:
         )
         summary_lbl.pack(anchor="w", pady=(0, 6))
 
-        def _refresh_rotation_effect_summary() -> None:
+        def _refresh_rotation_lf0_readouts() -> None:
             if self.team is None:
                 return
             summary_lbl.configure(text=self._rotation_effect_summary_text())
+            preview_lbl.configure(text=self._rotation_target_minutes_preview_text())
 
-        usage_resync_extras.append(_refresh_rotation_effect_summary)
-        _refresh_rotation_effect_summary()
+        ttk.Label(
+            lf0,
+            text="▼ 目標出場時間のおすすめ（読み取り）",
+            font=("Yu Gothic UI", 9, "bold"),
+            foreground="#9aa3b2",
+        ).pack(anchor="w", pady=(10, 2))
+        preview_lbl = ttk.Label(
+            lf0,
+            text="",
+            font=("Yu Gothic UI", 9),
+            foreground="#a8b4c0",
+            wraplength=640,
+            justify="left",
+        )
+        preview_lbl.pack(anchor="w", pady=(0, 6))
+        usage_resync_extras.append(_refresh_rotation_lf0_readouts)
+        _refresh_rotation_lf0_readouts()
         ttk.Label(
             lf0,
             text=(
@@ -6539,7 +6774,7 @@ class MainMenuView:
         def _save_usage_ov() -> None:
             def _after_save_usage() -> None:
                 self._refresh_strategy_window()
-                _refresh_rotation_effect_summary()
+                _refresh_rotation_lf0_readouts()
 
             self._usage_policy_editor_save(
                 combos_usage_ov,
@@ -6552,14 +6787,14 @@ class MainMenuView:
 
         def _reset_usage_ov() -> None:
             self._usage_policy_editor_reset_display(combos_usage_ov, usage_pairs_ov)
-            _refresh_rotation_effect_summary()
+            _refresh_rotation_lf0_readouts()
 
         def _reload_usage_combos_only() -> None:
             self._usage_policy_editor_reload_from_team(combos_usage_ov, usage_pairs_ov)
 
         def _reload_usage_ov() -> None:
             _reload_usage_combos_only()
-            _refresh_rotation_effect_summary()
+            _refresh_rotation_lf0_readouts()
 
         usage_resync_holder["fn"] = _reload_usage_combos_only
 
@@ -6610,6 +6845,7 @@ class MainMenuView:
             bench_cache_host=w,
             layout="collapsed",
             scroll_update=_rot_scrollregion,
+            after_lineup_change=_refresh_rotation_lf0_readouts,
         )
         ttk.Label(
             lf2,
@@ -6747,6 +6983,7 @@ class MainMenuView:
         bench_cache_host: Any,
         layout: str = "flat",
         scroll_update: Optional[Callable[[], None]] = None,
+        after_lineup_change: Optional[Callable[[], None]] = None,
     ) -> None:
         """
         Team 正本: 先発5 / 6th / ベンチ順（7〜12）。gm_dashboard_text の apply / 候補生成をそのまま利用。
@@ -6784,6 +7021,11 @@ class MainMenuView:
             self.refresh()
             self._refresh_strategy_window()
             _reload_all()
+            if after_lineup_change is not None:
+                try:
+                    after_lineup_change()
+                except Exception:
+                    pass
 
         def _reload_starters() -> None:
             starters = get_current_starting_five(self.team)
