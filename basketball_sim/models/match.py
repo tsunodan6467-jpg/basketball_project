@@ -136,6 +136,10 @@ class Match:
             reg_slot=reg_slot_away,
         )
 
+        # 試合中のみの個人ファウル正本（セーブ・Player には保持しない。発生処理は別タスク）
+        self.home_personal_fouls_by_player_id: Dict[int, int] = {}
+        self.away_personal_fouls_by_player_id: Dict[int, int] = {}
+
         self._minutes_tracker = {}
         self.play_by_play_log: List[Dict] = []
         self.commentary_log: List[Dict] = []
@@ -1948,7 +1952,13 @@ class Match:
 
         return self._validate_lineup(lineup, current_lineup, team)
 
+    def _sync_rotation_personal_fouls(self) -> None:
+        """Match 正本の個人ファウル数を RotationSystem へ同期（発生処理は未接続のため通常は空）。"""
+        self.home_rotation.set_personal_fouls_by_player_id(self.home_personal_fouls_by_player_id)
+        self.away_rotation.set_personal_fouls_by_player_id(self.away_personal_fouls_by_player_id)
+
     def _maybe_update_rotations(self, possession_index: int):
+        self._sync_rotation_personal_fouls()
         new_home_lineup = self._get_rotation_lineup(
             self.home_rotation,
             self.home_current_lineup,

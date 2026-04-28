@@ -150,13 +150,25 @@ class RotationSystem:
         except Exception:
             self._tactics_target_minutes = {}
 
-        self._personal_fouls_by_player_id: Optional[Dict[int, int]] = self._normalize_personal_fouls_map(
-            personal_fouls_by_player_id
-        )
+        if personal_fouls_by_player_id is None:
+            self._personal_fouls_by_player_id: Optional[Dict[int, int]] = None
+        else:
+            self.set_personal_fouls_by_player_id(personal_fouls_by_player_id)
         try:
             self._rotation_foul_policy: str = get_rotation_foul_policy(team)
         except Exception:
             self._rotation_foul_policy = "standard"
+
+    def set_personal_fouls_by_player_id(self, personal_fouls_by_player_id: Optional[Dict]) -> None:
+        """
+        試合中の個人ファウル数を更新（Match など外部正本から同期）。
+        None は空 dict 扱い（0 ファウルで map あり）。既存の __init__(None) は未同期扱いのまま。
+        """
+        if personal_fouls_by_player_id is None:
+            self._personal_fouls_by_player_id = {}
+            return
+        m = self._normalize_personal_fouls_map(personal_fouls_by_player_id)
+        self._personal_fouls_by_player_id = dict(m) if m else {}
 
     @staticmethod
     def _normalize_personal_fouls_map(raw: Optional[Dict]) -> Optional[Dict[int, int]]:
