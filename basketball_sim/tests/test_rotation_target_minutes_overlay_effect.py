@@ -66,6 +66,75 @@ def _pid_to_key(rot: RotationSystem) -> Dict[int, int]:
     return m
 
 
+def _simulate_rotation_minutes(team: Team, total_possessions: int = 160) -> Dict[int, float]:
+    """
+    RotationSystem を試合1本分相当進め、選手IDごとの出場時間を返す。
+    Match 本体は使わないが、試合中ローテ更新と同じ get_lineup 経路を通す。
+    """
+    rot = _rotation(team)
+    lineup = rot.get_current_lineup()
+    poss_per_q = max(1, total_possessions // 4)
+    for pos in range(total_possessions):
+        quarter = min(4, (pos // poss_per_q) + 1)
+        pos_in_q = pos % poss_per_q
+        lineup = rot.get_lineup(
+            current_lineup=lineup,
+            possession=pos,
+            total_possessions=total_possessions,
+            quarter=quarter,
+            possession_in_quarter=pos_in_q,
+            possessions_per_quarter=poss_per_q,
+            score_diff=0,
+        )
+    rot._update_play_time_until(total_possessions)
+    out: Dict[int, float] = {}
+    for p in rot.active_players:
+        out[int(p.player_id)] = float(rot.player_minutes.get(rot._player_key(p), 0.0))
+    return out
+
+
+def _simulate_rotation_minutes_from_midgame(
+    team: Team,
+    *,
+    start_possession: int = 80,
+    total_possessions: int = 160,
+    starter_minutes: float = 20.0,
+    bench_minutes: float = 10.0,
+) -> Dict[int, float]:
+    """
+    同一の中間状態（先発20分/ベンチ10分）を与えて後半だけ回す。
+    target_minutes による出場時間差を安定して比較するための補助。
+    """
+    rot = _rotation(team)
+    lineup = rot.get_current_lineup()
+    lineup_keys = {rot._player_key(p) for p in lineup}
+    for p in rot.active_players:
+        key = rot._player_key(p)
+        rot.player_minutes[key] = starter_minutes if key in lineup_keys else bench_minutes
+        rot.last_sub_in_possession[key] = -999
+        rot.lineup_entry_possession[key] = 0
+    rot.last_processed_possession = start_possession
+
+    poss_per_q = max(1, total_possessions // 4)
+    for pos in range(start_possession, total_possessions):
+        quarter = min(4, (pos // poss_per_q) + 1)
+        pos_in_q = pos % poss_per_q
+        lineup = rot.get_lineup(
+            current_lineup=lineup,
+            possession=pos,
+            total_possessions=total_possessions,
+            quarter=quarter,
+            possession_in_quarter=pos_in_q,
+            possessions_per_quarter=poss_per_q,
+            score_diff=0,
+        )
+    rot._update_play_time_until(total_possessions)
+    out: Dict[int, float] = {}
+    for p in rot.active_players:
+        out[int(p.player_id)] = float(rot.player_minutes.get(rot._player_key(p), 0.0))
+    return out
+
+
 def test_target_minutes_overlay_blend_formula_and_direction():
     """
     _build_target_minutes_map の overlay は常に 20% blend。
@@ -156,4 +225,29 @@ def test_out_candidates_prefer_player_more_over_target():
     outs: List[Player] = r._get_out_candidates(possession=50, total_possessions=160, target_map=target_map)
     assert a in outs and b in outs
     assert outs.index(a) < outs.index(b)
+
+
+def test_target_minutes_changes_simulated_minutes_directionally():
+    """
+    同一ロスター・同一進行で target_minutes あり/なしを比較し、
+    高 target は増え、低 target は減る方向へ動くことを確認する。
+    """
+    t_base = _team(12, team_id=21)
+    t_overlay = _team(12, team_id=22)
+
+    # 同条件比較: 片方だけ target_minutes を付与
+    high_pid = int(t_overlay.players[10].player_id)  # deep bench を厚めに
+    low_pid = int(t_overlay.players[2].player_id)    # 先発帯を薄めに
+    raw = dict(t_overlay.team_tactics or {})
+    rot = dict(raw.get("rotation") or {})
+    rot["target_minutes"] = {str(high_pid): 38.0, str(low_pid): 0.0}
+    raw["rotation"] = rot
+    t_overlay.team_tactics = raw
+    ensure_team_tactics_on_team(t_overlay)
+
+    m_base = _simulate_rotation_minutes(t_base, total_possessions=160)
+    m_overlay = _simulate_rotation_minutes(t_overlay, total_possessions=160)
+
+    assert m_overlay[high_pid] > m_base[high_pid]
+    assert m_overlay[low_pid] < m_base[low_pid]
 
