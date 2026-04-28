@@ -6160,13 +6160,27 @@ class MainMenuView:
                 pass
         messagebox.showinfo("目標出場", "目標出場時間を反映しました。", parent=message_parent)
 
-    def _rotation_lineup_recommendation_text(self) -> str:
+    def _compute_rotation_lineup_recommendation(self) -> Dict[str, Any]:
         """
-        ローテプリセットに応じた起用序列のおすすめ案（読み取り専用）。
-        Team 正本・target_minutes は変更しない。
+        ローテプリセットに基づく起用のおすすめ（先発5・6th・ベンチ）。
+        Team 正本は変更しない。表示と手動反映で同一データ源にする。
+        戻り: status, eff, label_ja, head_note, starters(5), sixth, bench, ほか
+        status: "ok" | "no_team" | "too_few" | "incomplete"
         """
+        out: Dict[str, Any] = {
+            "status": "no_team",
+            "eff": "balanced_v1",
+            "label_ja": "—",
+            "head_note": "",
+            "raw_pid": None,
+            "is_custom": False,
+            "starters": [],
+            "bench": [],
+        }
         if self.team is None:
-            return ""
+            out["status"] = "no_team"
+            return out
+
         try:
             ensure_team_tactics_on_team(self.team)
         except Exception:
@@ -6176,15 +6190,19 @@ class MainMenuView:
         raw_pid = st.get("preset_id")
         is_custom = bool(st.get("is_custom"))
         label_ja = str(st.get("label_ja", "") or "—")
+        out["raw_pid"] = raw_pid
+        out["is_custom"] = is_custom
+        out["label_ja"] = label_ja
         if (not raw_pid) or is_custom or (raw_pid not in ROTATION_PRESET_DEFS):
             eff = "balanced_v1"
-            head_note = (
+            out["head_note"] = (
                 "※ プリセット未設定、または「カスタム」表示のときは、"
                 "おすすめをバランス基準（balanced_v1）で計算しています。\n"
             )
         else:
             eff = str(raw_pid)
-            head_note = ""
+            out["head_note"] = ""
+        out["eff"] = eff
 
         def _pid(p: Any) -> Optional[int]:
             try:
@@ -6284,17 +6302,10 @@ class MainMenuView:
                 return eo - pen
             return eo
 
-        roster = [p for p in (getattr(self.team, "players", None) or []) if _eligible(p)]
+        roster: List[Any] = [p for p in (getattr(self.team, "players", None) or []) if _eligible(p)]
         if len(roster) < 5:
-            return (
-                "【ローテプリセット（表示用）】\n"
-                f"・状態: {label_ja}\n"
-                f"{head_note}\n"
-                "おすすめ先発を作るには登録選手（負傷・引退を除く）が5人未満です。\n"
-                "ロスターを揃えてからご確認ください。\n\n"
-                "【方針メモ（参照）】\n"
-                f"{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
-            )
+            out["status"] = "too_few"
+            return out
 
         starters: List[Optional[Any]] = [None, None, None, None, None]
         used: set = set()
@@ -6325,26 +6336,8 @@ class MainMenuView:
                 used.add(ip)
 
         if any(s is None for s in starters):
-            return (
-                "【ローテプリセット（表示用）】\n"
-                f"・状態: {label_ja}\n"
-                f"{head_note}\n"
-                "おすすめ先発を5人揃えられませんでした（同時に起用できる選手が足りない状態）。\n\n"
-                "【方針メモ（参照）】\n"
-                f"{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
-            )
-
-        def _line(p: Any) -> str:
-            pid = _pid(p)
-            nm = str(getattr(p, "name", "?"))[:16]
-            pos = str(getattr(p, "position", "?"))
-            o = _eff_ovr(p)
-            return f"{nm}  ({pos})  実効OVR {o}  id={pid}"
-
-        lines_st: List[str] = []
-        for i, pos in enumerate(STARTER_POSITIONS):
-            sp = starters[i]
-            lines_st.append(f"  {pos}: {_line(sp) if sp else '—'}")
+            out["status"] = "incomplete"
+            return out
 
         rest = [p for p in roster if _pid(p) not in used]
         sixth: Optional[Any] = None
@@ -6356,6 +6349,85 @@ class MainMenuView:
 
         bench: List[Any] = [p for p in rest if p is not sixth]
         bench.sort(key=_score, reverse=True)
+
+        out["status"] = "ok"
+        out["starters"] = [s for s in starters if s is not None]
+        out["sixth"] = sixth
+        out["bench"] = bench
+        return out
+
+    def _rotation_lineup_recommendation_text(self) -> str:
+        """
+        ローテプリセットに応じた起用序列のおすすめ案（読み取り専用の文字列）。
+        Team 正本・target_minutes は変更しない。
+        """
+        if self.team is None:
+            return ""
+        data = self._compute_rotation_lineup_recommendation()
+        eff = str(data.get("eff") or "balanced_v1")
+        label_ja = str(data.get("label_ja", "") or "—")
+        head_note = str(data.get("head_note", "") or "")
+        raw_pid = data.get("raw_pid")
+        is_custom = bool(data.get("is_custom", False))
+        stt = str(data.get("status") or "")
+
+        def _pid(p: Any) -> Optional[int]:
+            try:
+                v = getattr(p, "player_id", None)
+                if v is None:
+                    return None
+                return int(v)
+            except (TypeError, ValueError):
+                return None
+
+        def _eff_ovr(p: Any) -> int:
+            if hasattr(p, "get_effective_ovr") and callable(getattr(p, "get_effective_ovr")):
+                try:
+                    return int(p.get_effective_ovr())
+                except (TypeError, ValueError, AttributeError):
+                    pass
+            try:
+                return int(getattr(p, "ovr", 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def _line(p: Any) -> str:
+            pid = _pid(p)
+            nm = str(getattr(p, "name", "?"))[:16]
+            pos = str(getattr(p, "position", "?"))
+            o = _eff_ovr(p)
+            return f"{nm}  ({pos})  実効OVR {o}  id={pid}"
+
+        if stt == "too_few":
+            return (
+                "【ローテプリセット（表示用）】\n"
+                f"・状態: {label_ja}\n"
+                f"{head_note}\n"
+                "おすすめ先発を作るには登録選手（負傷・引退を除く）が5人未満です。\n"
+                "ロスターを揃えてからご確認ください。\n\n"
+                "【方針メモ（参照）】\n"
+                f"{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
+            )
+        if stt == "incomplete":
+            return (
+                "【ローテプリセット（表示用）】\n"
+                f"・状態: {label_ja}\n"
+                f"{head_note}\n"
+                "おすすめ先発を5人揃えられませんでした（同時に起用できる選手が足りない状態）。\n\n"
+                "【方針メモ（参照）】\n"
+                f"{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
+            )
+        if stt != "ok":
+            return ""
+
+        starters: List[Any] = list(data.get("starters") or [])
+        sixth: Any = data.get("sixth")
+        bench: List[Any] = list(data.get("bench") or [])
+
+        lines_st: List[str] = []
+        for i, pos in enumerate(STARTER_POSITIONS):
+            sp = starters[i] if i < len(starters) else None
+            lines_st.append(f"  {pos}: {_line(sp) if sp else '—'}")
 
         lines_s6 = f"  {_line(sixth) if sixth else '（該当なし）'}"
         lines_bn: List[str] = []
@@ -6390,6 +6462,146 @@ class MainMenuView:
             f"（プリセット説明）{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
         )
         return body
+
+    def _apply_recommended_lineup_to_team(
+        self,
+        message_parent: tk.Misc,
+    ) -> None:
+        """
+        おすすめ起用序列（計算と同一）を Team 正本へ反映。確認後のみ。
+        target_minutes / team_tactics のその他は変更しない。
+        """
+        if self.team is None:
+            return
+        team = self.team
+        data = self._compute_rotation_lineup_recommendation()
+        stt = str(data.get("status") or "")
+        if stt in ("no_team", "too_few", "incomplete"):
+            messagebox.showwarning(
+                "起用序列",
+                "おすすめ先発を揃えられないため、反映できません。",
+                parent=message_parent,
+            )
+            return
+        if stt != "ok":
+            return
+
+        starters: List[Any] = list(data.get("starters") or [])
+        sixth: Any = data.get("sixth")
+        bench: List[Any] = list(data.get("bench") or [])
+
+        if len(starters) != 5 or any(s is None for s in starters):
+            messagebox.showwarning(
+                "起用序列",
+                "おすすめ先発のデータが不正のため、反映できません。",
+                parent=message_parent,
+            )
+            return
+
+        def _pid(p: Any) -> Optional[int]:
+            try:
+                v = getattr(p, "player_id", None)
+                if v is None:
+                    return None
+                return int(v)
+            except (TypeError, ValueError):
+                return None
+
+        sids = [_pid(s) for s in starters]
+        if any(x is None for x in sids) or len(set(sids)) != 5:
+            messagebox.showerror("起用序列", "先発に重複がない必要があります。", parent=message_parent)
+            return
+        sset = {int(x) for x in sids}
+        pids_roster = {
+            int(getattr(p, "player_id", -1))
+            for p in (getattr(team, "players", None) or [])
+        }
+        for sid in sset:
+            if sid < 0 or sid not in pids_roster:
+                messagebox.showerror("起用序列", "ロスター外の選手が含まれています。", parent=message_parent)
+                return
+        for s in starters:
+            if s is None or s not in (getattr(team, "players", None) or []):
+                messagebox.showerror("起用序列", "チームに所属する選手だけ反映できます。", parent=message_parent)
+                return
+        s6 = _pid(sixth) if sixth is not None else None
+        if s6 is not None and (s6 in sset or sixth not in (getattr(team, "players", None) or [])):
+            messagebox.showerror("起用序列", "6th候補が不正です。", parent=message_parent)
+            return
+        bset: set = set()
+        for p in bench:
+            bpid = _pid(p)
+            if bpid is None or p not in (getattr(team, "players", None) or []):
+                messagebox.showerror("起用序列", "ベンチ候補に不正な選手が含まれています。", parent=message_parent)
+                return
+            if bpid in sset or bpid == s6 or bpid in bset:
+                messagebox.showerror("起用序列", "ベンチに先発・6thと重複があってはいけません。", parent=message_parent)
+                return
+            bset.add(bpid)
+
+        q = messagebox.askyesno(
+            "起用序列の上書き確認",
+            "現在の先発・6th・ベンチ順を、おすすめ起用序列で上書きします。\n"
+            "目標出場時間は変更しません。\n"
+            "よろしいですか？",
+            parent=message_parent,
+        )
+        if not q:
+            return
+
+        s_set = getattr(team, "set_starting_lineup_by_players", None)
+        if not callable(s_set):
+            messagebox.showerror("起用序列", "先発の設定に対応していません。", parent=message_parent)
+            return
+        try:
+            s_set(starters)
+        except Exception as exc:
+            messagebox.showerror("起用序列", str(exc), parent=message_parent)
+            return
+
+        clr6 = getattr(team, "clear_sixth_man", None)
+        s_six = getattr(team, "set_sixth_man", None)
+        if sixth is not None:
+            if not callable(s_six):
+                messagebox.showerror("起用序列", "6thの設定に対応していません。", parent=message_parent)
+                return
+            try:
+                s_six(sixth)
+            except Exception as exc:
+                messagebox.showerror("起用序列", str(exc), parent=message_parent)
+                return
+        else:
+            if callable(clr6):
+                try:
+                    clr6()
+                except Exception:
+                    pass
+
+        s_b = getattr(team, "set_bench_order_by_players", None)
+        if not callable(s_b):
+            messagebox.showerror("起用序列", "ベンチ序列の設定に対応していません。", parent=message_parent)
+            return
+        try:
+            s_b(bench)
+        except Exception as exc:
+            messagebox.showerror("起用序列", str(exc), parent=message_parent)
+            return
+
+        self.refresh()
+        self._refresh_strategy_window()
+        lrel = getattr(self, "_tactics_rotation_lineup_reload", None)
+        if callable(lrel):
+            try:
+                lrel()
+            except Exception:
+                pass
+        rfn = getattr(self, "_rotation_overview_lf0_readouts", None)
+        if callable(rfn):
+            try:
+                rfn()
+            except Exception:
+                pass
+        messagebox.showinfo("起用序列", "おすすめ起用序列を反映しました。", parent=message_parent)
 
     def _build_rotation_preset_editor_ui(
         self,
@@ -7248,6 +7460,12 @@ class MainMenuView:
             justify="left",
         )
         lineup_rec_lbl.pack(anchor="w", pady=(0, 4))
+        ttk.Button(
+            lf2,
+            text="このおすすめを起用序列に反映",
+            style="Menu.TButton",
+            command=lambda: self._apply_recommended_lineup_to_team(w),
+        ).pack(anchor="w", pady=(0, 4))
         ttk.Label(
             lf2,
             text=(
@@ -7267,6 +7485,9 @@ class MainMenuView:
 
         rotation_lf0_readout_extras.append(_extra_lineup_recommendation_readout)
 
+        def _register_lineup_reload(fn: Callable[[], None]) -> None:
+            self._tactics_rotation_lineup_reload = fn
+
         lf2_edit = ttk.Frame(lf2, style="Panel.TFrame")
         lf2_edit.pack(fill="x", pady=(0, 6))
         self._build_team_lineup_editor_ui(
@@ -7276,6 +7497,7 @@ class MainMenuView:
             layout="collapsed",
             scroll_update=_rot_scrollregion,
             after_lineup_change=_refresh_rotation_lf0_readouts,
+            register_lineup_reload=_register_lineup_reload,
         )
         ttk.Label(
             lf2,
@@ -7416,10 +7638,12 @@ class MainMenuView:
         layout: str = "flat",
         scroll_update: Optional[Callable[[], None]] = None,
         after_lineup_change: Optional[Callable[[], None]] = None,
+        register_lineup_reload: Optional[Callable[[Callable[[], None]], None]] = None,
     ) -> None:
         """
         Team 正本: 先発5 / 6th / ベンチ順（7〜12）。gm_dashboard_text の apply / 候補生成をそのまま利用。
         layout: \"flat\"（子窓）または \"collapsed\"（統合画面用・初期は各サブブロック閉じる）。
+        register_lineup_reload: 内蔵の _reload_all を登録するコールバック（おすすめ反映後の再表示用）。
         """
         if self.team is None:
             return
@@ -7776,6 +8000,11 @@ class MainMenuView:
             _build_bench_block(body)
 
         _reload_all()
+        if register_lineup_reload is not None:
+            try:
+                register_lineup_reload(_reload_all)
+            except Exception:
+                pass
 
     def _open_tactics_team_lineup_window(self, parent: tk.Misc) -> None:
         """Team.starting_lineup / sixth_man_id / bench_order を編集（gm_dashboard_text 経路。CLI と整合）。"""
