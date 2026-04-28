@@ -811,6 +811,13 @@ class Match:
             context = self._build_scoring_context_text(event, event_index)
             return f"{base} {context}".strip()
 
+        if event_type == "foul":
+            if primary and secondary:
+                return f"[{clock_label}] {primary}のファウル。{secondary}がフリースローへ。"
+            if primary:
+                return f"[{clock_label}] {primary}のファウル。"
+            return f"[{clock_label}] 守備側のファウル。"
+
         if event_type == "made_ft":
             options = [
                 f"[{clock_label}] {primary}がフリースロー成功。スコアは{score_text}。",
@@ -2951,8 +2958,26 @@ class Match:
             shot_profile = "ft"
             final_rate = 0.53 + (ft_attr * 0.0040)
 
+        ft_fouler: Optional[Player] = None
         if is_ft:
-            self._add_personal_foul(defense_team, self._pick_fouler(defense_lineup))
+            ft_fouler = self._pick_fouler(defense_lineup)
+            self._add_personal_foul(defense_team, ft_fouler)
+            if ft_fouler is not None:
+                self._record_event(
+                    event_type="foul",
+                    offense_team=offense_team,
+                    defense_team=defense_team,
+                    primary_player=ft_fouler,
+                    secondary_player=shooter,
+                    description_key="foul_on_shot",
+                    meta={
+                        "foul": True,
+                        "fouler_id": self._player_log_key(ft_fouler),
+                        "drawn_by_id": self._player_log_key(shooter),
+                        "shot_profile": "ft",
+                        "second_chance": True,
+                    },
+                )
 
         final_rate = max(0.08, min(0.84, final_rate))
 
@@ -3156,8 +3181,26 @@ class Match:
             shot_profile = "ft"
             final_rate = 0.51 + (ft_attr * 0.0040)
 
+        ft_fouler: Optional[Player] = None
         if is_ft:
-            self._add_personal_foul(defense_team, self._pick_fouler(defense_lineup))
+            ft_fouler = self._pick_fouler(defense_lineup)
+            self._add_personal_foul(defense_team, ft_fouler)
+            if ft_fouler is not None:
+                self._record_event(
+                    event_type="foul",
+                    offense_team=offense_team,
+                    defense_team=defense_team,
+                    primary_player=ft_fouler,
+                    secondary_player=shooter,
+                    description_key="foul_on_shot",
+                    meta={
+                        "foul": True,
+                        "fouler_id": self._player_log_key(ft_fouler),
+                        "drawn_by_id": self._player_log_key(shooter),
+                        "shot_profile": "ft",
+                        "second_chance": False,
+                    },
+                )
 
         final_rate = max(0.05, min(0.82, final_rate))
 
