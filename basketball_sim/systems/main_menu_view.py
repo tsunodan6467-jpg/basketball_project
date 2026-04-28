@@ -5807,7 +5807,7 @@ class MainMenuView:
             "【ローテの細部（交代・疲労など）】\n"
             f"・交代の幅：{sub_ja}\n"
             f"・疲労方針：{fat_ja}\n"
-            f"・ファウル配慮：{foul_ja}（※試合シミュでは未反映の場合があります）\n"
+            f"・ファウル配慮：{foul_ja}（個人ファウル数に応じた交代補正として一部反映）\n"
             f"・終盤方針：{clutch_ja}\n"
             "※ 先発・6th・ベンチ順は自動では変わりません。\n"
             "※ 目標出場時間はこのプリセットでは自動入力されません。\n"
@@ -8274,7 +8274,10 @@ class MainMenuView:
         foul_note_fr.pack(fill="x", pady=(2, 0))
         ttk.Label(
             foul_note_fr,
-            text="※ ファウル配慮は保存のみ。試合シミュには未反映です。",
+            text=(
+                "※ ファウル配慮は、個人ファウル数に応じた交代補正として一部反映されます。\n"
+                "※ ファウルアウト・チームファウル・非FTファウルは未実装です。"
+            ),
             font=("Yu Gothic UI", 9),
             foreground="#9aa3b2",
             wraplength=520,
