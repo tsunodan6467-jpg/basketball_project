@@ -33,6 +33,7 @@ from basketball_sim.systems.team_tactics import (
 )
 
 PERSONAL_FOUL_OUT_LIMIT = 5
+NON_SHOOTING_FOUL_RATE = 0.025
 
 
 class Match:
@@ -862,6 +863,11 @@ class Match:
             if primary:
                 return f"[{clock_label}] {primary}のファウル。"
             return f"[{clock_label}] 守備側のファウル。"
+
+        if event_type == "non_shooting_foul":
+            if primary:
+                return f"[{clock_label}] {primary}のファウル。サイドから再開。"
+            return f"[{clock_label}] 守備側のファウル。サイドから再開。"
 
         if event_type == "foul_out":
             if primary:
@@ -3263,6 +3269,29 @@ class Match:
                 },
             )
             return 0
+
+        if random.random() < NON_SHOOTING_FOUL_RATE:
+            non_shooting_fouler = self._pick_fouler(defense_lineup)
+            if non_shooting_fouler is not None:
+                foul_quarter = self._get_current_event_quarter()
+                self._add_personal_foul(defense_team, non_shooting_fouler)
+                team_fouls = self._add_team_foul(defense_team, foul_quarter)
+                self._record_event(
+                    event_type="non_shooting_foul",
+                    offense_team=offense_team,
+                    defense_team=defense_team,
+                    primary_player=non_shooting_fouler,
+                    description_key="non_shooting_foul",
+                    meta={
+                        "foul": True,
+                        "foul_type": "non_shooting",
+                        "fouler_id": self._player_log_key(non_shooting_fouler),
+                        "team_fouls": team_fouls,
+                        "team_fouls_quarter": foul_quarter,
+                        "team_fouls_team_id": self._team_key(defense_team),
+                        "bonus_free_throw": False,
+                    },
+                )
 
         team_adjust = (offense_team_offense - defense_team_defense) * 0.0008
         three_cutoff, two_cutoff, shot_rate_adjust = self._get_shot_mix(

@@ -65,6 +65,16 @@ def _build_match() -> Match:
     return Match(home_team=home, away_team=away)
 
 
+def _stub_random(values, default: float = 1.0):
+    seq = iter(values)
+    return lambda: next(seq, default)
+
+
+@pytest.fixture(autouse=True)
+def _disable_non_shooting_foul_rate(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 0.0)
+
+
 def _pbp_foul_primary_counts_by_player_id(match: Match) -> Counter:
     c: Counter = Counter()
     for ev in match.play_by_play_log:
@@ -129,8 +139,10 @@ def test_non_ft_possession_does_not_increase_personal_fouls(monkeypatch: pytest.
 
     monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
     monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
-    random_values = iter([1.0, 0.0, 0.0, 1.0])  # no steal, 3P branch, make, no assist
-    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 1.0, 0.0, 0.0, 1.0]),  # no steal, no non-shooting foul, 3P, make, no assist
+    )
 
     _ = m._simulate_possession(
         m.home_team,
@@ -165,8 +177,10 @@ def test_ft_make_adds_one_personal_foul_to_defense(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
     monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
     monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
-    random_values = iter([1.0, 0.8, 0.0])  # no steal, ft branch, make
-    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 1.0, 0.8, 0.0]),  # no steal, no non-shooting foul, ft branch, make
+    )
 
     points = m._simulate_possession(
         m.home_team,
@@ -218,8 +232,10 @@ def test_ft_miss_adds_one_personal_foul_to_defense(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
     monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
     monkeypatch.setattr(m, "_get_offense_rebound_rate", lambda *_args, **_kwargs: 0.0)
-    random_values = iter([1.0, 0.8, 0.99, 0.99])  # no steal, ft branch, miss, no oreb
-    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 1.0, 0.8, 0.99, 0.99]),  # no steal, no non-shooting foul, ft branch, miss, no oreb
+    )
 
     points = m._simulate_possession(
         m.away_team,
@@ -264,8 +280,7 @@ def test_second_chance_ft_records_foul_before_made_ft(monkeypatch: pytest.Monkey
     monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
     monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: shooter)
     monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
-    random_values = iter([0.5, 0.0])  # FT branch, make
-    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+    monkeypatch.setattr("basketball_sim.models.match.random.random", _stub_random([0.5, 0.0]))  # FT branch, make
 
     before = len(m.play_by_play_log)
     pts = m._simulate_second_chance(
@@ -304,8 +319,10 @@ def test_ft_make_commentary_includes_foul_line(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
     monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
     monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
-    random_values = iter([1.0, 0.8, 0.0])
-    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 1.0, 0.8, 0.0]),
+    )
 
     _ = m._simulate_possession(
         m.home_team,
@@ -326,8 +343,10 @@ def test_foul_addition_syncs_to_rotation_on_next_update(monkeypatch: pytest.Monk
     monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
     monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
     monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
-    random_values = iter([1.0, 0.8, 0.0])  # no steal, ft branch, make
-    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 1.0, 0.8, 0.0]),  # no steal, no non-shooting foul, ft branch, make
+    )
 
     _ = m._simulate_possession(
         m.home_team,
@@ -377,8 +396,10 @@ def test_ft_team_fouls_are_tracked_by_quarter(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (0.0, 0.0, 0.0))
     monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
     monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
-    random_values = iter([1.0, 0.8, 0.0, 1.0, 0.8, 0.0])  # no steal, ft branch, make x2
-    monkeypatch.setattr("basketball_sim.models.match.random.random", lambda: next(random_values))
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 1.0, 0.8, 0.0, 1.0, 1.0, 0.8, 0.0]),  # two possessions: no steal, no non-shooting, ft, make
+    )
 
     _ = m._simulate_possession(
         m.home_team,
@@ -403,3 +424,75 @@ def test_ft_team_fouls_are_tracked_by_quarter(monkeypatch: pytest.MonkeyPatch):
 
     assert m.away_team_fouls_by_quarter.get(1) == 1
     assert m.away_team_fouls_by_quarter.get(2) == 1
+
+
+def test_non_shooting_foul_adds_pf_team_foul_and_pbp_meta(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 1.0)
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(m, "_get_assist_chance", lambda *_args, **_kwargs: 0.0)
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 0.0, 0.0, 0.0, 1.0]),  # no steal, non-shooting foul, 3P branch, make, no assist
+    )
+
+    points = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+
+    assert points == 3
+    assert m.away_personal_fouls_by_player_id.get(defender.player_id) == 1
+    assert m.away_team_fouls_by_quarter.get(1) == 1
+    nsf = [e for e in m.play_by_play_log if e.get("event_type") == "non_shooting_foul"]
+    assert len(nsf) == 1
+    meta = nsf[0].get("meta") or {}
+    assert meta.get("foul") is True
+    assert meta.get("foul_type") == "non_shooting"
+    assert meta.get("fouler_id") == defender.player_id
+    assert meta.get("team_fouls") == 1
+    assert meta.get("team_fouls_quarter") == 1
+    assert meta.get("team_fouls_team_id") == m.away_team.team_id
+    assert meta.get("bonus_free_throw") is False
+    assert not any(e.get("event_type") in {"made_ft", "miss_ft"} for e in m.play_by_play_log)
+
+
+def test_non_shooting_foul_can_reach_foul_out_without_ft(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+    m.away_personal_fouls_by_player_id[defender.player_id] = 4
+
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 1.0)
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(m, "_get_assist_chance", lambda *_args, **_kwargs: 0.0)
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 0.0, 0.0, 0.0, 1.0]),
+    )
+
+    _ = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+
+    assert m.away_personal_fouls_by_player_id.get(defender.player_id) == 5
+    assert defender.player_id in m.away_fouled_out_player_ids
+    assert any(e.get("event_type") == "non_shooting_foul" for e in m.play_by_play_log)
+    assert any(
+        e.get("event_type") == "foul_out" and e.get("primary_player_id") == defender.player_id
+        for e in m.play_by_play_log
+    )
