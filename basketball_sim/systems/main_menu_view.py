@@ -6469,7 +6469,8 @@ class MainMenuView:
     ) -> None:
         """
         おすすめ起用序列（計算と同一）を Team 正本へ反映。確認後のみ。
-        target_minutes / team_tactics のその他は変更しない。
+        team_tactics["rotation"]["starters"] のみ同期（試合開始先発の差し替え元）。
+        target_minutes / sub_policy 等の既存 rotation 欄は変更しない。
         """
         if self.team is None:
             return
@@ -6542,7 +6543,11 @@ class MainMenuView:
         q = messagebox.askyesno(
             "起用序列の上書き確認",
             "現在の先発・6th・ベンチ順を、おすすめ起用序列で上書きします。\n"
+            "あわせて、試合開始先発に使われる戦術先発にも反映します。\n"
             "目標出場時間は変更しません。\n"
+            "\n"
+            "なお、試合では外国籍枠・ポジション・OVR差などの安全ルールにより、"
+            "必ず完全一致しない場合があります。\n"
             "よろしいですか？",
             parent=message_parent,
         )
@@ -6585,6 +6590,41 @@ class MainMenuView:
             s_b(bench)
         except Exception as exc:
             messagebox.showerror("起用序列", str(exc), parent=message_parent)
+            return
+
+        try:
+            raw = dict(get_safe_team_tactics(self.team))
+            rot = dict(raw.get("rotation") or {})
+            starters_map: Dict[str, int] = {}
+            for i, pos in enumerate(STARTER_POSITIONS):
+                if i >= len(starters):
+                    break
+                spid = _pid(starters[i])
+                if spid is not None:
+                    starters_map[pos] = int(spid)
+            rot["starters"] = starters_map
+            raw["rotation"] = rot
+            self._tactics_commit_payload(raw)
+        except Exception as exc:
+            messagebox.showerror(
+                "起用序列",
+                f"戦術先発（rotation.starters）の保存に失敗しました: {exc}",
+                parent=message_parent,
+            )
+            self.refresh()
+            self._refresh_strategy_window()
+            lrel = getattr(self, "_tactics_rotation_lineup_reload", None)
+            if callable(lrel):
+                try:
+                    lrel()
+                except Exception:
+                    pass
+            rfn = getattr(self, "_rotation_overview_lf0_readouts", None)
+            if callable(rfn):
+                try:
+                    rfn()
+                except Exception:
+                    pass
             return
 
         self.refresh()
@@ -7438,8 +7478,8 @@ class MainMenuView:
         ttk.Label(
             lf2,
             text=(
-                "試合起用の正本は Team の先発・6th・ベンチ。戦術用先発と目標出場は rotation。"
-                "データは別のままです。"
+                "試合起用の正本は Team の先発・6th・ベンチ。目標出場やローテ方針は team_tactics の rotation。"
+                "「おすすめを起用序列に反映」では、あわせて戦術先発（rotation.starters）も更新されます。"
             ),
             font=("Yu Gothic UI", 9),
             wraplength=640,
@@ -7471,6 +7511,9 @@ class MainMenuView:
             text=(
                 "※ この一覧はおすすめ表示のみです。自動では反映されません。\n"
                 "※ 先発・6th・ベンチ順を変更する場合は、下の起用序列で手動調整してください。\n"
+                "※ 反映すると、Team正本の先発・6th・ベンチ順に加え、"
+                "試合開始先発用の戦術先発にも同期します。\n"
+                "※ 試合では外国籍枠やポジション条件により、最終先発が一部調整される場合があります。\n"
                 "※ 目標出場時間は変更されません。\n"
                 "※ 外国籍枠の制限はこのおすすめでは考慮していません。"
             ),
