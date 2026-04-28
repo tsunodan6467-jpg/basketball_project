@@ -178,6 +178,27 @@ ROTATION_PRESET_DEFS: Dict[str, Dict[str, Any]] = {
             "clutch_policy": "hot_hand",
         },
     },
+    "condition_care_v1": {
+        "label_ja": "コンディション重視型",
+        "team": {"usage_policy": "balanced"},
+        "usage_policy": {
+            "priority": "balanced",
+            "evaluation_focus": "overall",
+            "form_weight": "high",
+            "age_balance": "balanced",
+            "injury_care": "high",
+            "schedule_care": "rest",
+            "foreign_player_usage": "balanced",
+        },
+        "rotation": {
+            **dict(ROTATION_DEFAULTS),
+            "starters": {},
+            "sub_policy": "standard",
+            "fatigue_policy": "strict",
+            "foul_policy": "standard",
+            "clutch_policy": "hot_hand",
+        },
+    },
 }
 
 ALLOWED_PLAYBOOK_LEVEL = frozenset({"low", "standard", "high"})

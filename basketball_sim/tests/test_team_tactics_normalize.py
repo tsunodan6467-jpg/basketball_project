@@ -207,6 +207,65 @@ def test_get_current_rotation_preset_state_development_v1_custom_roundtrip():
     assert s2["label_ja"] == "育成優先型"
 
 
+def test_rotation_preset_condition_care_v1_canonical_shape():
+    assert "condition_care_v1" in ROTATION_PRESET_DEFS
+    p = ROTATION_PRESET_DEFS["condition_care_v1"]
+    assert p["label_ja"] == "コンディション重視型"
+    assert p["team"] == {"usage_policy": "balanced"}
+    assert set(p["usage_policy"].keys()) == set(USAGE_POLICY_DEFAULTS.keys())
+    assert set(p["rotation"].keys()) == set(ROTATION_DEFAULTS.keys())
+    assert p["rotation"]["starters"] == {}
+    assert p["usage_policy"]["injury_care"] == "high"
+    assert p["usage_policy"]["schedule_care"] == "rest"
+    assert p["usage_policy"]["form_weight"] == "high"
+    assert p["rotation"]["sub_policy"] == "standard"
+    assert p["rotation"]["fatigue_policy"] == "strict"
+    assert p["rotation"]["foul_policy"] == "standard"
+    assert p["rotation"]["clutch_policy"] == "hot_hand"
+    base = get_default_team_tactics()
+    merged = dict(base)
+    merged["usage_policy"] = dict(p["usage_policy"])
+    merged["rotation"] = dict(p["rotation"])
+    normalize_team_tactics(merged, valid_player_ids=set())
+
+
+def test_apply_rotation_preset_condition_care_v1_smoke_and_lineup_unchanged():
+    team = SimpleNamespace(
+        strategy="balanced",
+        usage_policy="win_now",
+        players=[],
+        team_tactics={"rotation": {"starters": {"PG": 1, "SG": 2, "SF": 3, "PF": 4, "C": 5}}},
+        starting_lineup=[10, 11, 12, 13, 14],
+        sixth_man_id=20,
+        bench_order=[21, 22],
+    )
+    apply_rotation_preset(team, "condition_care_v1")
+    assert team.usage_policy == "balanced"
+    assert team.team_tactics["usage_policy"] == ROTATION_PRESET_DEFS["condition_care_v1"]["usage_policy"]
+    r = team.team_tactics["rotation"]
+    assert r["sub_policy"] == ROTATION_PRESET_DEFS["condition_care_v1"]["rotation"]["sub_policy"]
+    assert r["fatigue_policy"] == ROTATION_PRESET_DEFS["condition_care_v1"]["rotation"]["fatigue_policy"]
+    assert r["foul_policy"] == ROTATION_PRESET_DEFS["condition_care_v1"]["rotation"]["foul_policy"]
+    assert r["clutch_policy"] == ROTATION_PRESET_DEFS["condition_care_v1"]["rotation"]["clutch_policy"]
+    assert r.get("target_minutes") in ({},)
+    assert r["bench_order"] == ROTATION_DEFAULTS["bench_order"]
+    st = team.team_tactics["rotation"]["starters"]
+    assert isinstance(st, dict)
+    assert all(st.get(p) is None for p in ("PG", "SG", "SF", "PF", "C"))
+    assert list(team.starting_lineup) == [10, 11, 12, 13, 14]
+    assert team.sixth_man_id == 20
+    assert team.bench_order == [21, 22]
+    normalize_team_tactics(team.team_tactics, valid_player_ids=None)
+
+
+def test_get_current_rotation_preset_state_condition_care_v1_not_custom():
+    team = SimpleNamespace(strategy="balanced", usage_policy="balanced", players=[], team_tactics={})
+    apply_rotation_preset_with_preset_meta(team, "condition_care_v1")
+    s = get_current_rotation_preset_state(team)
+    assert s["is_custom"] is False
+    assert s["label_ja"] == "コンディション重視型"
+
+
 def test_playstyle_preset_balanced_v1_canonical_shape():
     p = PLAYSTYLE_PRESET_DEFS["balanced_v1"]
     assert p["label_ja"] == "バランス型"

@@ -94,11 +94,13 @@ _ROTATION_PRESET_DESC_JA: Dict[str, str] = {
     "balanced_v1": "勝利と育成のバランスを取る標準型。極端に偏らない起用。",
     "win_now_v1": "主力をやや長めに起用する型。短期的な勝ち星を狙う。",
     "development_v1": "若手や控えの出場機会をやや重視する型。長期育成に向く。",
+    "condition_care_v1": "疲労・ケガ・連戦を重視し、主力の酷使を避ける起用方針です。",
 }
 _ROTATION_PRESET_TOOLTIP_JA: Dict[str, str] = {
     "balanced_v1": "標準的な攻守・起用バランス。",
     "win_now_v1": "主力をやや長めに起用。",
     "development_v1": "若手・控えをやや使いやすくする。",
+    "condition_care_v1": "ケガ配慮と連戦時運用を強め、疲労時の交代判断をやや早めます。先発・6th・ベンチ順は自動変更せず、必要に応じて手動で調整します。",
 }
 
 
@@ -5731,6 +5733,87 @@ class MainMenuView:
         self._tactics_commit_payload(raw)
         messagebox.showinfo("保存", "セット傾向（playbook）を保存しました。", parent=message_parent)
 
+    def _rotation_effect_summary_text(self) -> str:
+        """起用プリセット適用後の読み取り専用サマリー（ローテ画面 0 用）。"""
+        if self.team is None:
+            return ""
+        try:
+            ensure_team_tactics_on_team(self.team)
+        except Exception:
+            pass
+        st = get_current_rotation_preset_state(self.team)
+        preset_name = str(st.get("label_ja") or "—")
+        if st.get("is_custom"):
+            preset_name = "カスタム（プリセットと一致しません）"
+
+        tc = str(getattr(self.team, "usage_policy", "balanced") or "balanced").strip()
+        team_coarse_ja = {"balanced": "バランス", "win_now": "勝利優先", "development": "育成優先"}.get(
+            tc, tc
+        )
+
+        up = dict((get_safe_team_tactics(self.team).get("usage_policy") or {}))
+        pairs_map, _labels = self._usage_policy_pairs_map_and_labels()
+
+        def _disp(key: str) -> str:
+            raw_v = str(up.get(key, "") or "")
+            v = raw_v
+            if key == "evaluation_focus" and v == "potential":
+                v = "overall"
+            for a, b in pairs_map.get(key, []):
+                if a == v:
+                    return b
+            return raw_v or "—"
+
+        rot = get_safe_team_tactics(self.team).get("rotation")
+        if not isinstance(rot, dict):
+            rot = {}
+        sp = str(rot.get("sub_policy") or "standard").strip()
+        fp = str(rot.get("fatigue_policy") or "standard").strip()
+        fop = str(rot.get("foul_policy") or "standard").strip()
+        cp = str(rot.get("clutch_policy") or "stars").strip()
+        sub_ja = {
+            "standard": "標準",
+            "starters_long": "主力長め",
+            "bench_deep": "ベンチ厚め",
+            "youth_dev": "若手育成",
+        }.get(sp, sp)
+        fat_ja = {
+            "strict": "疲労に厳格（無理を避けやすい）",
+            "standard": "標準",
+            "push": "多少無理をさせる",
+        }.get(fp, fp)
+        foul_ja = {
+            "early_pull": "早めに下げる",
+            "standard": "標準",
+            "ride": "我慢する",
+        }.get(fop, fop)
+        clutch_ja = {
+            "stars": "主力固定",
+            "hot_hand": "好調優先",
+            "defense": "守備重視",
+            "offense": "攻撃重視",
+        }.get(cp, cp)
+
+        return (
+            "【現在の反映内容】\n"
+            f"・ローテプリセット：{preset_name}\n"
+            f"・チーム基本起用（粗い）：{team_coarse_ja}\n"
+            f"・起用の基本方針：{_disp('priority')}\n"
+            f"・評価基準：{_disp('evaluation_focus')}\n"
+            f"・調子の反映：{_disp('form_weight')}\n"
+            f"・年齢バランス：{_disp('age_balance')}\n"
+            f"・ケガ配慮：{_disp('injury_care')}\n"
+            f"・連戦時運用：{_disp('schedule_care')}\n"
+            "【ローテの細部（交代・疲労など）】\n"
+            f"・交代の幅：{sub_ja}\n"
+            f"・疲労方針：{fat_ja}\n"
+            f"・ファウル配慮：{foul_ja}（※試合シミュでは未反映の場合があります）\n"
+            f"・終盤方針：{clutch_ja}\n"
+            "※ 先発・6th・ベンチ順は自動では変わりません。\n"
+            "※ 目標出場時間はこのプリセットでは自動入力されません。\n"
+            "※ 必要に応じて下の「2. 起用序列」や「ローテ詳細」で調整してください。"
+        )
+
     def _build_rotation_preset_editor_ui(
         self,
         parent: ttk.Frame,
@@ -5740,7 +5823,7 @@ class MainMenuView:
         usage_policy_resync: Optional[Callable[[], None]] = None,
     ) -> Tuple[Callable[[], None], Callable[[], None]]:
         """
-        0. 起用プリセット（ROTATION_PRESET_DEFS 3種）の共通 UI。
+        0. 起用プリセット（ROTATION_PRESET_DEFS）の共通 UI。
         戻り値: (状態ラベル更新, preset_meta からコンボ同期) 用コールバック。
         """
         lbl_rot_state = ttk.Label(parent, text="", wraplength=520)
@@ -5762,6 +5845,7 @@ class MainMenuView:
             "balanced_v1",
             "win_now_v1",
             "development_v1",
+            "condition_care_v1",
         )
         _rotation_preset_ids: Tuple[str, ...] = tuple(
             pid for pid in _ui_rotation_preset_order if pid in ROTATION_PRESET_DEFS
@@ -6341,11 +6425,14 @@ class MainMenuView:
         ).pack(anchor="w", pady=(0, 6))
         usage_pairs_ov, usage_labels_ov = self._usage_policy_pairs_map_and_labels()
         usage_resync_holder: Dict[str, Optional[Callable[[], None]]] = {"fn": None}
+        usage_resync_extras: List[Callable[[], None]] = []
 
         def _resync_usage_policy_from_preset() -> None:
             fn = usage_resync_holder.get("fn")
             if fn is not None:
                 fn()
+            for ex in usage_resync_extras:
+                ex()
 
         self._build_rotation_preset_editor_ui(
             lf0,
@@ -6353,6 +6440,29 @@ class MainMenuView:
             after_apply=None,
             usage_policy_resync=_resync_usage_policy_from_preset,
         )
+        ttk.Label(
+            lf0,
+            text="▼ いま入っているおすすめ（読み取り）",
+            font=("Yu Gothic UI", 9, "bold"),
+            foreground="#9aa3b2",
+        ).pack(anchor="w", pady=(8, 2))
+        summary_lbl = ttk.Label(
+            lf0,
+            text="",
+            font=("Yu Gothic UI", 9),
+            foreground="#c8d0dc",
+            wraplength=640,
+            justify="left",
+        )
+        summary_lbl.pack(anchor="w", pady=(0, 6))
+
+        def _refresh_rotation_effect_summary() -> None:
+            if self.team is None:
+                return
+            summary_lbl.configure(text=self._rotation_effect_summary_text())
+
+        usage_resync_extras.append(_refresh_rotation_effect_summary)
+        _refresh_rotation_effect_summary()
         ttk.Label(
             lf0,
             text=(
@@ -6427,22 +6537,31 @@ class MainMenuView:
         ).pack(anchor="w", pady=(0, 6))
 
         def _save_usage_ov() -> None:
+            def _after_save_usage() -> None:
+                self._refresh_strategy_window()
+                _refresh_rotation_effect_summary()
+
             self._usage_policy_editor_save(
                 combos_usage_ov,
                 usage_pairs_ov,
                 message_parent=w,
                 message_title="保存",
                 message_body="起用方針テンプレ（usage_policy）を保存しました。",
-                after_save=self._refresh_strategy_window,
+                after_save=_after_save_usage,
             )
 
         def _reset_usage_ov() -> None:
             self._usage_policy_editor_reset_display(combos_usage_ov, usage_pairs_ov)
+            _refresh_rotation_effect_summary()
 
-        def _reload_usage_ov() -> None:
+        def _reload_usage_combos_only() -> None:
             self._usage_policy_editor_reload_from_team(combos_usage_ov, usage_pairs_ov)
 
-        usage_resync_holder["fn"] = _reload_usage_ov
+        def _reload_usage_ov() -> None:
+            _reload_usage_combos_only()
+            _refresh_rotation_effect_summary()
+
+        usage_resync_holder["fn"] = _reload_usage_combos_only
 
         r1a = ttk.Frame(lf1, style="Panel.TFrame")
         r1a.pack(fill="x", pady=(0, 4))
