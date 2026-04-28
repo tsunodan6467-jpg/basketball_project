@@ -222,6 +222,103 @@ def build_postgame_edges_summary(match: Any, user_team: Any) -> Optional[Dict[st
     }
 
 
+def _safe_box_score_rows(match: Any) -> List[Dict[str, Any]]:
+    try:
+        fn = getattr(match, "get_player_box_score_rows", None)
+        if not callable(fn):
+            return []
+        rows = fn()
+        if not isinstance(rows, list):
+            return []
+        return [r for r in rows if isinstance(r, dict)]
+    except Exception:
+        return []
+
+
+def _row_belongs_to_user_team(row: Dict[str, Any], user_team: Any) -> bool:
+    if user_team is None:
+        return False
+    try:
+        uid = getattr(user_team, "team_id", None)
+        if uid is not None:
+            rid = row.get("team_id", None)
+            if rid is not None:
+                return int(rid) == int(uid)
+    except Exception:
+        pass
+    try:
+        un = str(getattr(user_team, "name", "") or "")
+        rn = str(row.get("team_name") or "")
+        if un and rn and un == rn:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _row_pf_minutes_name(row: Dict[str, Any]) -> Tuple[str, int, float]:
+    name = str(row.get("player_name") or "?")
+    try:
+        pf = int(row.get("pf", 0) or 0)
+    except (TypeError, ValueError):
+        pf = 0
+    try:
+        minutes = float(row.get("minutes", 0) or 0.0)
+    except (TypeError, ValueError):
+        minutes = 0.0
+    return name, pf, minutes
+
+
+def _format_pf_summary_lines(match: Any, user_team: Any) -> List[str]:
+    """
+    個人 PF の最小表示行（自チームのみ。PF>=1 の選手のみ列挙。
+    全員 PF=0 なら「PF記録なし」1 行。データ不十分なら空。
+    """
+    if user_team is None:
+        return []
+    try:
+        rows = _safe_box_score_rows(match)
+    except Exception:
+        return []
+    if not rows:
+        return []
+    own: List[Dict[str, Any]] = []
+    for r in rows:
+        try:
+            if _row_belongs_to_user_team(r, user_team):
+                own.append(r)
+        except Exception:
+            continue
+    if not own:
+        return []
+    with_pf: List[Dict[str, Any]] = []
+    for r in own:
+        try:
+            _n, pfi, _m = _row_pf_minutes_name(r)
+            if pfi >= 1:
+                with_pf.append(r)
+        except Exception:
+            continue
+    if with_pf:
+        keyed: List[Tuple[int, float, Dict[str, Any]]] = []
+        for r in with_pf:
+            try:
+                _nm, pfi, mins = _row_pf_minutes_name(r)
+                keyed.append((pfi, mins, r))
+            except Exception:
+                continue
+        keyed.sort(key=lambda t: (-t[0], -t[1]))
+        out: List[str] = ["ファウル（PF）:"]
+        for _pfi, _mins, r in keyed:
+            try:
+                nm, pfi, mins = _row_pf_minutes_name(r)
+                out.append(f"- {nm} PF {pfi} / {mins:.1f}分")
+            except Exception:
+                continue
+        return out
+    return ["PF記録なし"]
+
+
 def _narrative_lines(user_won: bool, edges: Dict[str, Any]) -> Tuple[str, str, str]:
     axes = [
         ("outside", "外角"),
@@ -285,9 +382,19 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
     except Exception:
         return ["【試合後サマリー】", "情報なし", ""]
 
+    pf_lines: List[str] = []
+    try:
+        pf_lines = _format_pf_summary_lines(match, user_team)
+    except Exception:
+        pf_lines = []
+
     edges = build_postgame_edges_summary(match, user_team)
     if edges is None:
-        return ["【試合後サマリー】", score_line, "情報なし（比較材料が不足しています）", ""]
+        out_none: List[str] = ["【試合後サマリー】", score_line]
+        if pf_lines:
+            out_none.extend(pf_lines)
+        out_none.extend(["情報なし（比較材料が不足しています）", ""])
+        return out_none
 
     if edges.get("_source") == "lineup_fallback":
         hdr = f"※スタッツ参照不可のため布陣比較の近似です / vs {opp_name}"
@@ -300,17 +407,11 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
     )
     line2 = f"守備強度: {edges['defense']} / ベンチ勝負: {edges['bench']}"
     w, l, p = _narrative_lines(user_won, edges)
-    return [
-        "【試合後サマリー】",
-        score_line,
-        hdr,
-        line1,
-        line2,
-        w,
-        l,
-        p,
-        "",
-    ]
+    out: List[str] = ["【試合後サマリー】", score_line]
+    if pf_lines:
+        out.extend(pf_lines)
+    out.extend([hdr, line1, line2, w, l, p, ""])
+    return out
 
 
 __all__ = ["build_postgame_edges_summary", "format_match_postgame_cli_lines"]
