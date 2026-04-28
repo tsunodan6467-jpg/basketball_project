@@ -1,4 +1,4 @@
-"""target_minutes overlay（20% blend）と交代候補方向の固定テスト。"""
+"""target_minutes overlay（小差分0.20 / 大差分0.30）と交代候補方向の固定テスト。"""
 
 from __future__ import annotations
 
@@ -135,39 +135,64 @@ def _simulate_rotation_minutes_from_midgame(
     return out
 
 
-def test_target_minutes_overlay_blend_formula_and_direction():
+def test_target_minutes_overlay_small_diff_keeps_0_20_blend():
     """
-    _build_target_minutes_map の overlay は常に 20% blend。
-    高め overlay は上方向、低め overlay は下方向へ寄ることを固定化する。
+    小差分（diff < 8.0）では 0.20 blend を維持する。
     """
     t = _team(12, team_id=11)
     r = _rotation(t)
     pid_map = _pid_to_key(r)
-    low_pid = int(r.active_players[0].player_id)
-    high_pid = int(r.active_players[1].player_id)
-    low_key = pid_map[low_pid]
-    high_key = pid_map[high_pid]
+    pid = int(r.active_players[0].player_id)
+    key = pid_map[pid]
 
     r._tactics_target_minutes = {}
     base_map = r._build_target_minutes_map()
-    low_base = float(base_map[low_key])
-    high_base = float(base_map[high_key])
+    base = float(base_map[key])
+    overlay_raw = base + 4.0  # diff<8
+    overlay = r._clamp_target_minutes(overlay_raw)
+    assert abs(overlay - base) < 8.0
 
-    # 保存側 0/40 相当を与えても、試合用 target は clamp(4..38) 後に 20% blend。
-    r._tactics_target_minutes = {low_pid: 0.0, high_pid: 40.0}
+    r._tactics_target_minutes = {pid: overlay_raw}
     with_overlay = r._build_target_minutes_map()
-    low_overlay = float(with_overlay[low_key])
-    high_overlay = float(with_overlay[high_key])
+    got = float(with_overlay[key])
+    expected = r._clamp_target_minutes(base + (overlay - base) * 0.20)
+    assert got == pytest.approx(expected, abs=1e-9)
 
-    low_o = r._clamp_target_minutes(0.0)
-    high_o = r._clamp_target_minutes(40.0)
-    low_expected = r._clamp_target_minutes(low_base + (low_o - low_base) * 0.20)
-    high_expected = r._clamp_target_minutes(high_base + (high_o - high_base) * 0.20)
 
-    assert low_overlay == pytest.approx(low_expected, abs=1e-9)
-    assert high_overlay == pytest.approx(high_expected, abs=1e-9)
-    assert low_overlay < low_base
-    assert high_overlay > high_base
+def test_target_minutes_overlay_large_diff_uses_0_30_blend_up_and_down():
+    """
+    大差分（diff >= 8.0）では、上方向/下方向どちらも 0.30 blend。
+    かつ出力 target は安全範囲（4..38）に収まる。
+    """
+    t = _team(12, team_id=15)
+    r = _rotation(t)
+    pid_map = _pid_to_key(r)
+    down_pid = int(r.active_players[0].player_id)
+    up_pid = int(r.active_players[1].player_id)
+    down_key = pid_map[down_pid]
+    up_key = pid_map[up_pid]
+
+    r._tactics_target_minutes = {}
+    base_map = r._build_target_minutes_map()
+    down_base = float(base_map[down_key])
+    up_base = float(base_map[up_key])
+
+    r._tactics_target_minutes = {down_pid: 0.0, up_pid: 40.0}
+    with_overlay = r._build_target_minutes_map()
+    down_got = float(with_overlay[down_key])
+    up_got = float(with_overlay[up_key])
+
+    down_overlay = r._clamp_target_minutes(0.0)
+    up_overlay = r._clamp_target_minutes(40.0)
+    assert abs(down_overlay - down_base) >= 8.0
+    assert abs(up_overlay - up_base) >= 8.0
+
+    down_expected = r._clamp_target_minutes(down_base + (down_overlay - down_base) * 0.30)
+    up_expected = r._clamp_target_minutes(up_base + (up_overlay - up_base) * 0.30)
+    assert down_got == pytest.approx(down_expected, abs=1e-9)
+    assert up_got == pytest.approx(up_expected, abs=1e-9)
+    assert down_got < down_base
+    assert up_got > up_base
     assert all(4.0 <= float(v) <= 38.0 for v in with_overlay.values())
 
 

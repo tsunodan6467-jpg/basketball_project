@@ -37,6 +37,10 @@ _WIN_NOW_TARGET_DEEP_BENCH_RANK_MIN: int = 7
 _WIN_NOW_OUT_CANDIDATE_CORE_BIAS: float = -0.40
 _WIN_NOW_OUT_CANDIDATE_MIN_TARGET: float = 19.0
 
+_TARGET_MINUTES_OVERLAY_BLEND_DEFAULT: float = 0.20
+_TARGET_MINUTES_OVERLAY_BLEND_LARGE_DIFF: float = 0.30
+_TARGET_MINUTES_OVERLAY_LARGE_DIFF_THRESHOLD: float = 8.0
+
 # foul_policy × 個人ファウル: OUT 候補スコアへの T1 補正（Match 由来の pf 正本は未接続でも外部 dict で駆動可能）
 _FOUL_TROUBLE_OUT_BONUS: Dict[str, Dict[str, float]] = {
     "early_pull": {"2": 0.8, "3": 1.6, "4p": 2.6},
@@ -334,6 +338,12 @@ class RotationSystem:
     def _clamp_target_minutes(self, minutes: float) -> float:
         return max(4.0, min(38.0, float(minutes)))
 
+    def _get_target_minutes_overlay_blend(self, base: float, overlay: float) -> float:
+        diff = abs(float(overlay) - float(base))
+        if diff >= _TARGET_MINUTES_OVERLAY_LARGE_DIFF_THRESHOLD:
+            return _TARGET_MINUTES_OVERLAY_BLEND_LARGE_DIFF
+        return _TARGET_MINUTES_OVERLAY_BLEND_DEFAULT
+
     def _is_win_now_target_bias_active(self) -> bool:
         """
         target minutes 微調整の有効条件（第2段階）。
@@ -500,7 +510,6 @@ class RotationSystem:
 
         overlay = getattr(self, "_tactics_target_minutes", None) or {}
         if overlay:
-            blend = 0.20
             for p in sorted_players:
                 key = self._player_key(p)
                 pid = getattr(p, "player_id", None)
@@ -514,6 +523,7 @@ class RotationSystem:
                     continue
                 o = self._clamp_target_minutes(float(overlay[pid_i]))
                 base = float(targets.get(key, 22.0))
+                blend = self._get_target_minutes_overlay_blend(base, o)
                 merged = base + (o - base) * blend
                 targets[key] = self._clamp_target_minutes(merged)
 
