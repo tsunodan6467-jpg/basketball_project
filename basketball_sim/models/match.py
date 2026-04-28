@@ -419,6 +419,45 @@ class Match:
         on_court_possessions = self._minutes_tracker.get(key, 0)
         return 40.0 * on_court_possessions / self.total_possessions
 
+    def get_player_box_score_rows(self) -> List[Dict[str, Any]]:
+        """
+        試合別の選手成績行データ（表示用の土台）。GUI には未接続。
+
+        - PF は home_personal_fouls_by_player_id / away_personal_fouls_by_player_id を正本とする。
+        - minutes は _get_player_minutes（_minutes_tracker ベース）。
+        - 1 試合あたりの PTS/REB/AST 等は、シーズン累計を混ぜないため今回は含めない（将来拡張用にキー追加可）。
+        """
+        rows: List[Dict[str, Any]] = []
+        for team, players, pf_map in (
+            (self.home_team, self.home_active_players, self.home_personal_fouls_by_player_id),
+            (self.away_team, self.away_active_players, self.away_personal_fouls_by_player_id),
+        ):
+            team_id = getattr(team, "team_id", None)
+            team_name = str(getattr(team, "name", "") or "")
+            for p in players or []:
+                if p is None:
+                    continue
+                try:
+                    pid = int(getattr(p, "player_id", None))
+                except (TypeError, ValueError):
+                    continue
+                if pid < 0:
+                    continue
+                name = str(getattr(p, "name", "") or "")
+                minutes = float(self._get_player_minutes(p))
+                pf = int(pf_map.get(pid, 0) or 0)
+                rows.append(
+                    {
+                        "team_id": team_id,
+                        "team_name": team_name,
+                        "player_id": pid,
+                        "player_name": name,
+                        "minutes": minutes,
+                        "pf": pf,
+                    }
+                )
+        return rows
+
     def _print_minutes_log(self, team: Team, active_players: List[Player]):
         print(f"[MINUTES] {team.name}")
 

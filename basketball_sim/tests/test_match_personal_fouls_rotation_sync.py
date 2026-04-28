@@ -1,5 +1,7 @@
 """Match 個人ファウル正本 → RotationSystem 同期/FT最小加算テスト。"""
 
+from collections import Counter
+
 import pytest
 
 from basketball_sim.models.match import Match
@@ -63,6 +65,30 @@ def _build_match() -> Match:
     return Match(home_team=home, away_team=away)
 
 
+def _pbp_foul_primary_counts_by_player_id(match: Match) -> Counter:
+    c: Counter = Counter()
+    for ev in match.play_by_play_log:
+        if ev.get("event_type") != "foul":
+            continue
+        pid = ev.get("primary_player_id")
+        if pid is None:
+            continue
+        try:
+            c[int(pid)] += 1
+        except (TypeError, ValueError):
+            continue
+    return c
+
+
+def _pf_dict_counter(match: Match) -> Counter:
+    c: Counter = Counter()
+    for k, v in match.home_personal_fouls_by_player_id.items():
+        c[int(k)] += int(v)
+    for k, v in match.away_personal_fouls_by_player_id.items():
+        c[int(k)] += int(v)
+    return c
+
+
 def test_match_initializes_empty_personal_foul_dicts():
     m = _build_match()
     assert m.home_personal_fouls_by_player_id == {}
@@ -109,6 +135,9 @@ def test_non_ft_possession_does_not_increase_personal_fouls(monkeypatch: pytest.
     assert m.home_personal_fouls_by_player_id == {}
     assert m.away_personal_fouls_by_player_id == {}
     assert not any(e.get("event_type") == "foul" for e in m.play_by_play_log)
+    rows = m.get_player_box_score_rows()
+    assert len(rows) == len(m.home_active_players) + len(m.away_active_players)
+    assert all(r.get("pf") == 0 for r in rows)
 
 
 def test_set_personal_fouls_accepts_string_keys_in_dict():
@@ -141,6 +170,13 @@ def test_ft_make_adds_one_personal_foul_to_defense(monkeypatch: pytest.MonkeyPat
     assert points == 1
     assert m.away_personal_fouls_by_player_id.get(defender.player_id) == 1
     assert m.home_personal_fouls_by_player_id == {}
+
+    assert _pbp_foul_primary_counts_by_player_id(m) == _pf_dict_counter(m)
+    rows = m.get_player_box_score_rows()
+    by_id = {r["player_id"]: r for r in rows}
+    assert by_id[defender.player_id]["pf"] == 1
+    assert by_id[defender.player_id]["team_id"] == m.away_team.team_id
+    assert by_id[shooter.player_id]["pf"] == 0
 
     ft_tail = [e for e in m.play_by_play_log if e.get("event_type") in ("foul", "made_ft")]
     assert len(ft_tail) == 2
@@ -191,6 +227,13 @@ def test_ft_miss_adds_one_personal_foul_to_defense(monkeypatch: pytest.MonkeyPat
     meta = fe.get("meta") or {}
     assert meta.get("second_chance") is False
 
+    assert _pbp_foul_primary_counts_by_player_id(m) == _pf_dict_counter(m)
+    rows = m.get_player_box_score_rows()
+    by_id = {r["player_id"]: r for r in rows}
+    assert by_id[defender.player_id]["pf"] == 1
+    assert by_id[defender.player_id]["team_id"] == m.home_team.team_id
+    assert by_id[shooter.player_id]["pf"] == 0
+
 
 def test_second_chance_ft_records_foul_before_made_ft(monkeypatch: pytest.MonkeyPatch):
     m = _build_match()
@@ -223,6 +266,12 @@ def test_second_chance_ft_records_foul_before_made_ft(monkeypatch: pytest.Monkey
     assert fe.get("primary_player_id") == defender.player_id
     assert fe.get("secondary_player_id") == shooter.player_id
     assert (fe.get("meta") or {}).get("second_chance") is True
+
+    assert _pbp_foul_primary_counts_by_player_id(m) == _pf_dict_counter(m)
+    rows = m.get_player_box_score_rows()
+    by_id = {r["player_id"]: r for r in rows}
+    assert by_id[defender.player_id]["pf"] == 1
+    assert by_id[defender.player_id]["team_id"] == m.away_team.team_id
 
 
 def test_ft_make_commentary_includes_foul_line(monkeypatch: pytest.MonkeyPatch):
