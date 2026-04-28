@@ -5814,23 +5814,33 @@ class MainMenuView:
             "※ 必要に応じて下の「2. 起用序列」や「ローテ詳細」で調整してください。"
         )
 
-    def _rotation_target_minutes_preview_text(self) -> str:
-        """起用序列とローテプリセットに基づく目標出場の目安（保存しない読み取り専用）。"""
+    def _rotation_target_minutes_recommendation_rows(
+        self,
+    ) -> Tuple[str, str, str, List[Dict[str, Any]], Optional[str]]:
+        """
+        起用序列とローテプリセットに基づく目標出場目安（最大12人分の構造化行）。
+        Returns:
+            (head, table_header_line, foot, rows, extra_line)
+            rows 空＝先発5人未満等で表なし。extra_line はベンチ省略時のみ。
+        row keys: player_id, player_name, role_label, current_minutes_label,
+                  recommended_minutes, recommended_label, memo
+        """
         if self.team is None:
-            return ""
+            return ("", "", "", [], None)
+
         try:
             ensure_team_tactics_on_team(self.team)
         except Exception:
             pass
 
         st = get_current_rotation_preset_state(self.team)
-        pid = st.get("preset_id")
+        pmeta = st.get("preset_id")
         is_custom = bool(st.get("is_custom"))
-        if (not pid) or is_custom or (pid not in ROTATION_PRESET_DEFS):
+        if (not pmeta) or is_custom or (pmeta not in ROTATION_PRESET_DEFS):
             eff = "balanced_v1"
             head = "※ プリセットが未設定、または手動で変えた「カスタム」状態のときは、目安をバランス基準で表示しています。\n\n"
         else:
-            eff = str(pid)
+            eff = str(pmeta)
             head = ""
 
         def _cur_tm(tm_raw: Any, p_id: int) -> str:
@@ -5875,8 +5885,8 @@ class MainMenuView:
                 return 0
 
         def _development_preview_memo(p: Any, _slot: str) -> str:
-            a = _age(p)
             bits: List[str] = []
+            a = _age(p)
             if a is not None and a <= 22:
                 bits.append("若手は時間を取りやすい目安")
             if a is not None and a >= 30:
@@ -5895,21 +5905,51 @@ class MainMenuView:
                 bits.append("疲労高め：交代を意識")
             return " ".join(bits)
 
+        def _one_row(
+            p_id: int,
+            name: str,
+            role: str,
+            cur_lbl: str,
+            rec_lbl: str,
+            rmin: float,
+            memo: str,
+        ) -> Dict[str, Any]:
+            m = max(0.0, min(40.0, float(rmin)))
+            return {
+                "player_id": p_id,
+                "player_name": name,
+                "role_label": role,
+                "current_minutes_label": cur_lbl,
+                "recommended_minutes": m,
+                "recommended_label": rec_lbl,
+                "memo": memo,
+            }
+
         rot = get_safe_team_tactics(self.team).get("rotation")
         if not isinstance(rot, dict):
             rot = {}
         tm = rot.get("target_minutes") if isinstance(rot.get("target_minutes"), dict) else {}
 
+        foot = (
+            "\n"
+            "※ 上の「このおすすめを目標出場時間に反映」は、押したときだけ上書き保存します。\n"
+            "※ 上書きしない限り、目標出場（team_tactics）には自動で書き込みません。\n"
+            "※ 下の「ローテ詳細」スライダーで微調整することもできます。\n"
+            "※ 先発・6th・ベンチ順の Team 正本は、ここからは変わりません（下の2で手動）。"
+        )
+        no_table_msg = (
+            head
+            + "先発登録が5人に満たないため、目安一覧は出せません。\n"
+            + "（契約中の選手で先発5人を揃えてから見てください。）\n\n"
+            "※ 上書き反映もできません。ローテ詳細で手動の目標出場を設定できます。"
+        )
+        table_hdr = "（列）選手 / 序列 / 保存 / おすすめ / メモ"
+
         starters = list(get_current_starting_five(self.team) or [])
         if len(starters) < 5:
-            return (
-                head
-                + "先発登録が5人に満たないため、目安一覧は出せません。\n"
-                + "（契約中の選手で先発5人を揃えてから見てください。）\n\n"
-                "※ この一覧は保存しません。ローテ詳細で手動の目標出場を設定できます。"
-            )
+            return (no_table_msg, "", foot, [], None)
 
-        st_rows: List[Tuple[int, int]] = []  # (player_id, ovr)
+        st_rows: List[Tuple[int, int]] = []
         for p in starters:
             try:
                 p_id = int(getattr(p, "player_id", -1) or -1)
@@ -5920,7 +5960,7 @@ class MainMenuView:
             t[0] for t in sorted([x for x in st_rows if x[0] >= 0], key=lambda t: t[1], reverse=True)[:2]
         }
 
-        out_lines: List[str] = [head + "（列）選手 / 序列 / 保存 / おすすめ / メモ"]
+        rows: List[Dict[str, Any]] = []
         n_shown = 0
         for pos, p in zip(STARTER_POSITIONS, starters):
             if n_shown >= 12:
@@ -5933,27 +5973,29 @@ class MainMenuView:
             role = f"先発{pos}"
             cur = _cur_tm(tm, p_id) if p_id >= 0 else "未設定"
             is_top2 = p_id in sorted_pids and p_id >= 0
+            rmin: float
             if eff == "win_now_v1" and is_top2:
-                rec, memo = ("32分前後", "主力寄り（勝利優先）")
+                rec, memo, rmin = ("32分前後", "主力寄り（勝利優先）", 32.0)
             elif eff == "win_now_v1" and not is_top2:
-                rec, memo = ("28分前後", "先発枠")
+                rec, memo, rmin = ("28分前後", "先発枠", 28.0)
             elif eff == "balanced_v1":
-                rec, memo = ("28分前後", "バランス先発")
+                rec, memo, rmin = ("28分前後", "バランス先発", 28.0)
             elif eff == "development_v1":
-                rec, memo = ("27分前後", "先発枠")
+                rec, memo, rmin = ("27分前後", "先発枠", 27.0)
                 a = _age(p)
                 if a is not None and a <= 22:
                     memo = "先発枠（若手は目安やや上）"
                 elif a is not None and a >= 30:
                     memo = "先発枠（ベテランは目安やさめ）"
             elif eff == "condition_care_v1":
-                rec, memo = ("27分前後", "休養意識の先発枠")
+                rec, memo, rmin = ("27分前後", "休養意識の先発枠", 27.0)
             else:
-                rec, memo = ("28分前後", "標準的な目安")
+                rec, memo, rmin = ("28分前後", "標準的な目安", 28.0)
             ex = _condition_preview_memo(p) if eff == "condition_care_v1" else ""
             if ex:
                 memo = f"{memo} {ex}".strip()
-            out_lines.append(f"{name} / {role} / {cur} / {rec} / {memo}")
+            if p_id >= 0:
+                rows.append(_one_row(p_id, name, role, cur, rec, rmin, memo))
             n_shown += 1
 
         sm = get_current_sixth_man(self.team)
@@ -5965,33 +6007,35 @@ class MainMenuView:
             name = str(getattr(sm, "name", "?"))[:14]
             cur = _cur_tm(tm, p_id) if p_id >= 0 else "未設定"
             if eff == "win_now_v1":
-                rec, memo = ("22分前後", "控えの柱")
+                rec, memo, rmin = ("22分前後", "控えの柱", 22.0)
             elif eff == "balanced_v1":
-                rec, memo = ("22分前後", "6th 起用")
+                rec, memo, rmin = ("22分前後", "6th 起用", 22.0)
             elif eff == "development_v1":
-                rec, memo = ("21分前後", "6th 起用")
+                rec, memo, rmin = ("21分前後", "6th 起用", 21.0)
                 a = _age(sm)
                 if a is not None and a <= 22:
                     memo = "6th 起用（育成枠）"
             elif eff == "condition_care_v1":
-                rec, memo = ("21分前後", "無理を避けたい枠")
+                rec, memo, rmin = ("21分前後", "無理を避けたい枠", 21.0)
             else:
-                rec, memo = ("22分前後", "6th 起用")
+                rec, memo, rmin = ("22分前後", "6th 起用", 22.0)
             ex = _condition_preview_memo(sm) if eff == "condition_care_v1" else (
                 _development_preview_memo(sm, "sixth") if eff == "development_v1" else ""
             )
             if ex:
                 memo = f"{memo} {ex}".strip()
-            out_lines.append(f"{name} / 6th / {cur} / {rec} / {memo}")
+            if p_id >= 0:
+                rows.append(_one_row(p_id, name, "6th", cur, rec, rmin, memo))
             n_shown += 1
 
         bench = [b for b in (get_current_bench_order(self.team) or []) if b is not None]
         n_b = len(bench)
+        extra_line: Optional[str] = None
         for bi, p in enumerate(bench):
             if n_shown >= 12:
                 rem = n_b - bi
                 if rem > 0:
-                    out_lines.append(f"… 他 {rem} 名（ベンチ以降は省略）")
+                    extra_line = f"… 他 {rem} 名（ベンチ以降は省略）"
                 break
             try:
                 p_id = int(getattr(p, "player_id", -1) or -1)
@@ -6005,33 +6049,116 @@ class MainMenuView:
                 role = f"{role}（{pos_label}）"
             cur = _cur_tm(tm, p_id) if p_id >= 0 else "未設定"
             if eff == "win_now_v1":
-                rec, memo = (("11分前後", "控え短め") if is_hi else ("4分前後", "出番は限定的"))
+                rec, memo, rmin = (
+                    ("11分前後", "控え短め", 11.0) if is_hi else ("4分前後", "出番は限定的", 4.0)
+                )
             elif eff == "balanced_v1":
-                rec, memo = (("15分前後", "ローテ寄与") if is_hi else ("7分前後", "短い出番"))
+                rec, memo, rmin = (
+                    ("15分前後", "ローテ寄与", 15.0) if is_hi else ("7分前後", "短い出番", 7.0)
+                )
             elif eff == "development_v1":
-                rec, memo = (("18分前後", "育成枠") if is_hi else ("11分前後", "出番を重視しやすい"))
+                rec, memo, rmin = (
+                    ("18分前後", "育成枠", 18.0) if is_hi else ("11分前後", "出番を重視しやすい", 11.0)
+                )
                 a = _age(p)
                 if a is not None and a <= 22 and is_hi:
                     memo = "育成枠（若手に時間を割きやすい）"
             elif eff == "condition_care_v1":
-                rec, memo = (("15分前後", "深めのローテ") if is_hi else ("9分前後", "省エネ起用目安"))
+                rec, memo, rmin = (
+                    ("15分前後", "深めのローテ", 15.0) if is_hi else ("9分前後", "省エネ起用目安", 9.0)
+                )
             else:
-                rec, memo = ("12分前後", "控え目安")
+                rec, memo, rmin = ("12分前後", "控え目安", 12.0)
             ex = _condition_preview_memo(p) if eff == "condition_care_v1" else _development_preview_memo(
                 p, "bench"
             ) if eff == "development_v1" else ""
             if ex:
                 memo = f"{memo} {ex}".strip()
-            out_lines.append(f"{name} / {role} / {cur} / {rec} / {memo}")
+            if p_id >= 0:
+                rows.append(_one_row(p_id, name, role, cur, rec, rmin, memo))
             n_shown += 1
 
-        foot = (
-            "\n"
-            "※ この一覧は「おすすめ表示」のみで、目標出場（team_tactics）へ自動保存しません。\n"
-            "※ 実際に目標出場を変えるときは「ローテ詳細」で、スライダーを手動調整してください。\n"
-            "※ 先発・6th・ベンチ順の Team 正本は、この一覧からは変わりません（下の2で手動）。"
+        return (head, table_hdr, foot, rows, extra_line)
+
+    def _rotation_target_minutes_preview_text(self) -> str:
+        """起用序列とローテプリセットに基づく目標出場の目安（行データの文字列化）。"""
+        if self.team is None:
+            return ""
+        head, table_hdr, foot, rows, extra_line = self._rotation_target_minutes_recommendation_rows()
+        if not rows:
+            return (head or "") + (foot or "")
+        hpre = head or ""
+        first = (hpre + table_hdr) if hpre else table_hdr
+        lines: List[str] = [first]
+        for r in rows:
+            lines.append(
+                f'{r["player_name"]} / {r["role_label"]} / {r["current_minutes_label"]} / '
+                f'{r["recommended_label"]} / {r["memo"]}'
+            )
+        if extra_line:
+            lines.append(extra_line)
+        return "\n".join(lines) + foot
+
+    def _apply_rotation_recommended_target_minutes(self, message_parent: tk.Misc) -> None:
+        """おすすめ行（最大12人）の分数だけ target_minutes に手動反映。Team正本は変更しない。"""
+        if self.team is None:
+            return
+        _head, _th, _ft, rows, _ex = self._rotation_target_minutes_recommendation_rows()
+        if not rows:
+            messagebox.showinfo(
+                "目標出場",
+                "先発5人が揃っていないか、反映できるおすすめ行がありません。",
+                parent=message_parent,
+            )
+            return
+        q = messagebox.askyesno(
+            "目標出場の上書き確認",
+            "現在の目標出場時間を、おすすめ値で上書きします。\n"
+            "この操作を行うと、ローテプリセット状態は「カスタム」と表示される場合があります。\n"
+            "先発・6th・ベンチ順は変更しません。\n"
+            "よろしいですか？",
+            parent=message_parent,
         )
-        return "\n".join(out_lines) + foot
+        if not q:
+            return
+        raw = dict(get_safe_team_tactics(self.team))
+        rot = dict(raw.get("rotation") or {})
+        tm: Dict[str, float] = {}
+        prev = rot.get("target_minutes")
+        if isinstance(prev, dict):
+            for k, v in prev.items():
+                try:
+                    ik = int(k)
+                except (TypeError, ValueError):
+                    continue
+                try:
+                    tm[str(ik)] = max(0.0, min(40.0, float(v)))
+                except (TypeError, ValueError):
+                    continue
+        for r in rows:
+            try:
+                pid = int(r["player_id"])
+            except (TypeError, ValueError, KeyError):
+                continue
+            if pid < 0:
+                continue
+            m = r.get("recommended_minutes", 0.0)
+            try:
+                m = max(0.0, min(40.0, float(m)))
+            except (TypeError, ValueError):
+                m = 0.0
+            tm[str(pid)] = m
+        rot["target_minutes"] = tm
+        raw["rotation"] = rot
+        self._tactics_commit_payload(raw)
+        self._refresh_strategy_window()
+        fn = getattr(self, "_rotation_overview_lf0_readouts", None)
+        if callable(fn):
+            try:
+                fn()
+            except Exception:
+                pass
+        messagebox.showinfo("目標出場", "目標出場時間を反映しました。", parent=message_parent)
 
     def _build_rotation_preset_editor_ui(
         self,
@@ -6694,6 +6821,18 @@ class MainMenuView:
             summary_lbl.configure(text=self._rotation_effect_summary_text())
             preview_lbl.configure(text=self._rotation_target_minutes_preview_text())
 
+        self._rotation_overview_lf0_readouts = _refresh_rotation_lf0_readouts
+
+        def _clear_rotation_overview_lf0_readouts(e: Any) -> None:
+            if getattr(e, "widget", None) is not w:
+                return
+            self._rotation_overview_lf0_readouts = None  # type: ignore[assignment]
+
+        try:
+            w.bind("<Destroy>", _clear_rotation_overview_lf0_readouts, add=True)
+        except Exception:
+            pass
+
         ttk.Label(
             lf0,
             text="▼ 目標出場時間のおすすめ（読み取り）",
@@ -6709,6 +6848,12 @@ class MainMenuView:
             justify="left",
         )
         preview_lbl.pack(anchor="w", pady=(0, 6))
+        ttk.Button(
+            lf0,
+            text="このおすすめを目標出場時間に反映",
+            style="Menu.TButton",
+            command=lambda: self._apply_rotation_recommended_target_minutes(w),
+        ).pack(anchor="w", pady=(0, 4))
         usage_resync_extras.append(_refresh_rotation_lf0_readouts)
         _refresh_rotation_lf0_readouts()
         ttk.Label(
