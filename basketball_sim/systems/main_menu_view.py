@@ -6045,7 +6045,13 @@ class MainMenuView:
         0. 起用プリセット（ROTATION_PRESET_DEFS）の共通 UI。
         戻り値: (状態ラベル更新, preset_meta からコンボ同期) 用コールバック。
         """
-        lbl_rot_state = ttk.Label(parent, text="", wraplength=520)
+        lbl_rot_state = ttk.Label(
+            parent,
+            text="",
+            wraplength=520,
+            font=("Yu Gothic UI", 9),
+            foreground="#111111",
+        )
 
         def _sync_rot_state() -> None:
             if self.team is None:
@@ -6075,7 +6081,14 @@ class MainMenuView:
         _rotation_id_by_label = {lab: pid for pid, lab in _rotation_label_by_id.items()}
         combo_rp["values"] = tuple(_rotation_label_by_id[pid] for pid in _rotation_preset_ids)
 
-        lbl_rp_desc = ttk.Label(parent, text="", wraplength=520, justify="left")
+        lbl_rp_desc = ttk.Label(
+            parent,
+            text="",
+            wraplength=520,
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            foreground="#333333",
+        )
 
         def _refresh_rotation_preset_desc() -> None:
             lab = ""
@@ -6663,13 +6676,13 @@ class MainMenuView:
             lf0,
             text="▼ いま入っているおすすめ（読み取り）",
             font=("Yu Gothic UI", 9, "bold"),
-            foreground="#9aa3b2",
+            foreground="#1a1d23",
         ).pack(anchor="w", pady=(8, 2))
         summary_lbl = ttk.Label(
             lf0,
             text="",
             font=("Yu Gothic UI", 9),
-            foreground="#c8d0dc",
+            foreground="#111111",
             wraplength=640,
             justify="left",
         )
@@ -6685,13 +6698,13 @@ class MainMenuView:
             lf0,
             text="▼ 目標出場時間のおすすめ（読み取り）",
             font=("Yu Gothic UI", 9, "bold"),
-            foreground="#9aa3b2",
+            foreground="#1a1d23",
         ).pack(anchor="w", pady=(10, 2))
         preview_lbl = ttk.Label(
             lf0,
             text="",
             font=("Yu Gothic UI", 9),
-            foreground="#a8b4c0",
+            foreground="#111111",
             wraplength=640,
             justify="left",
         )
