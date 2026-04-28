@@ -32,6 +32,8 @@ from basketball_sim.systems.team_tactics import (
     get_transition_style_pace_adjustment,
 )
 
+PERSONAL_FOUL_OUT_LIMIT = 5
+
 
 class Match:
     """
@@ -139,6 +141,8 @@ class Match:
         # 試合中のみの個人ファウル正本（セーブ・Player には保持しない。発生処理は別タスク）
         self.home_personal_fouls_by_player_id: Dict[int, int] = {}
         self.away_personal_fouls_by_player_id: Dict[int, int] = {}
+        self.home_fouled_out_player_ids: Set[int] = set()
+        self.away_fouled_out_player_ids: Set[int] = set()
 
         self._minutes_tracker = {}
         self.play_by_play_log: List[Dict] = []
@@ -856,6 +860,11 @@ class Match:
             if primary:
                 return f"[{clock_label}] {primary}のファウル。"
             return f"[{clock_label}] 守備側のファウル。"
+
+        if event_type == "foul_out":
+            if primary:
+                return f"[{clock_label}] {primary}が{PERSONAL_FOUL_OUT_LIMIT}ファウルでファウルアウト。"
+            return f"[{clock_label}] {PERSONAL_FOUL_OUT_LIMIT}ファウルでファウルアウト。"
 
         if event_type == "made_ft":
             options = [
@@ -1999,9 +2008,11 @@ class Match:
         return self._validate_lineup(lineup, current_lineup, team)
 
     def _sync_rotation_personal_fouls(self) -> None:
-        """Match 正本の個人ファウル数を RotationSystem へ同期（発生処理は未接続のため通常は空）。"""
+        """Match 正本の個人ファウル数/ファウルアウト状態を RotationSystem へ同期。"""
         self.home_rotation.set_personal_fouls_by_player_id(self.home_personal_fouls_by_player_id)
         self.away_rotation.set_personal_fouls_by_player_id(self.away_personal_fouls_by_player_id)
+        self.home_rotation.set_fouled_out_player_ids(self.home_fouled_out_player_ids)
+        self.away_rotation.set_fouled_out_player_ids(self.away_fouled_out_player_ids)
 
     def _maybe_update_rotations(self, possession_index: int):
         self._sync_rotation_personal_fouls()
@@ -2188,10 +2199,23 @@ class Match:
                 continue
             if bool(getattr(p, "is_retired", False)):
                 continue
+            try:
+                pid = int(getattr(p, "player_id", None))
+            except (TypeError, ValueError):
+                continue
+            if pid in self.home_fouled_out_player_ids or pid in self.away_fouled_out_player_ids:
+                continue
             candidates.append(p)
         if not candidates:
             return None
         return random.choice(candidates)
+
+    def _fouled_out_set_for_team(self, defense_team: Team) -> Optional[Set[int]]:
+        if defense_team == self.home_team:
+            return self.home_fouled_out_player_ids
+        if defense_team == self.away_team:
+            return self.away_fouled_out_player_ids
+        return None
 
     def _add_personal_foul(self, defense_team: Team, fouler: Optional[Player]) -> None:
         """Match内の個人ファウル正本(dict)へ +1 する。"""
@@ -2203,6 +2227,11 @@ class Match:
             return
         if player_id < 0:
             return
+        fouled_out = self._fouled_out_set_for_team(defense_team)
+        if fouled_out is None:
+            return
+        if player_id in fouled_out:
+            return
         if defense_team == self.home_team:
             target = self.home_personal_fouls_by_player_id
         elif defense_team == self.away_team:
@@ -2210,7 +2239,21 @@ class Match:
         else:
             return
         current = int(target.get(player_id, 0) or 0)
-        target[player_id] = max(0, current) + 1
+        next_pf = min(PERSONAL_FOUL_OUT_LIMIT, max(0, current) + 1)
+        target[player_id] = next_pf
+        if next_pf >= PERSONAL_FOUL_OUT_LIMIT and player_id not in fouled_out:
+            fouled_out.add(player_id)
+            self._record_event(
+                event_type="foul_out",
+                defense_team=defense_team,
+                primary_player=fouler,
+                description_key="foul_out",
+                meta={
+                    "player_id": player_id,
+                    "personal_fouls": next_pf,
+                    "foul_out_limit": PERSONAL_FOUL_OUT_LIMIT,
+                },
+            )
 
     def _get_lineup_profile(self, lineup: List[Player]) -> dict:
         if not lineup:

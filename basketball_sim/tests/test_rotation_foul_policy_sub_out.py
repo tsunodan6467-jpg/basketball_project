@@ -142,3 +142,28 @@ def test_get_out_candidates_runs_with_and_without_foul_map():
     out1 = r1._get_out_candidates(pos, 160, tm1)
     assert isinstance(out0, list)
     assert isinstance(out1, list)
+
+
+def test_set_fouled_out_player_ids_normalizes_and_can_sub_in_blocks():
+    t = _team_n("standard", 8)
+    ps = list(t.players)
+    r = RotationSystem(t, ps, starters=ps[:5])
+    p0 = ps[0]
+    r.set_fouled_out_player_ids({str(p0.player_id), "bad", -1})  # type: ignore[arg-type]
+    assert int(p0.player_id) in r._fouled_out_player_ids
+    assert r._can_sub_in(p0, possession=40, total_possessions=160) is False
+
+
+def test_fouled_out_on_court_gets_priority_out_and_bypasses_min_stint():
+    t = _team_n("standard", 8)
+    ps = list(t.players)
+    r = RotationSystem(t, ps, starters=ps[:5])
+    p0 = r.current_lineup[0]
+    r.set_fouled_out_player_ids({int(p0.player_id)})
+    # 入った直後でも foul out は外せる（クラッシュ回避より退場優先）
+    r.last_sub_in_possession[r._player_key(p0)] = 80
+    assert r._can_sub_out(p0, possession=81, total_possessions=160) is True
+    tm = r._build_target_minutes_map()
+    outs = r._get_out_candidates(possession=81, total_possessions=160, target_map=tm)
+    assert outs
+    assert outs[0] is p0

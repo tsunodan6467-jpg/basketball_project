@@ -40,6 +40,7 @@ _WIN_NOW_OUT_CANDIDATE_MIN_TARGET: float = 19.0
 _TARGET_MINUTES_OVERLAY_BLEND_DEFAULT: float = 0.20
 _TARGET_MINUTES_OVERLAY_BLEND_LARGE_DIFF: float = 0.30
 _TARGET_MINUTES_OVERLAY_LARGE_DIFF_THRESHOLD: float = 8.0
+_FOULED_OUT_SUB_OUT_BONUS: float = 999.0
 
 # foul_policy × 個人ファウル: OUT 候補スコアへの T1 補正（Match 由来の pf 正本は未接続でも外部 dict で駆動可能）
 _FOUL_TROUBLE_OUT_BONUS: Dict[str, Dict[str, float]] = {
@@ -158,6 +159,7 @@ class RotationSystem:
             self._personal_fouls_by_player_id: Optional[Dict[int, int]] = None
         else:
             self.set_personal_fouls_by_player_id(personal_fouls_by_player_id)
+        self._fouled_out_player_ids: set[int] = set()
         try:
             self._rotation_foul_policy: str = get_rotation_foul_policy(team)
         except Exception:
@@ -173,6 +175,32 @@ class RotationSystem:
             return
         m = self._normalize_personal_fouls_map(personal_fouls_by_player_id)
         self._personal_fouls_by_player_id = dict(m) if m else {}
+
+    def set_fouled_out_player_ids(self, fouled_out_player_ids: Optional[object]) -> None:
+        if fouled_out_player_ids is None:
+            self._fouled_out_player_ids = set()
+            return
+        out: set[int] = set()
+        try:
+            for item in fouled_out_player_ids:  # type: ignore[operator]
+                try:
+                    pid = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if pid < 0:
+                    continue
+                out.add(pid)
+        except Exception:
+            self._fouled_out_player_ids = set()
+            return
+        self._fouled_out_player_ids = out
+
+    def _is_fouled_out_player(self, player: Player) -> bool:
+        try:
+            pid = int(getattr(player, "player_id", None))
+        except (TypeError, ValueError):
+            return False
+        return pid in self._fouled_out_player_ids
 
     @staticmethod
     def _normalize_personal_fouls_map(raw: Optional[Dict]) -> Optional[Dict[int, int]]:
@@ -541,6 +569,8 @@ class RotationSystem:
         return self._count_bench_zero_minutes() >= 1
 
     def _can_sub_in(self, player: Player, possession: int, total_possessions: int) -> bool:
+        if self._is_fouled_out_player(player):
+            return False
         key = self._player_key(player)
         last_out = self.last_sub_out_possession.get(key, -999)
 
@@ -589,6 +619,8 @@ class RotationSystem:
         return (possession - last_out) >= eff_cooldown
 
     def _can_sub_out(self, player: Player, possession: int, total_possessions: int) -> bool:
+        if self._is_fouled_out_player(player):
+            return True
         key = self._player_key(player)
         last_in = self.last_sub_in_possession.get(key, -999)
         stint_len = self._current_stint_length(player, possession)
@@ -690,6 +722,9 @@ class RotationSystem:
 
             score = 0.0
             over_target = played - target
+
+            if self._is_fouled_out_player(p):
+                score += _FOULED_OUT_SUB_OUT_BONUS
 
             if over_target >= 4.0:
                 score += 4.0

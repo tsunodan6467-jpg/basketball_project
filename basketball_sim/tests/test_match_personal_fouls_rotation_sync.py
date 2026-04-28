@@ -93,15 +93,21 @@ def test_match_initializes_empty_personal_foul_dicts():
     m = _build_match()
     assert m.home_personal_fouls_by_player_id == {}
     assert m.away_personal_fouls_by_player_id == {}
+    assert m.home_fouled_out_player_ids == set()
+    assert m.away_fouled_out_player_ids == set()
 
 
 def test_match_syncs_to_rotation_system_on_maybe_update_rotations():
     m = _build_match()
     m.home_personal_fouls_by_player_id[201] = 4
     m.away_personal_fouls_by_player_id[305] = 2
+    m.home_fouled_out_player_ids.add(201)
+    m.away_fouled_out_player_ids.add(305)
     m._maybe_update_rotations(0)
     assert m.home_rotation._personal_fouls_by_player_id.get(201) == 4
     assert m.away_rotation._personal_fouls_by_player_id.get(305) == 2
+    assert 201 in m.home_rotation._fouled_out_player_ids
+    assert 305 in m.away_rotation._fouled_out_player_ids
 
 
 def test_set_personal_fouls_by_player_id_none_uses_empty_map():
@@ -317,3 +323,31 @@ def test_foul_addition_syncs_to_rotation_on_next_update(monkeypatch: pytest.Monk
     m._maybe_update_rotations(1)
 
     assert m.away_rotation._personal_fouls_by_player_id.get(defender.player_id) == 1
+
+
+def test_foul_out_reaches_limit_once_and_records_event():
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+    # direct add path: 5到達で1回だけ foul_out
+    for _ in range(7):
+        m._add_personal_foul(m.away_team, defender)
+    assert m.away_personal_fouls_by_player_id.get(defender.player_id) == 5
+    assert defender.player_id in m.away_fouled_out_player_ids
+    fout = [
+        e for e in m.play_by_play_log
+        if e.get("event_type") == "foul_out" and e.get("primary_player_id") == defender.player_id
+    ]
+    assert len(fout) == 1
+    meta = fout[0].get("meta") or {}
+    assert meta.get("personal_fouls") == 5
+    assert meta.get("foul_out_limit") == 5
+
+
+def test_pick_fouler_excludes_already_fouled_out_players():
+    m = _build_match()
+    p0 = m.away_current_lineup[0]
+    p1 = m.away_current_lineup[1]
+    m.away_fouled_out_player_ids.add(int(p0.player_id))
+    picked_ids = {int(m._pick_fouler([p0, p1]).player_id) for _ in range(10)}
+    assert int(p0.player_id) not in picked_ids
+    assert int(p1.player_id) in picked_ids
