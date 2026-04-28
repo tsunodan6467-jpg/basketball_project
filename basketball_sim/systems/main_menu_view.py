@@ -6160,6 +6160,237 @@ class MainMenuView:
                 pass
         messagebox.showinfo("目標出場", "目標出場時間を反映しました。", parent=message_parent)
 
+    def _rotation_lineup_recommendation_text(self) -> str:
+        """
+        ローテプリセットに応じた起用序列のおすすめ案（読み取り専用）。
+        Team 正本・target_minutes は変更しない。
+        """
+        if self.team is None:
+            return ""
+        try:
+            ensure_team_tactics_on_team(self.team)
+        except Exception:
+            pass
+
+        st = get_current_rotation_preset_state(self.team)
+        raw_pid = st.get("preset_id")
+        is_custom = bool(st.get("is_custom"))
+        label_ja = str(st.get("label_ja", "") or "—")
+        if (not raw_pid) or is_custom or (raw_pid not in ROTATION_PRESET_DEFS):
+            eff = "balanced_v1"
+            head_note = (
+                "※ プリセット未設定、または「カスタム」表示のときは、"
+                "おすすめをバランス基準（balanced_v1）で計算しています。\n"
+            )
+        else:
+            eff = str(raw_pid)
+            head_note = ""
+
+        def _pid(p: Any) -> Optional[int]:
+            try:
+                v = getattr(p, "player_id", None)
+                if v is None:
+                    return None
+                return int(v)
+            except (TypeError, ValueError):
+                return None
+
+        def _eligible(p: Any) -> bool:
+            if bool(getattr(p, "is_retired", False)):
+                return False
+            if hasattr(p, "is_injured") and callable(getattr(p, "is_injured")):
+                try:
+                    if p.is_injured():
+                        return False
+                except Exception:
+                    return False
+            return True
+
+        def _eff_ovr(p: Any) -> int:
+            if hasattr(p, "get_effective_ovr") and callable(getattr(p, "get_effective_ovr")):
+                try:
+                    return int(p.get_effective_ovr())
+                except (TypeError, ValueError, AttributeError):
+                    pass
+            try:
+                return int(getattr(p, "ovr", 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def _age(p: Any) -> Optional[int]:
+            try:
+                a = getattr(p, "age", None)
+                if a is None:
+                    return None
+                return int(a)
+            except (TypeError, ValueError):
+                return None
+
+        def _pot_points(p: Any) -> float:
+            raw = getattr(p, "potential", None)
+            s = str(raw or "").strip().upper()
+            return {
+                "S": 5.0,
+                "A": 4.0,
+                "B": 3.0,
+                "C": 2.0,
+                "D": 1.0,
+            }.get(s[:1] if s else "", 0.0)
+
+        def _fatigue(p: Any) -> int:
+            try:
+                return int(getattr(p, "fatigue", 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def _score(p: Any) -> float:
+            eo = float(_eff_ovr(p))
+            ag = _age(p)
+            if eff == "balanced_v1":
+                return eo
+            if eff == "win_now_v1":
+                bonus = 0.0
+                if ag is not None:
+                    if 26 <= ag <= 32:
+                        bonus += 2.0
+                    elif ag >= 33:
+                        bonus += 0.5
+                    elif ag <= 22:
+                        bonus -= 1.0
+                return eo + bonus
+            if eff == "development_v1":
+                bonus = 0.0
+                if ag is not None:
+                    if ag <= 22:
+                        bonus += 4.0
+                    elif ag <= 24:
+                        bonus += 2.0
+                    if ag >= 32:
+                        bonus -= 3.0
+                bonus += _pot_points(p) * 1.2
+                raw = eo + bonus
+                if eo < 42.0:
+                    raw = min(raw, eo + 8.0)
+                return raw
+            if eff == "condition_care_v1":
+                f = _fatigue(p)
+                pen = 0.0
+                if f >= 80:
+                    pen += 8.0
+                elif f >= 60:
+                    pen += 5.0
+                elif f >= 40:
+                    pen += 2.0
+                return eo - pen
+            return eo
+
+        roster = [p for p in (getattr(self.team, "players", None) or []) if _eligible(p)]
+        if len(roster) < 5:
+            return (
+                "【ローテプリセット（表示用）】\n"
+                f"・状態: {label_ja}\n"
+                f"{head_note}\n"
+                "おすすめ先発を作るには登録選手（負傷・引退を除く）が5人未満です。\n"
+                "ロスターを揃えてからご確認ください。\n\n"
+                "【方針メモ（参照）】\n"
+                f"{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
+            )
+
+        starters: List[Optional[Any]] = [None, None, None, None, None]
+        used: set = set()
+
+        for i, pos in enumerate(STARTER_POSITIONS):
+            pool = [
+                p
+                for p in roster
+                if str(getattr(p, "position", "SF") or "SF") == pos and _pid(p) not in used
+            ]
+            if pool:
+                b = max(pool, key=_score)
+                starters[i] = b
+                ip = _pid(b)
+                if ip is not None:
+                    used.add(ip)
+
+        for i in range(5):
+            if starters[i] is not None:
+                continue
+            pool = [p for p in roster if _pid(p) is not None and _pid(p) not in used]
+            if not pool:
+                break
+            b = max(pool, key=_score)
+            starters[i] = b
+            ip = _pid(b)
+            if ip is not None:
+                used.add(ip)
+
+        if any(s is None for s in starters):
+            return (
+                "【ローテプリセット（表示用）】\n"
+                f"・状態: {label_ja}\n"
+                f"{head_note}\n"
+                "おすすめ先発を5人揃えられませんでした（同時に起用できる選手が足りない状態）。\n\n"
+                "【方針メモ（参照）】\n"
+                f"{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
+            )
+
+        def _line(p: Any) -> str:
+            pid = _pid(p)
+            nm = str(getattr(p, "name", "?"))[:16]
+            pos = str(getattr(p, "position", "?"))
+            o = _eff_ovr(p)
+            return f"{nm}  ({pos})  実効OVR {o}  id={pid}"
+
+        lines_st: List[str] = []
+        for i, pos in enumerate(STARTER_POSITIONS):
+            sp = starters[i]
+            lines_st.append(f"  {pos}: {_line(sp) if sp else '—'}")
+
+        rest = [p for p in roster if _pid(p) not in used]
+        sixth: Optional[Any] = None
+        if rest:
+            sixth = max(rest, key=_score)
+            sip = _pid(sixth)
+            if sip is not None:
+                used.add(sip)
+
+        bench: List[Any] = [p for p in rest if p is not sixth]
+        bench.sort(key=_score, reverse=True)
+
+        lines_s6 = f"  {_line(sixth) if sixth else '（該当なし）'}"
+        lines_bn: List[str] = []
+        for j, p in enumerate(bench, start=1):
+            lines_bn.append(f"  {j + 6}番手: {_line(p)}")
+
+        eff_memo = {
+            "balanced_v1": "ポジションを埋めたうえで不足分をスコア順補完。6thは非先発の最高スコア、ベンチは残りをスコア順。",
+            "win_now_v1": "実効OVRを主軸に、即戦力年齢帯をやや加点。",
+            "development_v1": "若年・潜在格付けを加点しつつ、極端に低い実効OVRの押し上げに上限。",
+            "condition_care_v1": "負傷者は除外。疲労が高い選手はスコアを少し下げ、バランスに寄せます。",
+        }.get(eff, "")
+
+        pid_show = eff if (raw_pid and str(raw_pid) in ROTATION_PRESET_DEFS and not is_custom) else f"計算: {eff}"
+        body = (
+            f"【ローテプリセット（表示用）】\n"
+            f"・状態: {label_ja}  /  おすすめ計算: {pid_show}\n"
+            f"{head_note}"
+            f"【先発（おすすめ・{', '.join(STARTER_POSITIONS)}）】\n"
+            + "\n".join(lines_st)
+            + "\n\n"
+            "【6th（おすすめ）】\n"
+            f"{lines_s6}\n\n"
+            "【ベンチ順（おすすめ・7番手〜）】\n"
+        )
+        if lines_bn:
+            body += "\n".join(lines_bn) + "\n"
+        else:
+            body += "  （なし）\n"
+        body += (
+            f"\n【方針メモ】\n{eff_memo}\n"
+            f"（プリセット説明）{_ROTATION_PRESET_DESC_JA.get(eff, '')}\n"
+        )
+        return body
+
     def _build_rotation_preset_editor_ui(
         self,
         parent: ttk.Frame,
@@ -6815,11 +7046,18 @@ class MainMenuView:
         )
         summary_lbl.pack(anchor="w", pady=(0, 6))
 
+        rotation_lf0_readout_extras: List[Callable[[], None]] = []
+
         def _refresh_rotation_lf0_readouts() -> None:
             if self.team is None:
                 return
             summary_lbl.configure(text=self._rotation_effect_summary_text())
             preview_lbl.configure(text=self._rotation_target_minutes_preview_text())
+            for ex in rotation_lf0_readout_extras:
+                try:
+                    ex()
+                except Exception:
+                    pass
 
         self._rotation_overview_lf0_readouts = _refresh_rotation_lf0_readouts
 
@@ -6995,6 +7233,40 @@ class MainMenuView:
             wraplength=640,
             justify="left",
         ).pack(anchor="w", pady=(0, 6))
+        ttk.Label(
+            lf2,
+            text="▼ おすすめ起用序列（読み取り）",
+            font=("Yu Gothic UI", 9, "bold"),
+            foreground="#1a1d23",
+        ).pack(anchor="w", pady=(4, 2))
+        lineup_rec_lbl = ttk.Label(
+            lf2,
+            text="",
+            font=("Yu Gothic UI", 9),
+            foreground="#111111",
+            wraplength=640,
+            justify="left",
+        )
+        lineup_rec_lbl.pack(anchor="w", pady=(0, 4))
+        ttk.Label(
+            lf2,
+            text=(
+                "※ この一覧はおすすめ表示のみです。自動では反映されません。\n"
+                "※ 先発・6th・ベンチ順を変更する場合は、下の起用序列で手動調整してください。\n"
+                "※ 目標出場時間は変更されません。\n"
+                "※ 外国籍枠の制限はこのおすすめでは考慮していません。"
+            ),
+            font=("Yu Gothic UI", 9),
+            foreground="#9aa3b2",
+            wraplength=640,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 8))
+
+        def _extra_lineup_recommendation_readout() -> None:
+            lineup_rec_lbl.configure(text=self._rotation_lineup_recommendation_text())
+
+        rotation_lf0_readout_extras.append(_extra_lineup_recommendation_readout)
+
         lf2_edit = ttk.Frame(lf2, style="Panel.TFrame")
         lf2_edit.pack(fill="x", pady=(0, 6))
         self._build_team_lineup_editor_ui(
@@ -7021,6 +7293,8 @@ class MainMenuView:
             wraplength=640,
             justify="left",
         ).pack(anchor="w", pady=(0, 0))
+
+        _refresh_rotation_lf0_readouts()
 
         _rot_bind_wheel(scroll_content)
 
