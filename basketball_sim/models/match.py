@@ -143,6 +143,8 @@ class Match:
         self.away_personal_fouls_by_player_id: Dict[int, int] = {}
         self.home_fouled_out_player_ids: Set[int] = set()
         self.away_fouled_out_player_ids: Set[int] = set()
+        self.home_team_fouls_by_quarter: Dict[int, int] = {}
+        self.away_team_fouls_by_quarter: Dict[int, int] = {}
 
         self._minutes_tracker = {}
         self.play_by_play_log: List[Dict] = []
@@ -2217,6 +2219,39 @@ class Match:
             return self.away_fouled_out_player_ids
         return None
 
+    def _team_fouls_by_quarter_for_team(self, team: Team) -> Optional[Dict[int, int]]:
+        if team == self.home_team:
+            return self.home_team_fouls_by_quarter
+        if team == self.away_team:
+            return self.away_team_fouls_by_quarter
+        return None
+
+    def _get_current_event_quarter(self) -> int:
+        if self._event_context_quarter is not None:
+            try:
+                return max(1, int(self._event_context_quarter))
+            except (TypeError, ValueError):
+                return 1
+        quarter, _, _ = self._get_quarter_info(max(0, int(self.current_possession)))
+        return max(1, int(quarter))
+
+    def _add_team_foul(self, defense_team: Team, quarter: int) -> int:
+        target = self._team_fouls_by_quarter_for_team(defense_team)
+        if target is None:
+            return 0
+        q = max(1, int(quarter or 1))
+        current = int(target.get(q, 0) or 0)
+        next_count = max(0, current) + 1
+        target[q] = next_count
+        return next_count
+
+    def _get_team_fouls_for_quarter(self, team: Team, quarter: int) -> int:
+        target = self._team_fouls_by_quarter_for_team(team)
+        if target is None:
+            return 0
+        q = max(1, int(quarter or 1))
+        return int(target.get(q, 0) or 0)
+
     def _add_personal_foul(self, defense_team: Team, fouler: Optional[Player]) -> None:
         """Match内の個人ファウル正本(dict)へ +1 する。"""
         if fouler is None:
@@ -3045,6 +3080,8 @@ class Match:
             ft_fouler = self._pick_fouler(defense_lineup)
             self._add_personal_foul(defense_team, ft_fouler)
             if ft_fouler is not None:
+                foul_quarter = self._get_current_event_quarter()
+                team_fouls = self._add_team_foul(defense_team, foul_quarter)
                 self._record_event(
                     event_type="foul",
                     offense_team=offense_team,
@@ -3058,6 +3095,9 @@ class Match:
                         "drawn_by_id": self._player_log_key(shooter),
                         "shot_profile": "ft",
                         "second_chance": True,
+                        "team_fouls": team_fouls,
+                        "team_fouls_quarter": foul_quarter,
+                        "team_fouls_team_id": self._team_key(defense_team),
                     },
                 )
 
@@ -3268,6 +3308,8 @@ class Match:
             ft_fouler = self._pick_fouler(defense_lineup)
             self._add_personal_foul(defense_team, ft_fouler)
             if ft_fouler is not None:
+                foul_quarter = self._get_current_event_quarter()
+                team_fouls = self._add_team_foul(defense_team, foul_quarter)
                 self._record_event(
                     event_type="foul",
                     offense_team=offense_team,
@@ -3281,6 +3323,9 @@ class Match:
                         "drawn_by_id": self._player_log_key(shooter),
                         "shot_profile": "ft",
                         "second_chance": False,
+                        "team_fouls": team_fouls,
+                        "team_fouls_quarter": foul_quarter,
+                        "team_fouls_team_id": self._team_key(defense_team),
                     },
                 )
 

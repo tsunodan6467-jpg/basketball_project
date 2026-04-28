@@ -319,6 +319,59 @@ def _format_pf_summary_lines(match: Any, user_team: Any) -> List[str]:
     return ["PF記録なし"]
 
 
+def _safe_team_foul_maps(match: Any) -> Tuple[Dict[int, int], Dict[int, int]]:
+    try:
+        home_map = getattr(match, "home_team_fouls_by_quarter", None)
+        away_map = getattr(match, "away_team_fouls_by_quarter", None)
+    except Exception:
+        return {}, {}
+    if not isinstance(home_map, dict) or not isinstance(away_map, dict):
+        return {}, {}
+
+    def _normalize(src: Dict[Any, Any]) -> Dict[int, int]:
+        out: Dict[int, int] = {}
+        for k, v in src.items():
+            try:
+                q = int(k)
+                c = int(v)
+            except (TypeError, ValueError):
+                continue
+            if q <= 0 or c < 0:
+                continue
+            out[q] = c
+        return out
+
+    return _normalize(home_map), _normalize(away_map)
+
+
+def _quarter_label(q: int) -> str:
+    if q <= 4:
+        return f"Q{q}"
+    return f"OT{q - 4}"
+
+
+def _format_team_foul_row(label: str, foul_map: Dict[int, int], quarters: List[int]) -> str:
+    parts = [f"{_quarter_label(q)} {int(foul_map.get(q, 0) or 0)}" for q in quarters]
+    return f"- {label}: " + " / ".join(parts)
+
+
+def _format_team_foul_summary_lines(match: Any) -> List[str]:
+    home_map, away_map = _safe_team_foul_maps(match)
+    if not home_map and not away_map:
+        return []
+
+    quarters = sorted(set(home_map.keys()) | set(away_map.keys()))
+    if not quarters:
+        return ["チームファウル記録なし"]
+
+    home_name = str(getattr(getattr(match, "home_team", None), "name", "") or "ホーム")
+    away_name = str(getattr(getattr(match, "away_team", None), "name", "") or "アウェイ")
+    out = ["チームファウル:"]
+    out.append(_format_team_foul_row(home_name, home_map, quarters))
+    out.append(_format_team_foul_row(away_name, away_map, quarters))
+    return out
+
+
 def _narrative_lines(user_won: bool, edges: Dict[str, Any]) -> Tuple[str, str, str]:
     axes = [
         ("outside", "外角"),
@@ -387,12 +440,19 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
         pf_lines = _format_pf_summary_lines(match, user_team)
     except Exception:
         pf_lines = []
+    team_foul_lines: List[str] = []
+    try:
+        team_foul_lines = _format_team_foul_summary_lines(match)
+    except Exception:
+        team_foul_lines = []
 
     edges = build_postgame_edges_summary(match, user_team)
     if edges is None:
         out_none: List[str] = ["【試合後サマリー】", score_line]
         if pf_lines:
             out_none.extend(pf_lines)
+        if team_foul_lines:
+            out_none.extend(team_foul_lines)
         out_none.extend(["情報なし（比較材料が不足しています）", ""])
         return out_none
 
@@ -410,6 +470,8 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
     out: List[str] = ["【試合後サマリー】", score_line]
     if pf_lines:
         out.extend(pf_lines)
+    if team_foul_lines:
+        out.extend(team_foul_lines)
     out.extend([hdr, line1, line2, w, l, p, ""])
     return out
 

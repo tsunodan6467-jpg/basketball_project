@@ -57,6 +57,8 @@ def _light_match_stub(
     rows: list,
     hs: int = 90,
     aws: int = 88,
+    home_team_fouls_by_quarter: dict | None = None,
+    away_team_fouls_by_quarter: dict | None = None,
 ):
     h = SimpleNamespace(name="HomeX", team_id=home_id)
     a = SimpleNamespace(name="AwayX", team_id=away_id)
@@ -70,6 +72,8 @@ def _light_match_stub(
         def get_player_box_score_rows(self):
             return list(rows)
 
+    M.home_team_fouls_by_quarter = dict(home_team_fouls_by_quarter or {})
+    M.away_team_fouls_by_quarter = dict(away_team_fouls_by_quarter or {})
     return M(), h, a
 
 
@@ -89,6 +93,26 @@ def test_pf_block_reflects_get_player_box_score_rows():
     assert "Yamada" in text
     assert "PF 2" in text
     assert "18.5" in text
+
+
+def test_team_foul_block_shows_quarter_values_and_ot_label():
+    rows = [
+        {"team_id": 10, "team_name": "HomeX", "player_name": "Yamada", "minutes": 18.5, "pf": 2},
+    ]
+    m, home, _ = _light_match_stub(
+        10,
+        20,
+        rows,
+        home_team_fouls_by_quarter={1: 2, 2: 3, 5: 1},
+        away_team_fouls_by_quarter={1: 1, 2: 4, 5: 0},
+    )
+    text = "\n".join(format_match_postgame_cli_lines(m, home))
+    assert "チームファウル:" in text
+    assert "HomeX" in text
+    assert "AwayX" in text
+    assert "Q1 2" in text
+    assert "Q2 3" in text
+    assert "OT1 1" in text
 
 
 def test_pf_all_zero_shows_no_foul_line_only_record():
