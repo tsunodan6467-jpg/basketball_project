@@ -76,6 +76,18 @@ def _capture_steal_weights(m: Match, lineup: list[Player]) -> list[int]:
     return captured["weights"]
 
 
+def _capture_block_weights(m: Match, lineup: list[Player], *, is_three: bool = False) -> list[int]:
+    captured: dict[str, list[int]] = {}
+
+    def _fake_choices(population, weights=None, k=1):
+        captured["weights"] = list(weights or [])
+        return [population[0]]
+
+    with mock.patch("basketball_sim.models.match.random.choices", side_effect=_fake_choices):
+        m._pick_blocker(lineup, is_three=is_three)
+    return captured["weights"]
+
+
 def test_roles_defense_event_multiplier_stopper_and_light():
     t = _team(1, "T1")
     p = t.players[0]
@@ -92,10 +104,21 @@ def test_roles_defense_event_multiplier_standard_missing_invalid_fallback_to_one
     assert get_roles_defense_event_weight_multiplier(t, p) == 1.0
     _set_defense_assignment(t, p.player_id, "invalid_value")
     assert get_roles_defense_event_weight_multiplier(t, p) == 1.0
+    assert get_roles_defense_event_weight_multiplier(t, p, event_type="block") == 1.0
     t.team_tactics["roles"] = {}
     ensure_team_tactics_on_team(t)
     assert get_roles_defense_event_weight_multiplier(t, p) == 1.0
     assert get_roles_defense_event_weight_multiplier(t, None) == 1.0
+
+
+def test_roles_defense_event_multiplier_block_stopper_and_light():
+    t = _team(3, "T3")
+    p = t.players[0]
+    _set_defense_assignment(t, p.player_id, "stopper")
+    assert get_roles_defense_event_weight_multiplier(t, p, event_type="block") == 1.03
+    _set_defense_assignment(t, p.player_id, "light")
+    assert get_roles_defense_event_weight_multiplier(t, p, event_type="block") == 0.97
+    assert get_roles_defense_event_weight_multiplier(t, p, event_type="unknown") == 0.96
 
 
 def test_pick_stealer_weight_moves_stopper_gt_standard_gt_light_for_same_player():
@@ -117,7 +140,27 @@ def test_pick_stealer_weight_moves_stopper_gt_standard_gt_light_for_same_player(
     assert stopper_w[idx] > std_w[idx] > light_w[idx]
 
 
-def test_defense_roles_helper_is_not_used_by_block_rebound_or_foul_selectors():
+def test_pick_blocker_weight_moves_stopper_gt_standard_gt_light_for_same_player():
+    home = _team(30, "HB")
+    away = _team(40, "AB")
+    m = Match(home, away)
+    target_player = next(p for p in m.home_starters if getattr(p, "position", "") == "C")
+    target_pid = target_player.player_id
+
+    _set_defense_assignment(home, target_pid, "standard")
+    std_w = _capture_block_weights(m, m.home_starters, is_three=False)
+
+    _set_defense_assignment(home, target_pid, "stopper")
+    stopper_w = _capture_block_weights(m, m.home_starters, is_three=False)
+
+    _set_defense_assignment(home, target_pid, "light")
+    light_w = _capture_block_weights(m, m.home_starters, is_three=False)
+
+    idx = next(i for i, p in enumerate(m.home_starters) if p.player_id == target_pid)
+    assert stopper_w[idx] > std_w[idx] > light_w[idx]
+
+
+def test_defense_roles_helper_is_not_used_by_rebound_or_foul_selectors():
     home = _team(11, "H2")
     away = _team(21, "A2")
     m = Match(home, away)
@@ -126,6 +169,19 @@ def test_defense_roles_helper_is_not_used_by_block_rebound_or_foul_selectors():
         "basketball_sim.models.match.get_roles_defense_event_weight_multiplier",
         side_effect=AssertionError("should not be called"),
     ):
-        m._pick_blocker(m.home_starters, is_three=False)
         m._pick_rebounder(m.home_starters, "defense")
         m._pick_fouler(m.home_starters)
+
+
+def test_pick_blocker_uses_block_event_type_in_helper_call():
+    home = _team(12, "H3")
+    away = _team(22, "A3")
+    m = Match(home, away)
+    with mock.patch(
+        "basketball_sim.models.match.get_roles_defense_event_weight_multiplier",
+        return_value=1.0,
+    ) as mocked:
+        m._pick_blocker(m.home_starters, is_three=True)
+    assert mocked.called
+    _, kwargs = mocked.call_args
+    assert kwargs.get("event_type") == "block"

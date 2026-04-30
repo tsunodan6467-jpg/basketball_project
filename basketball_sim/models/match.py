@@ -2165,6 +2165,22 @@ class Match:
         return random.choices(passers, weights=weights, k=1)[0]
 
     def _pick_blocker(self, defense_lineup: List[Player], is_three: bool = False) -> Player:
+        defense_team: Optional[Team] = None
+        try:
+            lineup_ids = {
+                int(getattr(p, "player_id", 0) or 0)
+                for p in defense_lineup
+                if p is not None
+            }
+            home_ids = {int(getattr(p, "player_id", 0) or 0) for p in self.home_team.players}
+            away_ids = {int(getattr(p, "player_id", 0) or 0) for p in self.away_team.players}
+            if lineup_ids and lineup_ids.issubset(home_ids):
+                defense_team = self.home_team
+            elif lineup_ids and lineup_ids.issubset(away_ids):
+                defense_team = self.away_team
+        except Exception:
+            defense_team = None
+
         weights = []
         for p in defense_lineup:
             defense_attr = p.get_adjusted_attribute("defense")
@@ -2197,6 +2213,7 @@ class Match:
                     weight += 2
 
             weight *= self._position_weight(p, "block")
+            weight *= get_roles_defense_event_weight_multiplier(defense_team, p, event_type="block")
             weights.append(max(1, int(weight)))
 
         return random.choices(defense_lineup, weights=weights, k=1)[0]

@@ -1364,6 +1364,9 @@ _ROLES_CLUTCH_SHOOTER_MULTIPLIER_LIMITED: float = 0.94
 _ROLES_DEFENSE_EVENT_MULTIPLIER_STOPPER: float = 1.05
 _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD: float = 1.00
 _ROLES_DEFENSE_EVENT_MULTIPLIER_LIGHT: float = 0.96
+_ROLES_DEFENSE_BLOCK_EVENT_MULTIPLIER_STOPPER: float = 1.03
+_ROLES_DEFENSE_BLOCK_EVENT_MULTIPLIER_STANDARD: float = 1.00
+_ROLES_DEFENSE_BLOCK_EVENT_MULTIPLIER_LIGHT: float = 0.97
 
 
 def get_roles_clutch_priority_substitute_overlay(
@@ -1446,41 +1449,52 @@ def get_roles_clutch_shooter_weight_multiplier(team: Any, player: Any, *, is_clu
     return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
 
 
-def get_roles_defense_event_weight_multiplier(team: Any, player: Any) -> float:
+def get_roles_defense_event_weight_multiplier(team: Any, player: Any, *, event_type: str = "steal") -> float:
     """
     team_tactics.roles[pid].defense_assignment を守備イベント記録者の重みへ極小反映する。
 
-    stopper: 1.05 / light: 0.96 / standard・欠損・不正: 1.00
+    - steal: stopper 1.05 / light 0.96 / standard・欠損・不正 1.00
+    - block: stopper 1.03 / light 0.97 / standard・欠損・不正 1.00
     """
+    et = str(event_type or "steal").strip().lower()
+    if et == "block":
+        mul_stopper = _ROLES_DEFENSE_BLOCK_EVENT_MULTIPLIER_STOPPER
+        mul_standard = _ROLES_DEFENSE_BLOCK_EVENT_MULTIPLIER_STANDARD
+        mul_light = _ROLES_DEFENSE_BLOCK_EVENT_MULTIPLIER_LIGHT
+    else:
+        mul_stopper = _ROLES_DEFENSE_EVENT_MULTIPLIER_STOPPER
+        mul_standard = _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        mul_light = _ROLES_DEFENSE_EVENT_MULTIPLIER_LIGHT
+
     if player is None:
-        return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        return mul_standard
     try:
         tactics = get_safe_team_tactics(team)
         roles = tactics.get("roles")
         if not isinstance(roles, dict):
-            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+            return mul_standard
         try:
             pid = int(getattr(player, "player_id", 0) or 0)
         except (TypeError, ValueError):
-            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+            return mul_standard
         if pid <= 0:
-            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+            return mul_standard
         row = roles.get(str(pid))
         if not isinstance(row, dict):
-            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+            return mul_standard
         da = _pick_str(
             row.get("defense_assignment"),
             ALLOWED_DEFENSE_ASSIGNMENT,
             ROLE_DEFAULTS["defense_assignment"],
         )
     except Exception:
-        return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        return mul_standard
 
     if da == "stopper":
-        return _ROLES_DEFENSE_EVENT_MULTIPLIER_STOPPER
+        return mul_stopper
     if da == "light":
-        return _ROLES_DEFENSE_EVENT_MULTIPLIER_LIGHT
-    return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        return mul_light
+    return mul_standard
 
 
 # Rotation._find_best_substitute: usage_policy.injury_care（v1: fatigue 主・stamina 補助。form_weight とは別軸）
