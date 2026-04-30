@@ -638,7 +638,7 @@ def get_offense_tempo_pace_adjustment(team: Any) -> int:
 def get_transition_style_pace_adjustment(team: Any, offense_strategy: str) -> int:
     """
     Match._get_total_possessions 用の極小上乗せ。team_strategy.transition_style だけ参照。
-    push / half_court / situational（0）。本流の offense_tempo（±2）・練習 transition（+2）・
+    push / half_court / situational（0）。本流の offense_tempo（±3）・練習 transition（+2）・
     run_and_gun（+10）より常に小さい T1。T2 は同方向の offense_tempo で減衰、T3 は run_and_gun+push を二重にしない。
     """
     s = str(offense_strategy or "balanced").strip()
