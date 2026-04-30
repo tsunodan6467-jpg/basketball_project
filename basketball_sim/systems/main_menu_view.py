@@ -3626,7 +3626,8 @@ class MainMenuView:
         ttk.Label(
             fac_content,
             text="稼働状態・レベル概要・次投資の目安・市場／ファン指標（下のボタンで段階強化）。"
-            "投資時に費用が反映され、施設レベルと関連指標が更新されます。",
+            "投資時に費用が反映され、施設レベルと関連指標が更新されます。"
+            "（反映: 即時）",
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 6))
         self.facility_lines = self._make_line_vars(self.facility_panel, 6)
@@ -3713,7 +3714,11 @@ class MainMenuView:
         self._sponsor_status_var = tk.StringVar(value="")
         tk.Label(
             sponsor_inner,
-            text="メインスポンサー契約の種類を選び「反映」で確定します。下は契約変更の直近履歴です。",
+            text=(
+                "メインスポンサー契約の種類を選び「反映」で確定します。"
+                "下は契約変更の直近履歴です。"
+                "（反映: 主に次オフ収入）"
+            ),
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
@@ -3800,7 +3805,11 @@ class MainMenuView:
         self._pr_status_var = tk.StringVar(value="")
         tk.Label(
             pr_inner,
-            text="シーズン中の実行回数に上限があるファン向け施策です。下は実行履歴です。",
+            text=(
+                "シーズン中の実行回数に上限があるファン向け施策です。"
+                "下は実行履歴です。"
+                "（反映: 即時 / 今季中）"
+            ),
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
@@ -3958,7 +3967,11 @@ class MainMenuView:
         merch_inner = self._resolve_content_parent(self.merch_panel)
         tk.Label(
             merch_inner,
-            text="各ラインのフェーズを進めます（開発費は所持金から差し引き）。売上表示は簡易ダミーで、本番の収支・内訳とは未連携です。",
+            text=(
+                "各ラインのフェーズを進めます（開発費は所持金から差し引き）。"
+                "売上表示は簡易ダミーで、本番の収支・内訳とは未連携です。"
+                "（反映: 段階進行）"
+            ),
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
@@ -4577,6 +4590,61 @@ class MainMenuView:
             pr_filter_mode=pr_filter_key,
         )
 
+        quick_summary_lines: List[str] = []
+        if self.team is None:
+            quick_summary_lines = [
+                "【経営サマリー】",
+                "・現在資金: 未設定（チーム未接続）",
+                "・今季入金: 未設定（チーム未接続）",
+                "・直近収支: 未設定（チーム未接続）",
+                "・前季収支: 未設定（チーム未接続）",
+            ]
+        else:
+            money_i = self._safe_int(self._safe_get(self.team, "money", profile.get("money", 0)))
+            inseason_total_i = 0
+            inseason_logs = self._safe_get(self.team, "inseason_cash_round_log", [])
+            if isinstance(inseason_logs, list):
+                for _entry in inseason_logs:
+                    if isinstance(_entry, dict):
+                        inseason_total_i += self._safe_int(_entry.get("amount", 0))
+            cashflow_i = self._safe_int(
+                self._safe_get(self.team, "cashflow_last_season", profile.get("cashflow_last_season", 0))
+            )
+
+            history = self._safe_get(self.team, "finance_history", [])
+            latest_rev: Optional[int] = None
+            latest_exp: Optional[int] = None
+            latest_cf: Optional[int] = None
+            if isinstance(history, list):
+                for _row in reversed(history):
+                    if isinstance(_row, dict):
+                        latest_rev = self._safe_int(_row.get("revenue", 0))
+                        latest_exp = self._safe_int(_row.get("expense", 0))
+                        latest_cf = self._safe_int(_row.get("cashflow", latest_rev - latest_exp))
+                        break
+
+            inseason_line = (
+                f"・今季入金: {self._format_money(inseason_total_i)}"
+                if inseason_total_i > 0
+                else "・今季入金: 記録なし"
+            )
+            if latest_rev is None or latest_exp is None or latest_cf is None:
+                latest_line = "・直近収支: 履歴なし"
+            else:
+                latest_line = (
+                    f"・直近収支: 収入 {self._format_money(latest_rev)} / "
+                    f"支出 {self._format_money(latest_exp)} / "
+                    f"差引 {self._format_signed_money(latest_cf)}"
+                )
+
+            quick_summary_lines = [
+                "【経営サマリー】",
+                f"・現在資金: {self._format_money(money_i)}",
+                inseason_line,
+                latest_line,
+                f"・前季収支: {self._format_signed_money(cashflow_i)}",
+            ]
+
         dash_tw = getattr(self, "_management_dashboard_text", None)
         if dash_tw is not None:
             try:
@@ -4593,6 +4661,14 @@ class MainMenuView:
                             "■ 財務\n",
                             ("finance_block_header",),
                         )
+                        if quick_summary_lines:
+                            for qln in quick_summary_lines:
+                                dash_tw.insert(
+                                    "end",
+                                    qln + "\n",
+                                    ("finance_row_default",),
+                                )
+                            dash_tw.insert("end", "\n")
                         for ln in fin_lines:
                             dash_tw.insert(
                                 "end",
