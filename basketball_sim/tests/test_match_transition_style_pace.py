@@ -61,7 +61,7 @@ def test_transition_style_push_raises_total_slightly_on_balanced():
     home_sit = _with_transition(_team(3, "HomeS"), "situational", "standard")
     m_push = Match(home_team=home_push, away_team=away)
     m_sit = Match(home_team=home_sit, away_team=away)
-    assert m_push._get_total_possessions() - m_sit._get_total_possessions() == 1
+    assert m_push._get_total_possessions() - m_sit._get_total_possessions() == 2
     assert 140 <= m_push._get_total_possessions() <= 180
 
 
@@ -71,7 +71,7 @@ def test_transition_style_half_court_lowers_total_slightly_on_balanced():
     home_sit = _with_transition(_team(3, "HomeS"), "situational", "standard")
     m_hc = Match(home_team=home_hc, away_team=away)
     m_sit = Match(home_team=home_sit, away_team=away)
-    assert m_hc._get_total_possessions() - m_sit._get_total_possessions() == -1
+    assert m_hc._get_total_possessions() - m_sit._get_total_possessions() == -2
     assert 140 <= m_hc._get_total_possessions() <= 180
 
 
@@ -87,9 +87,9 @@ def test_offense_tempo_fast_dampens_push_bonus():
     m_sf = Match(home_team=h_sit_fast, away_team=away)
     d_std = m_ps._get_total_possessions() - m_ss._get_total_possessions()
     d_fast = m_pf._get_total_possessions() - m_sf._get_total_possessions()
-    assert d_std == 1
-    # fast+push: transition 成分は 0.5x→0（T2 減衰）。同じ fast の中では push でも増えない
-    assert d_fast == 0
+    assert d_std == 2
+    # fast+push: transition 成分は 0.5x→+1（T2 減衰）。同じ fast の中では push は situational より +1 のみ
+    assert d_fast == 1
     assert d_std - d_fast == 1
 
 
@@ -103,7 +103,7 @@ def test_run_and_gun_plus_push_does_not_stack_transition_push():
     m_push = Match(home_team=home_rag_push, away_team=away)
     assert m_push._get_total_possessions() == m_sit._get_total_possessions()
     assert get_transition_style_pace_adjustment(home_rag_push, "run_and_gun") == 0
-    assert get_transition_style_pace_adjustment(home_rag_push, "balanced") == 1
+    assert get_transition_style_pace_adjustment(home_rag_push, "balanced") == 2
 
 
 def test_situational_and_ordering_helper():

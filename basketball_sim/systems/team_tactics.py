@@ -657,9 +657,9 @@ def get_transition_style_pace_adjustment(team: Any, offense_strategy: str) -> in
     if style in ("", "situational"):
         return 0
     if style == "push":
-        base = 1
+        base = 2
     elif style == "half_court":
-        base = -1
+        base = -2
     else:
         return 0
     if s == "run_and_gun" and style == "push":
