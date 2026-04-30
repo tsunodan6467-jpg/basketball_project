@@ -24,6 +24,8 @@ def test_postgame_summary_after_full_match():
         match.simulate()
     text = "\n".join(format_match_postgame_cli_lines(match, home))
     assert "【試合後サマリー】" in text
+    assert "戦術メモ:" in text
+    assert "基本方針:" in text
     assert "結果:" in text
     assert "外角勝負:" in text
     assert "守備強度:" in text
@@ -170,3 +172,61 @@ def test_format_pf_summary_lines_safe_malformed_rows():
     h = SimpleNamespace(name="H", team_id=1)
     out = mpd._format_pf_summary_lines(m, h)
     assert out == ["PF記録なし"]
+
+
+def test_tactics_memo_shows_team_and_team_strategy_and_playbook():
+    rows = [{"team_id": 10, "team_name": "HomeX", "player_name": "Yamada", "minutes": 20.0, "pf": 1}]
+    m, home, _ = _light_match_stub(10, 20, rows)
+    home.players = []
+    home.strategy = "run_and_gun"
+    home.coach_style = "offense"
+    home.usage_policy = "win_now"
+    home.team_tactics = {
+        "version": 1,
+        "team_strategy": {
+            "offense_tempo": "fast",
+            "offense_style": "three_point",
+            "offense_creation": "ball_move",
+            "defense_style": "pressure",
+            "rebound_style": "balanced",
+            "transition_style": "push",
+        },
+        "playbook": {
+            "pick_and_roll": "standard",
+            "spain_pick_and_roll": "standard",
+            "handoff": "standard",
+            "off_ball_screen": "standard",
+            "post_up": "low",
+            "transition": "high",
+        },
+    }
+    text = "\n".join(format_match_postgame_cli_lines(m, home))
+    assert "戦術メモ:" in text
+    assert "基本方針:" in text
+    assert "ラン＆ガン" in text
+    assert "攻撃重視" in text
+    assert "勝利優先（今を勝つ）" in text
+    assert "攻守詳細:" in text
+    assert "セット傾向:" in text
+    assert "速攻頻度高" in text or "ポスト低" in text
+    assert "ファウル（PF）:" in text
+    assert "Yamada" in text
+
+
+def test_tactics_memo_empty_when_user_team_none():
+    m = SimpleNamespace(home_team=None, away_team=None)
+    assert mpd._format_tactics_context_lines(m, None) == []
+
+
+def test_tactics_memo_does_not_break_edges_none_branch():
+    rows = [{"team_id": 10, "team_name": "HomeX", "player_name": "A", "minutes": 1.0, "pf": 0}]
+    m, home, _ = _light_match_stub(10, 20, rows, hs=50, aws=50)
+    home.players = []
+    home.strategy = "inside"
+    home.coach_style = "defense"
+    home.usage_policy = "balanced"
+    # 比較不能に近いが戦術メモは出る
+    text = "\n".join(format_match_postgame_cli_lines(m, home))
+    assert "戦術メモ:" in text
+    assert "インサイド" in text
+    assert "PF記録なし" in text

@@ -6,7 +6,13 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from basketball_sim.systems.gm_ui_constants import (
+    COACH_STYLE_OPTIONS,
+    STRATEGY_OPTIONS,
+    USAGE_POLICY_OPTIONS,
+)
 from basketball_sim.systems.match_preview_cli_display import build_matchup_edges_summary
+from basketball_sim.systems.team_tactics import get_safe_team_tactics
 
 
 def _side_key(team_id: Any, home_id: Any, away_id: Any) -> Optional[str]:
@@ -372,6 +378,136 @@ def _format_team_foul_summary_lines(match: Any) -> List[str]:
     return out
 
 
+def _label_from_pairs(options: List[Tuple[str, str]], key: str, *, fallback: str) -> str:
+    k = str(key or "").strip()
+    for a, b in options:
+        if a == k:
+            return str(b)
+    return fallback
+
+
+_PLAYBOOK_LEVEL_JA = {"low": "低", "standard": "標準", "high": "高"}
+
+# main_menu_view のセット傾向ラベルと揃える（短縮表示用）
+_PLAYBOOK_KEY_JA: Tuple[Tuple[str, str], ...] = (
+    ("pick_and_roll", "PnR"),
+    ("spain_pick_and_roll", "Spain"),
+    ("handoff", "H/O"),
+    ("off_ball_screen", "オフスクリ"),
+    ("post_up", "ポスト"),
+    ("transition", "速攻頻度"),
+)
+
+_TEAM_STRATEGY_JA = (
+    (
+        "offense_tempo",
+        (("slow", "テンポ遅め"), ("standard", "テンポ標準"), ("fast", "テンポ速め")),
+        "テンポ",
+    ),
+    (
+        "offense_style",
+        (
+            ("balanced", "攻めバランス"),
+            ("inside", "ペイント重視"),
+            ("three_point", "3P重視"),
+            ("drive", "ドライブ重視"),
+        ),
+        "攻め",
+    ),
+    (
+        "offense_creation",
+        (
+            ("ball_move", "ボールムーブ"),
+            ("pick_and_roll", "P&R起点"),
+            ("iso", "アイソ"),
+            ("post", "ポスト起点"),
+        ),
+        "起点",
+    ),
+    (
+        "defense_style",
+        (
+            ("balanced", "守備バランス"),
+            ("protect_three", "3P警戒"),
+            ("protect_paint", "ペイント保護"),
+            ("pressure", "前から圧力"),
+        ),
+        "守備",
+    ),
+    (
+        "rebound_style",
+        (("get_back", "戻り優先"), ("balanced", "板バランス"), ("crash_offense", "攻撃板参加")),
+        "板",
+    ),
+    (
+        "transition_style",
+        (("push", "速攻重視"), ("situational", "状況判断"), ("half_court", "陣地優先")),
+        "転換",
+    ),
+)
+
+
+def _format_playbook_summary_line(pb: Dict[str, Any]) -> str:
+    parts: List[str] = []
+    for key, short in _PLAYBOOK_KEY_JA:
+        if key not in pb:
+            continue
+        raw_v = str(pb.get(key) or "standard").strip()
+        lv = _PLAYBOOK_LEVEL_JA.get(raw_v, raw_v)
+        parts.append(f"{short}{lv}")
+    if not parts:
+        return ""
+    return " / ".join(parts[:6])
+
+
+def _format_team_strategy_summary_line(ts: Dict[str, Any]) -> str:
+    parts: List[str] = []
+    for key, pairs, _short in _TEAM_STRATEGY_JA:
+        if key not in ts:
+            continue
+        lab = _label_from_pairs(list(pairs), str(ts.get(key) or ""), fallback="")
+        if lab:
+            parts.append(lab)
+    if not parts:
+        return ""
+    return " / ".join(parts[:6])
+
+
+def _format_tactics_context_lines(match: Any, user_team: Any) -> List[str]:
+    """
+    自チームの Team 属性と team_tactics（表示・整理用）。試合ロジックや係数は変更しない。
+    """
+    if user_team is None:
+        return []
+    try:
+        strat = str(getattr(user_team, "strategy", "balanced") or "balanced").strip()
+        coach = str(getattr(user_team, "coach_style", "balanced") or "balanced").strip()
+        usage = str(getattr(user_team, "usage_policy", "balanced") or "balanced").strip()
+        s_lab = _label_from_pairs(list(STRATEGY_OPTIONS), strat, fallback=strat)
+        c_lab = _label_from_pairs(list(COACH_STYLE_OPTIONS), coach, fallback=coach)
+        u_lab = _label_from_pairs(list(USAGE_POLICY_OPTIONS), usage, fallback=usage)
+        line_base = f"- 基本方針: {s_lab} / {c_lab} / {u_lab}"
+
+        safe = get_safe_team_tactics(user_team)
+        ts = safe.get("team_strategy") if isinstance(safe.get("team_strategy"), dict) else {}
+        pb = safe.get("playbook") if isinstance(safe.get("playbook"), dict) else {}
+
+        detail = _format_team_strategy_summary_line(ts)
+        line_detail = f"- 攻守詳細: {detail}" if detail else ""
+
+        pb_line = _format_playbook_summary_line(pb)
+        line_pb = f"- セット傾向: {pb_line}" if pb_line else ""
+
+        out = ["戦術メモ:", line_base]
+        if line_detail:
+            out.append(line_detail)
+        if line_pb:
+            out.append(line_pb)
+        return out
+    except Exception:
+        return []
+
+
 def _narrative_lines(user_won: bool, edges: Dict[str, Any]) -> Tuple[str, str, str]:
     axes = [
         ("outside", "外角"),
@@ -446,9 +582,17 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
     except Exception:
         team_foul_lines = []
 
+    tactics_lines: List[str] = []
+    try:
+        tactics_lines = _format_tactics_context_lines(match, user_team)
+    except Exception:
+        tactics_lines = []
+
     edges = build_postgame_edges_summary(match, user_team)
     if edges is None:
         out_none: List[str] = ["【試合後サマリー】", score_line]
+        if tactics_lines:
+            out_none.extend(tactics_lines)
         if pf_lines:
             out_none.extend(pf_lines)
         if team_foul_lines:
@@ -468,6 +612,8 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
     line2 = f"守備強度: {edges['defense']} / ベンチ勝負: {edges['bench']}"
     w, l, p = _narrative_lines(user_won, edges)
     out: List[str] = ["【試合後サマリー】", score_line]
+    if tactics_lines:
+        out.extend(tactics_lines)
     if pf_lines:
         out.extend(pf_lines)
     if team_foul_lines:
