@@ -1445,6 +1445,16 @@ def get_injury_care_substitute_overlay(team: Any, fatigue: int, stamina: int) ->
     return 0.0
 
 
+# _get_shot_mix 用: team_strategy offense_style / defense_style の T1 ベクトルにだけ掛ける体感調整（pace / assist / steal 等には不適用）。
+_TEAM_STRATEGY_SHOT_MIX_SCALE: float = 1.25
+
+
+def _scale_shot_mix_deltas(deltas: Tuple[float, float, float]) -> Tuple[float, float, float]:
+    s = _TEAM_STRATEGY_SHOT_MIX_SCALE
+    d3, d2, dsr = deltas
+    return (d3 * s, d2 * s, dsr * s)
+
+
 # _get_shot_mix 用: team_strategy 由来の 3/2/shot 微調整（極小）。必ず本流 offense_strategy より小さい T1 固定値で抑える。
 _OFFENSE_STYLE_T1_INSIDE: Tuple[float, float, float] = (-0.02, 0.01, 0.0015)
 _OFFENSE_STYLE_T1_THREE: Tuple[float, float, float] = (0.025, 0.006, 0.001)
@@ -1497,12 +1507,12 @@ def get_offense_style_shot_mix_deltas(
     k = _OFFENSE_STYLE_SAME_DIRECTION_DAMP
     # T2: 同方向減衰（戦略==スタイル）
     if s == style:
-        return (d3 * k, d2 * k, dsr * k)
+        return _scale_shot_mix_deltas((d3 * k, d2 * k, dsr * k))
     # T2: drive かつ 戦略 inside（ペイント同方向）→ 減衰
     if style == "drive" and s == "inside":
-        return (d3 * k, d2 * k, dsr * k)
+        return _scale_shot_mix_deltas((d3 * k, d2 * k, dsr * k))
     # T4: balanced 等 満額; 直交は同額のまま
-    return (d3, d2, dsr)
+    return _scale_shot_mix_deltas((d3, d2, dsr))
 
 
 # _get_shot_mix 守備側: team_strategy.defense_style（第3弾A: protect_paint / protect_three のみ）。T1 < Team.strategy "defense" の -0.01(shot) 等。
@@ -1546,8 +1556,8 @@ def get_defense_style_shot_mix_deltas(
     s = str(defense_strategy or "balanced").strip()
     if s == "defense":
         k = _DEFENSE_STYLE_WITH_DEFENSE_STRAT_DAMP
-        return (d3 * k, d2 * k, dsr * k)
-    return (d3, d2, dsr)
+        return _scale_shot_mix_deltas((d3 * k, d2 * k, dsr * k))
+    return _scale_shot_mix_deltas((d3, d2, dsr))
 
 
 # 第3弾B: pressure → _simulate_possession.steal_rate だけ。+0.010(戦略) / +0.006(コーチ) より必ず小さい

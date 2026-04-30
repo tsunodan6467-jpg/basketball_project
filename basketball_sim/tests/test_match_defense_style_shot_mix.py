@@ -1,9 +1,15 @@
 """team_tactics.team_strategy.defense_style（protect_paint / protect_three）→ Match._get_shot_mix（第3弾A）。"""
 
+import pytest
+
 from basketball_sim.models.match import Match
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.team_tactics import (
+    _DEFENSE_STYLE_T1_PROTECT_PAINT,
+    _DEFENSE_STYLE_T1_PROTECT_THREE,
+    _DEFENSE_STYLE_WITH_DEFENSE_STRAT_DAMP,
+    _TEAM_STRATEGY_SHOT_MIX_SCALE,
     ensure_team_tactics_on_team,
     get_defense_style_shot_mix_deltas,
 )
@@ -97,3 +103,18 @@ def test_protect_paint_vs_protect_three_three_cutoff_opposes():
     assert p[0] > 0.0
     assert q[0] < 0.0
     assert p[0] * q[0] < 0.0
+    assert p == pytest.approx(
+        tuple(x * _TEAM_STRATEGY_SHOT_MIX_SCALE for x in _DEFENSE_STYLE_T1_PROTECT_PAINT), abs=1e-9
+    )
+    assert q == pytest.approx(
+        tuple(x * _TEAM_STRATEGY_SHOT_MIX_SCALE for x in _DEFENSE_STYLE_T1_PROTECT_THREE), abs=1e-9
+    )
+
+
+def test_defense_protect_paint_defense_strategy_is_scaled_t1_times_damp():
+    """defense_strategy=defense 時は T1×減衰後に shot_mix スケールのみ掛かる（steal 定数とは別）。"""
+    t = _with_defense_style(_team(3, "DPD"), "protect_paint")
+    got = get_defense_style_shot_mix_deltas(t, "defense")
+    k = _DEFENSE_STYLE_WITH_DEFENSE_STRAT_DAMP
+    exp = tuple(x * k * _TEAM_STRATEGY_SHOT_MIX_SCALE for x in _DEFENSE_STYLE_T1_PROTECT_PAINT)
+    assert got == pytest.approx(exp, abs=1e-9)

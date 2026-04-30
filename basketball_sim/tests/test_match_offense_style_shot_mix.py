@@ -1,9 +1,15 @@
 """team_tactics.team_strategy.offense_style → Match._get_shot_mix（極小オーバーレイ、第2弾）。"""
 
+import pytest
+
 from basketball_sim.models.match import Match
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.team_tactics import (
+    _OFFENSE_STYLE_T1_DRIVE,
+    _OFFENSE_STYLE_T1_INSIDE,
+    _OFFENSE_STYLE_T1_THREE,
+    _TEAM_STRATEGY_SHOT_MIX_SCALE,
     ensure_team_tactics_on_team,
     get_offense_style_shot_mix_deltas,
 )
@@ -107,6 +113,8 @@ def test_drive_balanced_nonzero_three_down_two_up():
     assert d3 < 0.0
     assert d2 > 0.0
     assert dsr >= 0.0
+    exp = tuple(x * _TEAM_STRATEGY_SHOT_MIX_SCALE for x in _OFFENSE_STYLE_T1_DRIVE)
+    assert (d3, d2, dsr) == pytest.approx(exp, abs=1e-9)
 
 
 def test_drive_inside_strategy_damped():
@@ -134,3 +142,18 @@ def test_drive_t1_weaker_than_inside():
     vi = get_offense_style_shot_mix_deltas(t_i, "balanced")
     for i in range(3):
         assert abs(vd[i]) < abs(vi[i]) + 1e-9
+
+
+def test_offense_style_inside_balanced_is_scaled_t1():
+    """満額 inside × balanced は T1_INSIDE を _TEAM_STRATEGY_SHOT_MIX_SCALE 倍したベクトル。"""
+    t = _with_offense_style(_team(14, "Isc"), "inside")
+    got = get_offense_style_shot_mix_deltas(t, "balanced")
+    exp = tuple(x * _TEAM_STRATEGY_SHOT_MIX_SCALE for x in _OFFENSE_STYLE_T1_INSIDE)
+    assert got == pytest.approx(exp, abs=1e-9)
+
+
+def test_offense_style_three_point_balanced_is_scaled_t1():
+    t = _with_offense_style(_team(15, "3sc"), "three_point")
+    got = get_offense_style_shot_mix_deltas(t, "balanced")
+    exp = tuple(x * _TEAM_STRATEGY_SHOT_MIX_SCALE for x in _OFFENSE_STYLE_T1_THREE)
+    assert got == pytest.approx(exp, abs=1e-9)
