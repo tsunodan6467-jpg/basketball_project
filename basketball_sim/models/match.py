@@ -31,6 +31,7 @@ from basketball_sim.systems.team_tactics import (
     get_offense_style_shot_mix_deltas,
     get_offense_tempo_pace_adjustment,
     get_roles_clutch_shooter_weight_multiplier,
+    get_roles_defense_event_weight_multiplier,
     get_rebound_style_offense_oreb_delta,
     get_transition_style_pace_adjustment,
 )
@@ -2201,6 +2202,22 @@ class Match:
         return random.choices(defense_lineup, weights=weights, k=1)[0]
 
     def _pick_stealer(self, defense_lineup: List[Player]) -> Player:
+        defense_team: Optional[Team] = None
+        try:
+            lineup_ids = {
+                int(getattr(p, "player_id", 0) or 0)
+                for p in defense_lineup
+                if p is not None
+            }
+            home_ids = {int(getattr(p, "player_id", 0) or 0) for p in self.home_team.players}
+            away_ids = {int(getattr(p, "player_id", 0) or 0) for p in self.away_team.players}
+            if lineup_ids and lineup_ids.issubset(home_ids):
+                defense_team = self.home_team
+            elif lineup_ids and lineup_ids.issubset(away_ids):
+                defense_team = self.away_team
+        except Exception:
+            defense_team = None
+
         weights = []
         for p in defense_lineup:
             weight = (
@@ -2209,6 +2226,7 @@ class Match:
                 p.get_adjusted_attribute("stamina") * 0.20
             )
             weight *= self._position_weight(p, "steal")
+            weight *= get_roles_defense_event_weight_multiplier(defense_team, p)
             weights.append(max(1, int(weight)))
         return random.choices(defense_lineup, weights=weights, k=1)[0]
 

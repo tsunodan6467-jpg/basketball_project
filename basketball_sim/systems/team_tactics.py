@@ -1361,6 +1361,9 @@ _ROLES_CLUTCH_PRIORITY_T1: float = 0.10
 _ROLES_CLUTCH_SHOOTER_MULTIPLIER_GO_TO: float = 1.06
 _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD: float = 1.00
 _ROLES_CLUTCH_SHOOTER_MULTIPLIER_LIMITED: float = 0.94
+_ROLES_DEFENSE_EVENT_MULTIPLIER_STOPPER: float = 1.05
+_ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD: float = 1.00
+_ROLES_DEFENSE_EVENT_MULTIPLIER_LIGHT: float = 0.96
 
 
 def get_roles_clutch_priority_substitute_overlay(
@@ -1441,6 +1444,43 @@ def get_roles_clutch_shooter_weight_multiplier(team: Any, player: Any, *, is_clu
     if cp == "limited":
         return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_LIMITED
     return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+
+
+def get_roles_defense_event_weight_multiplier(team: Any, player: Any) -> float:
+    """
+    team_tactics.roles[pid].defense_assignment を守備イベント記録者の重みへ極小反映する。
+
+    stopper: 1.05 / light: 0.96 / standard・欠損・不正: 1.00
+    """
+    if player is None:
+        return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+    try:
+        tactics = get_safe_team_tactics(team)
+        roles = tactics.get("roles")
+        if not isinstance(roles, dict):
+            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        try:
+            pid = int(getattr(player, "player_id", 0) or 0)
+        except (TypeError, ValueError):
+            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        if pid <= 0:
+            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        row = roles.get(str(pid))
+        if not isinstance(row, dict):
+            return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+        da = _pick_str(
+            row.get("defense_assignment"),
+            ALLOWED_DEFENSE_ASSIGNMENT,
+            ROLE_DEFAULTS["defense_assignment"],
+        )
+    except Exception:
+        return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
+
+    if da == "stopper":
+        return _ROLES_DEFENSE_EVENT_MULTIPLIER_STOPPER
+    if da == "light":
+        return _ROLES_DEFENSE_EVENT_MULTIPLIER_LIGHT
+    return _ROLES_DEFENSE_EVENT_MULTIPLIER_STANDARD
 
 
 # Rotation._find_best_substitute: usage_policy.injury_care（v1: fatigue 主・stamina 補助。form_weight とは別軸）
