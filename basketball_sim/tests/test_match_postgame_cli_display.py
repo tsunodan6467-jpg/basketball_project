@@ -285,3 +285,58 @@ def test_endgame_role_memo_safe_when_roles_missing_or_malformed():
     text = "\n".join(format_match_postgame_cli_lines(m, home))
     assert "終盤メモ:" not in text
     assert "戦術メモ:" in text
+
+
+def test_defense_role_memo_shows_stopper_names():
+    rows = [{"team_id": 10, "team_name": "HomeX", "player_name": "Yamada", "minutes": 20.0, "pf": 1}]
+    m, home, _ = _light_match_stub(10, 20, rows)
+    home.players = [
+        SimpleNamespace(player_id=101, name="田中"),
+        SimpleNamespace(player_id=102, name="佐藤"),
+    ]
+    home.strategy = "balanced"
+    home.coach_style = "balanced"
+    home.usage_policy = "balanced"
+    home.team_tactics = {
+        "version": 1,
+        "roles": {
+            "101": {"defense_assignment": "stopper"},
+            "102": {"defense_assignment": "light"},
+        },
+    }
+    text = "\n".join(format_match_postgame_cli_lines(m, home))
+    assert "守備メモ:" in text
+    assert "守備役:" in text
+    assert "田中" in text
+    assert "戦術メモ:" in text
+    assert ("ファウル（PF）:" in text) or ("PF記録なし" in text)
+
+
+def test_defense_role_memo_not_shown_when_no_stopper():
+    rows = [{"team_id": 10, "team_name": "HomeX", "player_name": "Yamada", "minutes": 20.0, "pf": 1}]
+    m, home, _ = _light_match_stub(10, 20, rows)
+    home.players = [SimpleNamespace(player_id=101, name="田中")]
+    home.strategy = "balanced"
+    home.coach_style = "balanced"
+    home.usage_policy = "balanced"
+    home.team_tactics = {
+        "version": 1,
+        "roles": {"101": {"defense_assignment": "standard"}},
+    }
+    text = "\n".join(format_match_postgame_cli_lines(m, home))
+    assert "守備メモ:" not in text
+    assert "守備役:" not in text
+    assert "戦術メモ:" in text
+
+
+def test_defense_role_memo_safe_when_roles_missing_or_malformed():
+    rows = [{"team_id": 10, "team_name": "HomeX", "player_name": "Yamada", "minutes": 20.0, "pf": 1}]
+    m, home, _ = _light_match_stub(10, 20, rows)
+    home.players = [SimpleNamespace(player_id=101, name="田中")]
+    home.strategy = "balanced"
+    home.coach_style = "balanced"
+    home.usage_policy = "balanced"
+    home.team_tactics = {"version": 1, "roles": "broken"}
+    text = "\n".join(format_match_postgame_cli_lines(m, home))
+    assert "守備メモ:" not in text
+    assert "戦術メモ:" in text

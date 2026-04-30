@@ -568,6 +568,48 @@ def _format_endgame_role_memo_lines(user_team: Any) -> List[str]:
     ]
 
 
+def _format_defense_role_memo_lines(user_team: Any) -> List[str]:
+    """
+    roles.defense_assignment の表示専用メモ（守備役用途）。
+    stopper の選手がいるときだけ短く表示し、情報欠損時は空で返す。
+    """
+    if user_team is None:
+        return []
+    try:
+        safe = get_safe_team_tactics(user_team)
+        roles = safe.get("roles")
+        if not isinstance(roles, dict) or not roles:
+            return []
+    except Exception:
+        return []
+
+    names: List[str] = []
+    for pid_key, row in roles.items():
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("defense_assignment") or "").strip() != "stopper":
+            continue
+        try:
+            pid = int(str(pid_key).strip())
+        except (TypeError, ValueError):
+            continue
+        if pid <= 0:
+            continue
+        name = _get_player_name_by_id(user_team, pid)
+        names.append(name or f"#{pid}")
+
+    if not names:
+        return []
+    shown = " / ".join(names[:3])
+    if len(names) > 3:
+        shown += " / 他"
+    return [
+        "守備メモ:",
+        f"- 守備役: {shown}",
+        "- 守備役はスティール/ブロック記録者選択に一部反映されます。",
+    ]
+
+
 def _narrative_lines(user_won: bool, edges: Dict[str, Any]) -> Tuple[str, str, str]:
     axes = [
         ("outside", "外角"),
@@ -652,6 +694,11 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
         endgame_role_lines = _format_endgame_role_memo_lines(user_team)
     except Exception:
         endgame_role_lines = []
+    defense_role_lines: List[str] = []
+    try:
+        defense_role_lines = _format_defense_role_memo_lines(user_team)
+    except Exception:
+        defense_role_lines = []
 
     edges = build_postgame_edges_summary(match, user_team)
     if edges is None:
@@ -660,6 +707,8 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
             out_none.extend(tactics_lines)
         if endgame_role_lines:
             out_none.extend(endgame_role_lines)
+        if defense_role_lines:
+            out_none.extend(defense_role_lines)
         if pf_lines:
             out_none.extend(pf_lines)
         if team_foul_lines:
@@ -683,6 +732,8 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
         out.extend(tactics_lines)
     if endgame_role_lines:
         out.extend(endgame_role_lines)
+    if defense_role_lines:
+        out.extend(defense_role_lines)
     if pf_lines:
         out.extend(pf_lines)
     if team_foul_lines:
