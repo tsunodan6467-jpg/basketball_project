@@ -52,17 +52,17 @@ def test_offense_tempo_fast_vs_slow_changes_total_possessions_weakly():
     home_slow = _with_offense_tempo(_team(3, "HomeSlow"), "slow")
     m_fast = Match(home_team=home_fast, away_team=away)
     m_slow = Match(home_team=home_slow, away_team=away)
-    # fast: +2 / slow: -2 on home only → 差は 4（clamp 内）
-    assert m_fast._get_total_possessions() - m_slow._get_total_possessions() == 4
+    # fast: +3 / slow: -3 on home only → 差は 6（clamp 内）
+    assert m_fast._get_total_possessions() - m_slow._get_total_possessions() == 6
     assert 140 <= m_fast._get_total_possessions() <= 180
     assert 140 <= m_slow._get_total_possessions() <= 180
 
 
 def test_offense_tempo_does_not_override_existing_pace_baseline():
-    """既存補正は温存: offense_tempo 以外同一なら、fast と standard の差は 2 だけ（ホーム分）。"""
+    """既存補正は温存: offense_tempo 以外同一なら、fast と standard の差は 3 だけ（ホーム分）。"""
     away = _with_offense_tempo(_team(2, "Away"), "standard")
     home_std = _with_offense_tempo(_team(1, "HomeStd"), "standard")
     home_fast = _with_offense_tempo(_team(3, "HomeF"), "fast")
     m_std = Match(home_team=home_std, away_team=away)
     m_f = Match(home_team=home_fast, away_team=away)
-    assert m_f._get_total_possessions() - m_std._get_total_possessions() == 2
+    assert m_f._get_total_possessions() - m_std._get_total_possessions() == 3

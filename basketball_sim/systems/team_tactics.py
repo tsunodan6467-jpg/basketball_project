@@ -629,9 +629,9 @@ def get_offense_tempo_pace_adjustment(team: Any) -> int:
     except Exception:
         return 0
     if tempo == "fast":
-        return 2
+        return 3
     if tempo == "slow":
-        return -2
+        return -3
     return 0
 
 
