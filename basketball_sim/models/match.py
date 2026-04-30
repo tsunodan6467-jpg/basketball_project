@@ -26,6 +26,7 @@ from basketball_sim.systems.team_tactics import (
     get_defense_style_steal_rate_delta,
     get_normalized_rotation_starters_map,
     get_offense_creation_assist_delta,
+    get_playbook_shot_mix_deltas,
     get_playbook_assist_delta,
     get_offense_style_shot_mix_deltas,
     get_offense_tempo_pace_adjustment,
@@ -2540,6 +2541,10 @@ class Match:
         three_cutoff += _dd3
         two_cutoff += _dd2
         shot_rate_adjust += _ddsr
+        _pd3, _pd2, _pdsr = get_playbook_shot_mix_deltas(offense_team)
+        three_cutoff += _pd3
+        two_cutoff += _pd2
+        shot_rate_adjust += _pdsr
 
         three_push = (off_profile["three"] - 65.0) * 0.0025
         inside_push = ((off_profile["drive"] + off_profile["rebound"]) / 2 - 65.0) * 0.0018

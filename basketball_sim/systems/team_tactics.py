@@ -1520,6 +1520,22 @@ _DEFENSE_STYLE_T1_PROTECT_PAINT: Tuple[float, float, float] = (0.012, -0.006, -0
 _DEFENSE_STYLE_T1_PROTECT_THREE: Tuple[float, float, float] = (-0.012, 0.005, -0.0025)
 # T2: Team.strategy == "defense" との同方向減衰（0.2〜0.4 の安全域として 0.3）
 _DEFENSE_STYLE_WITH_DEFENSE_STRAT_DAMP: float = 0.3
+_PLAYBOOK_SHOT_MIX_LEVEL_DELTA: Dict[str, Dict[str, Tuple[float, float, float]]] = {
+    "off_ball_screen": {
+        "high": (0.0015, -0.0007, 0.0),
+        "low": (-0.0008, 0.0004, 0.0),
+    },
+    "post_up": {
+        "high": (-0.0012, 0.0016, 0.0002),
+        "low": (0.0006, -0.0008, -0.0001),
+    },
+}
+_PLAYBOOK_SHOT_MIX_THREE_MIN: float = -0.0025
+_PLAYBOOK_SHOT_MIX_THREE_MAX: float = 0.0025
+_PLAYBOOK_SHOT_MIX_TWO_MIN: float = -0.0025
+_PLAYBOOK_SHOT_MIX_TWO_MAX: float = 0.0025
+_PLAYBOOK_SHOT_MIX_RATE_MIN: float = -0.0010
+_PLAYBOOK_SHOT_MIX_RATE_MAX: float = 0.0010
 
 
 def get_defense_style_shot_mix_deltas(
@@ -1558,6 +1574,34 @@ def get_defense_style_shot_mix_deltas(
         k = _DEFENSE_STYLE_WITH_DEFENSE_STRAT_DAMP
         return _scale_shot_mix_deltas((d3 * k, d2 * k, dsr * k))
     return _scale_shot_mix_deltas((d3, d2, dsr))
+
+
+def get_playbook_shot_mix_deltas(offense_team: Any) -> Tuple[float, float, float]:
+    """
+    team_tactics.playbook の一部キーを _get_shot_mix へ極小加算する初回接続。
+
+    対象は off_ball_screen / post_up のみ。standard は 0、high/low のみ微調整し、
+    合計値は shot_mix 層専用の安全域でクランプする。
+    """
+    try:
+        safe = get_safe_team_tactics(offense_team)
+        pb = safe.get("playbook") if isinstance(safe.get("playbook"), dict) else {}
+    except Exception:
+        return (0.0, 0.0, 0.0)
+
+    d3 = 0.0
+    d2 = 0.0
+    dsr = 0.0
+    for key, by_level in _PLAYBOOK_SHOT_MIX_LEVEL_DELTA.items():
+        lv = str(pb.get(key) or "standard").strip()
+        a3, a2, asr = by_level.get(lv, (0.0, 0.0, 0.0))
+        d3 += float(a3)
+        d2 += float(a2)
+        dsr += float(asr)
+    d3 = max(_PLAYBOOK_SHOT_MIX_THREE_MIN, min(_PLAYBOOK_SHOT_MIX_THREE_MAX, d3))
+    d2 = max(_PLAYBOOK_SHOT_MIX_TWO_MIN, min(_PLAYBOOK_SHOT_MIX_TWO_MAX, d2))
+    dsr = max(_PLAYBOOK_SHOT_MIX_RATE_MIN, min(_PLAYBOOK_SHOT_MIX_RATE_MAX, dsr))
+    return (d3, d2, dsr)
 
 
 # 第3弾B: pressure → _simulate_possession.steal_rate だけ。+0.010(戦略) / +0.006(コーチ) より必ず小さい
