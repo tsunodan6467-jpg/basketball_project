@@ -26,6 +26,7 @@ from basketball_sim.systems.team_tactics import (
     get_defense_style_steal_rate_delta,
     get_normalized_rotation_starters_map,
     get_offense_creation_assist_delta,
+    get_playbook_assist_delta,
     get_offense_style_shot_mix_deltas,
     get_offense_tempo_pace_adjustment,
     get_rebound_style_offense_oreb_delta,
@@ -2466,6 +2467,7 @@ class Match:
         assist_rate += get_offense_creation_assist_delta(
             offense_team, str(strategy)
         )
+        assist_rate += get_playbook_assist_delta(offense_team)
 
         return max(0.28, min(0.82, assist_rate))
 

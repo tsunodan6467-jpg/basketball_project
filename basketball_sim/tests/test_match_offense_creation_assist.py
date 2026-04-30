@@ -6,8 +6,12 @@ from basketball_sim.models.match import Match
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.team_tactics import (
+    _PLAYBOOK_ASSIST_DELTA_MIN,
+    _PLAYBOOK_ASSIST_DELTA_MAX,
+    _PLAYBOOK_ASSIST_LEVEL_DELTA,
     ensure_team_tactics_on_team,
     get_offense_creation_assist_delta,
+    get_playbook_assist_delta,
 )
 
 
@@ -158,3 +162,119 @@ def test_get_assist_chance_ball_move_adds_small_delta_vs_post():
     ensure_team_tactics_on_team(home)
     b = m._get_assist_chance(home, m.home_starters, shooter, "two", False)
     assert a - b == pytest.approx(0.003, abs=1e-6)
+
+
+def test_playbook_assist_delta_high_vs_standard_vs_low():
+    t = _with_offense_creation(_team(20, "PB"), "post")
+    raw = dict(t.team_tactics or {})
+    ts = dict(raw.get("team_strategy") or {})
+    raw["team_strategy"] = ts
+    raw["playbook"] = {
+        "pick_and_roll": "standard",
+        "spain_pick_and_roll": "standard",
+        "handoff": "standard",
+        "off_ball_screen": "standard",
+        "post_up": "high",
+        "transition": "high",
+    }
+    t.team_tactics = raw
+    ensure_team_tactics_on_team(t)
+    d_std = get_playbook_assist_delta(t)
+
+    raw_h = dict(t.team_tactics or {})
+    raw_h["playbook"] = {
+        "pick_and_roll": "high",
+        "spain_pick_and_roll": "high",
+        "handoff": "high",
+        "off_ball_screen": "high",
+        "post_up": "high",
+        "transition": "high",
+    }
+    t.team_tactics = raw_h
+    ensure_team_tactics_on_team(t)
+    d_high = get_playbook_assist_delta(t)
+
+    raw_l = dict(t.team_tactics or {})
+    raw_l["playbook"] = {
+        "pick_and_roll": "low",
+        "spain_pick_and_roll": "low",
+        "handoff": "low",
+        "off_ball_screen": "low",
+        "post_up": "low",
+        "transition": "low",
+    }
+    t.team_tactics = raw_l
+    ensure_team_tactics_on_team(t)
+    d_low = get_playbook_assist_delta(t)
+
+    assert d_std == 0.0
+    assert d_high > d_std > d_low
+
+
+def test_playbook_assist_delta_clamped_bounds():
+    t = _with_offense_creation(_team(21, "PBC"), "post")
+    raw = dict(t.team_tactics or {})
+    raw["playbook"] = {
+        "pick_and_roll": "high",
+        "spain_pick_and_roll": "high",
+        "handoff": "high",
+        "off_ball_screen": "high",
+        "post_up": "high",
+        "transition": "high",
+    }
+    t.team_tactics = raw
+    ensure_team_tactics_on_team(t)
+    d = get_playbook_assist_delta(t)
+    assert d == pytest.approx(_PLAYBOOK_ASSIST_DELTA_MAX, abs=1e-9)
+
+
+def test_get_assist_chance_reflects_playbook_small_delta():
+    home = _with_offense_creation(_team(22, "Hpb"), "post")
+    home.strategy = "balanced"
+    away = _with_offense_creation(_team(23, "Apb"), "balanced")
+    m = Match(home_team=home, away_team=away)
+    shooter = m.home_starters[0]
+
+    raw = dict(home.team_tactics or {})
+    raw["playbook"] = {
+        "pick_and_roll": "standard",
+        "spain_pick_and_roll": "standard",
+        "handoff": "standard",
+        "off_ball_screen": "standard",
+        "post_up": "high",
+        "transition": "high",
+    }
+    home.team_tactics = raw
+    ensure_team_tactics_on_team(home)
+    base = m._get_assist_chance(home, m.home_starters, shooter, "two", False)
+
+    raw_h = dict(home.team_tactics or {})
+    raw_h["playbook"] = {
+        "pick_and_roll": "high",
+        "spain_pick_and_roll": "high",
+        "handoff": "high",
+        "off_ball_screen": "high",
+        "post_up": "high",
+        "transition": "high",
+    }
+    home.team_tactics = raw_h
+    ensure_team_tactics_on_team(home)
+    high = m._get_assist_chance(home, m.home_starters, shooter, "two", False)
+
+    raw_l = dict(home.team_tactics or {})
+    raw_l["playbook"] = {
+        "pick_and_roll": "low",
+        "spain_pick_and_roll": "low",
+        "handoff": "low",
+        "off_ball_screen": "low",
+        "post_up": "low",
+        "transition": "low",
+    }
+    home.team_tactics = raw_l
+    ensure_team_tactics_on_team(home)
+    low = m._get_assist_chance(home, m.home_starters, shooter, "two", False)
+
+    expect_high = sum(v["high"] for v in _PLAYBOOK_ASSIST_LEVEL_DELTA.values())
+    expect_low = sum(v["low"] for v in _PLAYBOOK_ASSIST_LEVEL_DELTA.values())
+    assert high - base == pytest.approx(min(_PLAYBOOK_ASSIST_DELTA_MAX, expect_high), abs=1e-6)
+    assert low - base == pytest.approx(max(_PLAYBOOK_ASSIST_DELTA_MIN, expect_low), abs=1e-6)

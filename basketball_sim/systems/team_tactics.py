@@ -1605,6 +1605,16 @@ _OFFENSE_CREATION_T1_PICK_ROLL_ASSIST: float = 0.0014
 # T2: three_point / inside は既に assist を上げる → 同方向減衰（offense_style と同オーダー 0.3）
 # T2b( iso ): run_and_gun / defense は既に assist を下げる → 負の同方向減衰に同定数 0.3
 
+# 第8弾: playbook を _get_assist_chance へ初接続（極小）。offense_creation の T1 より小さく保つ。
+_PLAYBOOK_ASSIST_LEVEL_DELTA: Dict[str, Dict[str, float]] = {
+    "pick_and_roll": {"high": 0.0012, "low": -0.0006},
+    "spain_pick_and_roll": {"high": 0.0010, "low": -0.0005},
+    "handoff": {"high": 0.0010, "low": -0.0005},
+    "off_ball_screen": {"high": 0.0012, "low": -0.0004},
+}
+_PLAYBOOK_ASSIST_DELTA_MIN: float = -0.0015
+_PLAYBOOK_ASSIST_DELTA_MAX: float = 0.0030
+
 
 def get_offense_creation_assist_delta(
     offense_team: Any, offense_strategy: str
@@ -1649,6 +1659,26 @@ def get_offense_creation_assist_delta(
     # post: 意図的に 0。ポスト主導の出方は Team.strategy inside / offense_style / ラインアップ項 / PF-C 等の
     # 既存補正に吸収されやすく、未実装の取りこぼしではない。独立デルタを入れるなら二重掛けを再設計してから。
     return 0.0
+
+
+def get_playbook_assist_delta(team: Any) -> float:
+    """
+    team_tactics.playbook の一部キーを _get_assist_chance へ極小加算する初回接続。
+
+    対象は pick_and_roll / spain_pick_and_roll / handoff / off_ball_screen のみ。
+    standard は 0、high/low のみ微調整し、最終値は安全域でクランプする。
+    """
+    try:
+        safe = get_safe_team_tactics(team)
+        pb = safe.get("playbook") if isinstance(safe.get("playbook"), dict) else {}
+    except Exception:
+        return 0.0
+
+    delta = 0.0
+    for key, by_level in _PLAYBOOK_ASSIST_LEVEL_DELTA.items():
+        lv = str(pb.get(key) or "standard").strip()
+        delta += float(by_level.get(lv, 0.0))
+    return max(_PLAYBOOK_ASSIST_DELTA_MIN, min(_PLAYBOOK_ASSIST_DELTA_MAX, delta))
 
 
 # 第7弾: rebound_style → _get_offense_rebound_rate。inside +0.04 等より必ず小さい
