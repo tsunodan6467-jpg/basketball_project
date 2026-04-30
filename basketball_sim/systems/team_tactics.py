@@ -1358,6 +1358,9 @@ def get_clutch_policy_substitute_overlay(
 
 # Rotation._find_best_substitute: roles.clutch_priority（終盤のみ。clutch_policy より弱い T1）
 _ROLES_CLUTCH_PRIORITY_T1: float = 0.10
+_ROLES_CLUTCH_SHOOTER_MULTIPLIER_GO_TO: float = 1.06
+_ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD: float = 1.00
+_ROLES_CLUTCH_SHOOTER_MULTIPLIER_LIMITED: float = 0.94
 
 
 def get_roles_clutch_priority_substitute_overlay(
@@ -1401,6 +1404,43 @@ def get_roles_clutch_priority_substitute_overlay(
     if cp == "limited":
         return -t1
     return 0.0
+
+
+def get_roles_clutch_shooter_weight_multiplier(team: Any, player: Any, *, is_clutch: bool) -> float:
+    """
+    team_tactics.roles[pid].clutch_priority をクラッチ時のFGシューター選択重みへ極小反映する。
+
+    - 非クラッチ時は常に 1.0
+    - go_to: 1.06 / limited: 0.94 / standard・欠損・不正: 1.0
+    """
+    if not is_clutch:
+        return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+    if player is None:
+        return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+    try:
+        tactics = get_safe_team_tactics(team)
+        roles = tactics.get("roles")
+        if not isinstance(roles, dict):
+            return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+        try:
+            pid = int(getattr(player, "player_id", 0) or 0)
+        except (TypeError, ValueError):
+            return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+        if pid <= 0:
+            return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+        row = roles.get(str(pid))
+        if not isinstance(row, dict):
+            return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+        cp = _pick_str(
+            row.get("clutch_priority"), ALLOWED_CLUTCH_PRIORITY, ROLE_DEFAULTS["clutch_priority"]
+        )
+    except Exception:
+        return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
+    if cp == "go_to":
+        return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_GO_TO
+    if cp == "limited":
+        return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_LIMITED
+    return _ROLES_CLUTCH_SHOOTER_MULTIPLIER_STANDARD
 
 
 # Rotation._find_best_substitute: usage_policy.injury_care（v1: fatigue 主・stamina 補助。form_weight とは別軸）

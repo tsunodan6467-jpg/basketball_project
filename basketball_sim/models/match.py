@@ -30,6 +30,7 @@ from basketball_sim.systems.team_tactics import (
     get_playbook_assist_delta,
     get_offense_style_shot_mix_deltas,
     get_offense_tempo_pace_adjustment,
+    get_roles_clutch_shooter_weight_multiplier,
     get_rebound_style_offense_oreb_delta,
     get_transition_style_pace_adjustment,
 )
@@ -570,6 +571,21 @@ class Match:
         quarter = int(event.get("quarter", 0) or 0)
         clock_seconds = int(event.get("clock_seconds", 0) or 0)
         return quarter >= 4 and clock_seconds <= 120
+
+    def _is_clutch_shooter_window(self) -> bool:
+        """
+        roles.clutch_priority をFGシューター選択へ適用する最小クラッチ判定。
+        第4Q以降 / 残り120秒以内 / 点差10以内。
+        """
+        try:
+            quarter, _, _ = self._get_quarter_info(max(0, int(self.current_possession)))
+            if quarter < 4:
+                return False
+            if self._get_clock_seconds(max(0, int(self.current_possession))) > 120:
+                return False
+            return abs(int(self.home_score) - int(self.away_score)) <= 10
+        except Exception:
+            return False
 
     def _abs_score_diff(self, event: Dict) -> int:
         return abs(int(event.get("home_score", 0)) - int(event.get("away_score", 0)))
@@ -2725,10 +2741,28 @@ class Match:
         offense_lineup: List[Player],
         shot_profile: str
     ) -> Player:
-        weights = [
-            self._get_shooter_weight(p, offense_team, offense_lineup, shot_profile)
-            for p in offense_lineup
-        ]
+        weights = []
+        for p in offense_lineup:
+            weight = self._get_shooter_weight(p, offense_team, offense_lineup, shot_profile)
+            weights.append(weight)
+        return random.choices(offense_lineup, weights=weights, k=1)[0]
+
+    def _select_field_goal_shooter(self, offense_team: Team, offense_lineup: List[Player], shot_profile: str) -> Player:
+        """
+        FG（2P/3P）専用のシューター選択。
+        クラッチ時間帯では roles.clutch_priority の極小 multiplier を重みへ乗算する。
+        """
+        if shot_profile not in {"two", "three"}:
+            return self._select_shooter(offense_team, offense_lineup, shot_profile)
+        is_clutch = self._is_clutch_shooter_window()
+        weights = []
+        for p in offense_lineup:
+            weight = self._get_shooter_weight(p, offense_team, offense_lineup, shot_profile)
+            mult = get_roles_clutch_shooter_weight_multiplier(
+                offense_team, p, is_clutch=is_clutch
+            )
+            weight = max(1, int(round(float(weight) * float(mult))))
+            weights.append(weight)
         return random.choices(offense_lineup, weights=weights, k=1)[0]
 
     def simulate(self) -> Tuple[Team, int, int]:
@@ -3145,13 +3179,13 @@ class Match:
         shot_profile = "two"
 
         if rand_val < three_cutoff:
-            shooter = self._select_shooter(offense_team, offense_lineup, "three")
+            shooter = self._select_field_goal_shooter(offense_team, offense_lineup, "three")
             three_attr = shooter.get_adjusted_attribute("three")
             pts = 3
             shot_profile = "three"
             final_rate = 0.200 + (three_attr * 0.0017) + ((offense_team_offense - defense_team_defense) * 0.0006) + 0.006 + shot_rate_adjust
         elif rand_val < two_cutoff:
-            shooter = self._select_shooter(offense_team, offense_lineup, "two")
+            shooter = self._select_field_goal_shooter(offense_team, offense_lineup, "two")
             if random.random() < 0.28:
                 shooter = rebounder
             shoot_attr = shooter.get_adjusted_attribute("shoot")
@@ -3403,7 +3437,7 @@ class Match:
         shot_profile = "two"
 
         if rand_val < three_cutoff:
-            shooter = self._select_shooter(offense_team, offense_lineup, "three")
+            shooter = self._select_field_goal_shooter(offense_team, offense_lineup, "three")
             three_attr = shooter.get_adjusted_attribute("three")
             pts = 3
             is_three = True
@@ -3411,7 +3445,7 @@ class Match:
             final_rate = 0.165 + (three_attr * 0.0017) + ((offense_team_offense - defense_team_defense) * 0.0006) + shot_rate_adjust
 
         elif rand_val < two_cutoff:
-            shooter = self._select_shooter(offense_team, offense_lineup, "two")
+            shooter = self._select_field_goal_shooter(offense_team, offense_lineup, "two")
             shoot_attr = shooter.get_adjusted_attribute("shoot")
             drive_attr = shooter.get_adjusted_attribute("drive")
             pts = 2
