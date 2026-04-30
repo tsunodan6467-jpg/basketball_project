@@ -508,6 +508,66 @@ def _format_tactics_context_lines(match: Any, user_team: Any) -> List[str]:
         return []
 
 
+def _get_player_name_by_id(team: Any, player_id: int) -> Optional[str]:
+    try:
+        players = list(getattr(team, "players", []) or [])
+    except Exception:
+        return None
+    for p in players:
+        try:
+            pid = int(getattr(p, "player_id", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if pid != int(player_id):
+            continue
+        name = str(getattr(p, "name", "") or "").strip()
+        if name:
+            return name
+    return None
+
+
+def _format_endgame_role_memo_lines(user_team: Any) -> List[str]:
+    """
+    roles.clutch_priority の表示専用メモ（終盤用途）。
+    go_to の選手がいるときだけ短く表示し、情報欠損時は空で返す。
+    """
+    if user_team is None:
+        return []
+    try:
+        safe = get_safe_team_tactics(user_team)
+        roles = safe.get("roles")
+        if not isinstance(roles, dict) or not roles:
+            return []
+    except Exception:
+        return []
+
+    names: List[str] = []
+    for pid_key, row in roles.items():
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("clutch_priority") or "").strip() != "go_to":
+            continue
+        try:
+            pid = int(str(pid_key).strip())
+        except (TypeError, ValueError):
+            continue
+        if pid <= 0:
+            continue
+        name = _get_player_name_by_id(user_team, pid)
+        names.append(name or f"#{pid}")
+
+    if not names:
+        return []
+    shown = " / ".join(names[:3])
+    if len(names) > 3:
+        shown += " / 他"
+    return [
+        "終盤メモ:",
+        f"- クラッチ優先: {shown}",
+        "- 終盤はクラッチ役がやや優先されます。",
+    ]
+
+
 def _narrative_lines(user_won: bool, edges: Dict[str, Any]) -> Tuple[str, str, str]:
     axes = [
         ("outside", "外角"),
@@ -587,12 +647,19 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
         tactics_lines = _format_tactics_context_lines(match, user_team)
     except Exception:
         tactics_lines = []
+    endgame_role_lines: List[str] = []
+    try:
+        endgame_role_lines = _format_endgame_role_memo_lines(user_team)
+    except Exception:
+        endgame_role_lines = []
 
     edges = build_postgame_edges_summary(match, user_team)
     if edges is None:
         out_none: List[str] = ["【試合後サマリー】", score_line]
         if tactics_lines:
             out_none.extend(tactics_lines)
+        if endgame_role_lines:
+            out_none.extend(endgame_role_lines)
         if pf_lines:
             out_none.extend(pf_lines)
         if team_foul_lines:
@@ -614,6 +681,8 @@ def format_match_postgame_cli_lines(match: Any, user_team: Any) -> List[str]:
     out: List[str] = ["【試合後サマリー】", score_line]
     if tactics_lines:
         out.extend(tactics_lines)
+    if endgame_role_lines:
+        out.extend(endgame_role_lines)
     if pf_lines:
         out.extend(pf_lines)
     if team_foul_lines:
