@@ -725,6 +725,118 @@ def build_facility_affordance_summary_line(team: Any, *, format_money: FormatMon
     return f"{prefix} 最安アップグレード {disp}・今は投資不可"
 
 
+def _build_action_availability_lines(team: Any, season: Any) -> Tuple[str, ...]:
+    """経営メニュー上部向けの短い施策可否表示（既存 can_* と状態だけを読む）。"""
+
+    if team is None:
+        return (
+            "【施策可否サマリー】",
+            "・施設投資：未設定",
+            "・スポンサー：未設定",
+            "・PR施策：未設定",
+            "・グッズ開発：未設定",
+        )
+
+    facility_status = "詳細で確認"
+    try:
+        upgradeable: List[str] = []
+        executable = False
+        for fk in FACILITY_ORDER:
+            lv = _safe_int(getattr(team, fk, 1), 1)
+            if lv >= FACILITY_MAX_LEVEL:
+                continue
+            upgradeable.append(fk)
+            ok, _reason = can_commit_facility_upgrade(team, fk)
+            if ok:
+                executable = True
+        if not upgradeable:
+            facility_status = "最大Lv到達"
+        elif executable:
+            facility_status = "実行可"
+        else:
+            min_cost = min(int(get_facility_upgrade_cost(team, fk)) for fk in upgradeable)
+            money = _safe_int(getattr(team, "money", 0), 0)
+            facility_status = "資金不足" if money < min_cost else "詳細で確認"
+    except Exception:
+        facility_status = "詳細で確認"
+
+    sponsor_status = "詳細で確認"
+    try:
+        if not bool(getattr(team, "is_user_team", False)):
+            sponsor_status = "詳細で確認"
+        else:
+            mg = getattr(team, "management", None)
+            sp = mg.get("sponsors") if isinstance(mg, dict) else None
+            cur = str((sp or {}).get("main_contract_type") or "").strip() if isinstance(sp, dict) else ""
+            if not cur:
+                sponsor_status = "未設定"
+            elif cur in MAIN_SPONSOR_IDS:
+                sponsor_status = "変更可" if any(str(x.get("id")) != cur for x in MAIN_SPONSOR_TYPES) else "契約済み"
+            else:
+                sponsor_status = "詳細で確認"
+    except Exception:
+        sponsor_status = "詳細で確認"
+
+    pr_status = "詳細で確認"
+    try:
+        if not PR_CAMPAIGNS:
+            pr_status = "未設定"
+        else:
+            results = [can_commit_pr_campaign(team, str(spec["id"]), season) for spec in PR_CAMPAIGNS]
+            if any(ok for ok, _reason in results):
+                pr_status = "実行可"
+            else:
+                _key, allowed, _reason = sync_pr_round_quota(team, season)
+                block = team.management.get("pr_campaigns") if isinstance(getattr(team, "management", None), dict) else None
+                used = _safe_int((block or {}).get("count_this_round", 0), 0)
+                if allowed and used >= int(MAX_ACTIONS_PER_ROUND):
+                    pr_status = "今ラウンド上限"
+                else:
+                    costs = [int(spec.get("cost", 0) or 0) for spec in PR_CAMPAIGNS]
+                    money = _safe_int(getattr(team, "money", 0), 0)
+                    pr_status = "資金不足" if costs and money < min(costs) else "未実行"
+    except Exception:
+        pr_status = "詳細で確認"
+
+    merch_status = "詳細で確認"
+    try:
+        if not MERCH_PRODUCTS:
+            merch_status = "未設定"
+        else:
+            open_items: List[Tuple[str, int]] = []
+            executable = False
+            for tmpl in MERCH_PRODUCTS:
+                pid = str(tmpl["id"])
+                item = get_merchandise_item(team, pid)
+                if item is None:
+                    continue
+                phase = str(item.get("phase", "concept"))
+                if phase == "on_sale":
+                    continue
+                open_items.append((pid, int(ADVANCE_COST.get(phase, 0) or 0)))
+                ok, _reason = can_advance_merchandise_phase(team, pid)
+                if ok:
+                    executable = True
+            if not open_items:
+                merch_status = "発売済み"
+            elif executable:
+                merch_status = "進行可"
+            else:
+                money = _safe_int(getattr(team, "money", 0), 0)
+                min_cost = min(cost for _pid, cost in open_items)
+                merch_status = "資金不足" if money < min_cost else "未実行"
+    except Exception:
+        merch_status = "詳細で確認"
+
+    return (
+        "【施策可否サマリー】",
+        f"・施設投資：{facility_status}",
+        f"・スポンサー：{sponsor_status}",
+        f"・PR施策：{pr_status}",
+        f"・グッズ開発：{merch_status}",
+    )
+
+
 def build_action_affordance_summary_line(
     team: Any,
     *,
@@ -1341,6 +1453,7 @@ class ManagementMenuSnapshot:
     """経営ウィンドウ向けに整形済みの表示行。"""
 
     finance_lines: Tuple[str, ...]
+    action_availability_lines: Tuple[str, ...]
     facility_lines: Tuple[str, ...]
     owner_preamble: str
     dashboard_text: str
@@ -1405,6 +1518,7 @@ def _placeholder_snapshot(
     cap_room_ph = "キャップ余白: チーム未接続"
     round_cash_ph = "今ラウンド収支メモ: チーム未接続"
     fh_note_ph = "直近財務メモ: チーム未接続"
+    action_availability_lines = _build_action_availability_lines(None, None)
     dashboard_finance_lines = _build_dashboard_finance_lines(
         fin,
         action_aff_ph,
@@ -1436,6 +1550,7 @@ def _placeholder_snapshot(
     empty_fac = tuple((fk, "未設定／接続後に表示") for fk in FACILITY_ORDER)
     return ManagementMenuSnapshot(
         finance_lines=fin,
+        action_availability_lines=action_availability_lines,
         facility_lines=fac,
         owner_preamble=own,
         dashboard_text=dash,
@@ -1501,6 +1616,7 @@ def build_management_menu_snapshot(
         )
         return ManagementMenuSnapshot(
             finance_lines=snap_none.finance_lines,
+            action_availability_lines=snap_none.action_availability_lines,
             facility_lines=snap_none.facility_lines,
             owner_preamble=snap_none.owner_preamble,
             dashboard_text=snap_none.dashboard_text,
@@ -1702,6 +1818,7 @@ def build_management_menu_snapshot(
         format_signed_money=format_signed_money,
     )
     finance_history_note_line = build_finance_history_note_summary_line(team)
+    action_availability_lines = _build_action_availability_lines(team, season)
 
     dashboard_finance_lines = _build_dashboard_finance_lines(
         fin_lines,
@@ -1753,6 +1870,7 @@ def build_management_menu_snapshot(
 
     return ManagementMenuSnapshot(
         finance_lines=tuple(fin_lines),
+        action_availability_lines=action_availability_lines,
         facility_lines=tuple(fac_lines),
         owner_preamble=own_preamble,
         dashboard_text=dash,

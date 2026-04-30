@@ -108,6 +108,13 @@ def test_snapshot_team_none_no_empty_strings():
         format_signed_money=_fmt_signed,
     )
     assert len(snap.finance_lines) == 6
+    assert snap.action_availability_lines == (
+        "【施策可否サマリー】",
+        "・施設投資：未設定",
+        "・スポンサー：未設定",
+        "・PR施策：未設定",
+        "・グッズ開発：未設定",
+    )
     assert len(snap.facility_lines) == 6
     assert "未設定" in snap.dashboard_text or "未実行" in snap.dashboard_text
     assert "履歴なし" in snap.dashboard_text
@@ -222,6 +229,11 @@ def test_snapshot_minimal_team_covers_blocks():
         format_signed_money=_fmt_signed,
     )
     assert "■ 財務" in snap.dashboard_text
+    assert snap.action_availability_lines[0] == "【施策可否サマリー】"
+    assert "・施設投資：実行可" in snap.action_availability_lines
+    assert "・スポンサー：変更可" in snap.action_availability_lines
+    assert "・PR施策：実行可" in snap.action_availability_lines
+    assert "・グッズ開発：進行可" in snap.action_availability_lines
     assert len(snap.dashboard_finance_lines) == 17
     assert _finance_block_body_from_dashboard(snap.dashboard_text) == "\n".join(
         snap.dashboard_finance_lines

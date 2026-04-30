@@ -4669,6 +4669,14 @@ class MainMenuView:
                                     ("finance_row_default",),
                                 )
                             dash_tw.insert("end", "\n")
+                        for aln in getattr(snap, "action_availability_lines", ()):
+                            dash_tw.insert(
+                                "end",
+                                aln + "\n",
+                                ("finance_row_default",),
+                            )
+                        if getattr(snap, "action_availability_lines", ()):
+                            dash_tw.insert("end", "\n")
                         for ln in fin_lines:
                             dash_tw.insert(
                                 "end",
