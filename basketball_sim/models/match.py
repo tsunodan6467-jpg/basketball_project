@@ -34,6 +34,8 @@ from basketball_sim.systems.team_tactics import (
 
 PERSONAL_FOUL_OUT_LIMIT = 5
 NON_SHOOTING_FOUL_RATE = 0.025
+BONUS_TEAM_FOUL_THRESHOLD = 5
+BONUS_FT_ATTEMPTS = 1
 
 
 class Match:
@@ -865,8 +867,13 @@ class Match:
             return f"[{clock_label}] 守備側のファウル。"
 
         if event_type == "non_shooting_foul":
+            meta_ev = event.get("meta") if isinstance(event.get("meta"), dict) else {}
+            if primary and meta_ev.get("bonus_free_throw"):
+                return f"[{clock_label}] {primary}のファウル。チームファウルがかさみ、フリースローへ。"
             if primary:
                 return f"[{clock_label}] {primary}のファウル。サイドから再開。"
+            if meta_ev.get("bonus_free_throw"):
+                return f"[{clock_label}] 守備側のファウル。チームファウルがかさみ、フリースローへ。"
             return f"[{clock_label}] 守備側のファウル。サイドから再開。"
 
         if event_type == "foul_out":
@@ -2258,6 +2265,78 @@ class Match:
         q = max(1, int(quarter or 1))
         return int(target.get(q, 0) or 0)
 
+    def _is_team_in_bonus(self, team_fouls: int) -> bool:
+        return int(team_fouls or 0) >= BONUS_TEAM_FOUL_THRESHOLD
+
+    def _resolve_bonus_free_throw(
+        self,
+        offense_team: Team,
+        defense_team: Team,
+        offense_lineup: List[Player],
+        defense_lineup: List[Player],
+        *,
+        second_chance: bool = False,
+    ) -> int:
+        """
+        ボーナスFTのみを解決する。守備側のPF/TFや foul イベントは付与しない。
+        defense_lineup は将来拡張用に受け取るが、現状は使用しない。
+        """
+        _ = defense_lineup
+        total_pts = 0
+        shot_profile = "ft"
+        pts = 1
+        for _ in range(BONUS_FT_ATTEMPTS):
+            shooter = self._select_shooter(offense_team, offense_lineup, "ft")
+            ft_attr = shooter.get_adjusted_attribute("ft")
+            final_rate = 0.51 + (ft_attr * 0.0040)
+            final_rate = max(0.05, min(0.82, final_rate))
+            bonus_meta_base = {
+                "shot_profile": shot_profile,
+                "bonus_free_throw": True,
+                "bonus_source": "non_shooting_foul",
+                "second_chance": second_chance,
+            }
+            if random.random() < final_rate:
+                if not self.is_playoff:
+                    shooter.season_points += pts
+                finish_type = self._resolve_finish_type(
+                    shooter,
+                    shot_profile,
+                    is_second_chance=second_chance,
+                    is_transition_play=False,
+                    assisted=False,
+                )
+                self._record_event(
+                    event_type="made_ft",
+                    offense_team=offense_team,
+                    defense_team=defense_team,
+                    primary_player=shooter,
+                    secondary_player=None,
+                    description_key="made_ft",
+                    scoring_team=offense_team,
+                    points=pts,
+                    meta={
+                        **bonus_meta_base,
+                        "assisted": False,
+                        "finish_type": finish_type,
+                    },
+                )
+                total_pts += pts
+            else:
+                self._record_event(
+                    event_type="miss_ft",
+                    offense_team=offense_team,
+                    defense_team=defense_team,
+                    primary_player=shooter,
+                    secondary_player=None,
+                    description_key="miss_ft",
+                    meta={
+                        **bonus_meta_base,
+                        "was_blocked": False,
+                    },
+                )
+        return total_pts
+
     def _add_personal_foul(self, defense_team: Team, fouler: Optional[Player]) -> None:
         """Match内の個人ファウル正本(dict)へ +1 する。"""
         if fouler is None:
@@ -3276,6 +3355,7 @@ class Match:
                 foul_quarter = self._get_current_event_quarter()
                 self._add_personal_foul(defense_team, non_shooting_fouler)
                 team_fouls = self._add_team_foul(defense_team, foul_quarter)
+                bonus_free_throw = self._is_team_in_bonus(team_fouls)
                 self._record_event(
                     event_type="non_shooting_foul",
                     offense_team=offense_team,
@@ -3289,9 +3369,17 @@ class Match:
                         "team_fouls": team_fouls,
                         "team_fouls_quarter": foul_quarter,
                         "team_fouls_team_id": self._team_key(defense_team),
-                        "bonus_free_throw": False,
+                        "bonus_free_throw": bonus_free_throw,
                     },
                 )
+                if bonus_free_throw:
+                    return self._resolve_bonus_free_throw(
+                        offense_team,
+                        defense_team,
+                        offense_lineup,
+                        defense_lineup,
+                        second_chance=False,
+                    )
 
         team_adjust = (offense_team_offense - defense_team_defense) * 0.0008
         three_cutoff, two_cutoff, shot_rate_adjust = self._get_shot_mix(

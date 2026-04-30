@@ -4,7 +4,7 @@ from collections import Counter
 
 import pytest
 
-from basketball_sim.models.match import Match
+from basketball_sim.models.match import BONUS_TEAM_FOUL_THRESHOLD, Match
 from basketball_sim.models.player import Player
 from basketball_sim.models.team import Team
 from basketball_sim.systems.team_tactics import ensure_team_tactics_on_team
@@ -496,3 +496,178 @@ def test_non_shooting_foul_can_reach_foul_out_without_ft(monkeypatch: pytest.Mon
         e.get("event_type") == "foul_out" and e.get("primary_player_id") == defender.player_id
         for e in m.play_by_play_log
     )
+
+
+def test_is_team_in_bonus_threshold():
+    m = _build_match()
+    assert m._is_team_in_bonus(BONUS_TEAM_FOUL_THRESHOLD - 1) is False
+    assert m._is_team_in_bonus(BONUS_TEAM_FOUL_THRESHOLD) is True
+
+
+def test_bonus_non_shooting_triggers_one_ft_skips_shot_branch(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+    m.away_team_fouls_by_quarter[1] = BONUS_TEAM_FOUL_THRESHOLD - 1
+
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 1.0)
+
+    def boom(*_a, **_k):
+        raise AssertionError("_get_shot_mix must not run after bonus non-shooting possession")
+
+    monkeypatch.setattr(m, "_get_shot_mix", boom)
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 0.0, 0.0]),
+    )
+
+    points = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+    assert points == 1
+    assert m.away_team_fouls_by_quarter.get(1) == BONUS_TEAM_FOUL_THRESHOLD
+    assert m.away_personal_fouls_by_player_id.get(defender.player_id) == 1
+
+    ft_events = [e for e in m.play_by_play_log if e.get("event_type") in {"made_ft", "miss_ft"}]
+    assert len(ft_events) == 1
+    assert ft_events[0].get("event_type") == "made_ft"
+    ft_meta = ft_events[0].get("meta") or {}
+    assert ft_meta.get("bonus_free_throw") is True
+    assert ft_meta.get("bonus_source") == "non_shooting_foul"
+    assert ft_meta.get("shot_profile") == "ft"
+    assert ft_meta.get("second_chance") is False
+
+    nsf = next(e for e in m.play_by_play_log if e.get("event_type") == "non_shooting_foul")
+    assert (nsf.get("meta") or {}).get("bonus_free_throw") is True
+
+    assert not any(e.get("event_type") == "foul" for e in m.play_by_play_log)
+
+
+def test_bonus_non_shooting_ft_miss(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+    m.away_team_fouls_by_quarter[1] = BONUS_TEAM_FOUL_THRESHOLD - 1
+
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 1.0)
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 0.0, 1.0]),
+    )
+
+    points = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+    assert points == 0
+    ft_events = [e for e in m.play_by_play_log if e.get("event_type") in {"made_ft", "miss_ft"}]
+    assert len(ft_events) == 1
+    assert ft_events[0].get("event_type") == "miss_ft"
+    ft_meta = ft_events[0].get("meta") or {}
+    assert ft_meta.get("bonus_free_throw") is True
+    assert ft_meta.get("bonus_source") == "non_shooting_foul"
+
+
+def test_non_shooting_below_team_bonus_threshold_no_extra_ft(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+    m.away_team_fouls_by_quarter[1] = BONUS_TEAM_FOUL_THRESHOLD - 2
+
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 1.0)
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(m, "_get_assist_chance", lambda *_args, **_kwargs: 0.0)
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 0.0, 0.0, 0.0, 1.0]),
+    )
+
+    points = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+    assert points == 3
+    assert not any(e.get("event_type") in {"made_ft", "miss_ft"} for e in m.play_by_play_log)
+    nsf = next(e for e in m.play_by_play_log if e.get("event_type") == "non_shooting_foul")
+    assert (nsf.get("meta") or {}).get("bonus_free_throw") is False
+    assert m.away_team_fouls_by_quarter.get(1) == BONUS_TEAM_FOUL_THRESHOLD - 1
+
+
+def test_bonus_non_shooting_coexists_foul_out_no_shooting_foul_event(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+    m.away_personal_fouls_by_player_id[defender.player_id] = BONUS_TEAM_FOUL_THRESHOLD - 1
+    m.away_team_fouls_by_quarter[1] = BONUS_TEAM_FOUL_THRESHOLD - 1
+
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 1.0)
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(m, "_get_assist_chance", lambda *_args, **_kwargs: 0.0)
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 0.0, 0.0]),
+    )
+
+    points = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+    assert points == 1
+    assert defender.player_id in m.away_fouled_out_player_ids
+    assert any(
+        e.get("event_type") == "foul_out" and e.get("primary_player_id") == defender.player_id
+        for e in m.play_by_play_log
+    )
+    assert not any(e.get("event_type") == "foul" for e in m.play_by_play_log)
+    assert len([e for e in m.play_by_play_log if e.get("event_type") in {"made_ft", "miss_ft"}]) == 1
+
+
+def test_bonus_non_shooting_commentary_mentions_free_throw(monkeypatch: pytest.MonkeyPatch):
+    m = _build_match()
+    defender = m.away_current_lineup[0]
+    m.away_team_fouls_by_quarter[1] = BONUS_TEAM_FOUL_THRESHOLD - 1
+
+    monkeypatch.setattr("basketball_sim.models.match.NON_SHOOTING_FOUL_RATE", 1.0)
+    monkeypatch.setattr(m, "_get_shot_mix", lambda *_args, **_kwargs: (1.0, 1.0, 0.0))
+    monkeypatch.setattr(m, "_select_shooter", lambda _team, lineup, _shot: lineup[0])
+    monkeypatch.setattr(m, "_pick_fouler", lambda _lineup: defender)
+    monkeypatch.setattr(
+        "basketball_sim.models.match.random.random",
+        _stub_random([1.0, 0.0, 0.0]),
+    )
+
+    _ = m._simulate_possession(
+        m.home_team,
+        m.away_team,
+        m.home_current_lineup,
+        m.away_current_lineup,
+        70.0,
+        70.0,
+    )
+    nsf = next(e for e in m.play_by_play_log if e.get("event_type") == "non_shooting_foul")
+    txt = m._build_commentary_text(nsf)
+    assert txt is not None
+    assert "フリースロー" in txt
+    assert "サイドから再開" not in txt
