@@ -200,16 +200,6 @@ _MANAGEMENT_FACILITY_PR_SEPARATOR = "\n\n■ 広報"
 _MANAGEMENT_PR_OWNER_SEPARATOR = "\n\n■ オーナー"
 _MANAGEMENT_OWNER_HISTORY_SEPARATOR = "\n\n■ 実行履歴 / 直近アクション\n"
 
-# 経営メニュー下部: 表示切替ページキー →「選択中：」用の短い日本語ラベル
-_FINANCE_DETAIL_PAGE_LABEL_JA: Dict[str, str] = {
-    "overview": "概要",
-    "facility": "施設",
-    "sponsor": "スポンサー",
-    "pr": "広報",
-    "merch": "グッズ",
-    "report": "詳細レポート・オーナー",
-}
-
 # Management dashboard Text widget base: bg #222834, fg #d6dbe3 — keep highlights subtle.
 _MGMT_DASH_CAP_BG = "#2a3346"
 _MGMT_DASH_CAP_FG = "#e2e8f2"
@@ -3363,8 +3353,8 @@ class MainMenuView:
 
         window = tk.Toplevel(self.root)
         window.title(f"経営情報 - {self._team_name()}")
-        window.geometry("980x1100")
-        window.minsize(880, 800)
+        window.geometry("980x760")
+        window.minsize(860, 620)
         window.configure(bg="#15171c")
         try:
             window.transient(self.root)
@@ -3394,7 +3384,7 @@ class MainMenuView:
         ttk.Label(
             fin_purpose,
             text=(
-                "【経営メニュー】状況の要約は右のダッシュボード、左の「概要」で財務サマリー（キャップ閲覧含む）に戻れます。"
+                "【経営メニュー】状況は右のダッシュボード、施設・スポンサー等は左のボタンから別ウィンドウで開きます。"
                 "数値の正本・締め処理は共通ロジック／オフシーズン財務締めに依存します。"
             ),
             wraplength=1020,
@@ -3417,17 +3407,17 @@ class MainMenuView:
         dash_board.pack(side="right", fill="both", expand=True)
         ttk.Label(
             dash_board,
-            text="現況ダッシュボード（コンパクト）",
+            text="現況ダッシュボード",
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
         self._management_dashboard_text = tk.Text(
             dash_board,
-            height=11,
+            height=14,
             wrap="word",
             bg="#222834",
             fg="#d6dbe3",
             insertbackground="#d6dbe3",
-            font=("Yu Gothic UI", 10),
+            font=("Yu Gothic UI", 9),
             relief="flat",
             borderwidth=0,
             highlightthickness=0,
@@ -3505,138 +3495,305 @@ class MainMenuView:
         )
         self._management_dashboard_text.configure(state="disabled")
 
-        fin_scroll_wrap = ttk.Frame(outer, style="Root.TFrame")
 
-        fin_canvas = tk.Canvas(
-            fin_scroll_wrap,
-            bg="#15171c",
-            highlightthickness=0,
-        )
-        fin_vsb = ttk.Scrollbar(fin_scroll_wrap, orient="vertical", command=fin_canvas.yview)
-        fin_canvas.configure(yscrollcommand=fin_vsb.set)
+        # メインはサマリー＋導線のみ（施設等は別 Toplevel）
+        self._management_action_toplevels = {}
+        self._finance_scroll_canvas = None
+        self._finance_scroll_content = None
+        self._finance_detail_shell = None
+        self._finance_detail_host = None
+        self._finance_detail_selection_var = None
+        self._finance_detail_page_key = None
+        self.finance_summary_panel = None
+        self.finance_summary_lines = []
+        self._finance_cap_text = None
+        self._finance_inseason_log_text = None
+        self.facility_panel = None
+        self.facility_lines = []
+        self._facility_upgrade_buttons = {}
+        self._facility_preview_vars = {}
+        self.owner_panel = None
+        self.owner_report_text = None
+        self.finance_report_panel = None
+        self.finance_report_text = None
+        self.sponsor_panel = None
+        self.pr_panel = None
+        self.merch_panel = None
+        self._merch_rows = []
+        self._sponsor_type_ids = []
+        self._sponsor_combo = None
+        self._sponsor_apply_btn = None
+        self._sponsor_history_text = None
+        self._sponsor_status_var = None
+        self._sponsor_preview_var = None
+        self._pr_combo = None
+        self._pr_run_btn = None
+        self._pr_history_text = None
+        self._pr_status_var = None
+        self._pr_remaining_var = None
+        self._pr_sort_combo = None
+        self._pr_filter_combo = None
+        self._pr_comparison_listbox = None
+        self._pr_comparison_ids = []
+        self._pr_campaign_ids = []
+        self._merch_dummy_text = None
+        self._merch_hist_text = None
 
-        content = ttk.Frame(fin_canvas, style="Root.TFrame")
-        fin_canvas_win = fin_canvas.create_window((0, 0), window=content, anchor="nw")
-
-        def _finance_scrollregion(_event: Any = None) -> None:
-            fin_canvas.update_idletasks()
-            bbox = fin_canvas.bbox("all")
-            if bbox:
-                fin_canvas.configure(scrollregion=bbox)
-
-        def _finance_canvas_inner_width(event: Any) -> None:
+        hub_fr = self._finance_hub_buttons
+        for _w in hub_fr.winfo_children():
             try:
-                fin_canvas.itemconfigure(fin_canvas_win, width=event.width)
+                _w.destroy()
+            except tk.TclError:
+                pass
+        for _txt, akey in (
+            ("施設", "facility"),
+            ("スポンサー", "sponsor"),
+            ("広報", "pr"),
+            ("グッズ", "merch"),
+            ("詳細レポート", "report"),
+        ):
+            ttk.Button(
+                hub_fr,
+                text=_txt,
+                style="Menu.TButton",
+                width=18,
+                command=lambda k=akey: self._open_finance_action_window(k),
+            ).pack(fill="x", pady=4)
+
+        fin_top.pack(fill="both", expand=True, pady=(0, 10))
+
+
+        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
+        bottom.pack(fill="x", pady=(12, 0))
+
+        tk.Label(
+            bottom,
+            text=(
+                "左のボタンから施設・スポンサー・広報・グッズ・詳細レポートを別ウィンドウで開けます。"
+                " 状況の要約は右のダッシュボードに集約しています。"
+            ),
+            bg="#1d2129",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=1020,
+            padx=2,
+        ).pack(fill="x", anchor="w", pady=(0, 4))
+
+        self.finance_hint_var = tk.StringVar(value="")
+        tk.Label(
+            bottom,
+            textvariable=self.finance_hint_var,
+            bg="#1d2129",
+            fg="#c5cad3",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            padx=2,
+            pady=2,
+        ).pack(fill="x", anchor="w")
+
+        bf = tk.Frame(bottom, bg="#1d2129")
+        bf.pack(anchor="e", pady=(8, 0))
+        self._jpn_text_button(bf, "閉じる", self._on_close_finance_window, side="right")
+
+        self._finance_window = window
+        window.protocol("WM_DELETE_WINDOW", self._on_close_finance_window)
+        try:
+            self._refresh_finance_window()
+        finally:
+            try:
+                window.update_idletasks()
+                window.deiconify()
+                window.lift()
             except tk.TclError:
                 pass
 
-        content.bind("<Configure>", lambda _e: _finance_scrollregion())
-        fin_canvas.bind("<Configure>", _finance_canvas_inner_width)
+    def _on_close_finance_window(self) -> None:
+        self._finance_destroy_all_action_subwindows()
+        window = getattr(self, "_finance_window", None)
+        try:
+            if window is not None and window.winfo_exists():
+                window.destroy()
+        finally:
+            self._finance_window = None
+            self.finance_summary_panel = None
+            self.finance_summary_lines = []
+            self._finance_cap_text = None
+            self.facility_panel = None
+            self.facility_lines = []
+            self.owner_panel = None
+            self.finance_report_panel = None
+            self.sponsor_panel = None
+            self.pr_panel = None
+            self.merch_panel = None
+            self._management_action_toplevels = {}
+            self._facility_upgrade_buttons = {}
+            self.finance_report_text = None
+            self.owner_report_text = None
+            self._sponsor_combo = None
+            self._sponsor_apply_btn = None
+            self._sponsor_history_text = None
+            self._sponsor_status_var = None
+            self._pr_combo = None
+            self._pr_run_btn = None
+            self._pr_history_text = None
+            self._pr_status_var = None
+            self._merch_rows = []
+            self._merch_dummy_text = None
+            self._merch_hist_text = None
+            self._management_dashboard_text = None
+            self._facility_preview_vars = {}
+            self._sponsor_preview_var = None
+            self._pr_selection_preview_var = None
+            self._pr_remaining_var = None
+            self._pr_sort_combo = None
+            self._pr_filter_combo = None
+            self._pr_comparison_listbox = None
+            self._pr_comparison_ids = []
+            self._finance_scroll_canvas = None
+            self._finance_scroll_content = None
+            self._finance_hub_buttons = None
+            self._finance_detail_shell = None
+            self._finance_detail_host = None
+            self._finance_detail_selection_var = None
+            self._finance_detail_page_key = None
+            self._finance_inseason_log_text = None
 
-        def _finance_hub_mousewheel(event: Any) -> None:
-            if getattr(event, "delta", 0):
-                fin_canvas.yview_scroll(int(-event.delta / 120), "units")
 
-        window.bind("<MouseWheel>", _finance_hub_mousewheel)
-        window.bind("<Button-4>", lambda _e: fin_canvas.yview_scroll(-1, "units"))
-        window.bind("<Button-5>", lambda _e: fin_canvas.yview_scroll(1, "units"))
+    def _finance_destroy_all_action_subwindows(self) -> None:
+        tws = getattr(self, "_management_action_toplevels", None)
+        if not isinstance(tws, dict) or not tws:
+            return
+        for key in list(tws.keys()):
+            tw = tws.pop(key, None)
+            self._finance_clear_action_widgets_for_key(key)
+            if tw is not None:
+                try:
+                    tw.destroy()
+                except tk.TclError:
+                    pass
 
-        fin_canvas.pack(side="left", fill="both", expand=True)
-        fin_vsb.pack(side="right", fill="y")
-        self._finance_scroll_canvas = fin_canvas
-        self._finance_scroll_content = content
+    def _finance_clear_action_widgets_for_key(self, key: str) -> None:
+        if key == "facility":
+            self.facility_panel = None
+            self.facility_lines = []
+            self._facility_upgrade_buttons = {}
+            self._facility_preview_vars = {}
+        elif key == "sponsor":
+            self.sponsor_panel = None
+            self._sponsor_combo = None
+            self._sponsor_apply_btn = None
+            self._sponsor_history_text = None
+            self._sponsor_status_var = None
+            self._sponsor_preview_var = None
+            self._sponsor_type_ids = []
+        elif key == "pr":
+            self.pr_panel = None
+            self._pr_combo = None
+            self._pr_run_btn = None
+            self._pr_history_text = None
+            self._pr_status_var = None
+            self._pr_remaining_var = None
+            self._pr_sort_combo = None
+            self._pr_filter_combo = None
+            self._pr_comparison_listbox = None
+            self._pr_comparison_ids = []
+            self._pr_campaign_ids = []
+            self._pr_selection_preview_var = None
+        elif key == "merch":
+            self.merch_panel = None
+            self._merch_rows = []
+            self._merch_dummy_text = None
+            self._merch_hist_text = None
+        elif key == "report":
+            self.owner_panel = None
+            self.owner_report_text = None
+            self.finance_report_panel = None
+            self.finance_report_text = None
 
-        content.columnconfigure(0, weight=1)
-        content.rowconfigure(0, weight=1)
-        self._finance_detail_shell = ttk.Frame(content, style="Root.TFrame")
-        self._finance_detail_shell.grid(row=0, column=0, sticky="nsew")
-        self._finance_detail_shell.columnconfigure(0, weight=1)
-        self._finance_detail_shell.rowconfigure(1, weight=1)
-        self._finance_detail_selection_var = tk.StringVar(value="選択中：概要")
-        ttk.Label(
-            self._finance_detail_shell,
-            textvariable=self._finance_detail_selection_var,
-            style="SectionTitle.TLabel",
-        ).grid(row=0, column=0, sticky="w", padx=2, pady=(0, 4))
-        self._finance_detail_host = ttk.Frame(self._finance_detail_shell, style="Root.TFrame")
-        self._finance_detail_host.grid(row=1, column=0, sticky="nsew")
-        self._finance_detail_host.columnconfigure(0, weight=1)
-        self._finance_detail_host.rowconfigure(0, weight=1)
+    def _on_management_action_window_close(self, key: str) -> None:
+        tws = getattr(self, "_management_action_toplevels", None)
+        tw = None
+        if isinstance(tws, dict):
+            tw = tws.pop(key, None)
+        self._finance_clear_action_widgets_for_key(key)
+        if tw is not None:
+            try:
+                tw.destroy()
+            except tk.TclError:
+                pass
 
-        self.finance_summary_panel = self._create_panel(self._finance_detail_host, "財務サマリー")
-        self.facility_panel = self._create_panel(self._finance_detail_host, "施設・基盤")
-        self.owner_panel = self._create_panel(self._finance_detail_host, "オーナー・方針")
-        self.finance_report_panel = self._create_panel(self._finance_detail_host, "詳細レポート")
+    def _open_finance_action_window(self, key: str) -> None:
+        parent_win = getattr(self, "_finance_window", None)
+        if parent_win is None:
+            return
+        try:
+            if not parent_win.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        tws = getattr(self, "_management_action_toplevels", None)
+        if not isinstance(tws, dict):
+            self._management_action_toplevels = {}
+            tws = self._management_action_toplevels
+        exist = tws.get(key)
+        if exist is not None:
+            try:
+                if exist.winfo_exists():
+                    exist.lift()
+                    exist.focus_force()
+                    return
+            except tk.TclError:
+                pass
+            tws.pop(key, None)
+        titles = {
+            "facility": "施設投資",
+            "sponsor": "スポンサー契約",
+            "pr": "広報・ファン施策",
+            "merch": "グッズ開発",
+            "report": "詳細レポート・オーナー",
+        }
+        tw = tk.Toplevel(parent_win)
+        tw.title(str(titles.get(key, "経営")))
+        tw.geometry("760x680")
+        tw.configure(bg="#15171c")
+        try:
+            tw.transient(parent_win)
+        except Exception:
+            pass
+        outer = ttk.Frame(tw, style="Root.TFrame", padding=10)
+        outer.pack(fill="both", expand=True)
 
-        fin_sum_inner = self._resolve_content_parent(self.finance_summary_panel)
-        ttk.Label(
-            fin_sum_inner,
-            text="資金・今季（記録）シーズン中入金・前季収支・人件費・状態の要約（詳細は下の各欄）",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(0, 6))
-        self.finance_summary_lines = self._make_line_vars(self.finance_summary_panel, 6)
-        ttk.Separator(fin_sum_inner, orient="horizontal").pack(fill="x", pady=(14, 8))
-        ttk.Label(
-            fin_sum_inner,
-            text="サラリーキャップ（閲覧）",
-            style="SectionTitle.TLabel",
-        ).pack(anchor="w", pady=(0, 6))
-        ttk.Label(
-            fin_sum_inner,
-            text="リーグキャップ・ペイロール・契約の読み取り専用です（編集は人事・CLI等の従来導線）。"
-            "収支の本格締めはオフシーズン処理で反映されます。",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(0, 6))
-        self._finance_cap_text = scrolledtext.ScrolledText(
-            fin_sum_inner,
-            height=10,
-            wrap="word",
-            bg="#222834",
-            fg="#d6dbe3",
-            insertbackground="#d6dbe3",
-            font=("Yu Gothic UI", 10),
-            relief="flat",
-            borderwidth=0,
-            highlightthickness=0,
-            padx=6,
-            pady=6,
-        )
-        self._finance_cap_text.pack(fill="both", expand=False, pady=(0, 4))
-        self._finance_cap_text.configure(state="disabled")
+        def _close() -> None:
+            self._on_management_action_window_close(key)
 
-        ttk.Separator(fin_sum_inner, orient="horizontal").pack(fill="x", pady=(14, 8))
-        ttk.Label(
-            fin_sum_inner,
-            text="シーズン中収益（本シーズン・記録）",
-            style="SectionTitle.TLabel",
-        ).pack(anchor="w", pady=(0, 4))
-        ttk.Label(
-            fin_sum_inner,
-            text="ラウンドごとのリーグ分配等の入金メモ（所持金には反映済み。年次の財務正本・詳細レポートとは別枠）。",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(0, 6))
-        self._finance_inseason_log_text = scrolledtext.ScrolledText(
-            fin_sum_inner,
-            height=8,
-            wrap="word",
-            bg="#222834",
-            fg="#d6dbe3",
-            insertbackground="#d6dbe3",
-            font=("Yu Gothic UI", 10),
-            relief="flat",
-            borderwidth=0,
-            highlightthickness=0,
-            padx=6,
-            pady=6,
-        )
-        self._finance_inseason_log_text.pack(fill="both", expand=False, pady=(0, 4))
-        self._finance_inseason_log_text.configure(state="disabled")
-        ttk.Label(
-            fin_sum_inner,
-            text="※ 広報・グッズの支出詳細は、経営メニュー内の各パネル履歴を参照してください。",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(2, 0))
+        tw.protocol("WM_DELETE_WINDOW", _close)
 
+        if key == "facility":
+            self._finance_populate_facility_panel(outer)
+        elif key == "sponsor":
+            self._finance_populate_sponsor_panel(outer)
+        elif key == "pr":
+            self._finance_populate_pr_panel(outer)
+        elif key == "merch":
+            self._finance_populate_merch_panel(outer)
+        elif key == "report":
+            self._finance_populate_report_panels(outer)
+        else:
+            try:
+                tw.destroy()
+            except tk.TclError:
+                pass
+            return
+
+        tws[key] = tw
+        self._refresh_finance_window()
+
+    def _finance_populate_facility_panel(self, host: tk.Misc) -> None:
+        self.facility_panel = self._create_panel(host, "施設・基盤")
+        self.facility_panel.pack(fill="both", expand=True)
         fac_content = self._resolve_content_parent(self.facility_panel)
         ttk.Label(
             fac_content,
@@ -3648,8 +3805,8 @@ class MainMenuView:
         self.facility_lines = self._make_line_vars(self.facility_panel, 6)
         btn_row = ttk.Frame(fac_content, style="Card.TFrame")
         btn_row.pack(fill="x", pady=(12, 0))
-        self._facility_upgrade_buttons: Dict[str, ttk.Button] = {}
-        self._facility_preview_vars: Dict[str, tk.StringVar] = {}
+        self._facility_upgrade_buttons = {}
+        self._facility_preview_vars = {}
         for i, fk in enumerate(FACILITY_ORDER):
             label = FACILITY_LABELS.get(fk, fk)
             cell = ttk.Frame(btn_row, style="Card.TFrame")
@@ -3676,54 +3833,10 @@ class MainMenuView:
             ).pack(fill="x", pady=(4, 0))
         btn_row.columnconfigure(0, weight=1)
         btn_row.columnconfigure(1, weight=1)
-        owner_parent = self._resolve_content_parent(self.owner_panel)
-        ttk.Label(
-            owner_parent,
-            text="オーナーからの期待・信頼・ミッション（チームデータに依存）。"
-            "ミッションは主にオフシーズンに評価・更新されます。",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(0, 6))
-        self.owner_report_text = scrolledtext.ScrolledText(
-            owner_parent,
-            height=14,
-            wrap="word",
-            bg="#222834",
-            fg="#d6dbe3",
-            insertbackground="#d6dbe3",
-            font=("Yu Gothic UI", 10),
-            relief="flat",
-            borderwidth=0,
-            highlightthickness=0,
-            padx=6,
-            pady=6,
-        )
-        self.owner_report_text.pack(fill="both", expand=True)
-        self.owner_report_text.configure(state="disabled")
-        report_parent = self._resolve_content_parent(self.finance_report_panel)
-        ttk.Label(
-            report_parent,
-            text="前季までの収入内訳・支出内訳・財務履歴（記録ベース）。"
-            "シーズン収支の正本反映はオフシーズンの財務締めです。",
-            font=("Yu Gothic UI", 9),
-        ).pack(anchor="w", pady=(0, 6))
-        self.finance_report_text = scrolledtext.ScrolledText(
-            report_parent,
-            height=16,
-            wrap="word",
-            bg="#222834",
-            fg="#d6dbe3",
-            insertbackground="#d6dbe3",
-            font=("Yu Gothic UI", 10),
-            relief="flat",
-            borderwidth=0,
-            highlightthickness=0,
-            padx=6,
-            pady=6,
-        )
-        self.finance_report_text.pack(fill="both", expand=True)
-        self.finance_report_text.configure(state="disabled")
 
-        self.sponsor_panel = self._create_panel(self._finance_detail_host, "スポンサー（メイン契約）")
+    def _finance_populate_sponsor_panel(self, host: tk.Misc) -> None:
+        self.sponsor_panel = self._create_panel(host, "スポンサー（メイン契約）")
+        self.sponsor_panel.pack(fill="both", expand=True)
         sponsor_inner = self._resolve_content_parent(self.sponsor_panel)
         self._sponsor_status_var = tk.StringVar(value="")
         tk.Label(
@@ -3813,7 +3926,9 @@ class MainMenuView:
         self._sponsor_history_text.pack(fill="both", expand=True)
         self._sponsor_history_text.configure(state="disabled")
 
-        self.pr_panel = self._create_panel(self._finance_detail_host, "広報・ファン施策")
+    def _finance_populate_pr_panel(self, host: tk.Misc) -> None:
+        self.pr_panel = self._create_panel(host, "広報・ファン施策")
+        self.pr_panel.pack(fill="both", expand=True)
         pr_inner = self._resolve_content_parent(self.pr_panel)
         self._pr_status_var = tk.StringVar(value="")
         tk.Label(
@@ -3913,7 +4028,7 @@ class MainMenuView:
         pr_sb.pack(side="right", fill="y")
         self._pr_comparison_listbox.configure(yscrollcommand=pr_sb.set)
         self._pr_comparison_listbox.bind("<<ListboxSelect>>", self._on_pr_comparison_pick)
-        self._pr_comparison_ids: List[str] = []
+        self._pr_comparison_ids = []
         pr_row = ttk.Frame(pr_inner, style="Card.TFrame")
         pr_row.pack(fill="x", pady=(0, 8))
         self._pr_campaign_ids = [str(x["id"]) for x in PR_CAMPAIGNS]
@@ -3975,7 +4090,9 @@ class MainMenuView:
         self._pr_history_text.pack(fill="both", expand=True)
         self._pr_history_text.configure(state="disabled")
 
-        self.merch_panel = self._create_panel(self._finance_detail_host, "グッズ開発")
+    def _finance_populate_merch_panel(self, host: tk.Misc) -> None:
+        self.merch_panel = self._create_panel(host, "グッズ開発")
+        self.merch_panel.pack(fill="both", expand=True)
         merch_inner = self._resolve_content_parent(self.merch_panel)
         tk.Label(
             merch_inner,
@@ -3994,7 +4111,7 @@ class MainMenuView:
         ).pack(fill="x", pady=(0, 8))
         merch_lines_fr = ttk.Frame(merch_inner, style="Card.TFrame")
         merch_lines_fr.pack(fill="x", pady=(0, 8))
-        self._merch_rows: List[Tuple[str, tk.StringVar, tk.StringVar, ttk.Button]] = []
+        self._merch_rows = []
         for tmpl in MERCH_PRODUCTS:
             pid = str(tmpl["id"])
             var = tk.StringVar(value="")
@@ -4080,193 +4197,59 @@ class MainMenuView:
         self._merch_hist_text.pack(fill="both", expand=True)
         self._merch_hist_text.configure(state="disabled")
 
-        hub_fr = self._finance_hub_buttons
-        ttk.Button(
-            hub_fr,
-            text="概要",
-            style="Menu.TButton",
-            width=12,
-            command=lambda: self._show_finance_detail_page("overview"),
-        ).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
-        ttk.Button(
-            hub_fr,
-            text="施設",
-            style="Menu.TButton",
-            width=12,
-            command=lambda: self._show_finance_detail_page("facility"),
-        ).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
-        ttk.Button(
-            hub_fr,
-            text="スポンサー",
-            style="Menu.TButton",
-            width=12,
-            command=lambda: self._show_finance_detail_page("sponsor"),
-        ).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
-        ttk.Button(
-            hub_fr,
-            text="広報",
-            style="Menu.TButton",
-            width=12,
-            command=lambda: self._show_finance_detail_page("pr"),
-        ).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
-        ttk.Button(
-            hub_fr,
-            text="グッズ",
-            style="Menu.TButton",
-            width=12,
-            command=lambda: self._show_finance_detail_page("merch"),
-        ).grid(row=2, column=0, padx=2, pady=2, sticky="ew")
-        ttk.Button(
-            hub_fr,
-            text="詳細レポート",
-            style="Menu.TButton",
-            width=12,
-            command=lambda: self._show_finance_detail_page("report"),
-        ).grid(row=2, column=1, padx=2, pady=2, sticky="ew")
-        hub_fr.columnconfigure(0, weight=1)
-        hub_fr.columnconfigure(1, weight=1)
-
-        fin_top.pack(fill="x", pady=(0, 10))
-        fin_scroll_wrap.pack(fill="both", expand=True)
-        self._show_finance_detail_page("overview")
-
-        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
-        bottom.pack(fill="x", pady=(12, 0))
-
-        tk.Label(
-            bottom,
-            text=(
-                "レイアウト: 上＝要約ダッシュ＋表示切替／下＝選択中のパネルのみ（右端の縦バーでスクロール）。"
-                " 詳細レポートではオーナー・方針とレポート本文をまとめて表示します。"
-            ),
-            bg="#1d2129",
-            fg="#b8c0cc",
-            anchor="w",
-            justify="left",
+    def _finance_populate_report_panels(self, host: tk.Misc) -> None:
+        wrap = ttk.Frame(host, style="Root.TFrame")
+        wrap.pack(fill="both", expand=True)
+        self.owner_panel = self._create_panel(wrap, "オーナー・方針")
+        self.owner_panel.pack(fill="both", expand=False)
+        owner_parent = self._resolve_content_parent(self.owner_panel)
+        ttk.Label(
+            owner_parent,
+            text="オーナーからの期待・信頼・ミッション（チームデータに依存）。"
+            "ミッションは主にオフシーズンに評価・更新されます。",
             font=("Yu Gothic UI", 9),
-            wraplength=1020,
-            padx=2,
-        ).pack(fill="x", anchor="w", pady=(0, 4))
-
-        self.finance_hint_var = tk.StringVar(value="")
-        tk.Label(
-            bottom,
-            textvariable=self.finance_hint_var,
-            bg="#1d2129",
-            fg="#c5cad3",
-            anchor="w",
-            justify="left",
+        ).pack(anchor="w", pady=(0, 6))
+        self.owner_report_text = scrolledtext.ScrolledText(
+            owner_parent,
+            height=14,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self.owner_report_text.pack(fill="both", expand=True)
+        self.owner_report_text.configure(state="disabled")
+        self.finance_report_panel = self._create_panel(wrap, "詳細レポート")
+        self.finance_report_panel.pack(fill="both", expand=True)
+        report_parent = self._resolve_content_parent(self.finance_report_panel)
+        ttk.Label(
+            report_parent,
+            text="前季までの収入内訳・支出内訳・財務履歴（記録ベース）。"
+            "シーズン収支の正本反映はオフシーズンの財務締めです。",
             font=("Yu Gothic UI", 9),
-            padx=2,
-            pady=2,
-        ).pack(fill="x", anchor="w")
-
-        bf = tk.Frame(bottom, bg="#1d2129")
-        bf.pack(anchor="e", pady=(8, 0))
-        self._jpn_text_button(bf, "閉じる", self._on_close_finance_window, side="right")
-
-        self._finance_window = window
-        window.protocol("WM_DELETE_WINDOW", self._on_close_finance_window)
-        try:
-            self._refresh_finance_window()
-        finally:
-            try:
-                window.update_idletasks()
-                window.deiconify()
-                window.lift()
-            except tk.TclError:
-                pass
-
-    def _on_close_finance_window(self) -> None:
-        window = getattr(self, "_finance_window", None)
-        try:
-            if window is not None and window.winfo_exists():
-                window.destroy()
-        finally:
-            self._finance_window = None
-            self._facility_upgrade_buttons = {}
-            self.finance_report_text = None
-            self.owner_report_text = None
-            self._sponsor_combo = None
-            self._sponsor_apply_btn = None
-            self._sponsor_history_text = None
-            self._sponsor_status_var = None
-            self._pr_combo = None
-            self._pr_run_btn = None
-            self._pr_history_text = None
-            self._pr_status_var = None
-            self._merch_rows = []
-            self._merch_dummy_text = None
-            self._merch_hist_text = None
-            self._management_dashboard_text = None
-            self._facility_preview_vars = {}
-            self._sponsor_preview_var = None
-            self._pr_selection_preview_var = None
-            self._pr_remaining_var = None
-            self._pr_sort_combo = None
-            self._pr_filter_combo = None
-            self._pr_comparison_listbox = None
-            self._pr_comparison_ids = []
-            self._finance_scroll_canvas = None
-            self._finance_scroll_content = None
-            self._finance_hub_buttons = None
-            self._finance_detail_shell = None
-            self._finance_detail_host = None
-            self._finance_detail_selection_var = None
-            self._finance_detail_page_key = None
-            self._finance_inseason_log_text = None
-
-    def _show_finance_detail_page(self, page_key: str) -> None:
-        """Show one management detail pane (or overview) inside the finance window scroll host."""
-        host = getattr(self, "_finance_detail_host", None)
-        sel = getattr(self, "_finance_detail_selection_var", None)
-        if host is None:
-            return
-        if page_key == "salary_cap":
-            page_key = "overview"
-        if page_key not in _FINANCE_DETAIL_PAGE_LABEL_JA:
-            page_key = "overview"
-        self._finance_detail_page_key = page_key
-        fs = getattr(self, "finance_summary_panel", None)
-        fac = getattr(self, "facility_panel", None)
-        own = getattr(self, "owner_panel", None)
-        rep = getattr(self, "finance_report_panel", None)
-        sp = getattr(self, "sponsor_panel", None)
-        pr = getattr(self, "pr_panel", None)
-        mer = getattr(self, "merch_panel", None)
-        for p in (fs, fac, own, rep, sp, pr, mer):
-            if p is None:
-                continue
-            try:
-                p.pack_forget()
-            except tk.TclError:
-                pass
-        if sel is not None:
-            try:
-                sel.set(f"選択中：{_FINANCE_DETAIL_PAGE_LABEL_JA.get(page_key, page_key)}")
-            except tk.TclError:
-                pass
-        try:
-            if page_key == "overview":
-                if fs is not None:
-                    fs.pack(fill="both", expand=True)
-            elif page_key == "report":
-                if own is not None:
-                    own.pack(fill="both", expand=False)
-                if rep is not None:
-                    rep.pack(fill="both", expand=True)
-            else:
-                single = {
-                    "facility": fac,
-                    "sponsor": sp,
-                    "pr": pr,
-                    "merch": mer,
-                }.get(page_key)
-                if single is not None:
-                    single.pack(fill="both", expand=True)
-        except tk.TclError:
-            pass
-        self._update_finance_window_scrollregion()
+        ).pack(anchor="w", pady=(0, 6))
+        self.finance_report_text = scrolledtext.ScrolledText(
+            report_parent,
+            height=16,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=6,
+            pady=6,
+        )
+        self.finance_report_text.pack(fill="both", expand=True)
+        self.finance_report_text.configure(state="disabled")
 
     def _apply_compact_management_dashboard_text(
         self,
@@ -4274,7 +4257,7 @@ class MainMenuView:
         snap: Any,
         quick_summary_lines: List[str],
     ) -> bool:
-        """Fill the management dashboard Text with a short hub view (full blocks stay in lower panels)."""
+        """Fill the management dashboard Text with a short hub view (詳細は別 Toplevel)."""
         fin_lines = getattr(snap, "dashboard_finance_lines", None)
         if not fin_lines:
             return False
@@ -4291,51 +4274,48 @@ class MainMenuView:
         fac_tail = sub_after_fin.split(_MANAGEMENT_FACILITY_PR_SEPARATOR, 1)
         if not fac_lines_snap or len(fac_tail) != 2:
             return False
-        dash_tw.insert("end", "■ 財務\n", ("finance_block_header",))
+        dash_tw.insert("end", "■ 現況サマリー\n", ("finance_block_header",))
         if quick_summary_lines:
             for qln in quick_summary_lines:
                 dash_tw.insert("end", qln + "\n", ("finance_row_default",))
             dash_tw.insert("end", "\n")
+        dash_tw.insert("end", "■ 施策可否\n", ("finance_block_header",))
         for aln in getattr(snap, "action_availability_lines", ()):
             dash_tw.insert("end", aln + "\n", ("finance_row_default",))
         if getattr(snap, "action_availability_lines", ()):
             dash_tw.insert("end", "\n")
-        for _key in (
-            "action_affordance_summary",
-            "owner_action_guidance_summary",
-            "finance_pressure_summary",
-        ):
-            ln = str(getattr(snap, _key, "") or "").strip()
-            if ln:
-                dash_tw.insert(
-                    "end",
-                    ln + "\n",
-                    _management_finance_dashboard_row_tags(ln),
-                )
-        dash_tw.insert(
-            "end",
-            "（年俸枠・キャップ・ラウンド収支メモ・各施策余力の一覧は下段の財務サマリー表示）\n",
-            ("finance_row_default",),
-        )
-        dash_tw.insert("end", "\n\n■ 施設\n", ("facility_block_header",))
-        for fln in list(fac_lines_snap)[:3]:
+        cap_ln = str(getattr(snap, "payroll_capacity_summary", "") or "").strip()
+        if cap_ln:
+            if len(cap_ln) > 96:
+                cap_ln = cap_ln[:93] + "…"
+            dash_tw.insert("end", cap_ln + "\n", ("finance_row_cap",))
+            dash_tw.insert("end", "\n")
+        dash_tw.insert("end", "\n■ 施設\n", ("facility_block_header",))
+        for fln in list(fac_lines_snap)[:2]:
             dash_tw.insert(
                 "end",
                 fln + "\n",
                 _management_facility_dashboard_row_tags(fln),
             )
-        dash_tw.insert("end", "\n")
+        dash_tw.insert("end", "\n■ 広報・スポンサー・グッズ\n", ("finance_block_header",))
         pr_summary = str(getattr(snap, "pr_dashboard_summary", "") or "").strip()
         if pr_summary:
-            for pln in pr_summary.split("\n")[:4]:
+            for pln in pr_summary.split("\n")[:2]:
                 if pln.strip():
                     dash_tw.insert(
                         "end",
                         pln + "\n",
                         _management_pr_dashboard_row_tags(pln),
                     )
+        for _aff_key in ("sponsor_affordance_summary", "merch_affordance_summary"):
+            aln2 = str(getattr(snap, _aff_key, "") or "").strip()
+            if aln2:
+                if len(aln2) > 100:
+                    aln2 = aln2[:97] + "…"
+                dash_tw.insert("end", aln2 + "\n", ("pr_row_default",))
         own_prev = str(getattr(snap, "owner_preamble", "") or "").strip()
-        own_kept = [x for x in own_prev.split("\n") if x.strip()][:5]
+        own_kept = [x for x in own_prev.split("\n") if x.strip()][:2]
+        dash_tw.insert("end", "\n■ オーナー\n", ("owner_block_header",))
         for oln in own_kept:
             dash_tw.insert(
                 "end",
@@ -4352,7 +4332,7 @@ class MainMenuView:
                 dash_tw.insert("end", htail[0] + "\n", ("history_row_default",))
         dash_tw.insert(
             "end",
-            "（続き・内訳は各パネル履歴と「詳細レポート」で確認）\n",
+            "（詳細は左のボタンから各ウィンドウで確認）\n",
             ("history_row_default",),
         )
         return True
@@ -4871,7 +4851,8 @@ class MainMenuView:
             except tk.TclError:
                 pass
 
-        for var, line in zip(self.finance_summary_lines, snap.finance_lines):
+        fsum_lines = getattr(self, "finance_summary_lines", None) or []
+        for var, line in zip(fsum_lines, snap.finance_lines):
             var.set(line)
 
         cap_tw = getattr(self, "_finance_cap_text", None)
@@ -4910,7 +4891,8 @@ class MainMenuView:
             except tk.TclError:
                 pass
 
-        for var, line in zip(self.facility_lines, snap.facility_lines):
+        fac_line_widgets = getattr(self, "facility_lines", None) or []
+        for var, line in zip(fac_line_widgets, snap.facility_lines):
             var.set(line)
 
         fp_vars = getattr(self, "_facility_preview_vars", None)
@@ -5092,11 +5074,7 @@ class MainMenuView:
             "グッズ売上表示は簡易ダミーです。"
         )
 
-        pk = getattr(self, "_finance_detail_page_key", None)
-        if pk is not None and getattr(self, "_finance_detail_host", None) is not None:
-            self._show_finance_detail_page(pk)
-        else:
-            self._update_finance_window_scrollregion()
+        self._update_finance_window_scrollregion()
 
     def open_strategy_window(self) -> None:
         """Open a safe read-only strategy / rotation subwindow."""
