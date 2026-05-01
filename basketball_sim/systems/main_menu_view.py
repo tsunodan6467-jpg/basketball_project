@@ -202,12 +202,11 @@ _MANAGEMENT_OWNER_HISTORY_SEPARATOR = "\n\n■ 実行履歴 / 直近アクショ
 
 # 経営メニュー下部: 表示切替ページキー →「選択中：」用の短い日本語ラベル
 _FINANCE_DETAIL_PAGE_LABEL_JA: Dict[str, str] = {
-    "overview": "財務サマリー",
+    "overview": "概要",
     "facility": "施設",
     "sponsor": "スポンサー",
     "pr": "広報",
     "merch": "グッズ",
-    "salary_cap": "サラリーキャップ",
     "report": "詳細レポート・オーナー",
 }
 
@@ -3395,7 +3394,7 @@ class MainMenuView:
         ttk.Label(
             fin_purpose,
             text=(
-                "【経営メニュー】状況の要約は右のダッシュボード、左のボタンで下段の表示を切り替えます。"
+                "【経営メニュー】状況の要約は右のダッシュボード、左の「概要」で財務サマリー（キャップ閲覧含む）に戻れます。"
                 "数値の正本・締め処理は共通ロジック／オフシーズン財務締めに依存します。"
             ),
             wraplength=1020,
@@ -3553,7 +3552,7 @@ class MainMenuView:
         self._finance_detail_shell.grid(row=0, column=0, sticky="nsew")
         self._finance_detail_shell.columnconfigure(0, weight=1)
         self._finance_detail_shell.rowconfigure(1, weight=1)
-        self._finance_detail_selection_var = tk.StringVar(value="選択中：財務サマリー")
+        self._finance_detail_selection_var = tk.StringVar(value="選択中：概要")
         ttk.Label(
             self._finance_detail_shell,
             textvariable=self._finance_detail_selection_var,
@@ -4084,38 +4083,38 @@ class MainMenuView:
         hub_fr = self._finance_hub_buttons
         ttk.Button(
             hub_fr,
+            text="概要",
+            style="Menu.TButton",
+            width=12,
+            command=lambda: self._show_finance_detail_page("overview"),
+        ).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+        ttk.Button(
+            hub_fr,
             text="施設",
             style="Menu.TButton",
             width=12,
             command=lambda: self._show_finance_detail_page("facility"),
-        ).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+        ).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
         ttk.Button(
             hub_fr,
             text="スポンサー",
             style="Menu.TButton",
             width=12,
             command=lambda: self._show_finance_detail_page("sponsor"),
-        ).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        ).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
         ttk.Button(
             hub_fr,
             text="広報",
             style="Menu.TButton",
             width=12,
             command=lambda: self._show_finance_detail_page("pr"),
-        ).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
+        ).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
         ttk.Button(
             hub_fr,
             text="グッズ",
             style="Menu.TButton",
             width=12,
             command=lambda: self._show_finance_detail_page("merch"),
-        ).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
-        ttk.Button(
-            hub_fr,
-            text="サラリーキャップ",
-            style="Menu.TButton",
-            width=12,
-            command=lambda: self._show_finance_detail_page("salary_cap"),
         ).grid(row=2, column=0, padx=2, pady=2, sticky="ew")
         ttk.Button(
             hub_fr,
@@ -4217,26 +4216,14 @@ class MainMenuView:
             self._finance_detail_page_key = None
             self._finance_inseason_log_text = None
 
-    def _finance_try_focus_cap_text(self) -> None:
-        """Bring the salary-cap ScrolledText near the top of its pane (UI only)."""
-        tw = getattr(self, "_finance_cap_text", None)
-        if tw is None:
-            return
-        try:
-            if not tw.winfo_exists():
-                return
-            tw.configure(state="normal")
-            tw.see("1.0")
-            tw.configure(state="disabled")
-        except tk.TclError:
-            pass
-
     def _show_finance_detail_page(self, page_key: str) -> None:
         """Show one management detail pane (or overview) inside the finance window scroll host."""
         host = getattr(self, "_finance_detail_host", None)
         sel = getattr(self, "_finance_detail_selection_var", None)
         if host is None:
             return
+        if page_key == "salary_cap":
+            page_key = "overview"
         if page_key not in _FINANCE_DETAIL_PAGE_LABEL_JA:
             page_key = "overview"
         self._finance_detail_page_key = page_key
@@ -4260,11 +4247,9 @@ class MainMenuView:
             except tk.TclError:
                 pass
         try:
-            if page_key in ("overview", "salary_cap"):
+            if page_key == "overview":
                 if fs is not None:
                     fs.pack(fill="both", expand=True)
-                if page_key == "salary_cap":
-                    self.root.after(80, self._finance_try_focus_cap_text)
             elif page_key == "report":
                 if own is not None:
                     own.pack(fill="both", expand=False)
