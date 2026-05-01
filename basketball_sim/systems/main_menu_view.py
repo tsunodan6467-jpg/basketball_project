@@ -3541,6 +3541,7 @@ class MainMenuView:
         self._sponsor_history_text = None
         self._sponsor_status_var = None
         self._sponsor_preview_var = None
+        self._sponsor_finance_combo_sig = None
         self._pr_combo = None
         self._pr_run_btn = None
         self._pr_history_text = None
@@ -3712,6 +3713,7 @@ class MainMenuView:
             self._sponsor_status_var = None
             self._sponsor_preview_var = None
             self._sponsor_type_ids = []
+            self._sponsor_finance_combo_sig = None
         elif key == "pr":
             self.pr_panel = None
             self._pr_combo = None
@@ -3944,6 +3946,7 @@ class MainMenuView:
         ).pack(fill="x", anchor="w")
 
     def _finance_populate_sponsor_panel(self, host: tk.Misc) -> None:
+        self._sponsor_finance_combo_sig = None
         self.sponsor_panel = self._create_panel(host, "スポンサー（メイン契約）")
         self.sponsor_panel.pack(fill="both", expand=True)
         sponsor_inner = self._resolve_content_parent(self.sponsor_panel)
@@ -4009,8 +4012,19 @@ class MainMenuView:
             font=("Yu Gothic UI", 10),
         )
         self._sponsor_combo.pack(side="left", padx=(0, 10))
+        init_ix = 0
+        if self.team is not None:
+            try:
+                ensure_sponsor_management_on_team(self.team)
+                icur = str(self.team.management.get("sponsors", {}).get("main_contract_type", "standard"))
+                for j, tid in enumerate(self._sponsor_type_ids):
+                    if tid == icur:
+                        init_ix = j
+                        break
+            except (TypeError, ValueError, AttributeError, KeyError):
+                init_ix = 0
         try:
-            self._sponsor_combo.current(0)
+            self._sponsor_combo.current(init_ix)
         except tk.TclError:
             pass
         self._sponsor_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_finance_window())
@@ -4806,13 +4820,32 @@ class MainMenuView:
         ensure_sponsor_management_on_team(self.team)
         cur = str(self.team.management.get("sponsors", {}).get("main_contract_type", "standard"))
         ids = getattr(self, "_sponsor_type_ids", [])
-        for i, tid in enumerate(ids):
-            if tid == cur:
-                try:
-                    combo.current(i)
-                except tk.TclError:
-                    pass
-                break
+        team_id = int(getattr(self.team, "team_id", -1))
+        sig = (team_id, cur)
+        prev_sig = getattr(self, "_sponsor_finance_combo_sig", None)
+        force_combo = prev_sig != sig
+        if force_combo:
+            for i, tid in enumerate(ids):
+                if tid == cur:
+                    try:
+                        combo.current(i)
+                    except tk.TclError:
+                        pass
+                    break
+            self._sponsor_finance_combo_sig = sig
+        else:
+            try:
+                sel_i = int(combo.current())
+            except (tk.TclError, TypeError, ValueError):
+                sel_i = -1
+            if sel_i < 0 or sel_i >= len(ids):
+                for i, tid in enumerate(ids):
+                    if tid == cur:
+                        try:
+                            combo.current(i)
+                        except tk.TclError:
+                            pass
+                        break
         sp = int(self._safe_get(self.team, "sponsor_power", 0))
         state_lbl = self._sponsor_finance_panel_state_label(self.team, cur)
         status_var.set(
