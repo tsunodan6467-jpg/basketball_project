@@ -158,11 +158,15 @@ from basketball_sim.systems.sponsor_management import (
     label_for_main_sponsor_type,
 )
 from basketball_sim.systems.pr_campaign_management import (
+    MAX_ACTIONS_PER_ROUND,
+    PR_CAMPAIGN_CLI_COMPARISON_HINTS,
     PR_CAMPAIGNS,
+    can_commit_pr_campaign,
     commit_pr_campaign,
     format_pr_history_lines,
     format_pr_status_line,
     resolve_pr_round_context,
+    sync_pr_round_quota,
 )
 from basketball_sim.systems.merchandise_management import (
     ADVANCE_COST,
@@ -4153,14 +4157,9 @@ class MainMenuView:
         self.pr_panel = self._create_panel(host, "広報・ファン施策")
         self.pr_panel.pack(fill="both", expand=True)
         pr_inner = self._resolve_content_parent(self.pr_panel)
-        self._pr_status_var = tk.StringVar(value="")
         tk.Label(
             pr_inner,
-            text=(
-                "シーズン中の実行回数に上限があるファン向け施策です。"
-                "下は実行履歴です。"
-                "（反映: 即時 / 今季中）"
-            ),
+            text="ファン向け施策です。上から順に現状・候補・効果の説明・履歴です。実行はシーズン中の枠と所持金に依存します。",
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
@@ -4168,7 +4167,17 @@ class MainMenuView:
             font=("Yu Gothic UI", 9),
             wraplength=900,
             padx=2,
-        ).pack(fill="x", pady=(0, 4))
+        ).pack(fill="x", pady=(0, 6))
+
+        tk.Label(
+            pr_inner,
+            text="【現在の広報状況】",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", anchor="w", pady=(0, 2))
+        self._pr_status_var = tk.StringVar(value="")
         tk.Label(
             pr_inner,
             textvariable=self._pr_status_var,
@@ -4176,22 +4185,21 @@ class MainMenuView:
             fg="#d6dbe3",
             anchor="w",
             justify="left",
-            font=("Yu Gothic UI", 11),
+            font=("Yu Gothic UI", 10),
             wraplength=900,
             padx=2,
         ).pack(fill="x", pady=(0, 8))
-        self._pr_remaining_var = tk.StringVar(value="")
+
+        ttk.Separator(pr_inner, orient="horizontal").pack(fill="x", pady=(0, 6))
+
         tk.Label(
             pr_inner,
-            textvariable=self._pr_remaining_var,
+            text="【施策候補】",
             bg="#222834",
-            fg="#e8ecf2",
+            fg="#b8c0cc",
             anchor="w",
-            justify="left",
             font=("Yu Gothic UI", 10, "bold"),
-            wraplength=900,
-            padx=2,
-        ).pack(fill="x", pady=(0, 6))
+        ).pack(fill="x", anchor="w", pady=(0, 2))
         pr_cmp_row = ttk.Frame(pr_inner, style="Card.TFrame")
         pr_cmp_row.pack(fill="x", pady=(0, 6))
         ttk.Label(pr_cmp_row, text="並べ替え:", font=("Yu Gothic UI", 9)).pack(side="left", padx=(0, 6))
@@ -4224,7 +4232,7 @@ class MainMenuView:
         self._pr_filter_combo.bind("<<ComboboxSelected>>", lambda _e: self._refresh_finance_window())
         tk.Label(
             pr_inner,
-            text="候補一覧（比較・行を選ぶと下のコンボと実行対象が連動）",
+            text="候補一覧（行を選ぶと下のコンボと実行対象が連動）",
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
@@ -4232,10 +4240,10 @@ class MainMenuView:
             padx=2,
         ).pack(fill="x", pady=(0, 4))
         pr_lb_fr = tk.Frame(pr_inner, bg="#222834")
-        pr_lb_fr.pack(fill="x", pady=(0, 8))
+        pr_lb_fr.pack(fill="x", pady=(0, 6))
         self._pr_comparison_listbox = tk.Listbox(
             pr_lb_fr,
-            height=5,
+            height=4,
             bg="#222834",
             fg="#d6dbe3",
             selectbackground="#3d4a60",
@@ -4253,14 +4261,21 @@ class MainMenuView:
         self._pr_comparison_listbox.bind("<<ListboxSelect>>", self._on_pr_comparison_pick)
         self._pr_comparison_ids = []
         pr_row = ttk.Frame(pr_inner, style="Card.TFrame")
-        pr_row.pack(fill="x", pady=(0, 8))
+        pr_row.pack(fill="x", pady=(0, 6))
+        tk.Label(
+            pr_row,
+            text="実行する施策：",
+            bg="#222834",
+            fg="#b8c0cc",
+            font=("Yu Gothic UI", 10),
+        ).pack(side="left", padx=(0, 6))
         self._pr_campaign_ids = [str(x["id"]) for x in PR_CAMPAIGNS]
         pr_labels = [str(x["label"]) for x in PR_CAMPAIGNS]
         self._pr_combo = ttk.Combobox(
             pr_row,
             values=pr_labels,
             state="readonly",
-            width=32,
+            width=28,
             font=("Yu Gothic UI", 10),
         )
         self._pr_combo.pack(side="left", padx=(0, 10))
@@ -4276,6 +4291,14 @@ class MainMenuView:
             command=self._on_pr_campaign_run,
         )
         self._pr_run_btn.pack(side="left")
+        tk.Label(
+            pr_inner,
+            text="プレビュー（選択中の候補）",
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 2))
         self._pr_selection_preview_var = tk.StringVar(value="")
         tk.Label(
             pr_inner,
@@ -4288,14 +4311,74 @@ class MainMenuView:
             wraplength=900,
             padx=2,
         ).pack(fill="x", pady=(0, 6))
+        _pr_hint_lines = "\n".join(
+            f"・{str(spec.get('label', ''))}：{PR_CAMPAIGN_CLI_COMPARISON_HINTS.get(str(spec.get('id', '')), '')}"
+            for spec in PR_CAMPAIGNS
+        )
         tk.Label(
             pr_inner,
-            text="実行履歴（直近）",
+            text="候補の目安（表示のみ・数値ロジックは変更しません）",
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(2, 2))
+        tk.Label(
+            pr_inner,
+            text=_pr_hint_lines,
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 6))
+
+        ttk.Separator(pr_inner, orient="horizontal").pack(fill="x", pady=(0, 6))
+
+        tk.Label(
+            pr_inner,
+            text="【効果と反映タイミング】",
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
-            font=("Yu Gothic UI", 10),
-        ).pack(fill="x", pady=(4, 2))
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", anchor="w", pady=(0, 2))
+        tk.Label(
+            pr_inner,
+            text=(
+                "PR施策は実行時に費用を支払い、人気・ファン基盤へ即時反映されます。\n"
+                "人気・ファン基盤は、将来の集客・グッズ・スポンサー収入の土台に関係します。\n"
+                "収入式への本格接続は段階実装中です（試合収入式への本接続は後段）。"
+            ),
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 8))
+
+        ttk.Separator(pr_inner, orient="horizontal").pack(fill="x", pady=(0, 6))
+
+        tk.Label(
+            pr_inner,
+            text="【広報履歴】",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", anchor="w", pady=(0, 2))
+        tk.Label(
+            pr_inner,
+            text="直近のPR施策実行履歴を表示します。",
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 4))
         self._pr_history_text = scrolledtext.ScrolledText(
             pr_inner,
             height=4,
@@ -4681,6 +4764,34 @@ class MainMenuView:
             return "変更可"
         return "契約済み"
 
+    @staticmethod
+    def _pr_finance_panel_state_label(team: Any, season: Any) -> str:
+        """施策可否サマリーと同系の文言（PR ロジックは持たない）。"""
+        if team is None:
+            return "詳細で確認"
+        if not bool(getattr(team, "is_user_team", False)):
+            return "詳細で確認"
+        if not PR_CAMPAIGNS:
+            return "未設定"
+        try:
+            results = [can_commit_pr_campaign(team, str(spec["id"]), season) for spec in PR_CAMPAIGNS]
+            if any(ok for ok, _reason in results):
+                return "実行可"
+            _wk, allowed, _reason = sync_pr_round_quota(team, season)
+            if not allowed:
+                return "詳細で確認"
+            block = team.management.get("pr_campaigns") if isinstance(getattr(team, "management", None), dict) else None
+            used = int((block or {}).get("count_this_round", 0) or 0)
+            if allowed and used >= int(MAX_ACTIONS_PER_ROUND):
+                return "今ラウンド上限"
+            costs = [int(spec.get("cost", 0) or 0) for spec in PR_CAMPAIGNS]
+            money = int(getattr(team, "money", 0) or 0)
+            if costs and money < min(costs):
+                return "資金不足"
+            return "未実行"
+        except (TypeError, ValueError, AttributeError, KeyError):
+            return "詳細で確認"
+
     def _sync_pr_comparison_row_to_chrome(self, index: int) -> None:
         combo = getattr(self, "_pr_combo", None)
         row_ids = getattr(self, "_pr_comparison_ids", [])
@@ -4886,7 +4997,14 @@ class MainMenuView:
         if combo is None or status_var is None:
             return
         if self.team is None:
-            status_var.set("（チーム未接続）広報・ファン施策の状態は表示できません。")
+            status_var.set(
+                "人気：—\n"
+                "ファン基盤：—\n"
+                "今ラウンド消化：— ／ —\n"
+                "状態：詳細で確認\n"
+                "\n"
+                "（チーム未接続のため上記は表示できません。メイン画面でチームに接続してください。）"
+            )
             try:
                 combo.configure(state="disabled")
                 if run_btn is not None:
@@ -4906,7 +5024,17 @@ class MainMenuView:
         line_a = format_pr_status_line(self.team, season)
         pop = int(self._safe_get(self.team, "popularity", 0))
         fb = int(self._safe_get(self.team, "fan_base", 0))
-        status_var.set(f"{line_a}\n人気: {pop} ／ ファン基盤: {fb:,}")
+        sync_pr_round_quota(self.team, season)
+        block = self.team.management.get("pr_campaigns") if isinstance(getattr(self.team, "management", None), dict) else {}
+        used = int((block or {}).get("count_this_round", 0) or 0)
+        state_lbl = self._pr_finance_panel_state_label(self.team, season)
+        status_var.set(
+            f"{line_a}\n"
+            f"人気：{pop} ／ 100\n"
+            f"ファン基盤：{fb:,}\n"
+            f"今ラウンド消化：{used} ／ {MAX_ACTIONS_PER_ROUND} 回\n"
+            f"状態：{state_lbl}"
+        )
         is_user = bool(getattr(self.team, "is_user_team", False))
         _, allowed, _ = resolve_pr_round_context(season)
         try:
@@ -5242,13 +5370,6 @@ class MainMenuView:
         if pr_preview is not None:
             try:
                 pr_preview.set(snap.pr_selection_preview)
-            except tk.TclError:
-                pass
-
-        pr_rem_v = getattr(self, "_pr_remaining_var", None)
-        if pr_rem_v is not None:
-            try:
-                pr_rem_v.set(snap.pr_remaining_summary)
             except tk.TclError:
                 pass
 
