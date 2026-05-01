@@ -413,6 +413,32 @@ class MainMenuView:
         "development": "育成型",
     }
 
+    # 強化メニュー本表の「個別練習」列（短縮）。個別練習変更ウィンドのツリー略称と揃える。
+    _DEV_ROSTER_DRILL_LABEL_JA: Dict[str, str] = {
+        "balanced": "バランス",
+        "dribble": "ドリブル",
+        "rebound": "リバ",
+        "stamina_run": "走り込み",
+        "shoot_form": "シュート",
+        "three_point": "3P",
+        "free_throw": "FT",
+        "drive_finish": "ドライブ",
+        "passing_read": "パス",
+        "defense_footwork": "守備Fw",
+        "strength": "筋力",
+        "speed_agility": "俊敏",
+        "iq_film": "IQ映像",
+    }
+    # 強化メニュー本表の「育成方針」列（選手個人・個別練習に連動する方針）。C-3 の個別練習編集と揃える。
+    _DEV_ROSTER_FOCUS_LABEL_JA: Dict[str, str] = {
+        "balanced": "バランス",
+        "shooting": "シュート",
+        "playmaking": "プレメイク",
+        "defense": "守備",
+        "physical": "フィジカル",
+        "iq_handling": "IQ・判断",
+    }
+
     USAGE_POLICY_LABELS = {
         "balanced": "バランス",
         "win_now": "勝利優先",
@@ -9566,6 +9592,56 @@ class MainMenuView:
         )
         ttk.Button(btn, text="閉じる", style="Menu.TButton", command=w.destroy).pack(side="right", padx=4)
 
+    def _development_window_embed_top_panels_with_scroll(
+        self, parent: tk.Misc, *, canvas_height_px: int
+    ) -> Tuple[ttk.Frame, ttk.Frame]:
+        """育成影響要因・スペシャル練習など上段3パネルが縦に長いとき、本表を潰さないよう縦スクロールで包む。"""
+        host = ttk.Frame(parent, style="Root.TFrame")
+        bar = ttk.Frame(host, style="Root.TFrame")
+        bar.pack(fill="both", expand=True)
+        canvas = tk.Canvas(
+            bar,
+            height=int(canvas_height_px),
+            bg="#15171c",
+            highlightthickness=0,
+            borderwidth=0,
+        )
+        vsb = ttk.Scrollbar(bar, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        inner = ttk.Frame(canvas, style="Root.TFrame")
+        win_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+
+        def _on_inner_configure(_event: Any = None) -> None:
+            bbox = canvas.bbox("all")
+            if bbox is not None:
+                canvas.configure(scrollregion=bbox)
+
+        def _on_canvas_configure(event: Any) -> None:
+            try:
+                canvas.itemconfigure(win_id, width=event.width)
+            except tk.TclError:
+                pass
+
+        inner.bind("<Configure>", _on_inner_configure)
+        canvas.bind("<Configure>", _on_canvas_configure)
+
+        def _wheel(event: Any) -> str:
+            if getattr(event, "delta", 0):
+                canvas.yview_scroll(int(-event.delta / 120), "units")
+            return "break"
+
+        canvas.bind("<MouseWheel>", _wheel)
+        inner.bind("<MouseWheel>", _wheel)
+        canvas.bind("<Enter>", lambda _e: canvas.focus_set())
+        canvas.bind("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
+        canvas.bind("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
+        inner.bind("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
+        inner.bind("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
+
+        canvas.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+        return host, inner
+
     def open_development_window(self) -> None:
         """強化・育成の閲覧ウィンドウ。最下部ボタンからチーム練習・個別練習を変更可能。"""
         existing = getattr(self, "_development_window", None)
@@ -9673,8 +9749,13 @@ class MainMenuView:
             justify="left",
         ).pack(anchor="w")
 
-        top = ttk.Frame(dev_center, style="Root.TFrame")
-        top.pack(fill="x", pady=(0, 12))
+        top_scroll_host, top_outer = self._development_window_embed_top_panels_with_scroll(
+            dev_center, canvas_height_px=260
+        )
+        top_scroll_host.pack(fill="x", pady=(0, 10))
+
+        top = ttk.Frame(top_outer, style="Root.TFrame")
+        top.pack(fill="both", expand=True)
         top.columnconfigure(0, weight=1)
         top.columnconfigure(1, weight=1)
         top.columnconfigure(2, weight=1)
@@ -9697,17 +9778,29 @@ class MainMenuView:
 
         ttk.Label(
             table_wrap,
-            text="ロスター別の育成一覧（POT・育成指標・年齢帯・見立て）",
+            text="ロスター別の育成一覧（POT・育成指標・年齢帯・個別練習・育成方針・見立て）※上の3パネルは縦スクロールで全文表示",
             style="TopBar.TLabel",
             anchor="w",
         ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
 
-        columns = ("name", "pos", "age", "ovr", "pot", "dev", "games", "stage", "outlook")
+        columns = (
+            "name",
+            "pos",
+            "age",
+            "ovr",
+            "pot",
+            "dev",
+            "games",
+            "stage",
+            "training_drill",
+            "training_focus",
+            "outlook",
+        )
         self.development_tree = ttk.Treeview(
             table_wrap,
             columns=columns,
             show="headings",
-            height=18,
+            height=10,
         )
         headings = {
             "name": "選手名",
@@ -9718,18 +9811,22 @@ class MainMenuView:
             "dev": "育成値",
             "games": "試合数",
             "stage": "年齢帯",
+            "training_drill": "個別練習",
+            "training_focus": "育成方針",
             "outlook": "育成見立て",
         }
         widths = {
-            "name": 170,
-            "pos": 70,
-            "age": 70,
-            "ovr": 70,
-            "pot": 70,
-            "dev": 80,
-            "games": 80,
-            "stage": 110,
-            "outlook": 260,
+            "name": 168,
+            "pos": 68,
+            "age": 66,
+            "ovr": 66,
+            "pot": 66,
+            "dev": 76,
+            "games": 76,
+            "stage": 100,
+            "training_drill": 92,
+            "training_focus": 82,
+            "outlook": 228,
         }
         for key in columns:
             self.development_tree.heading(key, text=headings[key])
@@ -9761,6 +9858,14 @@ class MainMenuView:
                 window.destroy()
         finally:
             self._development_window = None
+
+    def _development_tree_drill_label(self, player: Any) -> str:
+        k = str(self._safe_get(player, "training_drill", "balanced") or "balanced")
+        return self._DEV_ROSTER_DRILL_LABEL_JA.get(k, "バランス")
+
+    def _development_tree_focus_label(self, player: Any) -> str:
+        k = str(self._safe_get(player, "training_focus", "balanced") or "balanced")
+        return self._DEV_ROSTER_FOCUS_LABEL_JA.get(k, "バランス")
 
     def _refresh_development_window(self) -> None:
         if getattr(self, "development_header_var", None) is None:
@@ -9850,7 +9955,19 @@ class MainMenuView:
                 tree.insert(
                     "",
                     "end",
-                    values=(pname, "—", "—", "—", "—", "—", "—", "—", outlook),
+                    values=(
+                        pname,
+                        "—",
+                        "—",
+                        "—",
+                        "—",
+                        "—",
+                        "—",
+                        "—",
+                        "—",
+                        "—",
+                        outlook,
+                    ),
                 )
             else:
                 for player in players_sorted:
@@ -9869,13 +9986,15 @@ class MainMenuView:
                             str(self._safe_get(player, "development", "-")),
                             str(self._safe_get(player, "games_played", 0)),
                             stage,
+                            self._development_tree_drill_label(player),
+                            self._development_tree_focus_label(player),
                             outlook,
                         ),
                     )
 
         self.development_hint_intro_var.set(
             "上段パネル: 人数・育成方針・施設Lvと効き方の目安・HC/戦術・スペシャル練習の解放。"
-            "下表: 選手ごとの POT / 育成指標 / 試合出場 / 年齢帯 / 見立て（閲覧）。"
+            "下表: 選手ごとの POT / 育成指標 / 試合出場 / 年齢帯 / 個別練習 / 育成方針 / 見立て（閲覧）。"
             "練習の編集は、この下の履歴のさらに下にある2ボタンから。"
         )
         self._refresh_development_training_log_widgets()
