@@ -12689,7 +12689,34 @@ class MainMenuView:
         wrap = ttk.Frame(w, style="Root.TFrame", padding=12)
         wrap.pack(fill="both", expand=True)
         wrap.rowconfigure(0, weight=1)
+        wrap.rowconfigure(1, weight=0)
         wrap.columnconfigure(0, weight=1)
+        # 下段は PanedWindow だと Windows 環境で下ペインの高さが潰れ、詳細が画面外に落ちることがある。
+        # 上段だけ伸縮し、下段は内容の自然高さを確保する。
+        self.style.configure(
+            "PlayerTrainSection.TLabel",
+            background="#1d2129",
+            foreground="#f3f5f7",
+            font=("Yu Gothic UI", 10, "bold"),
+        )
+        self.style.configure(
+            "PlayerTrainDetail.TLabel",
+            background="#1d2129",
+            foreground="#e8ecf0",
+            font=("Yu Gothic UI", 10),
+        )
+        self.style.configure(
+            "PlayerTrainHint.TLabel",
+            background="#1d2129",
+            foreground="#9aa3b2",
+            font=("Yu Gothic UI", 9),
+        )
+        self.style.configure(
+            "PlayerTrainNote.TLabel",
+            background="#1d2129",
+            foreground="#d6dbe3",
+            font=("Yu Gothic UI", 9),
+        )
 
         roster = list(getattr(self.team, "players", []) or [])
         roster = sorted(
@@ -12718,6 +12745,19 @@ class MainMenuView:
         ]
         drill_label_to_key = {label: (key, focus) for key, label, focus in drills}
         key_to_drill_label = {key: label for key, label, _ in drills}
+        # 個別練習に紐づく育成方針（Player.training_focus）の表示用。保存値の正は選手オブジェクト。
+        _PLAYER_TRAINING_FOCUS_LABEL_JA: Dict[str, str] = {
+            "balanced": "バランス",
+            "shooting": "シュート",
+            "playmaking": "プレーメイク",
+            "defense": "ディフェンス",
+            "physical": "フィジカル",
+            "iq_handling": "IQ・判断",
+        }
+
+        def _focus_label_for_key(fk: str) -> str:
+            k = str(fk or "balanced")
+            return _PLAYER_TRAINING_FOCUS_LABEL_JA.get(k, k)
 
         from basketball_sim.systems.draft import build_draft_candidate_role_shape_label
 
@@ -12769,17 +12809,14 @@ class MainMenuView:
                 _drill_short_for_tree(cd),
             )
 
-        pw = ttk.PanedWindow(wrap, orient=tk.VERTICAL)
-        pw.grid(row=0, column=0, sticky="nsew")
-
-        top_fr = ttk.Frame(pw, style="Panel.TFrame", padding=(0, 0, 0, 4))
-        bot_fr = ttk.Frame(pw, style="Panel.TFrame", padding=(0, 8, 0, 0))
-        pw.add(top_fr, weight=3)
-        pw.add(bot_fr, weight=2)
+        top_fr = ttk.Frame(wrap, style="Panel.TFrame", padding=(0, 0, 0, 4))
+        top_fr.grid(row=0, column=0, sticky="nsew")
+        bot_fr = ttk.Frame(wrap, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        bot_fr.grid(row=1, column=0, sticky="new")
 
         ttk.Label(
             top_fr,
-            text="ロスター一覧（行を選ぶと下部で能力・練習を編集）",
+            text="ロスター一覧（行を選ぶと下部で個別練習・能力を確認・変更）",
             font=("Yu Gothic UI", 9),
         ).pack(anchor="w", pady=(0, 4))
 
@@ -12806,7 +12843,7 @@ class MainMenuView:
         tree.heading("age", text="年齢")
         tree.heading("nat", text="国籍区分")
         tree.heading("role", text="タイプ")
-        tree.heading("drill", text="現在練習")
+        tree.heading("drill", text="個別練習")
         tree.column("name", width=140, stretch=True)
         tree.column("pos", width=40, stretch=False)
         tree.column("ovr", width=40, stretch=False)
@@ -12819,11 +12856,19 @@ class MainMenuView:
         for i, p in enumerate(roster):
             tree.insert("", "end", iid=str(i), values=_row_values(p))
 
-        ttk.Label(bot_fr, text="選択中の選手", font=("Yu Gothic UI", 10, "bold")).pack(anchor="w")
+        ttk.Label(bot_fr, text="選択中の選手", style="PlayerTrainSection.TLabel").pack(anchor="w")
         head_var = tk.StringVar(value="")
-        ttk.Label(bot_fr, textvariable=head_var, wraplength=820, font=("Yu Gothic UI", 10)).pack(
-            anchor="w", pady=(2, 4)
-        )
+        ttk.Label(
+            bot_fr,
+            textvariable=head_var,
+            wraplength=820,
+            style="PlayerTrainDetail.TLabel",
+        ).pack(anchor="w", pady=(2, 2))
+        ttk.Label(
+            bot_fr,
+            text="育成方針は、選んだ個別練習に合わせて自動設定されます。",
+            style="PlayerTrainHint.TLabel",
+        ).pack(anchor="w", pady=(0, 4))
 
         attrs_fr = tk.Frame(bot_fr, bg="#1d2129", highlightthickness=0)
         attrs_fr.pack(fill="x", pady=(0, 6))
@@ -12864,7 +12909,7 @@ class MainMenuView:
 
         drill_row = ttk.Frame(bot_fr)
         drill_row.pack(fill="x", pady=(0, 4))
-        ttk.Label(drill_row, text="練習に変更", font=("Yu Gothic UI", 10, "bold")).pack(
+        ttk.Label(drill_row, text="個別練習に変更", style="PlayerTrainSection.TLabel").pack(
             side="left", padx=(0, 8)
         )
         drill_combo = ttk.Combobox(
@@ -12876,18 +12921,19 @@ class MainMenuView:
         drill_combo.pack(side="left")
 
         note_var = tk.StringVar(value="")
-        tk.Label(
+        ttk.Label(
             bot_fr,
             textvariable=note_var,
-            bg="#1d2129",
-            fg="#d6dbe3",
+            style="PlayerTrainNote.TLabel",
             justify="left",
-            anchor="w",
-            font=("Yu Gothic UI", 9),
-            padx=8,
-            pady=6,
             wraplength=820,
-        ).pack(fill="x", pady=(0, 8))
+        ).pack(fill="x", anchor="w", padx=8, pady=6)
+
+        ttk.Label(
+            bot_fr,
+            text="「反映」でこの選手の個別練習と育成方針が更新されます。",
+            style="PlayerTrainHint.TLabel",
+        ).pack(fill="x", anchor="w", padx=8, pady=(0, 6))
 
         def _selected_player() -> Optional[Any]:
             sel = tree.selection()
@@ -12910,9 +12956,11 @@ class MainMenuView:
             cd = str(getattr(p, "training_drill", "balanced") or "balanced")
             nat_l = jp_reg_display.get_player_nationality_bucket_label(p)
             role_l = _role_shape_label(p)
+            cur_fk = str(getattr(p, "training_focus", "balanced") or "balanced")
             head_var.set(
                 f"{nm}  /  {pos}  /  OVR {ovr}  /  POT {pot}  /  年齢 {age}  /  "
-                f"{nat_l}  /  タイプ: {role_l}  /  現在の練習: {_drill_label_for_key(cd)}"
+                f"{nat_l}  /  タイプ: {role_l}\n"
+                f"現在：個別練習＝{_drill_label_for_key(cd)} / 育成方針＝{_focus_label_for_key(cur_fk)}"
             )
             for ak, lbl in attr_value_lbl.items():
                 lbl.config(text=str(int(getattr(p, ak, 0) or 0)))
@@ -12925,13 +12973,14 @@ class MainMenuView:
                 return
             key_focus = drill_label_to_key.get(drill_combo.get(), ("balanced", "balanced"))
             key = key_focus[0]
+            cand_focus = key_focus[1]
             reason = self._player_drill_lock_reason(self.team, key)
-            current_drill = str(getattr(p, "training_drill", "balanced") or "balanced")
-            cur_lab = _drill_label_for_key(current_drill)
+            cand_lab = _drill_label_for_key(key)
+            f_lab = _focus_label_for_key(cand_focus)
             if reason:
-                note_var.set(f"現在: {cur_lab} / 選択中の練習: 未解放（{reason}）")
+                note_var.set(f"選択中：{cand_lab} / 育成方針：{f_lab} / 未解放：{reason}")
             else:
-                note_var.set(f"現在: {cur_lab} / 選択中の練習: 反映可能です。")
+                note_var.set(f"選択中：{cand_lab} / 育成方針：{f_lab} / 解放済み")
 
         def _on_tree_select(_event: Any = None) -> None:
             p = _selected_player()
