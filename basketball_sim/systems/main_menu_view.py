@@ -149,6 +149,8 @@ from basketball_sim.systems.roster_fa_release import (
     precheck_release_player_to_fa,
 )
 from basketball_sim.systems.sponsor_management import (
+    MAIN_SPONSOR_CLI_COMPARISON_HINTS,
+    MAIN_SPONSOR_IDS,
     MAIN_SPONSOR_TYPES,
     commit_main_sponsor_contract,
     ensure_sponsor_management_on_team,
@@ -3945,14 +3947,9 @@ class MainMenuView:
         self.sponsor_panel = self._create_panel(host, "スポンサー（メイン契約）")
         self.sponsor_panel.pack(fill="both", expand=True)
         sponsor_inner = self._resolve_content_parent(self.sponsor_panel)
-        self._sponsor_status_var = tk.StringVar(value="")
         tk.Label(
             sponsor_inner,
-            text=(
-                "メインスポンサー契約の種類を選び「反映」で確定します。"
-                "下は契約変更の直近履歴です。"
-                "（反映: 主に次オフ収入）"
-            ),
+            text="メイン契約の種類を選び「メイン契約を反映」で確定します。上から順に現状・候補・履歴です。",
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
@@ -3960,7 +3957,17 @@ class MainMenuView:
             font=("Yu Gothic UI", 9),
             wraplength=900,
             padx=2,
-        ).pack(fill="x", pady=(0, 4))
+        ).pack(fill="x", pady=(0, 6))
+
+        tk.Label(
+            sponsor_inner,
+            text="【現在のスポンサー】",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", anchor="w", pady=(0, 2))
+        self._sponsor_status_var = tk.StringVar(value="")
         tk.Label(
             sponsor_inner,
             textvariable=self._sponsor_status_var,
@@ -3968,19 +3975,37 @@ class MainMenuView:
             fg="#d6dbe3",
             anchor="w",
             justify="left",
-            font=("Yu Gothic UI", 11),
+            font=("Yu Gothic UI", 10),
             wraplength=900,
             padx=2,
         ).pack(fill="x", pady=(0, 8))
+
+        ttk.Separator(sponsor_inner, orient="horizontal").pack(fill="x", pady=(0, 6))
+
+        tk.Label(
+            sponsor_inner,
+            text="【契約候補】",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", anchor="w", pady=(0, 2))
         sponsor_row = ttk.Frame(sponsor_inner, style="Card.TFrame")
-        sponsor_row.pack(fill="x", pady=(0, 8))
+        sponsor_row.pack(fill="x", pady=(0, 6))
+        tk.Label(
+            sponsor_row,
+            text="候補：",
+            bg="#222834",
+            fg="#b8c0cc",
+            font=("Yu Gothic UI", 10),
+        ).pack(side="left", padx=(0, 6))
         self._sponsor_type_ids = [str(x["id"]) for x in MAIN_SPONSOR_TYPES]
         combo_labels = [str(x["label"]) for x in MAIN_SPONSOR_TYPES]
         self._sponsor_combo = ttk.Combobox(
             sponsor_row,
             values=combo_labels,
             state="readonly",
-            width=36,
+            width=32,
             font=("Yu Gothic UI", 10),
         )
         self._sponsor_combo.pack(side="left", padx=(0, 10))
@@ -3996,6 +4021,14 @@ class MainMenuView:
             command=self._on_sponsor_contract_apply,
         )
         self._sponsor_apply_btn.pack(side="left")
+        tk.Label(
+            sponsor_inner,
+            text="プレビュー（選択中の候補）",
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 2))
         self._sponsor_preview_var = tk.StringVar(value="")
         tk.Label(
             sponsor_inner,
@@ -4010,15 +4043,84 @@ class MainMenuView:
         ).pack(fill="x", pady=(0, 6))
         tk.Label(
             sponsor_inner,
-            text="契約変更履歴（直近）",
+            text="スポンサー契約はその場で現金を増やすものではなく、主に次オフ収入へ反映されます。",
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
-            font=("Yu Gothic UI", 10),
-        ).pack(fill="x", pady=(4, 2))
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 4))
+        _hint_lines = "\n".join(
+            f"・{str(spec.get('label', ''))}：{MAIN_SPONSOR_CLI_COMPARISON_HINTS.get(str(spec.get('id', '')), '')}"
+            for spec in MAIN_SPONSOR_TYPES
+        )
+        tk.Label(
+            sponsor_inner,
+            text="候補の目安（表示のみ・数値ロジックは変更しません）",
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(2, 2))
+        tk.Label(
+            sponsor_inner,
+            text=_hint_lines,
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 6))
+
+        tk.Label(
+            sponsor_inner,
+            text="【次オフ収入について】",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", anchor="w", pady=(0, 2))
+        tk.Label(
+            sponsor_inner,
+            text=(
+                "スポンサー収入はオフシーズン財務締めで確定します。\n"
+                "sponsor_power・人気・勝ち越しなどが収入に関係します。\n"
+                "契約変更時の即時の現金増加はありません。"
+            ),
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=2,
+        ).pack(fill="x", pady=(0, 8))
+
+        ttk.Separator(sponsor_inner, orient="horizontal").pack(fill="x", pady=(0, 6))
+
+        tk.Label(
+            sponsor_inner,
+            text="【契約履歴】",
+            bg="#222834",
+            fg="#b8c0cc",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", anchor="w", pady=(0, 2))
+        tk.Label(
+            sponsor_inner,
+            text="直近のメインスポンサー契約変更を表示します。",
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+        ).pack(fill="x", pady=(0, 4))
         self._sponsor_history_text = scrolledtext.ScrolledText(
             sponsor_inner,
-            height=5,
+            height=4,
             wrap="word",
             bg="#222834",
             fg="#d6dbe3",
@@ -4549,6 +4651,22 @@ class MainMenuView:
         self._refresh_finance_window()
         self.refresh()
 
+    @staticmethod
+    def _sponsor_finance_panel_state_label(team: Any, cur_id: str) -> str:
+        """施策サマリーと同系の安全な文言（契約ロジックは持たない）。"""
+        if team is None:
+            return "詳細で確認"
+        if not bool(getattr(team, "is_user_team", False)):
+            return "今は変更不可"
+        tid = str(cur_id or "").strip()
+        if not tid:
+            return "未設定"
+        if tid not in MAIN_SPONSOR_IDS:
+            return "詳細で確認"
+        if any(str(x.get("id")) != tid for x in MAIN_SPONSOR_TYPES):
+            return "変更可"
+        return "契約済み"
+
     def _sync_pr_comparison_row_to_chrome(self, index: int) -> None:
         combo = getattr(self, "_pr_combo", None)
         row_ids = getattr(self, "_pr_comparison_ids", [])
@@ -4663,7 +4781,12 @@ class MainMenuView:
             return
         if self.team is None:
             status_var.set(
-                "（チーム未接続）メイン契約・スポンサー力は表示できません。メインでチームに接続してください。"
+                "契約：—\n"
+                "スポンサー力：—\n"
+                "反映：主に次オフ収入\n"
+                "状態：詳細で確認\n"
+                "\n"
+                "（チーム未接続のため上記は表示できません。メイン画面でチームに接続してください。）"
             )
             try:
                 combo.configure(state="disabled")
@@ -4691,9 +4814,12 @@ class MainMenuView:
                     pass
                 break
         sp = int(self._safe_get(self.team, "sponsor_power", 0))
+        state_lbl = self._sponsor_finance_panel_state_label(self.team, cur)
         status_var.set(
-            f"現在のメイン契約: {label_for_main_sponsor_type(cur)} ｜ スポンサー力 {sp}／100 "
-            "（次回オフシーズン締めのスポンサー収入内訳に反映）"
+            f"契約：{label_for_main_sponsor_type(cur)}\n"
+            f"スポンサー力：{sp} ／ 100\n"
+            "反映：主に次オフ収入\n"
+            f"状態：{state_lbl}"
         )
         is_user = bool(getattr(self.team, "is_user_team", False))
         try:
