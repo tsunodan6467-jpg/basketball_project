@@ -172,6 +172,7 @@ from basketball_sim.systems.merchandise_management import (
     ADVANCE_COST,
     MERCH_PRODUCTS,
     PHASE_LABEL_JA,
+    VALID_PHASES,
     advance_merchandise_phase,
     can_advance_merchandise_phase,
     ensure_merchandise_on_team,
@@ -5224,7 +5225,13 @@ class MainMenuView:
         item = get_merchandise_item(team, product_id)
         if item is None:
             return
-        ph = str(item.get("phase", "concept"))
+        raw_ph = item.get("phase", "concept")
+        if raw_ph is None or (isinstance(raw_ph, str) and not str(raw_ph).strip()):
+            ph = "concept"
+        else:
+            ph = str(raw_ph).strip()
+        if ph not in VALID_PHASES:
+            ph = "concept"
         if ph == "on_sale":
             messagebox.showinfo("グッズ開発", "すでに発売中です。")
             return
