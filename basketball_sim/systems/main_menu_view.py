@@ -171,7 +171,9 @@ from basketball_sim.systems.pr_campaign_management import (
 from basketball_sim.systems.merchandise_management import (
     ADVANCE_COST,
     MERCH_PRODUCTS,
+    PHASE_LABEL_JA,
     advance_merchandise_phase,
+    can_advance_merchandise_phase,
     ensure_merchandise_on_team,
     estimate_dummy_merch_sales_lines,
     format_merchandise_history_lines,
@@ -188,6 +190,7 @@ from basketball_sim.systems.management_menu_snapshot import (
     PR_SORT_COST_DESC,
     PR_SORT_DEFAULT,
     build_management_menu_snapshot,
+    build_merchandise_affordance_summary_line,
     build_pr_selection_preview_line,
 )
 
@@ -3558,6 +3561,7 @@ class MainMenuView:
         self._pr_campaign_ids = []
         self._merch_dummy_text = None
         self._merch_hist_text = None
+        self._merch_summary_var = None
 
         hub_fr = self._finance_hub_buttons
         for _w in hub_fr.winfo_children():
@@ -3663,6 +3667,7 @@ class MainMenuView:
             self._merch_rows = []
             self._merch_dummy_text = None
             self._merch_hist_text = None
+            self._merch_summary_var = None
             self._management_dashboard_text = None
             self._facility_preview_vars = {}
             self._facility_card_level_vars = {}
@@ -3736,6 +3741,7 @@ class MainMenuView:
             self._merch_rows = []
             self._merch_dummy_text = None
             self._merch_hist_text = None
+            self._merch_summary_var = None
         elif key == "report":
             self.owner_panel = None
             self.owner_report_text = None
@@ -4396,36 +4402,146 @@ class MainMenuView:
         self._pr_history_text.pack(fill="both", expand=True)
         self._pr_history_text.configure(state="disabled")
 
+    def _merch_next_action_tag(self, affordance_line: str) -> str:
+        aff = str(affordance_line or "")
+        if "今なら進行可" in aff or "ぎりぎり" in aff:
+            return "進行可"
+        if "今は厳しい" in aff:
+            return "資金不足"
+        if "発売中のため追加工程なし" in aff:
+            return "発売済み"
+        return "詳細で確認"
+
+    def _build_merch_panel_summary_text(self, team: Any) -> str:
+        n = len(MERCH_PRODUCTS)
+        if n <= 0:
+            return "【現在のグッズ開発】\n商品ラインが未設定です。"
+        if team is None:
+            return (
+                "【現在のグッズ開発】\n"
+                "発売中ライン：— / —\n"
+                "開発中ライン：—\n"
+                "次アクション：詳細で確認\n"
+                "チーム未接続のため内訳を表示できません。"
+            )
+        ensure_merchandise_on_team(team)
+        block = team.management.get("merchandise")
+        items: List[Any] = []
+        if isinstance(block, dict):
+            raw = block.get("items")
+            if isinstance(raw, list):
+                items = raw
+        on_sale = sum(
+            1 for r in items if isinstance(r, dict) and str(r.get("phase", "")) == "on_sale"
+        )
+        developing = max(0, n - on_sale)
+        try:
+            aff = build_merchandise_affordance_summary_line(team, format_money=self._format_money)
+        except Exception:
+            aff = "グッズ余力: 詳細で確認"
+        tag = self._merch_next_action_tag(aff)
+        return (
+            f"【現在のグッズ開発】\n"
+            f"発売中ライン：{on_sale} / {n}\n"
+            f"開発中ライン：{developing}\n"
+            f"次アクション：{tag}\n"
+            f"{aff}\n"
+            "反映：段階進行は「開発を進める」実行時。発売中ラインが増えると、将来の物販収入内訳の改善に関係しやすくなります。"
+        )
+
+    def _merch_row_judgment_line(
+        self, team: Any, product_id: str, item: Any, is_user: bool
+    ) -> str:
+        if item is None:
+            return "段階：— ｜ 次費用：— ｜ 状態：詳細で確認"
+        ph = str(item.get("phase", "concept"))
+        lab = PHASE_LABEL_JA.get(ph, ph)
+        if ph == "on_sale":
+            return f"段階：{lab} ｜ 次費用：— ｜ 状態：発売済み"
+        cost = int(ADVANCE_COST.get(ph, 0) or 0)
+        cost_s = f"{cost:,} 円" if cost > 0 else "—"
+        if not is_user:
+            return f"段階：{lab} ｜ 次費用：{cost_s} ｜ 状態：詳細で確認（自チームのみ操作可）"
+        ok, reason = can_advance_merchandise_phase(team, product_id)
+        if ok:
+            status = "進行可"
+        else:
+            rs = str(reason or "")
+            if "資金" in rs:
+                status = "資金不足"
+            elif "発売" in rs:
+                status = "発売済み"
+            else:
+                status = "詳細で確認"
+        return f"段階：{lab} ｜ 次費用：{cost_s} ｜ 状態：{status}"
+
     def _finance_populate_merch_panel(self, host: tk.Misc) -> None:
         self.merch_panel = self._create_panel(host, "グッズ開発")
         self.merch_panel.pack(fill="both", expand=True)
         merch_inner = self._resolve_content_parent(self.merch_panel)
         tk.Label(
             merch_inner,
-            text=(
-                "各ラインのフェーズを進めます（開発費は所持金から差し引き）。"
-                "売上表示は簡易ダミーで、本番の収支・内訳とは未連携です。"
-                "（反映: 段階進行）"
-            ),
+            text="各ラインを段階で進めます（開発費は「開発を進める」実行時に所持金から差し引き）。",
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
             justify="left",
-            font=("Yu Gothic UI", 10),
+            font=("Yu Gothic UI", 9),
             wraplength=900,
             padx=2,
+        ).pack(fill="x", pady=(0, 6))
+        self._merch_summary_var = tk.StringVar(value="")
+        tk.Label(
+            merch_inner,
+            textvariable=self._merch_summary_var,
+            bg="#1a1f28",
+            fg="#c5cad3",
+            anchor="nw",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+            padx=8,
+            pady=6,
         ).pack(fill="x", pady=(0, 8))
+        tk.Label(
+            merch_inner,
+            text="【商品ライン】",
+            bg="#222834",
+            fg="#e8ecf1",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", pady=(0, 4))
         merch_lines_fr = ttk.Frame(merch_inner, style="Card.TFrame")
         merch_lines_fr.pack(fill="x", pady=(0, 8))
         self._merch_rows = []
         for tmpl in MERCH_PRODUCTS:
             pid = str(tmpl["id"])
             var = tk.StringVar(value="")
+            dvar = tk.StringVar(value="")
             pvar = tk.StringVar(value="")
             row_fr = ttk.Frame(merch_lines_fr, style="Card.TFrame")
-            row_fr.pack(fill="x", pady=3)
+            row_fr.pack(fill="x", pady=4)
+            btn = ttk.Button(
+                row_fr,
+                text="開発を進める",
+                style="Menu.TButton",
+                command=lambda p=pid: self._on_merch_advance(p),
+            )
+            btn.pack(side="right", anchor="n", pady=(2, 0))
             left_col = tk.Frame(row_fr, bg="#222834")
             left_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            nm = str(tmpl.get("name", pid))
+            cat = str(tmpl.get("category", ""))
+            head = f"{nm}（{cat}）" if cat else nm
+            tk.Label(
+                left_col,
+                text=head,
+                bg="#222834",
+                fg="#e8ecf1",
+                anchor="w",
+                font=("Yu Gothic UI", 10, "bold"),
+                wraplength=560,
+            ).pack(anchor="w", fill="x")
             tk.Label(
                 left_col,
                 textvariable=var,
@@ -4433,9 +4549,27 @@ class MainMenuView:
                 fg="#d6dbe3",
                 anchor="w",
                 justify="left",
-                font=("Yu Gothic UI", 10),
-                wraplength=620,
-            ).pack(anchor="w", fill="x")
+                font=("Yu Gothic UI", 9),
+                wraplength=560,
+            ).pack(anchor="w", fill="x", pady=(2, 0))
+            tk.Label(
+                left_col,
+                textvariable=dvar,
+                bg="#222834",
+                fg="#a8b4c4",
+                anchor="w",
+                justify="left",
+                font=("Yu Gothic UI", 9),
+                wraplength=560,
+            ).pack(anchor="w", fill="x", pady=(1, 0))
+            tk.Label(
+                left_col,
+                text="プレビュー",
+                bg="#222834",
+                fg="#7d8a9a",
+                anchor="w",
+                font=("Yu Gothic UI", 8),
+            ).pack(anchor="w", pady=(4, 0))
             tk.Label(
                 left_col,
                 textvariable=pvar,
@@ -4444,27 +4578,42 @@ class MainMenuView:
                 anchor="w",
                 justify="left",
                 font=("Yu Gothic UI", 9),
-                wraplength=620,
-            ).pack(anchor="w", fill="x", pady=(2, 0))
-            btn = ttk.Button(
-                row_fr,
-                text="開発を進める",
-                style="Menu.TButton",
-                command=lambda p=pid: self._on_merch_advance(p),
-            )
-            btn.pack(side="right")
-            self._merch_rows.append((pid, var, pvar, btn))
+                wraplength=560,
+            ).pack(anchor="w", fill="x", pady=(0, 2))
+            self._merch_rows.append((pid, var, pvar, btn, dvar))
         tk.Label(
             merch_inner,
-            text="売上・ランキング（ダミー）",
+            text="【効果と反映】",
+            bg="#222834",
+            fg="#e8ecf1",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", pady=(4, 2))
+        tk.Label(
+            merch_inner,
+            text=(
+                "グッズ開発は段階進行です。発売済みラインは将来の物販収入に関係します。\n"
+                "物販収入は人気・ファン基盤・成績などの影響も受けます。\n"
+                "下の売上目安は参考表示であり、本番収支の確定値ではありません。"
+            ),
             bg="#222834",
             fg="#b8c0cc",
             anchor="w",
-            font=("Yu Gothic UI", 10),
-        ).pack(fill="x", pady=(6, 2))
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=900,
+        ).pack(fill="x", pady=(0, 8))
+        tk.Label(
+            merch_inner,
+            text="【売上目安（参考）】",
+            bg="#222834",
+            fg="#e8ecf1",
+            anchor="w",
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", pady=(0, 2))
         self._merch_dummy_text = scrolledtext.ScrolledText(
             merch_inner,
-            height=5,
+            height=4,
             wrap="word",
             bg="#222834",
             fg="#c5cad3",
@@ -4480,15 +4629,23 @@ class MainMenuView:
         self._merch_dummy_text.configure(state="disabled")
         tk.Label(
             merch_inner,
-            text="開発履歴（直近）",
+            text="【開発履歴】",
             bg="#222834",
-            fg="#b8c0cc",
+            fg="#e8ecf1",
             anchor="w",
-            font=("Yu Gothic UI", 10),
-        ).pack(fill="x", pady=(4, 2))
+            font=("Yu Gothic UI", 10, "bold"),
+        ).pack(fill="x", pady=(4, 0))
+        tk.Label(
+            merch_inner,
+            text="直近のグッズ開発進行を表示します。",
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            font=("Yu Gothic UI", 8),
+        ).pack(fill="x", pady=(0, 2))
         self._merch_hist_text = scrolledtext.ScrolledText(
             merch_inner,
-            height=3,
+            height=4,
             wrap="word",
             bg="#222834",
             fg="#d6dbe3",
@@ -5091,11 +5248,27 @@ class MainMenuView:
         dummy_tw = getattr(self, "_merch_dummy_text", None)
         hist_tw = getattr(self, "_merch_hist_text", None)
         rows = getattr(self, "_merch_rows", None)
+        sum_var = getattr(self, "_merch_summary_var", None)
         if not rows:
             return
         if self.team is None:
-            for _pid, var, _pvar, btn in rows:
+            if sum_var is not None:
+                try:
+                    sum_var.set(self._build_merch_panel_summary_text(None))
+                except tk.TclError:
+                    pass
+            for row in rows:
+                if len(row) >= 5:
+                    _pid, var, _pvar, btn, dvar = row[:5]
+                else:
+                    _pid, var, _pvar, btn = row[:4]
+                    dvar = None
                 var.set("（チーム未接続）ライン状態は表示できません。")
+                if dvar is not None:
+                    try:
+                        dvar.set("段階：— ｜ 次費用：— ｜ 状態：詳細で確認")
+                    except tk.TclError:
+                        pass
                 try:
                     btn.state(["disabled"])
                 except tk.TclError:
@@ -5119,12 +5292,27 @@ class MainMenuView:
             return
         ensure_merchandise_on_team(self.team)
         is_user = bool(getattr(self.team, "is_user_team", False))
-        for pid, var, _pvar, btn in rows:
+        if sum_var is not None:
+            try:
+                sum_var.set(self._build_merch_panel_summary_text(self.team))
+            except tk.TclError:
+                pass
+        for row in rows:
+            if len(row) >= 5:
+                pid, var, _pvar, btn, dvar = row[:5]
+            else:
+                pid, var, _pvar, btn = row[:4]
+                dvar = None
             item = get_merchandise_item(self.team, pid)
             if item is not None:
                 var.set(format_merchandise_row_display(item))
             else:
                 var.set("（ライン未取得）接続とデータを確認してください。")
+            if dvar is not None:
+                try:
+                    dvar.set(self._merch_row_judgment_line(self.team, pid, item, is_user))
+                except tk.TclError:
+                    pass
             try:
                 if not is_user or (item is not None and str(item.get("phase")) == "on_sale"):
                     btn.state(["disabled"])
@@ -5510,7 +5698,9 @@ class MainMenuView:
         merch_prev_map = dict(snap.merch_line_previews)
         mrows = getattr(self, "_merch_rows", None)
         if mrows:
-            for pid, _v, mpv, _btn in mrows:
+            for row in mrows:
+                pid = row[0]
+                mpv = row[2]
                 try:
                     mpv.set(merch_prev_map.get(pid, "—"))
                 except tk.TclError:
