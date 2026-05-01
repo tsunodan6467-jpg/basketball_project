@@ -172,14 +172,15 @@ from basketball_sim.systems.merchandise_management import (
     ADVANCE_COST,
     MERCH_PRODUCTS,
     PHASE_LABEL_JA,
-    VALID_PHASES,
     advance_merchandise_phase,
     can_advance_merchandise_phase,
     ensure_merchandise_on_team,
     estimate_dummy_merch_sales_lines,
+    format_merchandise_advance_cost_yen_display,
     format_merchandise_history_lines,
     format_merchandise_row_display,
     get_merchandise_item,
+    normalize_merchandise_phase_value,
 )
 from basketball_sim.systems.management_menu_snapshot import (
     PR_FILTER_AFFORDABLE,
@@ -4455,7 +4456,7 @@ class MainMenuView:
     ) -> str:
         if item is None:
             return "段階：— ｜ 次費用：— ｜ 状態：詳細で確認"
-        ph = str(item.get("phase", "concept"))
+        ph = normalize_merchandise_phase_value(item.get("phase"))
         lab = PHASE_LABEL_JA.get(ph, ph)
         if ph == "on_sale":
             return f"段階：{lab} ｜ 次費用：— ｜ 状態：発売済み"
@@ -5225,13 +5226,7 @@ class MainMenuView:
         item = get_merchandise_item(team, product_id)
         if item is None:
             return
-        raw_ph = item.get("phase", "concept")
-        if raw_ph is None or (isinstance(raw_ph, str) and not str(raw_ph).strip()):
-            ph = "concept"
-        else:
-            ph = str(raw_ph).strip()
-        if ph not in VALID_PHASES:
-            ph = "concept"
+        ph = normalize_merchandise_phase_value(item.get("phase"))
         if ph == "on_sale":
             messagebox.showinfo("グッズ開発", "すでに発売中です。")
             return
@@ -5240,7 +5235,7 @@ class MainMenuView:
             return
         if not messagebox.askyesno(
             "グッズ開発",
-            f"次の工程に進みますか？\n必要資金: {self._format_money(cost)}",
+            f"次の工程に進みますか？\n必要資金: {format_merchandise_advance_cost_yen_display(cost)}",
         ):
             return
         ok, msg = advance_merchandise_phase(team, product_id)

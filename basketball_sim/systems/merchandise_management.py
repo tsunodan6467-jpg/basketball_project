@@ -37,6 +37,35 @@ VALID_PHASES = frozenset(PHASE_ORDER)
 MAX_MERCH_HISTORY = 36
 MERCH_PRODUCT_IDS = frozenset(p["id"] for p in MERCH_PRODUCTS)
 
+
+def normalize_merchandise_phase_value(raw: Any) -> str:
+    """item['phase'] の表示・費用参照用。None / 空 / 未知は concept。"""
+    if raw is None or (isinstance(raw, str) and not str(raw).strip()):
+        return "concept"
+    ph = str(raw).strip()
+    if ph not in VALID_PHASES:
+        return "concept"
+    return ph
+
+
+def format_merchandise_advance_cost_yen_display(yen: Any) -> str:
+    """
+    グッズ次工程費用の人間向け表記。
+
+    経営画面の format_money_yen_ja_readable は100万円未満が「0万円」になるため、
+    グッズ開発の金額表示では円のカンマ表記を使う（内部の円整数は変更しない）。
+    """
+    try:
+        n = int(yen)
+    except (TypeError, ValueError):
+        return "確認中"
+    if n <= 0:
+        return "確認中"
+    if n < 0:
+        return "−" + format_merchandise_advance_cost_yen_display(-n)
+    return f"{n:,}円"
+
+
 # CLI 候補比較用の短文（表示のみ。フェーズ・コストの正本は既存定数）
 MERCH_PRODUCT_CLI_COMPARISON_HINTS: Dict[str, str] = {
     "jersey_alt": "ユニフォーム系・ブランド訴求（工程は重め）",
@@ -102,10 +131,7 @@ def ensure_merchandise_on_team(team: Any) -> None:
         pid = tmpl["id"]
         base = {"id": pid, "category": tmpl["category"], "name": tmpl["name"]}
         if pid in saved_by_id:
-            ph = str(saved_by_id[pid].get("phase", "concept"))
-            if ph not in VALID_PHASES:
-                ph = "concept"
-            base["phase"] = ph
+            base["phase"] = normalize_merchandise_phase_value(saved_by_id[pid].get("phase"))
         else:
             base["phase"] = "concept"
         items.append(base)
@@ -150,9 +176,7 @@ def can_advance_merchandise_phase(team: Any, product_id: str) -> Tuple[bool, str
     item = get_merchandise_item(team, pid)
     if item is None:
         return False, "商品データが見つかりません。"
-    phase = str(item.get("phase", "concept"))
-    if phase not in VALID_PHASES:
-        phase = "concept"
+    phase = normalize_merchandise_phase_value(item.get("phase"))
     if phase == "on_sale":
         return False, "すでに発売中です。"
     nxt = _next_phase(phase)
@@ -181,9 +205,9 @@ def _advance_merchandise_phase_core(team: Any, product_id: str, *, source: str) 
     if item is None:
         return False, "商品データが見つかりません。"
 
-    phase = str(item.get("phase", "concept"))
-    if phase not in VALID_PHASES:
-        phase = "concept"
+    raw_ph = item.get("phase")
+    phase = normalize_merchandise_phase_value(raw_ph)
+    if raw_ph is None or str(raw_ph).strip() != phase:
         item["phase"] = phase
 
     if phase == "on_sale":
@@ -242,7 +266,7 @@ def try_cpu_merchandise_advance(team: Any, season: Any, rng: Random) -> bool:
 def format_merchandise_status_line(item: Dict[str, Any]) -> str:
     name = str(item.get("name", "-"))
     cat = str(item.get("category", "-"))
-    ph = str(item.get("phase", "concept"))
+    ph = normalize_merchandise_phase_value(item.get("phase"))
     pl = PHASE_LABEL_JA.get(ph, ph)
     return f"{name}（{cat}）｜ 状態: {pl}"
 
@@ -250,7 +274,7 @@ def format_merchandise_status_line(item: Dict[str, Any]) -> str:
 def format_merchandise_row_display(item: Dict[str, Any]) -> str:
     """GUI 1 行表示（次工程コスト付き）。"""
     base = format_merchandise_status_line(item)
-    ph = str(item.get("phase", "concept"))
+    ph = normalize_merchandise_phase_value(item.get("phase"))
     if ph == "on_sale":
         return base + " ｜ 次の工程: —"
     cost = int(ADVANCE_COST.get(ph, 0) or 0)

@@ -25,7 +25,9 @@ from basketball_sim.systems.merchandise_management import (
     PHASE_LABEL_JA,
     _next_phase,
     can_advance_merchandise_phase,
+    format_merchandise_advance_cost_yen_display,
     get_merchandise_item,
+    normalize_merchandise_phase_value,
 )
 from basketball_sim.systems.pr_campaign_management import (
     MAX_ACTIONS_PER_ROUND,
@@ -590,7 +592,7 @@ def build_merchandise_line_previews(
         if item is None:
             out.append((pid, f"「{name}」: データ未取得／実行不可"))
             continue
-        phase = str(item.get("phase", "concept"))
+        phase = normalize_merchandise_phase_value(item.get("phase"))
         if phase == "on_sale":
             out.append((pid, f"「{name}」: 発売中／追加の開発工程なし"))
             continue
@@ -601,7 +603,8 @@ def build_merchandise_line_previews(
         cost = int(ADVANCE_COST.get(phase, 0) or 0)
         next_lab = PHASE_LABEL_JA.get(nxt, nxt)
         ok, reason = can_advance_merchandise_phase(team, pid)
-        base = f"「{name}」: {format_money(cost)}で→{next_lab}（年次グッズ収入内訳の改善が見込まれる）"
+        cost_disp = format_merchandise_advance_cost_yen_display(cost)
+        base = f"「{name}」: {cost_disp}で→{next_lab}（年次グッズ収入内訳の改善が見込まれる）"
         if ok:
             out.append((pid, f"{base}／実行可"))
         else:
@@ -636,7 +639,7 @@ def build_merchandise_affordance_summary_line(team: Any, *, format_money: Format
         item = get_merchandise_item(team, pid)
         if item is None:
             return f"{prefix} 商品未設定"
-        phase = str(item.get("phase", "concept"))
+        phase = normalize_merchandise_phase_value(item.get("phase"))
         if phase == "on_sale":
             continue
         all_on_sale = False
@@ -656,7 +659,7 @@ def build_merchandise_affordance_summary_line(team: Any, *, format_money: Format
     if costs_ok:
         min_ok = min(costs_ok)
         margin = money - min_ok
-        disp = format_money(min_ok)
+        disp = format_merchandise_advance_cost_yen_display(min_ok)
         if margin == 0 or margin < 200_000:
             return f"{prefix} 次工程 {disp}・ぎりぎり"
         if margin >= min_ok:
@@ -665,7 +668,7 @@ def build_merchandise_affordance_summary_line(team: Any, *, format_money: Format
 
     min_block = min(c for c, _ in candidates)
     margin = money - min_block
-    disp = format_money(min_block)
+    disp = format_merchandise_advance_cost_yen_display(min_block)
     if margin < 0:
         return f"{prefix} 次工程 {disp}・今は厳しい"
     if margin == 0 or margin < 200_000:
@@ -810,7 +813,7 @@ def _build_action_availability_lines(team: Any, season: Any) -> Tuple[str, ...]:
                 item = get_merchandise_item(team, pid)
                 if item is None:
                     continue
-                phase = str(item.get("phase", "concept"))
+                phase = normalize_merchandise_phase_value(item.get("phase"))
                 if phase == "on_sale":
                     continue
                 open_items.append((pid, int(ADVANCE_COST.get(phase, 0) or 0)))
