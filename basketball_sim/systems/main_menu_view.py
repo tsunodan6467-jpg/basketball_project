@@ -9661,9 +9661,10 @@ class MainMenuView:
         ttk.Label(
             purpose,
             text=(
-                "【強化メニュー】チーム練習・個別練習の方針、スペシャル練習の解放条件、"
-                "選手ごとの育成指標と見立てを確認します。上段の3パネルとロスター一覧は閲覧です。"
-                "練習内容の変更だけ、ウィンドウ最下部（直近変更ログの下）の"
+                "【強化メニュー】育成方針（チーム練習）・個別練習・スペシャル練習の解放、"
+                "育成に効く施設のLv、選手ごとの見立てをまとめて確認します。"
+                "上段3パネルとロスター表は閲覧のみです。"
+                "育成方針・個別練習の変更は、ウィンドウ最下部（直近変更ログの下）の"
                 "「チーム練習を変更」「個別練習を変更」から行えます。"
                 "メイン画面でチーム未接続のときは変更ボタンは使えません。"
             ),
@@ -9686,8 +9687,8 @@ class MainMenuView:
         self.development_special_panel.grid(row=0, column=2, sticky="nsew", padx=(8, 0))
 
         self.development_summary_lines = self._make_line_vars(self.development_summary_panel, 6)
-        self.development_effect_lines = self._make_line_vars(self.development_effect_panel, 6)
-        self.development_special_lines = self._make_line_vars(self.development_special_panel, 7)
+        self.development_effect_lines = self._make_line_vars(self.development_effect_panel, 12)
+        self.development_special_lines = self._make_line_vars(self.development_special_panel, 16)
 
         table_wrap = ttk.Frame(dev_center, style="Panel.TFrame", padding=10)
         table_wrap.pack(fill="both", expand=True)
@@ -9696,7 +9697,7 @@ class MainMenuView:
 
         ttk.Label(
             table_wrap,
-            text="ロスター別の育成一覧（POT・development・年齢帯・見立て）",
+            text="ロスター別の育成一覧（POT・育成指標・年齢帯・見立て）",
             style="TopBar.TLabel",
             anchor="w",
         ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
@@ -9806,7 +9807,7 @@ class MainMenuView:
 
         summary_lines = [
             f"ロスター人数: {len(players_sorted)}",
-            f"チーム練習方針: {team_tf_label}",
+            f"育成方針（チーム練習）: {team_tf_label}",
             f"若手(23歳以下): {young_count}",
             f"全盛期(24-31歳): {prime_count}",
             f"ベテラン(32歳以上): {veteran_count}",
@@ -9815,7 +9816,8 @@ class MainMenuView:
         for var, line in zip(self.development_summary_lines, summary_lines):
             var.set(line)
 
-        effect_lines = [
+        facility_lines = self._build_development_facility_block_lines(self.team)
+        other_effect_lines = [
             f"HCスタイル: {coach_text}",
             f"戦術: {strategy_text}",
             self._build_development_coach_note(coach_key),
@@ -9823,6 +9825,7 @@ class MainMenuView:
             "若手は伸びやすく、32歳以上は衰退しやすい傾向です",
             "試合出場数も育成量に影響します",
         ]
+        effect_lines = facility_lines + other_effect_lines
         for var, line in zip(self.development_effect_lines, effect_lines):
             var.set(line)
 
@@ -9871,8 +9874,8 @@ class MainMenuView:
                     )
 
         self.development_hint_intro_var.set(
-            "上段パネル: 人数・練習方針・HC/戦術の育成への効き方・スペシャル練習。"
-            "下表: 選手ごとの POT / development / 試合出場 / 年齢帯 / 見立て（閲覧）。"
+            "上段パネル: 人数・育成方針・施設Lvと効き方の目安・HC/戦術・スペシャル練習の解放。"
+            "下表: 選手ごとの POT / 育成指標 / 試合出場 / 年齢帯 / 見立て（閲覧）。"
             "練習の編集は、この下の履歴のさらに下にある2ボタンから。"
         )
         self._refresh_development_training_log_widgets()
@@ -9898,6 +9901,39 @@ class MainMenuView:
         if key == "defense":
             return "戦術補足: 守備重視なのでフィジカルと守備役割の成長を確認しましょう"
         return "戦術補足: バランス型で全ポジションを横断的に育てやすいです"
+
+    def _build_development_facility_block_lines(self, team: Any) -> List[str]:
+        """強化メニュー用。施設投資ロジックは触らず、Lvと効き方の目安のみ表示する。"""
+        if team is None:
+            return [
+                "■ 育成・スペシャル練習へ効く施設（現在Lv）",
+                "トレーニング施設Lv: —（チーム未接続）",
+                "メディカル施設Lv: —",
+                "フロントLv: —",
+                "※アリーナは主に集客・収支（育成計算とは直接は結び付けていません）。",
+                "■ HC・戦術・年齢・出場",
+            ]
+        tf = int(getattr(team, "training_facility_level", 1) or 1)
+        med = int(getattr(team, "medical_facility_level", 1) or 1)
+        fo = int(getattr(team, "front_office_level", 1) or 1)
+        return [
+            "■ 育成・スペシャル練習へ効く施設（現在Lv）",
+            (
+                f"トレーニング施設Lv{tf}："
+                "個別練習の追加成長の発生率の目安に関係します。"
+                "一部のスペシャル練習の解放条件にも使われます。"
+            ),
+            (
+                f"メディカル施設Lv{med}："
+                "フィジカル系のスペシャル練習（筋力強化など）の解放条件に関係します。"
+            ),
+            (
+                f"フロントLv{fo}："
+                "IQ・映像分析系の個別練習（映像分析など）の解放条件に関係します。"
+            ),
+            "※アリーナは主に集客・収支（育成計算とは直接は結び付けていません）。",
+            "■ HC・戦術・年齢・出場",
+        ]
 
     def _get_age_stage_text(self, age: int) -> str:
         if age <= 23:
@@ -12369,20 +12405,69 @@ class MainMenuView:
 
         return lines
 
+    def _format_special_training_unlock_gap_ja(self, team: Any, coach: str, drill_name: str) -> str:
+        """カタログ項目名ごとに、未解放時の不足条件を短文で示す（閾値は _build_special_training_catalog_items と一致）。"""
+        tf = int(getattr(team, "training_facility_level", 1) or 1)
+        fo = int(getattr(team, "front_office_level", 1) or 1)
+        med = int(getattr(team, "medical_facility_level", 1) or 1)
+        cur_lab = self._coach_style_label(coach)
+        if drill_name == "スピード&アジリティ":
+            return f"トレーニング施設Lv3が必要／現在Lv{tf}"
+        if drill_name == "映像分析（IQ）":
+            return f"フロントLv2が必要／現在Lv{fo}"
+        if drill_name == "ディフェンスフットワーク":
+            return f"HCが守備重視または育成が必要／現在は{cur_lab}"
+        if drill_name == "筋力強化":
+            return f"メディカル施設Lv2が必要／現在Lv{med}"
+        if drill_name == "精密オフェンス":
+            bits: List[str] = []
+            if coach not in {"offense", "development"}:
+                bits.append(f"HCが攻撃重視または育成が必要／現在は{cur_lab}")
+            if tf < 3:
+                bits.append(f"トレーニング施設Lv3が必要／現在Lv{tf}")
+            return "・".join(bits) if bits else "条件未達"
+        if drill_name == "強圧ディフェンス":
+            bits = []
+            if coach != "defense":
+                bits.append(f"HCが守備重視が必要／現在は{cur_lab}")
+            if med < 2:
+                bits.append(f"メディカル施設Lv2が必要／現在Lv{med}")
+            return "・".join(bits) if bits else "条件未達"
+        return "条件未達"
+
     def _build_current_special_training_lines(self, team: Any) -> List[str]:
-        coach = str(getattr(team, "coach_style", "balanced") or "balanced")
-        items = self._build_special_training_catalog_items(team, coach_override=coach)
+        if team is None:
+            coach = "balanced"
+            items: List[tuple] = []
+        else:
+            coach = str(getattr(team, "coach_style", "balanced") or "balanced")
+            items = self._build_special_training_catalog_items(team, coach_override=coach)
         unlocked = [f"{c}:{n}" for c, n, ok, _ in items if ok]
         lines = [
-            f"現在HC: {self._coach_style_label(coach)}",
-            f"解放数: {len(unlocked)}/{len(items)}",
-            "解放中: " + (" / ".join(unlocked) if unlocked else "なし"),
+            f"現在HC: {self._coach_style_label(coach) if team is not None else '（チーム未接続）'}",
+            f"解放数: {len(unlocked)}/{len(items) if items else 0}",
+            "解放中: " + (" / ".join(unlocked) if unlocked else ("なし" if team is not None else "チーム未接続")),
+            "── スペシャル練習（項目別）──",
         ]
-        return lines + self._build_coach_unlock_count_rows(team)
+        if team is not None and items:
+            for c, n, ok, _cond in items:
+                if ok:
+                    lines.append(f"解放済み：【{c}】{n}")
+                else:
+                    gap = self._format_special_training_unlock_gap_ja(team, coach, n)
+                    lines.append(f"未解放：【{c}】{n}（{gap}）")
+        elif team is None:
+            lines.append("（チームに接続すると項目別の条件を表示します）")
+        lines.append("── HC別の解放数（参考）──")
+        lines.extend(self._build_coach_unlock_count_rows(team))
+        return lines
 
     def _build_coach_unlock_count_rows(self, team: Any) -> List[str]:
         rows: List[str] = []
         for style_key, style_label in COACH_STYLE_OPTIONS:
+            if team is None:
+                rows.append(f"{style_label}: —")
+                continue
             items = self._build_special_training_catalog_items(team, coach_override=style_key)
             count = len([1 for _, _, ok, _ in items if ok])
             rows.append(f"{style_label}: {count}/{len(items)}")
