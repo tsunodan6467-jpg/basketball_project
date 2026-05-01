@@ -9715,7 +9715,7 @@ class MainMenuView:
             bottom,
             text="閉じる",
             style="Menu.TButton",
-            command=window.destroy,
+            command=self._on_close_development_window,
         ).pack(anchor="e", pady=(8, 0))
 
         bottom.pack(side="bottom", fill="x", pady=(12, 0))
@@ -9750,7 +9750,7 @@ class MainMenuView:
         ).pack(anchor="w")
 
         top_scroll_host, top_outer = self._development_window_embed_top_panels_with_scroll(
-            dev_center, canvas_height_px=260
+            dev_center, canvas_height_px=240
         )
         top_scroll_host.pack(fill="x", pady=(0, 10))
 
@@ -9769,7 +9769,14 @@ class MainMenuView:
 
         self.development_summary_lines = self._make_line_vars(self.development_summary_panel, 6)
         self.development_effect_lines = self._make_line_vars(self.development_effect_panel, 12)
-        self.development_special_lines = self._make_line_vars(self.development_special_panel, 16)
+        self.development_special_lines = self._make_line_vars(self.development_special_panel, 4)
+        special_content = self._resolve_content_parent(self.development_special_panel)
+        ttk.Button(
+            special_content,
+            text="スペシャル練習の詳細",
+            style="Menu.TButton",
+            command=self._open_development_special_detail_window,
+        ).pack(anchor="w", pady=(6, 0))
 
         table_wrap = ttk.Frame(dev_center, style="Panel.TFrame", padding=10)
         table_wrap.pack(fill="both", expand=True)
@@ -9852,12 +9859,132 @@ class MainMenuView:
             pass
 
     def _on_close_development_window(self) -> None:
+        try:
+            sd = getattr(self, "_development_special_detail_window", None)
+            if sd is not None and sd.winfo_exists():
+                sd.destroy()
+        except Exception:
+            pass
+        finally:
+            self._development_special_detail_window = None
+            self._development_special_detail_text = None
         window = getattr(self, "_development_window", None)
         try:
             if window is not None and window.winfo_exists():
                 window.destroy()
         finally:
             self._development_window = None
+
+    def _build_development_special_panel_summary_lines(self, team: Any) -> List[str]:
+        """強化メニュー本体のスペシャル練習パネル用の短い要約（詳細は別窓）。"""
+        if team is None:
+            coach = "balanced"
+            items: List[tuple] = []
+        else:
+            coach = str(getattr(team, "coach_style", "balanced") or "balanced")
+            items = self._build_special_training_catalog_items(team, coach_override=coach)
+        unlocked = [f"{c}:{n}" for c, n, ok, _ in items if ok]
+        joined = " / ".join(unlocked) if unlocked else ("なし" if team is not None else "チーム未接続")
+        if len(joined) > 70:
+            joined = joined[:67] + "…"
+        return [
+            f"現在HC：{self._coach_style_label(coach) if team is not None else '（チーム未接続）'}",
+            f"解放数：{len(unlocked)}/{len(items) if items else 0}",
+            f"解放中：{joined}",
+            "詳細は下の「スペシャル練習の詳細」から確認できます。",
+        ]
+
+    def _on_close_development_special_detail_window(self) -> None:
+        w = getattr(self, "_development_special_detail_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        finally:
+            self._development_special_detail_window = None
+            self._development_special_detail_text = None
+
+    def _refresh_development_special_detail_body(self) -> None:
+        tw = getattr(self, "_development_special_detail_text", None)
+        if tw is None:
+            return
+        lines = self._build_current_special_training_lines(self.team)
+        body = "\n".join(lines)
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_development_special_detail_window(self) -> None:
+        """スペシャル練習解放の全文（閲覧専用）。判定は _build_current_special_training_lines に委譲。"""
+        parent = getattr(self, "_development_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_development_special_detail_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_development_special_detail_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("スペシャル練習の詳細")
+        w.geometry("720x560")
+        w.minsize(520, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            outer,
+            text="スペシャル練習の解放状況（閲覧のみ・変更はチーム練習／HC／施設投資などから行います）",
+            style="SectionTitle.TLabel",
+            wraplength=680,
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._development_special_detail_window = w
+        self._development_special_detail_text = tw
+        self._refresh_development_special_detail_body()
+        tw.configure(state="disabled")
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(btn_row, text="閉じる", style="Menu.TButton", command=self._on_close_development_special_detail_window).pack(
+            side="right"
+        )
+
+        w.protocol("WM_DELETE_WINDOW", self._on_close_development_special_detail_window)
 
     def _development_tree_drill_label(self, player: Any) -> str:
         k = str(self._safe_get(player, "training_drill", "balanced") or "balanced")
@@ -9934,12 +10061,16 @@ class MainMenuView:
         for var, line in zip(self.development_effect_lines, effect_lines):
             var.set(line)
 
-        special_lines = self._build_current_special_training_lines(self.team)
-        slot_n = len(self.development_special_lines)
-        while len(special_lines) < slot_n:
-            special_lines.append("（この行は予備／表示項目なし）")
+        special_lines = self._build_development_special_panel_summary_lines(self.team)
         for i, var in enumerate(self.development_special_lines):
-            var.set(special_lines[i] if i < len(special_lines) else "（表示なし）")
+            var.set(special_lines[i] if i < len(special_lines) else "")
+        try:
+            if getattr(self, "_development_special_detail_window", None) is not None:
+                dw = self._development_special_detail_window
+                if dw is not None and dw.winfo_exists():
+                    self._refresh_development_special_detail_body()
+        except Exception:
+            pass
 
         tree = getattr(self, "development_tree", None)
         if tree is not None:
