@@ -124,11 +124,20 @@ def _tactics_preset_desc_ui_text(
 
 from basketball_sim.systems.facility_investment import (
     FACILITY_LABELS,
+    FACILITY_MAX_LEVEL,
     FACILITY_ORDER,
     can_commit_facility_upgrade,
     commit_facility_upgrade,
     get_facility_upgrade_cost,
 )
+
+# 施設ウィンドウ用の短文（ロジックは変えず表示のみ）
+_FACILITY_MANAGEMENT_EFFECT_BLURB_JA: Dict[str, str] = {
+    "arena_level": "効果（目安）: 集客・ファン基盤・収支（ゲート収入等）に関係します。",
+    "training_facility_level": "効果（目安）: 育成・練習の効き方（強化メニュー側の条件）に関係します。",
+    "medical_facility_level": "効果（目安）: 疲労・ケア・一部練習解放（強化メニュー側の条件）に関係します。",
+    "front_office_level": "効果（目安）: スカウト水準・経営補助に関係します。",
+}
 from basketball_sim.systems.contract_logic import (
     MAX_CONTRACT_YEARS_DEFAULT,
     apply_contract_extension,
@@ -3512,6 +3521,10 @@ class MainMenuView:
         self.facility_lines = []
         self._facility_upgrade_buttons = {}
         self._facility_preview_vars = {}
+        self._facility_card_level_vars = {}
+        self._facility_card_cost_vars = {}
+        self._facility_card_status_vars = {}
+        self._facility_market_summary_var = None
         self.owner_panel = None
         self.owner_report_text = None
         self.finance_report_panel = None
@@ -3645,6 +3658,10 @@ class MainMenuView:
             self._merch_hist_text = None
             self._management_dashboard_text = None
             self._facility_preview_vars = {}
+            self._facility_card_level_vars = {}
+            self._facility_card_cost_vars = {}
+            self._facility_card_status_vars = {}
+            self._facility_market_summary_var = None
             self._sponsor_preview_var = None
             self._pr_selection_preview_var = None
             self._pr_remaining_var = None
@@ -3681,6 +3698,10 @@ class MainMenuView:
             self.facility_lines = []
             self._facility_upgrade_buttons = {}
             self._facility_preview_vars = {}
+            self._facility_card_level_vars = {}
+            self._facility_card_cost_vars = {}
+            self._facility_card_status_vars = {}
+            self._facility_market_summary_var = None
         elif key == "sponsor":
             self.sponsor_panel = None
             self._sponsor_combo = None
@@ -3797,42 +3818,128 @@ class MainMenuView:
         fac_content = self._resolve_content_parent(self.facility_panel)
         ttk.Label(
             fac_content,
-            text="稼働状態・レベル概要・次投資の目安・市場／ファン指標（下のボタンで段階強化）。"
-            "投資時に費用が反映され、施設レベルと関連指標が更新されます。"
-            "（反映: 即時）",
+            text=(
+                "各施設は1段階ずつ強化できます。投資は所持金から即時に差し引かれ、レベルと一部指標が更新されます。"
+                "収支の本格反映はオフシーズン締めもあわせて参照してください。（反映: 即時）"
+            ),
             font=("Yu Gothic UI", 9),
+            wraplength=700,
+            justify="left",
         ).pack(anchor="w", pady=(0, 6))
-        self.facility_lines = self._make_line_vars(self.facility_panel, 6)
-        btn_row = ttk.Frame(fac_content, style="Card.TFrame")
-        btn_row.pack(fill="x", pady=(12, 0))
-        self._facility_upgrade_buttons = {}
+        ttk.Label(
+            fac_content,
+            text=(
+                "※トレーニング／メディカル／フロントのLvは、強化・育成メニュー内のスペシャル練習解放条件などでも参照されます。"
+            ),
+            font=("Yu Gothic UI", 9),
+            wraplength=700,
+            foreground="#b8c0cc",
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
+
+        # 旧6行サマリーはカード内に集約し、ここでは重複表示しない
+        self.facility_lines = []
         self._facility_preview_vars = {}
+        self._facility_card_level_vars = {}
+        self._facility_card_cost_vars = {}
+        self._facility_card_status_vars = {}
+        self._facility_upgrade_buttons = {}
+
+        cards = ttk.Frame(fac_content, style="Card.TFrame")
+        cards.pack(fill="both", expand=True)
+        cards.columnconfigure(0, weight=1)
+        cards.columnconfigure(1, weight=1)
+
         for i, fk in enumerate(FACILITY_ORDER):
-            label = FACILITY_LABELS.get(fk, fk)
-            cell = ttk.Frame(btn_row, style="Card.TFrame")
-            cell.grid(row=i // 2, column=i % 2, sticky="nsew", padx=4, pady=4)
-            b = ttk.Button(
-                cell,
-                text=f"{label}を強化",
-                style="Menu.TButton",
-                command=lambda k=fk: self._on_facility_upgrade_click(k),
-            )
-            b.pack(fill="x")
-            self._facility_upgrade_buttons[fk] = b
-            pv = tk.StringVar(value="")
-            self._facility_preview_vars[fk] = pv
+            r, c = divmod(i, 2)
+            title = FACILITY_LABELS.get(fk, fk)
+            cell = ttk.Frame(cards, style="Card.TFrame", padding=8)
+            cell.grid(row=r, column=c, sticky="nsew", padx=4, pady=4)
+            inner = tk.Frame(cell, bg="#222834", padx=8, pady=8)
+            inner.pack(fill="both", expand=True)
+
             tk.Label(
-                cell,
-                textvariable=pv,
+                inner,
+                text=title,
+                bg="#222834",
+                fg="#eef3f8",
+                anchor="w",
+                font=("Yu Gothic UI", 12, "bold"),
+            ).pack(anchor="w", pady=(0, 6))
+
+            lv_v = tk.StringVar(value="")
+            co_v = tk.StringVar(value="")
+            st_v = tk.StringVar(value="")
+            self._facility_card_level_vars[fk] = lv_v
+            self._facility_card_cost_vars[fk] = co_v
+            self._facility_card_status_vars[fk] = st_v
+
+            tk.Label(
+                inner,
+                textvariable=lv_v,
+                bg="#222834",
+                fg="#eef3f8",
+                anchor="w",
+                font=("Yu Gothic UI", 11, "bold"),
+                wraplength=320,
+            ).pack(anchor="w")
+            tk.Label(
+                inner,
+                textvariable=co_v,
+                bg="#222834",
+                fg="#d6dbe3",
+                anchor="w",
+                font=("Yu Gothic UI", 10),
+                wraplength=320,
+            ).pack(anchor="w", pady=(2, 0))
+            tk.Label(
+                inner,
+                textvariable=st_v,
+                bg="#222834",
+                fg="#c5cad3",
+                anchor="w",
+                font=("Yu Gothic UI", 10),
+                wraplength=320,
+            ).pack(anchor="w", pady=(2, 0))
+
+            eff = _FACILITY_MANAGEMENT_EFFECT_BLURB_JA.get(fk, "効果（目安）: 関連指標が更新されます。")
+            tk.Label(
+                inner,
+                text=eff,
                 bg="#222834",
                 fg="#9aa4b2",
                 anchor="w",
                 justify="left",
                 font=("Yu Gothic UI", 9),
-                wraplength=300,
-            ).pack(fill="x", pady=(4, 0))
-        btn_row.columnconfigure(0, weight=1)
-        btn_row.columnconfigure(1, weight=1)
+                wraplength=320,
+            ).pack(anchor="w", pady=(6, 8))
+
+            b = ttk.Button(
+                inner,
+                text="投資する",
+                style="Menu.TButton",
+                command=lambda k=fk: self._on_facility_upgrade_click(k),
+            )
+            b.pack(fill="x")
+            self._facility_upgrade_buttons[fk] = b
+
+        self._facility_market_summary_var = tk.StringVar(value="")
+        tk.Label(
+            fac_content,
+            text="チーム指標（参考）",
+            font=("Yu Gothic UI", 9, "bold"),
+            foreground="#b8c0cc",
+        ).pack(anchor="w", pady=(10, 2))
+        tk.Label(
+            fac_content,
+            textvariable=self._facility_market_summary_var,
+            bg="#222834",
+            fg="#9aa4b2",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 9),
+            wraplength=700,
+        ).pack(fill="x", anchor="w")
 
     def _finance_populate_sponsor_panel(self, host: tk.Misc) -> None:
         self.sponsor_panel = self._create_panel(host, "スポンサー（メイン契約）")
@@ -4336,6 +4443,65 @@ class MainMenuView:
             ("history_row_default",),
         )
         return True
+
+    def _refresh_facility_management_card_vars(self, snap: Any) -> None:
+        """施設別ウィンドウのカード表示のみ更新（投資ロジックは触らない）。"""
+        lv_map = getattr(self, "_facility_card_level_vars", None)
+        cost_map = getattr(self, "_facility_card_cost_vars", None)
+        st_map = getattr(self, "_facility_card_status_vars", None)
+        if not (isinstance(lv_map, dict) and lv_map and isinstance(cost_map, dict) and isinstance(st_map, dict)):
+            return
+        team = self.team
+        max_lv = int(FACILITY_MAX_LEVEL)
+        for fk in FACILITY_ORDER:
+            lv_v = lv_map.get(fk)
+            c_v = cost_map.get(fk)
+            s_v = st_map.get(fk)
+            if lv_v is None or c_v is None or s_v is None:
+                continue
+            try:
+                if team is None:
+                    lv_v.set("現在Lv: — / —")
+                    c_v.set("次Lv費用: —")
+                    s_v.set("状態: チーム未接続")
+                    continue
+                lv = int(self._safe_get(team, fk, 1))
+                lv_v.set(f"現在Lv: {lv} / {max_lv}")
+                if lv >= max_lv:
+                    c_v.set("次Lv費用: —（最大）")
+                else:
+                    c_v.set(f"次Lv費用: {self._format_money(get_facility_upgrade_cost(team, fk))}")
+                if not bool(getattr(team, "is_user_team", False)):
+                    s_v.set("状態: 自チームのみ操作可")
+                    continue
+                ok, msg = can_commit_facility_upgrade(team, fk)
+                if ok:
+                    s_v.set("状態: 実行可")
+                elif "最大" in str(msg or ""):
+                    s_v.set("状態: 最大Lv到達")
+                elif "不足" in str(msg or ""):
+                    s_v.set("状態: 資金不足")
+                else:
+                    m = str(msg or "実行不可").strip()
+                    if len(m) > 44:
+                        m = m[:41] + "…"
+                    s_v.set(f"状態: {m}")
+            except tk.TclError:
+                pass
+
+        foot = getattr(self, "_facility_market_summary_var", None)
+        if foot is not None:
+            try:
+                if team is None:
+                    foot.set("")
+                else:
+                    fl = tuple(getattr(snap, "facility_lines", ()) or ())
+                    if len(fl) > 4:
+                        foot.set(str(fl[4]))
+                    else:
+                        foot.set("")
+            except tk.TclError:
+                pass
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -4903,6 +5069,8 @@ class MainMenuView:
                     pv.set(fac_prev_map.get(fk, "—"))
                 except tk.TclError:
                     pass
+
+        self._refresh_facility_management_card_vars(snap)
 
         sp_preview = getattr(self, "_sponsor_preview_var", None)
         if sp_preview is not None:
