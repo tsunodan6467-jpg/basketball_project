@@ -3384,32 +3384,35 @@ class MainMenuView:
         ttk.Label(
             fin_purpose,
             text=(
-                "【経営メニュー】この画面は、現状確認・一部投資操作・案内を行う画面です。"
-                "財務/施設/オーナーの計算・評価の正本は共通ロジック側で処理されます。"
-                "シーズン収支の正本反映はオフシーズンの財務締めで行われます。"
-                "（施設投資など一部支出は実行時に反映されます）"
-                "財務サマリー・キャップ閲覧、施設投資、オーナー方針、"
-                "収支の詳細レポート、スポンサー・広報・グッズ開発をまとめて扱う画面です。"
-                "下にスクロールすると各ブロックが続きます。"
-                "開いた時点で各欄に現在値、または「履歴なし・未実行・未設定・対象なし」に相当する説明が入ります。"
-                "操作で増えるのは主に履歴や確定メッセージです。"
-                "画面上部の「現況ダッシュボード」に、財務・施設・オーナー・直近施策の要約を常時表示します。"
+                "【経営メニュー】状況の要約は右のダッシュボード、実行は左のボタンから下段の各パネルへ。"
+                "数値の正本・締め処理は共通ロジック／オフシーズン財務締めに依存します。"
             ),
             wraplength=1020,
             font=("Yu Gothic UI", 10),
             justify="left",
         ).pack(anchor="w")
 
-        dash_board = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
-        dash_board.pack(fill="x", pady=(0, 10))
+        fin_top = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
+        hub_actions = ttk.Frame(fin_top, style="Card.TFrame", padding=(0, 0, 10, 0))
+        hub_actions.pack(side="left", fill="y", anchor="nw")
+        ttk.Label(
+            hub_actions,
+            text="経営アクション（ジャンプ）",
+            style="SectionTitle.TLabel",
+        ).pack(anchor="w", pady=(0, 6))
+        self._finance_hub_buttons = ttk.Frame(hub_actions, style="Card.TFrame")
+        self._finance_hub_buttons.pack(anchor="nw")
+
+        dash_board = ttk.Frame(fin_top, style="Card.TFrame", padding=(0, 0, 0, 0))
+        dash_board.pack(side="right", fill="both", expand=True)
         ttk.Label(
             dash_board,
-            text="現況ダッシュボード（財務 / 施設 / オーナー / 直近施策）",
+            text="現況ダッシュボード（コンパクト）",
             style="SectionTitle.TLabel",
         ).pack(anchor="w", pady=(0, 6))
         self._management_dashboard_text = tk.Text(
             dash_board,
-            height=20,
+            height=11,
             wrap="word",
             bg="#222834",
             fg="#d6dbe3",
@@ -3421,7 +3424,7 @@ class MainMenuView:
             padx=8,
             pady=8,
         )
-        self._management_dashboard_text.pack(fill="both", expand=False)
+        self._management_dashboard_text.pack(fill="both", expand=True)
         for _tag in (
             "finance_block_header",
             "finance_row_default",
@@ -3493,7 +3496,6 @@ class MainMenuView:
         self._management_dashboard_text.configure(state="disabled")
 
         fin_scroll_wrap = ttk.Frame(outer, style="Root.TFrame")
-        fin_scroll_wrap.pack(fill="both", expand=True)
 
         fin_canvas = tk.Canvas(
             fin_scroll_wrap,
@@ -3532,6 +3534,7 @@ class MainMenuView:
         fin_canvas.pack(side="left", fill="both", expand=True)
         fin_vsb.pack(side="right", fill="y")
         self._finance_scroll_canvas = fin_canvas
+        self._finance_scroll_content = content
 
         content.columnconfigure(0, weight=1)
         content.columnconfigure(1, weight=1)
@@ -4068,14 +4071,66 @@ class MainMenuView:
         self._merch_hist_text.pack(fill="both", expand=True)
         self._merch_hist_text.configure(state="disabled")
 
+        def _fin_jump(panel: tk.Misc) -> None:
+            self.root.after(1, lambda pl=panel: self._finance_scroll_to_management_panel(pl))
+
+        hub_fr = self._finance_hub_buttons
+        ttk.Button(
+            hub_fr,
+            text="施設",
+            style="Menu.TButton",
+            width=12,
+            command=lambda: _fin_jump(self.facility_panel),
+        ).grid(row=0, column=0, padx=2, pady=2, sticky="ew")
+        ttk.Button(
+            hub_fr,
+            text="スポンサー",
+            style="Menu.TButton",
+            width=12,
+            command=lambda: _fin_jump(self.sponsor_panel),
+        ).grid(row=0, column=1, padx=2, pady=2, sticky="ew")
+        ttk.Button(
+            hub_fr,
+            text="広報",
+            style="Menu.TButton",
+            width=12,
+            command=lambda: _fin_jump(self.pr_panel),
+        ).grid(row=1, column=0, padx=2, pady=2, sticky="ew")
+        ttk.Button(
+            hub_fr,
+            text="グッズ",
+            style="Menu.TButton",
+            width=12,
+            command=lambda: _fin_jump(self.merch_panel),
+        ).grid(row=1, column=1, padx=2, pady=2, sticky="ew")
+        ttk.Button(
+            hub_fr,
+            text="サラリーキャップ",
+            style="Menu.TButton",
+            width=12,
+            command=lambda: _fin_jump(self.finance_summary_panel),
+        ).grid(row=2, column=0, padx=2, pady=2, sticky="ew")
+        ttk.Button(
+            hub_fr,
+            text="詳細レポート",
+            style="Menu.TButton",
+            width=12,
+            command=lambda: _fin_jump(self.finance_report_panel),
+        ).grid(row=2, column=1, padx=2, pady=2, sticky="ew")
+        hub_fr.columnconfigure(0, weight=1)
+        hub_fr.columnconfigure(1, weight=1)
+
+        fin_top.pack(fill="x", pady=(0, 10))
+        fin_scroll_wrap.pack(fill="both", expand=True)
+
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
         bottom.pack(fill="x", pady=(12, 0))
 
         tk.Label(
             bottom,
             text=(
-                "レイアウト: 上段＝財務・施設 ／ 中段＝オーナー・詳細レポート ／ 下段＝スポンサー・広報・グッズ。"
-                " 右端の縦バーで全体をスクロールできます。"
+                "レイアウト: 上＝要約ダッシュ＋ジャンプ／下＝財務・施設・オーナー・詳細・スポンサー・広報・グッズ。"
+                " 右端の縦バーは下段パネル群のみスクロールします。"
             ),
             bg="#1d2129",
             fg="#b8c0cc",
@@ -4146,7 +4201,143 @@ class MainMenuView:
             self._pr_comparison_listbox = None
             self._pr_comparison_ids = []
             self._finance_scroll_canvas = None
+            self._finance_scroll_content = None
+            self._finance_hub_buttons = None
             self._finance_inseason_log_text = None
+
+    def _finance_scroll_to_management_panel(self, panel: tk.Misc) -> None:
+        """Scroll the finance hub canvas so `panel` (a row panel inside `content`) is near the top."""
+        canvas = getattr(self, "_finance_scroll_canvas", None)
+        content = getattr(self, "_finance_scroll_content", None)
+        if canvas is None or content is None:
+            return
+        try:
+            if not canvas.winfo_exists() or not panel.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        try:
+            win = getattr(self, "_finance_window", None)
+            if win is not None and win.winfo_exists():
+                win.update_idletasks()
+        except tk.TclError:
+            pass
+        canvas.update_idletasks()
+        bbox = canvas.bbox("all")
+        if not bbox:
+            return
+        _, y0, _, y1 = bbox
+        total = float(y1 - y0)
+        if total <= 1.0:
+            return
+        y_rel = 0.0
+        w: tk.Misc | None = panel
+        while w is not None and w is not content:
+            try:
+                y_rel += float(w.winfo_y())
+                w = w.master  # type: ignore[assignment]
+            except tk.TclError:
+                return
+        ch = float(canvas.winfo_height() or 0)
+        ph = float(panel.winfo_height() or 0)
+        frac = (y_rel - max(0.0, (ch - ph) / 2.0)) / total
+        if frac < 0.0:
+            frac = 0.0
+        if frac > 1.0:
+            frac = 1.0
+        try:
+            canvas.yview_moveto(frac)
+        except tk.TclError:
+            pass
+
+    def _apply_compact_management_dashboard_text(
+        self,
+        dash_tw: tk.Text,
+        snap: Any,
+        quick_summary_lines: List[str],
+    ) -> bool:
+        """Fill the management dashboard Text with a short hub view (full blocks stay in lower panels)."""
+        fin_lines = getattr(snap, "dashboard_finance_lines", None)
+        if not fin_lines:
+            return False
+        try:
+            parts = str(getattr(snap, "dashboard_text", "") or "").split(
+                _MANAGEMENT_FINANCE_BLOCK_SEPARATOR, 1
+            )
+        except Exception:
+            return False
+        if len(parts) != 2:
+            return False
+        sub_after_fin = parts[1]
+        fac_lines_snap = getattr(snap, "facility_lines", None) or ()
+        fac_tail = sub_after_fin.split(_MANAGEMENT_FACILITY_PR_SEPARATOR, 1)
+        if not fac_lines_snap or len(fac_tail) != 2:
+            return False
+        dash_tw.insert("end", "■ 財務\n", ("finance_block_header",))
+        if quick_summary_lines:
+            for qln in quick_summary_lines:
+                dash_tw.insert("end", qln + "\n", ("finance_row_default",))
+            dash_tw.insert("end", "\n")
+        for aln in getattr(snap, "action_availability_lines", ()):
+            dash_tw.insert("end", aln + "\n", ("finance_row_default",))
+        if getattr(snap, "action_availability_lines", ()):
+            dash_tw.insert("end", "\n")
+        for _key in (
+            "action_affordance_summary",
+            "owner_action_guidance_summary",
+            "finance_pressure_summary",
+        ):
+            ln = str(getattr(snap, _key, "") or "").strip()
+            if ln:
+                dash_tw.insert(
+                    "end",
+                    ln + "\n",
+                    _management_finance_dashboard_row_tags(ln),
+                )
+        dash_tw.insert(
+            "end",
+            "（年俸枠・キャップ・ラウンド収支メモ・各施策余力の一覧は下の「財務サマリー」）\n",
+            ("finance_row_default",),
+        )
+        dash_tw.insert("end", "\n\n■ 施設\n", ("facility_block_header",))
+        for fln in list(fac_lines_snap)[:3]:
+            dash_tw.insert(
+                "end",
+                fln + "\n",
+                _management_facility_dashboard_row_tags(fln),
+            )
+        dash_tw.insert("end", "\n")
+        pr_summary = str(getattr(snap, "pr_dashboard_summary", "") or "").strip()
+        if pr_summary:
+            for pln in pr_summary.split("\n")[:4]:
+                if pln.strip():
+                    dash_tw.insert(
+                        "end",
+                        pln + "\n",
+                        _management_pr_dashboard_row_tags(pln),
+                    )
+        own_prev = str(getattr(snap, "owner_preamble", "") or "").strip()
+        own_kept = [x for x in own_prev.split("\n") if x.strip()][:5]
+        for oln in own_kept:
+            dash_tw.insert(
+                "end",
+                oln + "\n",
+                _management_owner_dashboard_row_tags(oln),
+            )
+        hist_marker = _MANAGEMENT_OWNER_HISTORY_SEPARATOR
+        dt = str(getattr(snap, "dashboard_text", "") or "")
+        dash_tw.insert("end", "\n", ())
+        dash_tw.insert("end", "■ 直近アクション（要約）\n", ("history_block_header",))
+        if hist_marker in dt:
+            htail = [x for x in dt.split(hist_marker, 1)[1].strip().split("\n") if x.strip()]
+            if htail:
+                dash_tw.insert("end", htail[0] + "\n", ("history_row_default",))
+        dash_tw.insert(
+            "end",
+            "（続き・内訳は各パネル履歴と「詳細レポート」で確認）\n",
+            ("history_row_default",),
+        )
+        return True
 
     def _on_facility_upgrade_click(self, facility_key: str) -> None:
         team = self.team
@@ -4651,125 +4842,12 @@ class MainMenuView:
                 dash_tw.configure(state="normal")
                 dash_tw.delete("1.0", tk.END)
                 fin_lines = getattr(snap, "dashboard_finance_lines", None)
-                if fin_lines:
-                    parts = snap.dashboard_text.split(
-                        _MANAGEMENT_FINANCE_BLOCK_SEPARATOR, 1
+                if not (
+                    fin_lines
+                    and self._apply_compact_management_dashboard_text(
+                        dash_tw, snap, quick_summary_lines
                     )
-                    if len(parts) == 2:
-                        dash_tw.insert(
-                            "end",
-                            "■ 財務\n",
-                            ("finance_block_header",),
-                        )
-                        if quick_summary_lines:
-                            for qln in quick_summary_lines:
-                                dash_tw.insert(
-                                    "end",
-                                    qln + "\n",
-                                    ("finance_row_default",),
-                                )
-                            dash_tw.insert("end", "\n")
-                        for aln in getattr(snap, "action_availability_lines", ()):
-                            dash_tw.insert(
-                                "end",
-                                aln + "\n",
-                                ("finance_row_default",),
-                            )
-                        if getattr(snap, "action_availability_lines", ()):
-                            dash_tw.insert("end", "\n")
-                        for ln in fin_lines:
-                            dash_tw.insert(
-                                "end",
-                                ln + "\n",
-                                _management_finance_dashboard_row_tags(ln),
-                            )
-                        sub_after_fin = parts[1]
-                        fac_lines_snap = getattr(snap, "facility_lines", None)
-                        fac_tail = sub_after_fin.split(
-                            _MANAGEMENT_FACILITY_PR_SEPARATOR, 1
-                        )
-                        if fac_lines_snap and len(fac_tail) == 2:
-                            dash_tw.insert(
-                                "end",
-                                "\n\n■ 施設\n",
-                                ("facility_block_header",),
-                            )
-                            for fln in fac_lines_snap:
-                                dash_tw.insert(
-                                    "end",
-                                    fln + "\n",
-                                    _management_facility_dashboard_row_tags(fln),
-                                )
-                            pr_owner = fac_tail[1].split(
-                                _MANAGEMENT_PR_OWNER_SEPARATOR, 1
-                            )
-                            if len(pr_owner) == 2:
-                                dash_tw.insert("end", "\n\n")
-                                pr_block = ("■ 広報" + pr_owner[0]).rstrip("\n")
-                                for pln in pr_block.split("\n"):
-                                    if pln == "":
-                                        continue
-                                    dash_tw.insert(
-                                        "end",
-                                        pln + "\n",
-                                        _management_pr_dashboard_row_tags(pln),
-                                    )
-                                oh_hist = pr_owner[1].split(
-                                    _MANAGEMENT_OWNER_HISTORY_SEPARATOR, 1
-                                )
-                                if len(oh_hist) == 2:
-                                    dash_tw.insert(
-                                        "end",
-                                        _MANAGEMENT_PR_OWNER_SEPARATOR + "\n",
-                                        ("owner_block_header",),
-                                    )
-                                    owner_body = oh_hist[0].lstrip("\n")
-                                    for oln in owner_body.split("\n"):
-                                        if oln == "":
-                                            continue
-                                        dash_tw.insert(
-                                            "end",
-                                            oln + "\n",
-                                            _management_owner_dashboard_row_tags(oln),
-                                        )
-                                    hist_body = oh_hist[1]
-                                    _hsep = _MANAGEMENT_OWNER_HISTORY_SEPARATOR
-                                    if hist_body == "":
-                                        dash_tw.insert("end", _hsep)
-                                    else:
-                                        dash_tw.insert(
-                                            "end",
-                                            _hsep,
-                                            ("history_block_header",),
-                                        )
-                                        for hln in hist_body.split("\n"):
-                                            if hln == "":
-                                                continue
-                                            dash_tw.insert(
-                                                "end",
-                                                hln + "\n",
-                                                _management_history_dashboard_row_tags(
-                                                    hln
-                                                ),
-                                            )
-                                else:
-                                    dash_tw.insert(
-                                        "end",
-                                        _MANAGEMENT_PR_OWNER_SEPARATOR + pr_owner[1],
-                                    )
-                            else:
-                                dash_tw.insert(
-                                    "end",
-                                    _MANAGEMENT_FACILITY_PR_SEPARATOR + fac_tail[1],
-                                )
-                        else:
-                            dash_tw.insert(
-                                "end",
-                                _MANAGEMENT_FINANCE_BLOCK_SEPARATOR + sub_after_fin,
-                            )
-                    else:
-                        dash_tw.insert("1.0", snap.dashboard_text)
-                else:
+                ):
                     dash_tw.insert("1.0", snap.dashboard_text)
                 dash_tw.configure(state="disabled")
             except tk.TclError:
