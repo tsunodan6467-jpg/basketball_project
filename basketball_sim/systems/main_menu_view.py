@@ -9768,7 +9768,14 @@ class MainMenuView:
         self.development_special_panel.grid(row=0, column=2, sticky="nsew", padx=(8, 0))
 
         self.development_summary_lines = self._make_line_vars(self.development_summary_panel, 6)
-        self.development_effect_lines = self._make_line_vars(self.development_effect_panel, 12)
+        self.development_effect_lines = self._make_line_vars(self.development_effect_panel, 4)
+        effect_content = self._resolve_content_parent(self.development_effect_panel)
+        ttk.Button(
+            effect_content,
+            text="育成影響の詳細",
+            style="Menu.TButton",
+            command=self._open_development_effect_detail_window,
+        ).pack(anchor="w", pady=(6, 0))
         self.development_special_lines = self._make_line_vars(self.development_special_panel, 4)
         special_content = self._resolve_content_parent(self.development_special_panel)
         ttk.Button(
@@ -9785,7 +9792,7 @@ class MainMenuView:
 
         ttk.Label(
             table_wrap,
-            text="ロスター別の育成一覧（POT・育成指標・年齢帯・個別練習・育成方針・見立て）※上の3パネルは縦スクロールで全文表示",
+            text="ロスター別の育成一覧（POT・育成指標・年齢帯・個別練習・育成方針・見立て）※上段は要約＋詳細ボタン。縦スクロールで上段全体を表示",
             style="TopBar.TLabel",
             anchor="w",
         ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
@@ -9868,6 +9875,15 @@ class MainMenuView:
         finally:
             self._development_special_detail_window = None
             self._development_special_detail_text = None
+        try:
+            ed = getattr(self, "_development_effect_detail_window", None)
+            if ed is not None and ed.winfo_exists():
+                ed.destroy()
+        except Exception:
+            pass
+        finally:
+            self._development_effect_detail_window = None
+            self._development_effect_detail_text = None
         window = getattr(self, "_development_window", None)
         try:
             if window is not None and window.winfo_exists():
@@ -9986,6 +10002,101 @@ class MainMenuView:
 
         w.protocol("WM_DELETE_WINDOW", self._on_close_development_special_detail_window)
 
+    def _on_close_development_effect_detail_window(self) -> None:
+        w = getattr(self, "_development_effect_detail_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        finally:
+            self._development_effect_detail_window = None
+            self._development_effect_detail_text = None
+
+    def _refresh_development_effect_detail_body(self) -> None:
+        tw = getattr(self, "_development_effect_detail_text", None)
+        if tw is None:
+            return
+        lines = self._build_development_effect_detail_lines(self.team)
+        body = "\n".join(lines)
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_development_effect_detail_window(self) -> None:
+        """育成影響要因・施設効果の全文（閲覧専用）。本文は _build_development_effect_detail_lines に委譲。"""
+        parent = getattr(self, "_development_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_development_effect_detail_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_development_effect_detail_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("育成影響の詳細")
+        w.geometry("720x560")
+        w.minsize(520, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            outer,
+            text="育成影響要因・施設効果（閲覧のみ・施設やHCの変更は経営メニュー等から行います）",
+            style="SectionTitle.TLabel",
+            wraplength=680,
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._development_effect_detail_window = w
+        self._development_effect_detail_text = tw
+        self._refresh_development_effect_detail_body()
+        tw.configure(state="disabled")
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_development_effect_detail_window,
+        ).pack(side="right")
+
+        w.protocol("WM_DELETE_WINDOW", self._on_close_development_effect_detail_window)
+
     def _development_tree_drill_label(self, player: Any) -> str:
         k = str(self._safe_get(player, "training_drill", "balanced") or "balanced")
         return self._DEV_ROSTER_DRILL_LABEL_JA.get(k, "バランス")
@@ -10048,18 +10159,9 @@ class MainMenuView:
         for var, line in zip(self.development_summary_lines, summary_lines):
             var.set(line)
 
-        facility_lines = self._build_development_facility_block_lines(self.team)
-        other_effect_lines = [
-            f"HCスタイル: {coach_text}",
-            f"戦術: {strategy_text}",
-            self._build_development_coach_note(coach_key),
-            self._build_development_strategy_note(strategy_key),
-            "若手は伸びやすく、32歳以上は衰退しやすい傾向です",
-            "試合出場数も育成量に影響します",
-        ]
-        effect_lines = facility_lines + other_effect_lines
-        for var, line in zip(self.development_effect_lines, effect_lines):
-            var.set(line)
+        effect_summary = self._build_development_effect_panel_summary_lines(self.team)
+        for i, var in enumerate(self.development_effect_lines):
+            var.set(effect_summary[i] if i < len(effect_summary) else "")
 
         special_lines = self._build_development_special_panel_summary_lines(self.team)
         for i, var in enumerate(self.development_special_lines):
@@ -10069,6 +10171,13 @@ class MainMenuView:
                 dw = self._development_special_detail_window
                 if dw is not None and dw.winfo_exists():
                     self._refresh_development_special_detail_body()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_development_effect_detail_window", None) is not None:
+                ew = self._development_effect_detail_window
+                if ew is not None and ew.winfo_exists():
+                    self._refresh_development_effect_detail_body()
         except Exception:
             pass
 
@@ -10183,6 +10292,46 @@ class MainMenuView:
             ),
             "※アリーナは主に集客・収支（育成計算とは直接は結び付けていません）。",
             "■ HC・戦術・年齢・出場",
+        ]
+
+    def _build_development_effect_detail_lines(self, team: Any) -> List[str]:
+        """強化メニュー別窓用。従来本体パネルに出していた施設＋HC/戦術/補足の全文（ロジック追加なし）。"""
+        facility_lines = self._build_development_facility_block_lines(team)
+        strategy_key = self._safe_get(team, "strategy", None)
+        coach_key = self._safe_get(team, "coach_style", None)
+        strategy_text = self.STRATEGY_LABELS.get(str(strategy_key), str(strategy_key or "-"))
+        coach_text = self.COACH_STYLE_LABELS.get(str(coach_key), str(coach_key or "-"))
+        other_effect_lines = [
+            f"HCスタイル: {coach_text}",
+            f"戦術: {strategy_text}",
+            self._build_development_coach_note(coach_key),
+            self._build_development_strategy_note(strategy_key),
+            "若手は伸びやすく、32歳以上は衰退しやすい傾向です",
+            "試合出場数も育成量に影響します",
+        ]
+        return facility_lines + other_effect_lines
+
+    def _build_development_effect_panel_summary_lines(self, team: Any) -> List[str]:
+        """強化メニュー本体の育成影響要因パネル用の短い要約（詳細は別窓）。"""
+        if team is None:
+            return [
+                "施設：トレーニングLv— / メディカルLv— / フロントLv—（チーム未接続）",
+                "方針：HC— / 戦術—",
+                "補足：年齢・出場機会・個別練習が成長に影響します。",
+                "詳細は下の「育成影響の詳細」から確認できます。",
+            ]
+        tf = int(getattr(team, "training_facility_level", 1) or 1)
+        med = int(getattr(team, "medical_facility_level", 1) or 1)
+        fo = int(getattr(team, "front_office_level", 1) or 1)
+        strategy_key = self._safe_get(team, "strategy", None)
+        coach_key = self._safe_get(team, "coach_style", None)
+        strategy_text = self.STRATEGY_LABELS.get(str(strategy_key), str(strategy_key or "-"))
+        coach_text = self.COACH_STYLE_LABELS.get(str(coach_key), str(coach_key or "-"))
+        return [
+            f"施設：トレーニングLv{tf} / メディカルLv{med} / フロントLv{fo}",
+            f"方針：HC＝{coach_text} / 戦術＝{strategy_text}",
+            "補足：年齢・出場機会・個別練習が成長に影響します。",
+            "詳細は下の「育成影響の詳細」から確認できます。",
         ]
 
     def _get_age_stage_text(self, age: int) -> str:
