@@ -1307,10 +1307,49 @@ class MainMenuView:
         """人事本体のトレード／FA帯用の短い要約（全文は別窓の _format_hr_trade_fa_guidance_text）。"""
         tx = self._roster_transaction_status_text()
         return (
-            "編成操作：トレード／インシーズンFA／契約解除／＋1年延長ができます。重要な操作は確認のうえ反映されます。\n"
+            "トレード／インシーズンFA／契約解除／＋1年延長ができます。重要な操作は確認のうえ反映されます。\n"
             f"トレード／インシーズンFA（可否の要約）: {tx}\n"
             "詳細な注意点・CLIとの役割分担は下の「トレード・FA案内を表示」から確認できます。"
         )
+
+    def _build_roster_window_registration_summary(self) -> str:
+        """登録・国籍枠：既存の枠集計＋直近大会名のみ（大会ルール全文は別窓・案内に委譲）。"""
+        if self.team is None:
+            return ""
+        lines: List[str] = []
+        try:
+            lines.append(jp_reg_display.format_contract_roster_summary(self.team))
+        except Exception:
+            pass
+        try:
+            ct = jp_reg_display.gui_next_competition_type(self.season, self.team)
+            nm = competition_display_name(ct)
+            if nm:
+                lines.append(f"直近の大会想定：{nm}（登録枠の上限は大会により異なります）")
+        except Exception:
+            pass
+        return "\n".join(x for x in lines if x)
+
+    def _format_roster_window_contract_overview_snippet(self, players: List[Any]) -> str:
+        """player.salary の合計と契約残1年人数のみ。年俸ロジックは新設しない。"""
+        if not players:
+            return ""
+        total = 0
+        one_year = 0
+        for p in players:
+            try:
+                total += int(self._safe_get(p, "salary", 0) or 0)
+            except Exception:
+                pass
+            try:
+                cy = self._safe_get(p, "contract_years_left", None)
+                if cy is None:
+                    continue
+                if int(cy) == 1:
+                    one_year += 1
+            except Exception:
+                pass
+        return f"契約概況：年俸合計 {self._format_money(total)} ／ 契約残1年の選手 {one_year}人"
 
     def _on_close_roster_trade_fa_guidance_detail_window(self) -> None:
         w = getattr(self, "_roster_trade_fa_guidance_detail_window", None)
@@ -1836,36 +1875,54 @@ class MainMenuView:
         roster_main = ttk.Frame(outer, style="Root.TFrame", padding=0)
         roster_main.pack(side="top", fill="both", expand=True)
 
-        header = ttk.Frame(roster_main, style="Panel.TFrame", padding=(14, 10))
-        header.pack(fill="x", pady=(0, 12))
+        summary_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(14, 10))
+        summary_wrap.pack(fill="x", pady=(0, 10))
+
+        ttk.Label(summary_wrap, text="ロスター状況", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 4))
 
         self.roster_header_var = tk.StringVar(value="")
         ttk.Label(
-            header,
+            summary_wrap,
             textvariable=self.roster_header_var,
             style="TopBar.TLabel",
             anchor="w",
-        ).pack(fill="x")
+        ).pack(fill="x", anchor="w")
+
+        ttk.Label(summary_wrap, text="登録・国籍枠", style="SectionTitle.TLabel").pack(anchor="w", pady=(10, 4))
 
         self.roster_jp_header_var = tk.StringVar(value="")
         tk.Label(
-            roster_main,
+            summary_wrap,
             textvariable=self.roster_jp_header_var,
             bg="#1d2129",
             fg="#c8d0dc",
             justify="left",
             anchor="w",
             font=("Yu Gothic UI", 9),
-            padx=14,
-            pady=4,
+            padx=0,
+            pady=0,
             wraplength=900,
         ).pack(fill="x", pady=(0, 6))
+
+        self.roster_contract_snippet_var = tk.StringVar(value="")
+        tk.Label(
+            summary_wrap,
+            textvariable=self.roster_contract_snippet_var,
+            bg="#1d2129",
+            fg="#d0d6de",
+            justify="left",
+            anchor="w",
+            font=("Yu Gothic UI", 9),
+            padx=0,
+            pady=0,
+            wraplength=900,
+        ).pack(fill="x", pady=(0, 2))
 
         trade_fa_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(12, 8))
         trade_fa_wrap.pack(fill="x", pady=(0, 8))
         ttk.Label(
             trade_fa_wrap,
-            text="編成操作：トレード／インシーズンFA／契約解除／＋1年延長（表で選手を選んでから各ボタン）",
+            text="編成操作：表で選手を選び、トレード・FA・解除・延長を行います。",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -3536,15 +3593,25 @@ class MainMenuView:
         if count > 0:
             avg_ovr = sum(int(self._safe_get(p, "ovr", 0) or 0) for p in players_sorted) / count
 
-        self.roster_header_var.set(
-            f"{team_name} ロスター一覧    人数: {count}    平均OVR: {avg_ovr:.1f}"
-        )
+        self.roster_header_var.set(f"{team_name} ｜ 人数：{count}人 ｜ 平均OVR：{avg_ovr:.1f}")
         jp_h = getattr(self, "roster_jp_header_var", None)
-        if jp_h is not None and self.team is not None:
-            try:
-                jp_h.set(jp_reg_display.format_roster_window_jp_header(self.season, self.team))
-            except Exception:
+        if jp_h is not None:
+            if self.team is not None:
+                try:
+                    jp_h.set(self._build_roster_window_registration_summary())
+                except Exception:
+                    jp_h.set("")
+            else:
                 jp_h.set("")
+        cv = getattr(self, "roster_contract_snippet_var", None)
+        if cv is not None:
+            if self.team is not None and players_sorted:
+                try:
+                    cv.set(self._format_roster_window_contract_overview_snippet(players_sorted))
+                except Exception:
+                    cv.set("")
+            else:
+                cv.set("")
         unlocked = self.inseason_roster_moves_allowed()
         lock_line_release = (
             "契約解除: 実行可（要選手選択）。"
