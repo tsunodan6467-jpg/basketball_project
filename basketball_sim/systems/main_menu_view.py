@@ -9672,6 +9672,11 @@ class MainMenuView:
         dev_center = ttk.Frame(outer, style="Root.TFrame")
 
         bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
+        # 直近変更は長い補足ラベルより先に pack する（補足の折返しでログ行が画面外に落ちないようにする）
+        self.development_training_log_summary_var = tk.StringVar(value="")
+        self._development_log_frame = tk.Frame(bottom, bg="#1d2129")
+        self._development_log_frame.pack(fill="x", anchor="w", pady=(0, 8))
+
         self.development_hint_intro_var = tk.StringVar(value="")
         tk.Label(
             bottom,
@@ -9683,18 +9688,8 @@ class MainMenuView:
             font=("Yu Gothic UI", 10),
             padx=2,
             pady=2,
-        ).pack(fill="x", anchor="w")
-        tk.Label(
-            bottom,
-            text="直近変更:",
-            bg="#1d2129",
-            fg="#d6dbe3",
-            anchor="w",
-            font=("Yu Gothic UI", 10, "bold"),
-            padx=2,
-        ).pack(fill="x", anchor="w", pady=(8, 2))
-        self._development_log_frame = tk.Frame(bottom, bg="#1d2129")
-        self._development_log_frame.pack(fill="x", anchor="w")
+            wraplength=980,
+        ).pack(fill="x", anchor="w", pady=(0, 4))
 
         action_row = ttk.Frame(bottom, style="Panel.TFrame", padding=(0, 8, 0, 0))
         action_row.pack(fill="x")
@@ -9740,7 +9735,7 @@ class MainMenuView:
                 "【強化メニュー】育成方針（チーム練習）・個別練習・スペシャル練習の解放、"
                 "育成に効く施設のLv、選手ごとの見立てをまとめて確認します。"
                 "上段3パネルとロスター表は閲覧のみです。"
-                "育成方針・個別練習の変更は、ウィンドウ最下部（直近変更ログの下）の"
+                "育成方針・個別練習の変更は、ウィンドウ最下部の「直近変更」の下にある"
                 "「チーム練習を変更」「個別練習を変更」から行えます。"
                 "メイン画面でチーム未接続のときは変更ボタンは使えません。"
             ),
@@ -9885,6 +9880,15 @@ class MainMenuView:
         finally:
             self._development_effect_detail_window = None
             self._development_effect_detail_text = None
+        try:
+            ld = getattr(self, "_development_training_log_detail_window", None)
+            if ld is not None and ld.winfo_exists():
+                ld.destroy()
+        except Exception:
+            pass
+        finally:
+            self._development_training_log_detail_window = None
+            self._development_training_log_detail_text = None
         window = getattr(self, "_development_window", None)
         try:
             if window is not None and window.winfo_exists():
@@ -10098,6 +10102,103 @@ class MainMenuView:
 
         w.protocol("WM_DELETE_WINDOW", self._on_close_development_effect_detail_window)
 
+    def _on_close_development_training_log_detail_window(self) -> None:
+        w = getattr(self, "_development_training_log_detail_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        finally:
+            self._development_training_log_detail_window = None
+            self._development_training_log_detail_text = None
+
+    def _refresh_development_training_log_detail_body(self) -> None:
+        tw = getattr(self, "_development_training_log_detail_text", None)
+        if tw is None:
+            return
+        body = self._build_development_training_log_detail_body_text(getattr(self, "team", None))
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_development_training_log_detail_window(self) -> None:
+        """チーム練習・個別練習の変更履歴（閲覧専用）。本文は Team の既存リスト表示のみ。"""
+        parent = getattr(self, "_development_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_development_training_log_detail_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_development_training_log_detail_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("直近変更ログ")
+        w.geometry("720x520")
+        w.minsize(520, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(2, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(outer, text="直近変更ログ", style="SectionTitle.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
+        ttk.Label(
+            outer,
+            text="チーム練習・個別練習の最近の変更履歴です。（閲覧のみ）",
+            wraplength=680,
+            font=("Yu Gothic UI", 10),
+        ).grid(row=1, column=0, sticky="ew", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=22,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=2, column=0, sticky="nsew")
+        self._development_training_log_detail_window = w
+        self._development_training_log_detail_text = tw
+        self._refresh_development_training_log_detail_body()
+        tw.configure(state="disabled")
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=3, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_development_training_log_detail_window,
+        ).pack(side="right")
+
+        w.protocol("WM_DELETE_WINDOW", self._on_close_development_training_log_detail_window)
+
     def _development_tree_drill_label(self, player: Any) -> str:
         k = str(self._safe_get(player, "training_drill", "balanced") or "balanced")
         return self._DEV_ROSTER_DRILL_LABEL_JA.get(k, "バランス")
@@ -10234,11 +10335,17 @@ class MainMenuView:
                     )
 
         self.development_hint_intro_var.set(
-            "上段パネル: 人数・育成方針・施設Lvと効き方の目安・HC/戦術・スペシャル練習の解放。"
-            "下表: 選手ごとの POT / 育成指標 / 試合出場 / 年齢帯 / 個別練習 / 育成方針 / 見立て（閲覧）。"
-            "練習の編集は、この下の履歴のさらに下にある2ボタンから。"
+            "上段は要約＋各「詳細」ボタン、下表は選手別の育成状況です。"
+            "練習の変更は「直近変更」の下のボタンから行えます。"
         )
         self._refresh_development_training_log_widgets()
+        try:
+            if getattr(self, "_development_training_log_detail_window", None) is not None:
+                lw = self._development_training_log_detail_window
+                if lw is not None and lw.winfo_exists():
+                    self._refresh_development_training_log_detail_body()
+        except Exception:
+            pass
 
     def _build_development_coach_note(self, coach_key: Any) -> str:
         key = str(coach_key or "")
@@ -12934,47 +13041,56 @@ class MainMenuView:
             return "player"
         return "other"
 
+    def _build_development_training_log_summary_text(self, team: Any) -> str:
+        """強化メニュー本体下部の直近変更1行要約（件数・最新のみ）。"""
+        if team is None:
+            return "直近変更：チーム未接続のため履歴を表示できません"
+        logs = list(getattr(team, "training_change_log", []) or [])
+        if not logs:
+            return "直近変更：履歴なし"
+        n = len(logs)
+        latest = str(logs[-1]).strip()
+        if len(latest) > 72:
+            latest = latest[:69] + "…"
+        return f"直近変更：{n}件あり / 最新：{latest}"
+
+    def _build_development_training_log_detail_body_text(self, team: Any) -> str:
+        """別窓用。既存の training_change_log リストをそのまま列挙（保存仕様は触らない）。"""
+        if team is None:
+            return "チーム未接続のため変更履歴を表示できません。"
+        logs = list(getattr(team, "training_change_log", []) or [])
+        if not logs:
+            return "履歴はまだありません。"
+        return "\n".join(f"- {str(e).strip()}" for e in logs)
+
     def _refresh_development_training_log_widgets(self) -> None:
         frame = getattr(self, "_development_log_frame", None)
         if frame is None:
             return
         for child in frame.winfo_children():
             child.destroy()
+        if getattr(self, "development_training_log_summary_var", None) is None:
+            self.development_training_log_summary_var = tk.StringVar(value="")
         team = getattr(self, "team", None)
-        logs = list(getattr(team, "training_change_log", []) or []) if team is not None else []
-        if not logs:
-            empty_msg = (
-                "（直近の練習変更履歴はありません）"
-                if team is not None
-                else "（チーム未接続のため履歴を表示できません）"
-            )
-            tk.Label(
-                frame,
-                text=f"  {empty_msg}",
-                bg="#1d2129",
-                fg="#9aa3b2",
-                anchor="w",
-                font=("Yu Gothic UI", 10),
-                padx=2,
-                pady=0,
-            ).pack(fill="x", anchor="w")
-            return
-        limit = 5
-        colors = {"team": "#7ec8ff", "player": "#e8c07a", "other": "#9aa3b2"}
-        for entry in logs[-limit:]:
-            kind = self._training_log_entry_kind(entry)
-            fg = colors.get(kind, colors["other"])
-            tk.Label(
-                frame,
-                text=f"- {entry}",
-                bg="#1d2129",
-                fg=fg,
-                anchor="w",
-                justify="left",
-                font=("Yu Gothic UI", 10),
-                padx=2,
-                pady=0,
-            ).pack(fill="x", anchor="w")
+        self.development_training_log_summary_var.set(self._build_development_training_log_summary_text(team))
+        tk.Label(
+            frame,
+            textvariable=self.development_training_log_summary_var,
+            bg="#1d2129",
+            fg="#d6dbe3",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 10),
+            padx=2,
+            pady=0,
+            wraplength=980,
+        ).pack(fill="x", anchor="w", pady=(0, 6))
+        ttk.Button(
+            frame,
+            text="直近変更ログを表示",
+            style="Menu.TButton",
+            command=self._open_development_training_log_detail_window,
+        ).pack(anchor="w")
 
     def _build_recent_training_change_log_text(self, team: Any, limit: int = 5) -> str:
         logs = list(getattr(team, "training_change_log", []) or [])
