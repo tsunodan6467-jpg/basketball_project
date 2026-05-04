@@ -1303,6 +1303,112 @@ class MainMenuView:
             "【その他】施設投資などもターミナルの「8. GMメニュー」から行います。"
         )
 
+    def _build_roster_trade_fa_guidance_summary_text(self) -> str:
+        """人事本体のトレード／FA帯用の短い要約（全文は別窓の _format_hr_trade_fa_guidance_text）。"""
+        tx = self._roster_transaction_status_text()
+        return (
+            "編成操作：トレード／インシーズンFA／契約解除／＋1年延長ができます。重要な操作は確認のうえ反映されます。\n"
+            f"トレード／インシーズンFA（可否の要約）: {tx}\n"
+            "詳細な注意点・CLIとの役割分担は下の「トレード・FA案内を表示」から確認できます。"
+        )
+
+    def _on_close_roster_trade_fa_guidance_detail_window(self) -> None:
+        w = getattr(self, "_roster_trade_fa_guidance_detail_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        finally:
+            self._roster_trade_fa_guidance_detail_window = None
+            self._roster_trade_fa_guidance_detail_text = None
+
+    def _refresh_roster_trade_fa_guidance_detail_body(self) -> None:
+        tw = getattr(self, "_roster_trade_fa_guidance_detail_text", None)
+        if tw is None:
+            return
+        body = self._format_hr_trade_fa_guidance_text()
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_roster_trade_fa_guidance_detail_window(self) -> None:
+        """トレード／インシーズンFA／契約解除の案内全文（閲覧専用）。本文は _format_hr_trade_fa_guidance_text に委譲。"""
+        parent = getattr(self, "_roster_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_roster_trade_fa_guidance_detail_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_roster_trade_fa_guidance_detail_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("トレード・FA案内")
+        w.geometry("720x520")
+        w.minsize(520, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(2, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(outer, text="トレード・FA案内", style="SectionTitle.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
+        ttk.Label(
+            outer,
+            text="トレード、インシーズンFA、契約解除に関する注意点です。（閲覧のみ・実行は人事画面の各ボタンから行います）",
+            wraplength=680,
+            font=("Yu Gothic UI", 10),
+        ).grid(row=1, column=0, sticky="ew", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=22,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=2, column=0, sticky="nsew")
+        self._roster_trade_fa_guidance_detail_window = w
+        self._roster_trade_fa_guidance_detail_text = tw
+        self._refresh_roster_trade_fa_guidance_detail_body()
+        tw.configure(state="disabled")
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=3, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_roster_trade_fa_guidance_detail_window,
+        ).pack(side="right")
+
+        w.protocol("WM_DELETE_WINDOW", self._on_close_roster_trade_fa_guidance_detail_window)
+
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
         for i, var in enumerate(self.next_game_lines):
@@ -1631,7 +1737,7 @@ class MainMenuView:
         trade_fa_wrap.pack(fill="x", pady=(0, 8))
         ttk.Label(
             trade_fa_wrap,
-            text="トレード・FA（表で選手選択→解除。「トレード」＋インシーズンFAは横ボタン）",
+            text="編成操作：トレード／インシーズンFA／契約解除／＋1年延長（表で選手を選んでから各ボタン）",
             style="TopBar.TLabel",
             anchor="w",
         ).pack(fill="x", anchor="w", pady=(0, 6))
@@ -1657,26 +1763,34 @@ class MainMenuView:
             side="left",
             padx=(10, 0),
         )
-        tf_row = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
-        tf_row.pack(fill="both", expand=False)
-        tf_row.columnconfigure(0, weight=1)
-        tf_row.rowconfigure(0, weight=1)
-        self.roster_trade_fa_text = tk.Text(
-            tf_row,
-            wrap="word",
-            height=2,
+        self._jpn_text_button(
+            tf_btn_row,
+            "＋1年延長",
+            self._on_roster_extend_one_year_selected,
+            side="left",
+            padx=(10, 0),
+        )
+        tf_summary = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
+        tf_summary.pack(fill="x", anchor="w", pady=(4, 0))
+        self.roster_trade_fa_summary_var = tk.StringVar(value="")
+        tk.Label(
+            tf_summary,
+            textvariable=self.roster_trade_fa_summary_var,
             bg="#1d2129",
             fg="#d6dbe3",
-            insertbackground="#d6dbe3",
+            anchor="w",
+            justify="left",
             font=("Yu Gothic UI", 10),
-            relief="flat",
             padx=8,
-            pady=8,
-        )
-        tf_vsb = ttk.Scrollbar(tf_row, orient="vertical", command=self.roster_trade_fa_text.yview)
-        self.roster_trade_fa_text.configure(yscrollcommand=tf_vsb.set)
-        self.roster_trade_fa_text.grid(row=0, column=0, sticky="nsew")
-        tf_vsb.grid(row=0, column=1, sticky="ns")
+            pady=0,
+            wraplength=900,
+        ).pack(fill="x", anchor="w", pady=(0, 6))
+        ttk.Button(
+            tf_summary,
+            text="トレード・FA案内を表示",
+            style="Menu.TButton",
+            command=self._open_roster_trade_fa_guidance_detail_window,
+        ).pack(anchor="w")
 
         columns = (
             "role",
@@ -1826,19 +1940,6 @@ class MainMenuView:
 
         btn_row = tk.Frame(bottom, bg="#1d2129")
         btn_row.pack(fill="x", pady=(8, 0))
-        self._jpn_text_button(
-            btn_row,
-            "＋1年延長",
-            self._on_roster_extend_one_year_selected,
-            side="left",
-        )
-        self._jpn_text_button(
-            btn_row,
-            "契約解除（FA送り）",
-            self._on_roster_release_selected,
-            side="left",
-            padx=(8, 0),
-        )
         self._jpn_text_button(btn_row, "閉じる", self._on_close_roster_window, side="right")
 
         self._roster_window = window
@@ -1846,6 +1947,15 @@ class MainMenuView:
         self._refresh_roster_window()
 
     def _on_close_roster_window(self) -> None:
+        try:
+            gd = getattr(self, "_roster_trade_fa_guidance_detail_window", None)
+            if gd is not None and gd.winfo_exists():
+                gd.destroy()
+        except Exception:
+            pass
+        finally:
+            self._roster_trade_fa_guidance_detail_window = None
+            self._roster_trade_fa_guidance_detail_text = None
         window = getattr(self, "_roster_window", None)
         try:
             if window is not None and window.winfo_exists():
@@ -3365,18 +3475,25 @@ class MainMenuView:
             "【詳細ロスター】下のペインは全文テキスト一覧（閲覧専用）。表と同一メンバーで、並びは GM 表示ルールに準拠します。\n"
             "並び: ポジション順(PG→C)→同ポジ内OVR降順（docs/GM_ROSTER_DISPLAY_RULES.md と共通）。"
             "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
-            "【今できる操作（人事画面）】閲覧。＋1年延長（年俸据え置き・残年数が 1 年以上かつ"
+            "【今できる操作（人事画面）】閲覧。＋1年延長は上部の「＋1年延長」から（年俸据え置き・残年数が 1 年以上かつ"
             f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
             "【トレード】ウィンドウ上部の「トレード」から（1〜3名の入替、現金・RB は双方向。1対1相当は人数を1対1で指定）。"
             " CLI からも同様のトレードメニューで実行できます（「8. GMメニュー」→「10. トレード」）。"
             "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
             "期限はトレードと同じルールです（上部の案内を参照）。\n"
-            "【契約解除（FA送り）】表で選手を選び、上部トレード行または下部の同ボタンから実行（最低人数・ロックは上記）。"
+            "【契約解除（FA送り）】表で選手を選び、上部の編成操作ボタンから実行（最低人数・ロックは上記）。"
         )
 
-        trade_txt = getattr(self, "roster_trade_fa_text", None)
-        if trade_txt is not None:
-            self._gm_set_readonly_text(trade_txt, self._format_hr_trade_fa_guidance_text())
+        summary_var = getattr(self, "roster_trade_fa_summary_var", None)
+        if summary_var is not None:
+            summary_var.set(self._build_roster_trade_fa_guidance_summary_text())
+        try:
+            if getattr(self, "_roster_trade_fa_guidance_detail_window", None) is not None:
+                gw = self._roster_trade_fa_guidance_detail_window
+                if gw is not None and gw.winfo_exists():
+                    self._refresh_roster_trade_fa_guidance_detail_body()
+        except Exception:
+            pass
 
         detail_txt = getattr(self, "roster_detail_text", None)
         if detail_txt is not None:
