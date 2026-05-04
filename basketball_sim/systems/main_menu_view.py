@@ -1312,44 +1312,89 @@ class MainMenuView:
             "詳細な注意点・CLIとの役割分担は下の「トレード・FA案内を表示」から確認できます。"
         )
 
-    def _build_roster_window_registration_summary(self) -> str:
-        """登録・国籍枠：既存の枠集計＋直近大会名のみ（大会ルール全文は別窓・案内に委譲）。"""
-        if self.team is None:
-            return ""
-        lines: List[str] = []
-        try:
-            lines.append(jp_reg_display.format_contract_roster_summary(self.team))
-        except Exception:
-            pass
-        try:
-            ct = jp_reg_display.gui_next_competition_type(self.season, self.team)
-            nm = competition_display_name(ct)
-            if nm:
-                lines.append(f"直近の大会想定：{nm}（登録枠の上限は大会により異なります）")
-        except Exception:
-            pass
-        return "\n".join(x for x in lines if x)
+    def _count_display_nationality_raw(self, players: List[Any]) -> Tuple[int, int, int, int, int]:
+        """表示用：Player.nationality の値（Japan/Foreign/Asia/Naturalized）で人数化。ロジックは変更しない。"""
+        jp_n = fr_n = asia_n = nat_n = other_n = 0
+        for p in players:
+            raw = getattr(p, "nationality", None)
+            s = str(raw).strip() if raw is not None else ""
+            if s == "Japan":
+                jp_n += 1
+            elif s == "Foreign":
+                fr_n += 1
+            elif s == "Asia":
+                asia_n += 1
+            elif s == "Naturalized":
+                nat_n += 1
+            else:
+                other_n += 1
+        return jp_n, fr_n, asia_n, nat_n, other_n
 
-    def _format_roster_window_contract_overview_snippet(self, players: List[Any]) -> str:
-        """player.salary の合計と契約残1年人数のみ。年俸ロジックは新設しない。"""
-        if not players:
-            return ""
+    def _roster_situation_finance_stats(
+        self, players: List[Any]
+    ) -> Tuple[int, int, str, int, int, int]:
+        """年俸・契約残年の単純集計。(合計, 平均, 最高年俸選手名, 最高年俸額, 残1年, 残2年以上)"""
         total = 0
-        one_year = 0
+        y1 = y2p = 0
+        n = len(players)
+        best_name = "—"
+        best_sal = 0
+        first_best: Any = None
         for p in players:
             try:
                 total += int(self._safe_get(p, "salary", 0) or 0)
             except Exception:
                 pass
             try:
+                sal = int(self._safe_get(p, "salary", 0) or 0)
+                if first_best is None or sal > best_sal:
+                    best_sal = sal
+                    first_best = p
+            except Exception:
+                pass
+            try:
                 cy = self._safe_get(p, "contract_years_left", None)
                 if cy is None:
                     continue
-                if int(cy) == 1:
-                    one_year += 1
+                ci = int(cy)
+                if ci == 1:
+                    y1 += 1
+                elif ci >= 2:
+                    y2p += 1
             except Exception:
                 pass
-        return f"契約概況：年俸合計 {self._format_money(total)} ／ 契約残1年の選手 {one_year}人"
+        if first_best is not None:
+            best_name = str(self._safe_get(first_best, "name", "—"))
+        avg = int(round(total / n)) if n > 0 else 0
+        return total, avg, best_name, best_sal, y1, y2p
+
+    def _build_roster_situation_block_text(
+        self, team_name: str, count: int, players_sorted: List[Any], avg_ovr: float
+    ) -> str:
+        """人事ウィンドウ上部「ロスター状況」本文（箇条書き・単純集計のみ）。"""
+        lines: List[str] = [f"・チーム：{team_name}"]
+        if count <= 0:
+            lines.append("・ロスター：0人")
+            lines.append("・平均OVR：—")
+            lines.append("・年俸合計：—　年俸平均：—　最高年俸：—")
+            lines.append("・契約：残1年 0人　残2年以上 0人")
+            return "\n".join(lines)
+        jp_n, fr_n, asia_n, nat_n, oth = self._count_display_nationality_raw(players_sorted)
+        l1 = (
+            f"・ロスター：{count}人　日本人：{jp_n}人　外国籍：{fr_n}人　"
+            f"アジア：{asia_n}人　帰化：{nat_n}人"
+        )
+        if oth > 0:
+            l1 += f"　（国籍未設定等：{oth}人）"
+        lines.append(l1)
+        lines.append(f"・平均OVR：{avg_ovr:.0f}")
+        tot, avg_m, bnm, bsal, y1, y2p = self._roster_situation_finance_stats(players_sorted)
+        lines.append(
+            f"・年俸合計：{self._format_money(tot)}　年俸平均：{self._format_money(avg_m)}　"
+            f"最高年俸：{bnm} {self._format_money(bsal)}"
+        )
+        lines.append(f"・契約：残1年 {y1}人　残2年以上 {y2p}人")
+        return "\n".join(lines)
 
     def _on_close_roster_trade_fa_guidance_detail_window(self) -> None:
         w = getattr(self, "_roster_trade_fa_guidance_detail_window", None)
@@ -1551,6 +1596,143 @@ class MainMenuView:
         ).pack(side="right")
 
         w.protocol("WM_DELETE_WINDOW", self._on_close_roster_gm_text_list_detail_window)
+
+    def _format_roster_hr_rules_detail_body(self) -> str:
+        """人事「編成ルールの詳細」窓：ルール説明が中心（数値は本体「ロスター状況」を参照）。"""
+        if self.team is None:
+            return "チームが未接続です。"
+        team = self.team
+        lines: List[str] = []
+        lines.append("編成ルールの詳細（閲覧専用）")
+        lines.append("")
+        lines.append(
+            "現在の契約・年俸の集計は、ウィンドウ上部の「ロスター状況」を参照してください。"
+            "（この窓ではルールの考え方と大会別の参考情報をまとめます。）"
+        )
+        lines.append("")
+        lines.append("■ 用語の整理（別々のルールです）")
+        lines.append(
+            "・「契約ロスター（本契約枠）」… チームに登録できる外国籍／アジア・帰化の人数上限です。"
+            " 上部の人数（日本人／外国籍／アジア／帰化）は nationality の表示用集計です。"
+        )
+        lines.append(
+            "・「試合登録」… その大会にエントリーできる人数上限です（契約ロスター枠とは別です）。"
+        )
+        lines.append(
+            "・「オンザコート制限」… コート上に同時に置ける外国籍などの上限です（試合登録とも別です）。"
+        )
+        lines.append("")
+        try:
+            lines.append(jp_reg_display.format_contract_roster_summary(team))
+        except Exception:
+            pass
+        lines.append("")
+        lines.append("■ 直近の大会想定とレギュレーション（参考）")
+        try:
+            ct = jp_reg_display.gui_next_competition_type(self.season, team)
+            nm = competition_display_name(ct)
+            lines.append(f"直近の大会想定：{nm}")
+            lines.append("")
+            lines.append("【参考】試合登録・オンザコート上限（大会により異なります。契約ロスター枠とは別概念です）")
+            lines.append(jp_reg_display.format_competition_rules_brief(ct))
+        except Exception:
+            lines.append("直近の大会想定を取得できませんでした。")
+        lines.append("")
+        lines.append(
+            "※トレード／FA／解除／延長の実行やルール変更はこの窓では行えません。"
+            " 運用上の注意は「トレード・FA案内を表示」も参照してください。"
+        )
+        return "\n".join(lines)
+
+    def _on_close_roster_hr_rules_detail_window(self) -> None:
+        w = getattr(self, "_roster_hr_rules_detail_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        finally:
+            self._roster_hr_rules_detail_window = None
+            self._roster_hr_rules_detail_text = None
+
+    def _refresh_roster_hr_rules_detail_body(self) -> None:
+        tw = getattr(self, "_roster_hr_rules_detail_text", None)
+        if tw is None:
+            return
+        body = self._format_roster_hr_rules_detail_body()
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_roster_hr_rules_detail_window(self) -> None:
+        """編成ルールの詳細（閲覧専用）。本文は _format_roster_hr_rules_detail_body に委譲。"""
+        parent = getattr(self, "_roster_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_roster_hr_rules_detail_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_roster_hr_rules_detail_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("編成ルールの詳細")
+        w.geometry("720x540")
+        w.minsize(520, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(outer, text="編成ルールの詳細", style="SectionTitle.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 8)
+        )
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._roster_hr_rules_detail_window = w
+        self._roster_hr_rules_detail_text = tw
+        self._refresh_roster_hr_rules_detail_body()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_roster_hr_rules_detail_window,
+        ).pack(side="right")
+
+        w.protocol("WM_DELETE_WINDOW", self._on_close_roster_hr_rules_detail_window)
 
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
@@ -1880,43 +2062,26 @@ class MainMenuView:
 
         ttk.Label(summary_wrap, text="ロスター状況", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 4))
 
-        self.roster_header_var = tk.StringVar(value="")
-        ttk.Label(
-            summary_wrap,
-            textvariable=self.roster_header_var,
-            style="TopBar.TLabel",
-            anchor="w",
-        ).pack(fill="x", anchor="w")
-
-        ttk.Label(summary_wrap, text="登録・国籍枠", style="SectionTitle.TLabel").pack(anchor="w", pady=(10, 4))
-
-        self.roster_jp_header_var = tk.StringVar(value="")
+        self.roster_situation_var = tk.StringVar(value="")
         tk.Label(
             summary_wrap,
-            textvariable=self.roster_jp_header_var,
+            textvariable=self.roster_situation_var,
             bg="#1d2129",
-            fg="#c8d0dc",
+            fg="#d6dbe3",
             justify="left",
             anchor="w",
-            font=("Yu Gothic UI", 9),
+            font=("Yu Gothic UI", 10),
             padx=0,
             pady=0,
             wraplength=900,
-        ).pack(fill="x", pady=(0, 6))
+        ).pack(fill="x", anchor="w", pady=(0, 8))
 
-        self.roster_contract_snippet_var = tk.StringVar(value="")
-        tk.Label(
+        ttk.Button(
             summary_wrap,
-            textvariable=self.roster_contract_snippet_var,
-            bg="#1d2129",
-            fg="#d0d6de",
-            justify="left",
-            anchor="w",
-            font=("Yu Gothic UI", 9),
-            padx=0,
-            pady=0,
-            wraplength=900,
-        ).pack(fill="x", pady=(0, 2))
+            text="編成ルールの詳細",
+            style="Menu.TButton",
+            command=self._open_roster_hr_rules_detail_window,
+        ).pack(anchor="w", pady=(0, 2))
 
         trade_fa_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(12, 8))
         trade_fa_wrap.pack(fill="x", pady=(0, 8))
@@ -2093,6 +2258,15 @@ class MainMenuView:
         finally:
             self._roster_gm_text_list_detail_window = None
             self._roster_gm_text_list_detail_text = None
+        try:
+            hr = getattr(self, "_roster_hr_rules_detail_window", None)
+            if hr is not None and hr.winfo_exists():
+                hr.destroy()
+        except Exception:
+            pass
+        finally:
+            self._roster_hr_rules_detail_window = None
+            self._roster_hr_rules_detail_text = None
         window = getattr(self, "_roster_window", None)
         try:
             if window is not None and window.winfo_exists():
@@ -3593,25 +3767,19 @@ class MainMenuView:
         if count > 0:
             avg_ovr = sum(int(self._safe_get(p, "ovr", 0) or 0) for p in players_sorted) / count
 
-        self.roster_header_var.set(f"{team_name} ｜ 人数：{count}人 ｜ 平均OVR：{avg_ovr:.1f}")
-        jp_h = getattr(self, "roster_jp_header_var", None)
-        if jp_h is not None:
+        rs = getattr(self, "roster_situation_var", None)
+        if rs is not None:
             if self.team is not None:
                 try:
-                    jp_h.set(self._build_roster_window_registration_summary())
+                    rs.set(
+                        self._build_roster_situation_block_text(
+                            team_name, count, players_sorted, avg_ovr
+                        )
+                    )
                 except Exception:
-                    jp_h.set("")
+                    rs.set("")
             else:
-                jp_h.set("")
-        cv = getattr(self, "roster_contract_snippet_var", None)
-        if cv is not None:
-            if self.team is not None and players_sorted:
-                try:
-                    cv.set(self._format_roster_window_contract_overview_snippet(players_sorted))
-                except Exception:
-                    cv.set("")
-            else:
-                cv.set("")
+                rs.set("")
         unlocked = self.inseason_roster_moves_allowed()
         lock_line_release = (
             "契約解除: 実行可（要選手選択）。"
@@ -3646,6 +3814,13 @@ class MainMenuView:
                 dl = self._roster_gm_text_list_detail_window
                 if dl is not None and dl.winfo_exists():
                     self._refresh_roster_gm_text_list_detail_body()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_roster_hr_rules_detail_window", None) is not None:
+                hr = self._roster_hr_rules_detail_window
+                if hr is not None and hr.winfo_exists():
+                    self._refresh_roster_hr_rules_detail_body()
         except Exception:
             pass
 
