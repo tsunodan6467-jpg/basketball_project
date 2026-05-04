@@ -1409,6 +1409,110 @@ class MainMenuView:
 
         w.protocol("WM_DELETE_WINDOW", self._on_close_roster_trade_fa_guidance_detail_window)
 
+    def _on_close_roster_gm_text_list_detail_window(self) -> None:
+        w = getattr(self, "_roster_gm_text_list_detail_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        finally:
+            self._roster_gm_text_list_detail_window = None
+            self._roster_gm_text_list_detail_text = None
+
+    def _refresh_roster_gm_text_list_detail_body(self) -> None:
+        tw = getattr(self, "_roster_gm_text_list_detail_text", None)
+        if tw is None:
+            return
+        if self.team is not None:
+            body = format_gm_roster_text(self.team)
+        else:
+            body = "チームが未接続です。"
+        try:
+            self._gm_set_readonly_text(tw, body)
+        except tk.TclError:
+            pass
+
+    def _open_roster_gm_text_list_detail_window(self) -> None:
+        """詳細ロスター全文（閲覧専用・別窓）。本文は format_gm_roster_text に委譲。"""
+        parent = getattr(self, "_roster_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_roster_gm_text_list_detail_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_roster_gm_text_list_detail_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("詳細ロスター")
+        w.geometry("760x560")
+        w.minsize(520, 380)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(2, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(outer, text="詳細ロスター", style="SectionTitle.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 4)
+        )
+        ttk.Label(
+            outer,
+            text="表と同じメンバーを、GM表示ルールに沿ったテキスト一覧で確認できます。（閲覧専用）",
+            wraplength=700,
+            font=("Yu Gothic UI", 10),
+        ).grid(row=1, column=0, sticky="ew", pady=(0, 8))
+
+        text_host = ttk.Frame(outer, style="Panel.TFrame", padding=0)
+        text_host.grid(row=2, column=0, sticky="nsew")
+        text_host.rowconfigure(0, weight=1)
+        text_host.columnconfigure(0, weight=1)
+        tw = tk.Text(
+            text_host,
+            wrap="none",
+            height=22,
+            bg="#222834",
+            fg="#e8ecf0",
+            insertbackground="#e8ecf0",
+            font=("Consolas", 10),
+            relief="flat",
+            padx=10,
+            pady=8,
+        )
+        vsb = ttk.Scrollbar(text_host, orient="vertical", command=tw.yview)
+        hsb = ttk.Scrollbar(text_host, orient="horizontal", command=tw.xview)
+        tw.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+        tw.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+
+        self._roster_gm_text_list_detail_window = w
+        self._roster_gm_text_list_detail_text = tw
+        self._refresh_roster_gm_text_list_detail_body()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=3, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_roster_gm_text_list_detail_window,
+        ).pack(side="right")
+
+        w.protocol("WM_DELETE_WINDOW", self._on_close_roster_gm_text_list_detail_window)
+
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
         for i, var in enumerate(self.next_game_lines):
@@ -1684,7 +1788,7 @@ class MainMenuView:
 
 
     def open_roster_window(self) -> None:
-        """人事・ロスター: トレード／FA 案内（正本）、表、詳細ロスター。＋1年延長・FA 解除は条件付き。"""
+        """人事・ロスター: トレード／FA 案内、表、詳細ロスター（テキスト一覧は別窓）。＋1年延長・FA 解除は条件付き。"""
         existing = getattr(self, "_roster_window", None)
         try:
             if existing is not None and existing.winfo_exists():
@@ -1708,7 +1812,31 @@ class MainMenuView:
         outer = ttk.Frame(window, style="Root.TFrame", padding=12)
         outer.pack(fill="both", expand=True)
 
-        header = ttk.Frame(outer, style="Panel.TFrame", padding=(14, 10))
+        # 下部（補足＋閉じる）を先に bottom へ固定し、ロスター帯の伸縮で画面外に押し出されないようにする
+        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
+        bottom.pack(side="bottom", fill="x", pady=(12, 0))
+
+        self.roster_hint_var = tk.StringVar(value="")
+        tk.Label(
+            bottom,
+            textvariable=self.roster_hint_var,
+            bg="#1d2129",
+            fg="#d6dbe3",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 10),
+            padx=2,
+            pady=2,
+        ).pack(fill="x", anchor="w")
+
+        btn_row = tk.Frame(bottom, bg="#1d2129")
+        btn_row.pack(fill="x", pady=(8, 0))
+        self._jpn_text_button(btn_row, "閉じる", self._on_close_roster_window, side="right")
+
+        roster_main = ttk.Frame(outer, style="Root.TFrame", padding=0)
+        roster_main.pack(side="top", fill="both", expand=True)
+
+        header = ttk.Frame(roster_main, style="Panel.TFrame", padding=(14, 10))
         header.pack(fill="x", pady=(0, 12))
 
         self.roster_header_var = tk.StringVar(value="")
@@ -1721,7 +1849,7 @@ class MainMenuView:
 
         self.roster_jp_header_var = tk.StringVar(value="")
         tk.Label(
-            outer,
+            roster_main,
             textvariable=self.roster_jp_header_var,
             bg="#1d2129",
             fg="#c8d0dc",
@@ -1733,7 +1861,7 @@ class MainMenuView:
             wraplength=900,
         ).pack(fill="x", pady=(0, 6))
 
-        trade_fa_wrap = ttk.Frame(outer, style="Panel.TFrame", padding=(12, 8))
+        trade_fa_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(12, 8))
         trade_fa_wrap.pack(fill="x", pady=(0, 8))
         ttk.Label(
             trade_fa_wrap,
@@ -1806,17 +1934,15 @@ class MainMenuView:
             "years",
         )
 
-        roster_paned = ttk.Panedwindow(outer, orient="vertical")
-        roster_paned.pack(fill="both", expand=True)
-
-        tree_wrap = ttk.Frame(roster_paned, style="Panel.TFrame", padding=10)
-        roster_paned.add(tree_wrap, weight=10)
+        tree_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=10)
+        # 縦は表の行数＋帯の自然高さに抑え、余白は roster_main 側で吸収（閉じる行は outer の bottom で固定）
+        tree_wrap.pack(fill="x", expand=False)
 
         self.roster_tree = ttk.Treeview(
             tree_wrap,
             columns=columns,
             show="headings",
-            height=16,
+            height=15,
         )
         headings = {
             "role": "役割",
@@ -1856,91 +1982,36 @@ class MainMenuView:
 
         self.roster_tree.grid(row=0, column=0, sticky="nsew")
         vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, sticky="ew")
+        hsb.grid(row=1, column=0, columnspan=2, sticky="ew")
         tree_wrap.columnconfigure(0, weight=1)
-        tree_wrap.rowconfigure(0, weight=1)
+        tree_wrap.rowconfigure(0, weight=0)
 
-        detail_outer = ttk.Frame(roster_paned, style="Panel.TFrame", padding=(10, 6, 10, 10))
-        roster_paned.add(detail_outer, weight=2)
-        try:
-            roster_paned.pane(tree_wrap, minsize=180)
-            roster_paned.pane(detail_outer, minsize=96)
-        except tk.TclError:
-            pass
-        detail_outer.columnconfigure(0, weight=1)
+        detail_band = ttk.Frame(tree_wrap, style="Panel.TFrame", padding=(0, 10, 0, 0))
+        detail_band.grid(row=2, column=0, columnspan=2, sticky="ew")
         ttk.Label(
-            detail_outer,
+            detail_band,
             text="詳細ロスター（テキスト一覧・閲覧専用）",
             style="TopBar.TLabel",
             anchor="w",
-        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
-        ttk.Label(
-            detail_outer,
-            text="表と同一ロスターです。並び・体裁は GM 表示ルール（docs/GM_ROSTER_DISPLAY_RULES.md）に沿います。",
-            wraplength=900,
-            font=("Yu Gothic UI", 9),
-        ).grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 2))
-        text_host = ttk.Frame(detail_outer, style="Panel.TFrame", padding=0)
-        text_host.grid(row=2, column=0, columnspan=2, sticky="nsew")
-        detail_outer.rowconfigure(2, weight=1)
-        text_host.rowconfigure(0, weight=1)
-        text_host.columnconfigure(0, weight=1)
-        self.roster_detail_text = tk.Text(
-            text_host,
-            wrap="none",
-            height=3,
-            bg="#222834",
-            fg="#e8ecf0",
-            insertbackground="#e8ecf0",
-            font=("Consolas", 10),
-            relief="flat",
-            padx=10,
-            pady=8,
-        )
-        rdt_vsb = ttk.Scrollbar(text_host, orient="vertical", command=self.roster_detail_text.yview)
-        rdt_hsb = ttk.Scrollbar(text_host, orient="horizontal", command=self.roster_detail_text.xview)
-        self.roster_detail_text.configure(yscrollcommand=rdt_vsb.set, xscrollcommand=rdt_hsb.set)
-        self.roster_detail_text.grid(row=0, column=0, sticky="nsew")
-        rdt_vsb.grid(row=0, column=1, sticky="ns")
-        rdt_hsb.grid(row=1, column=0, sticky="ew")
-
-        self._roster_vert_split_done = False
-
-        def _apply_roster_vertical_split(_event: Any = None) -> None:
-            if self._roster_vert_split_done:
-                return
-            try:
-                ph = int(roster_paned.winfo_height())
-                if ph < 200:
-                    return
-                roster_paned.sashpos(0, max(160, int(ph * 0.82)))
-                self._roster_vert_split_done = True
-            except tk.TclError:
-                pass
-
-        roster_paned.bind("<Map>", _apply_roster_vertical_split)
-        window.after_idle(_apply_roster_vertical_split)
-        window.after(200, _apply_roster_vertical_split)
-
-        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
-        bottom.pack(fill="x", pady=(12, 0))
-
-        self.roster_hint_var = tk.StringVar(value="")
+        ).pack(fill="x", anchor="w", pady=(0, 4))
         tk.Label(
-            bottom,
-            textvariable=self.roster_hint_var,
+            detail_band,
+            text="詳細ロスターは「詳細ロスターを表示」から確認できます。表と同じメンバーをテキスト一覧で閲覧できます（閲覧専用）。",
             bg="#1d2129",
             fg="#d6dbe3",
             anchor="w",
             justify="left",
-            font=("Yu Gothic UI", 10),
-            padx=2,
-            pady=2,
-        ).pack(fill="x", anchor="w")
-
-        btn_row = tk.Frame(bottom, bg="#1d2129")
-        btn_row.pack(fill="x", pady=(8, 0))
-        self._jpn_text_button(btn_row, "閉じる", self._on_close_roster_window, side="right")
+            font=("Yu Gothic UI", 9),
+            padx=0,
+            pady=0,
+            wraplength=900,
+        ).pack(fill="x", anchor="w", pady=(0, 6))
+        ttk.Button(
+            detail_band,
+            text="詳細ロスターを表示",
+            style="Menu.TButton",
+            command=self._open_roster_gm_text_list_detail_window,
+        ).pack(anchor="w")
 
         self._roster_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_roster_window)
@@ -1956,6 +2027,15 @@ class MainMenuView:
         finally:
             self._roster_trade_fa_guidance_detail_window = None
             self._roster_trade_fa_guidance_detail_text = None
+        try:
+            ld = getattr(self, "_roster_gm_text_list_detail_window", None)
+            if ld is not None and ld.winfo_exists():
+                ld.destroy()
+        except Exception:
+            pass
+        finally:
+            self._roster_gm_text_list_detail_window = None
+            self._roster_gm_text_list_detail_text = None
         window = getattr(self, "_roster_window", None)
         try:
             if window is not None and window.winfo_exists():
@@ -3472,7 +3552,7 @@ class MainMenuView:
             else "契約解除: レギュラー後半はロック（トレード／インシーズンFA と同じ期限）。"
         )
         self.roster_hint_var.set(
-            "【詳細ロスター】下のペインは全文テキスト一覧（閲覧専用）。表と同一メンバーで、並びは GM 表示ルールに準拠します。\n"
+            "【詳細ロスター】「詳細ロスターを表示」で全文テキスト一覧（閲覧専用）を開けます。表と同一メンバーで、並びは GM 表示ルールに準拠します。\n"
             "並び: ポジション順(PG→C)→同ポジ内OVR降順（docs/GM_ROSTER_DISPLAY_RULES.md と共通）。"
             "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
             "【今できる操作（人事画面）】閲覧。＋1年延長は上部の「＋1年延長」から（年俸据え置き・残年数が 1 年以上かつ"
@@ -3494,13 +3574,13 @@ class MainMenuView:
                     self._refresh_roster_trade_fa_guidance_detail_body()
         except Exception:
             pass
-
-        detail_txt = getattr(self, "roster_detail_text", None)
-        if detail_txt is not None:
-            if self.team is not None:
-                self._gm_set_readonly_text(detail_txt, format_gm_roster_text(self.team))
-            else:
-                self._gm_set_readonly_text(detail_txt, "チームが未接続です。")
+        try:
+            if getattr(self, "_roster_gm_text_list_detail_window", None) is not None:
+                dl = self._roster_gm_text_list_detail_window
+                if dl is not None and dl.winfo_exists():
+                    self._refresh_roster_gm_text_list_detail_body()
+        except Exception:
+            pass
 
     def open_finance_window(self) -> None:
         """Open a safe read-only finance / management subwindow."""
@@ -12606,7 +12686,7 @@ class MainMenuView:
             "当窓の「戦術・HC・起用」タブは参照のみです。"
             "サラリーキャップの数値は左メニュー「経営」の「財務サマリー」下部。当窓の「サラリーキャップ」は案内のみです。"
             "チーム属性は左メニュー「情報」の「概要」上部。当窓の「チーム情報」は案内のみです。"
-            "ロスター全文テキストは左メニュー「人事」の「詳細ロスター」。当窓の「ロスター」は案内のみです。"
+            "ロスター全文テキストは左メニュー「人事」で「詳細ロスターを表示」から。当窓の「ロスター」は案内のみです。"
             "施設投資もターミナルのシーズンメニュー「8. GMメニュー」から行ってください。"
         )
 
@@ -12668,11 +12748,11 @@ class MainMenuView:
             return (
                 "チームが未接続です。\n\n"
                 "ロスターの全文テキスト一覧は、左メニュー「人事」を開き、"
-                "ウィンドウ下部の「詳細ロスター（テキスト一覧）」を参照してください。"
+                "「詳細ロスターを表示」で別窓を開いて参照してください。"
             )
         return (
             "ロスター全員のテキスト一覧（並び・体裁は docs/GM_ROSTER_DISPLAY_RULES.md）の参照は、"
-            "左メニュー「人事」を開き、表の下のペイン「詳細ロスター（テキスト一覧）」にまとめました。\n\n"
+            "左メニュー「人事」を開き、表の下の「詳細ロスターを表示」で別窓にまとめました。\n\n"
             "契約の＋1年延長・FA 解除などの操作は、人事ウィンドウ上部の表から選手を選んで行ってください。\n\n"
             "このタブは案内のみです。"
         )
@@ -13910,7 +13990,7 @@ class MainMenuView:
             notice.grid(row=0, column=0, sticky="ew")
             ttk.Label(
                 notice,
-                text="（閲覧・案内のみ／正本は人事「詳細ロスター」）",
+                text="（閲覧・案内のみ／正本は人事「詳細ロスターを表示」）",
                 font=("Yu Gothic UI", 10, "bold"),
             ).pack(anchor="w")
             txt = tk.Text(
