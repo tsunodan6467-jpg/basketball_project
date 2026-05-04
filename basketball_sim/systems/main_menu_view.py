@@ -9814,7 +9814,7 @@ class MainMenuView:
             table_wrap,
             columns=columns,
             show="headings",
-            height=10,
+            height=12,
         )
         headings = {
             "name": "選手名",
@@ -9829,18 +9829,19 @@ class MainMenuView:
             "training_focus": "育成方針",
             "outlook": "育成見立て",
         }
+        # L-4: 列幅は指示レンジに寄せ、POS/年齢など短い列を詰めて左寄せの主要列を確保。見立ては右端・横スクロールで追う想定。
         widths = {
-            "name": 168,
-            "pos": 68,
-            "age": 66,
-            "ovr": 66,
-            "pot": 66,
-            "dev": 76,
-            "games": 76,
-            "stage": 100,
-            "training_drill": 92,
-            "training_focus": 82,
-            "outlook": 228,
+            "name": 170,
+            "pos": 50,
+            "age": 50,
+            "ovr": 56,
+            "pot": 50,
+            "dev": 70,
+            "games": 62,
+            "stage": 72,
+            "training_drill": 88,
+            "training_focus": 84,
+            "outlook": 252,
         }
         for key in columns:
             self.development_tree.heading(key, text=headings[key])
