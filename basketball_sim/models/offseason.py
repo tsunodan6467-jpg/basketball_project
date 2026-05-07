@@ -280,6 +280,8 @@ class Offseason:
         draft_ui_prompt_bid: Optional[Any] = None,
         resign_ui_prompt: Optional[Callable[..., Any]] = None,
         pre_conduct_free_agency_ui_prompt: Optional[Callable[..., Any]] = None,
+        scout_dispatch_ui_prompt: Optional[Callable[..., Any]] = None,
+        scout_focus_ui_prompt: Optional[Callable[..., Any]] = None,
     ):
         self.teams = teams
         self.free_agents = free_agents
@@ -289,6 +291,8 @@ class Offseason:
         self._pre_conduct_free_agency_ui_prompt: Optional[Callable[..., Any]] = (
             pre_conduct_free_agency_ui_prompt
         )
+        self._scout_dispatch_ui_prompt: Optional[Callable[..., Any]] = scout_dispatch_ui_prompt
+        self._scout_focus_ui_prompt: Optional[Callable[..., Any]] = scout_focus_ui_prompt
         self.draft_pool: List[Player] = []
         # 来年のドラフト候補（次オフのドラフトで使う）をリーグ状態として保持するための一時バッファ
         self.future_draft_pool: List[Player] = []
@@ -3004,6 +3008,20 @@ class Offseason:
         print("2. 大学")
         print("3. 海外")
 
+        if callable(self._scout_dispatch_ui_prompt):
+            try:
+                raw = self._scout_dispatch_ui_prompt(team)
+            except Exception as exc:
+                print(f"[SCOUT-DISPATCH] UIプロンプトでエラー: {exc} / 既定値で進めます")
+                raw = None
+            dispatch = self._normalize_scout_dispatch(str(raw) if raw is not None else "college")
+            self._set_team_scout_dispatch(team, dispatch)
+            print(
+                f"[SCOUT-DISPATCH] {team.name} -> "
+                f"{self._get_scout_dispatch_label(dispatch)}"
+            )
+            return
+
         mapping = {
             "1": "highschool",
             "2": "college",
@@ -3149,6 +3167,22 @@ class Offseason:
         print("3. Defense")
         print("4. Athletic")
         print("5. Playmaking")
+
+        if callable(self._scout_focus_ui_prompt):
+            try:
+                raw = self._scout_focus_ui_prompt(team)
+            except Exception as exc:
+                print(f"[SCOUT-FOCUS] UIプロンプトでエラー: {exc} / 既定値で進めます")
+                raw = None
+            focus = self._normalize_scout_focus(str(raw) if raw is not None else "balanced")
+            if hasattr(team, "set_scout_focus"):
+                team.set_scout_focus(focus)
+            else:
+                team.scout_focus = focus
+            print(
+                f"[SCOUT-FOCUS] {team.name} -> {self._get_scout_focus_label(focus)}"
+            )
+            return
 
         while True:
             try:

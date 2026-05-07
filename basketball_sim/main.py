@@ -2716,7 +2716,9 @@ def _main_menu_advance_button_and_hint(season_finished: bool, offseason_complete
         )
     return (
         "オフシーズンを実行",
-        "レギュラーシーズン終了。『オフシーズンを実行』で契約・ドラフト等を進めます（数分かかる場合があります）。",
+        "レギュラーシーズン終了。『オフシーズンを実行』で再契約・契約満了・FA・ドラフト・財務決算へ進みます。\n"
+        "実行前に、人事メニューで「今オフ契約満了候補」を確認しておくと安全です。\n"
+        "処理中は数分ほど応答しない場合があります。",
     )
 
 
@@ -3391,10 +3393,13 @@ def run_main_menu_ui_mode(
             if root is not None:
                 ok = messagebox.askokcancel(
                     "オフシーズン",
-                    "レギュラーシーズン終了後、ディビジョンPOは内部で処理済みです。\n"
-                    "PO結果は『日程』『情報』で確認できます。\n\n"
-                    "オフシーズン処理（再契約・FA・ドラフト等）を開始します。\n"
-                    "数分かかる場合があり、その間ウィンドウが応答しなくなることがあります。\n\n"
+                    "レギュラーシーズンが終了しました。\n"
+                    "ディビジョンPOは内部で処理済みです。結果は「日程」「情報」で確認できます。\n\n"
+                    "これからオフシーズン処理を開始します。\n"
+                    "主な処理：再契約、契約満了、FA、ドラフト、財務決算 など\n"
+                    "一部で再契約・ドラフト・FAの選択ダイアログが表示される場合があります。\n\n"
+                    "実行前に、人事メニューで「今オフ契約満了候補」を確認しておくと安全です。\n"
+                    "処理には数分かかる場合があり、その間ウィンドウが応答しなくなることがあります。\n\n"
                     "続けますか？",
                     parent=root,
                 )
@@ -3427,6 +3432,21 @@ def run_main_menu_ui_mode(
                             user_team=user_team,
                         )
                     )
+
+                    def _gui_scout_dispatch_default(_team: Any) -> str:
+                        print(
+                            "GUI実行中のため、来期ドラフト候補の調査先は「大学」を既定選択します。"
+                        )
+                        return "college"
+
+                    def _gui_scout_focus_default(_team: Any) -> str:
+                        print(
+                            "GUI実行中のため、ドラフトコンバインのスカウト方針は「Balanced」を既定選択します。"
+                        )
+                        return "balanced"
+
+                    off_kw["scout_dispatch_ui_prompt"] = _gui_scout_dispatch_default
+                    off_kw["scout_focus_ui_prompt"] = _gui_scout_focus_default
                 offseason = Offseason(teams, free_agents, **off_kw)
                 offseason.run()
             except Exception as exc:
