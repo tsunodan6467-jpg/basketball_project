@@ -141,6 +141,7 @@ _FACILITY_MANAGEMENT_EFFECT_BLURB_JA: Dict[str, str] = {
 from basketball_sim.systems.contract_logic import (
     MAX_CONTRACT_YEARS_DEFAULT,
     apply_contract_extension,
+    get_expiring_players,
     is_draft_rookie_contract_active,
 )
 from basketball_sim.systems.roster_fa_release import (
@@ -1734,6 +1735,175 @@ class MainMenuView:
 
         w.protocol("WM_DELETE_WINDOW", self._on_close_roster_hr_rules_detail_window)
 
+    def _get_user_team_expiring_players(self) -> List[Any]:
+        """今オフ契約満了候補（残1年）。読み取り専用、人事画面の事前警告表示用。"""
+        if self.team is None:
+            return []
+        players: List[Any] = []
+        try:
+            infos = get_expiring_players([self.team])
+            players = [info.player for info in infos if getattr(info, "player", None) is not None]
+        except Exception:
+            try:
+                players = [
+                    p
+                    for p in (self._safe_get(self.team, "players", []) or [])
+                    if int(self._safe_get(p, "contract_years_left", 0) or 0) == 1
+                ]
+            except Exception:
+                players = []
+        try:
+            players.sort(
+                key=lambda p: int(self._safe_get(p, "ovr", 0) or 0),
+                reverse=True,
+            )
+        except Exception:
+            pass
+        return players
+
+    def _format_expiring_contracts_summary_text(self) -> str:
+        """人事本体に出す1行：今オフ契約満了候補：N人（A、B、C ほかX人）。"""
+        if self.team is None:
+            return "今オフ契約満了候補：—"
+        players = self._get_user_team_expiring_players()
+        if not players:
+            return "今オフ契約満了候補：なし"
+        n = len(players)
+        visible = 3
+        names = [str(self._safe_get(p, "name", "-")) for p in players[:visible]]
+        head = "、".join(names)
+        if n <= visible:
+            return f"今オフ契約満了候補：{n}人（{head}）"
+        rest = n - visible
+        return f"今オフ契約満了候補：{n}人（{head} ほか{rest}人）"
+
+    def _format_expiring_contracts_detail_text(self) -> str:
+        """契約満了候補の詳細本文（閲覧専用）。"""
+        lines: List[str] = []
+        lines.append("契約満了候補（閲覧専用）")
+        lines.append("")
+        lines.append(
+            "この一覧は、現在の契約残年数が1年の選手です。"
+            "オフシーズンでは再契約／FA化の判断対象になります。"
+        )
+        lines.append(
+            "今のうちに人事画面の「＋1年延長」で延長するか、"
+            "オフの再契約判断に備えてください。"
+            f"（残上限は {MAX_CONTRACT_YEARS_DEFAULT} 年・年俸据え置きで延長します）"
+        )
+        lines.append("")
+        if self.team is None:
+            lines.append("チームが未接続です。")
+            return "\n".join(lines)
+        players = self._get_user_team_expiring_players()
+        if not players:
+            lines.append("該当する選手はいません。")
+            return "\n".join(lines)
+        lines.append(f"該当：{len(players)}人（OVR降順で表示）")
+        lines.append("")
+        for player in players:
+            name = str(self._safe_get(player, "name", "-"))
+            pos = str(self._safe_get(player, "position", "-"))
+            ovr = str(self._safe_get(player, "ovr", "-"))
+            age = str(self._safe_get(player, "age", "-"))
+            salary = self._format_money(self._safe_get(player, "salary", 0))
+            lines.append(
+                f"・{name} / {pos} / OVR {ovr} / 年齢 {age} / 年俸 {salary} / 契約残1年"
+            )
+        return "\n".join(lines)
+
+    def _refresh_roster_expiring_contracts_detail_body(self) -> None:
+        tw = getattr(self, "_roster_expiring_contracts_detail_text", None)
+        if tw is None:
+            return
+        body = self._format_expiring_contracts_detail_text()
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_roster_expiring_contracts_detail_window(self) -> None:
+        """今オフ契約満了候補の詳細（閲覧専用・別窓）。本文は _format_expiring_contracts_detail_text に委譲。"""
+        parent = getattr(self, "_roster_window", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_roster_expiring_contracts_detail_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_roster_expiring_contracts_detail_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("契約満了候補の詳細")
+        w.geometry("680x500")
+        w.minsize(480, 320)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(outer, text="契約満了候補", style="SectionTitle.TLabel").grid(
+            row=0, column=0, sticky="w", pady=(0, 8)
+        )
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=22,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._roster_expiring_contracts_detail_window = w
+        self._roster_expiring_contracts_detail_text = tw
+        self._refresh_roster_expiring_contracts_detail_body()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_roster_expiring_contracts_detail_window,
+        ).pack(side="right")
+
+        w.protocol("WM_DELETE_WINDOW", self._on_close_roster_expiring_contracts_detail_window)
+
+    def _on_close_roster_expiring_contracts_detail_window(self) -> None:
+        w = getattr(self, "_roster_expiring_contracts_detail_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        except Exception:
+            pass
+        finally:
+            self._roster_expiring_contracts_detail_window = None
+            self._roster_expiring_contracts_detail_text = None
+
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
         for i, var in enumerate(self.next_game_lines):
@@ -2088,6 +2258,29 @@ class MainMenuView:
             wraplength=900,
         ).pack(fill="x", anchor="w", pady=(0, 0))
 
+        expiring_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(10, 4))
+        expiring_wrap.pack(fill="x", pady=(0, 6))
+        expiring_row = ttk.Frame(expiring_wrap, style="Panel.TFrame")
+        expiring_row.pack(fill="x", anchor="w")
+        self.roster_expiring_var = tk.StringVar(value="今オフ契約満了候補：—")
+        tk.Label(
+            expiring_row,
+            textvariable=self.roster_expiring_var,
+            bg="#1d2129",
+            fg="#d6dbe3",
+            anchor="w",
+            justify="left",
+            font=("Yu Gothic UI", 10),
+            padx=0,
+            pady=0,
+        ).pack(side="left", anchor="w", fill="x", expand=True)
+        ttk.Button(
+            expiring_row,
+            text="契約満了候補の詳細",
+            style="Menu.TButton",
+            command=self._open_roster_expiring_contracts_detail_window,
+        ).pack(side="right", anchor="e")
+
         trade_fa_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(10, 4))
         trade_fa_wrap.pack(fill="x", pady=(0, 6))
         tf_header = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
@@ -2280,6 +2473,15 @@ class MainMenuView:
         finally:
             self._roster_hr_rules_detail_window = None
             self._roster_hr_rules_detail_text = None
+        try:
+            ew = getattr(self, "_roster_expiring_contracts_detail_window", None)
+            if ew is not None and ew.winfo_exists():
+                ew.destroy()
+        except Exception:
+            pass
+        finally:
+            self._roster_expiring_contracts_detail_window = None
+            self._roster_expiring_contracts_detail_text = None
         window = getattr(self, "_roster_window", None)
         try:
             if window is not None and window.winfo_exists():
@@ -3795,6 +3997,13 @@ class MainMenuView:
                 rs.set("")
         self.roster_hint_var.set("補足：詳細説明は各詳細ボタンから確認できます。")
 
+        exp_var = getattr(self, "roster_expiring_var", None)
+        if exp_var is not None:
+            try:
+                exp_var.set(self._format_expiring_contracts_summary_text())
+            except Exception:
+                exp_var.set("今オフ契約満了候補：—")
+
         summary_var = getattr(self, "roster_trade_fa_summary_var", None)
         if summary_var is not None:
             summary_var.set(self._build_roster_trade_fa_guidance_summary_text())
@@ -3817,6 +4026,13 @@ class MainMenuView:
                 hr = self._roster_hr_rules_detail_window
                 if hr is not None and hr.winfo_exists():
                     self._refresh_roster_hr_rules_detail_body()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_roster_expiring_contracts_detail_window", None) is not None:
+                ew = self._roster_expiring_contracts_detail_window
+                if ew is not None and ew.winfo_exists():
+                    self._refresh_roster_expiring_contracts_detail_body()
         except Exception:
             pass
 
