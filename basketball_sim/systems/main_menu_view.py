@@ -2030,12 +2030,12 @@ class MainMenuView:
         except Exception:
             pass
 
-        outer = ttk.Frame(window, style="Root.TFrame", padding=12)
+        outer = ttk.Frame(window, style="Root.TFrame", padding=10)
         outer.pack(fill="both", expand=True)
 
         # 下部（補足＋閉じる）を先に bottom へ固定し、ロスター帯の伸縮で画面外に押し出されないようにする
-        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=12)
-        bottom.pack(side="bottom", fill="x", pady=(12, 0))
+        bottom = ttk.Frame(outer, style="Panel.TFrame", padding=8)
+        bottom.pack(side="bottom", fill="x", pady=(6, 0))
 
         self.roster_hint_var = tk.StringVar(value="")
         tk.Label(
@@ -2051,16 +2051,28 @@ class MainMenuView:
         ).pack(fill="x", anchor="w")
 
         btn_row = tk.Frame(bottom, bg="#1d2129")
-        btn_row.pack(fill="x", pady=(8, 0))
+        btn_row.pack(fill="x", pady=(4, 0))
         self._jpn_text_button(btn_row, "閉じる", self._on_close_roster_window, side="right")
 
         roster_main = ttk.Frame(outer, style="Root.TFrame", padding=0)
         roster_main.pack(side="top", fill="both", expand=True)
 
-        summary_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(14, 10))
-        summary_wrap.pack(fill="x", pady=(0, 10))
+        summary_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(10, 6))
+        summary_wrap.pack(fill="x", pady=(0, 6))
 
-        ttk.Label(summary_wrap, text="ロスター状況", style="SectionTitle.TLabel").pack(anchor="w", pady=(0, 4))
+        summary_header = ttk.Frame(summary_wrap, style="Panel.TFrame")
+        summary_header.pack(fill="x", pady=(0, 2))
+        ttk.Label(
+            summary_header,
+            text="ロスター状況",
+            style="SectionTitle.TLabel",
+        ).pack(side="left", anchor="w")
+        ttk.Button(
+            summary_header,
+            text="編成ルールの詳細",
+            style="Menu.TButton",
+            command=self._open_roster_hr_rules_detail_window,
+        ).pack(side="right", anchor="e")
 
         self.roster_situation_var = tk.StringVar(value="")
         tk.Label(
@@ -2074,25 +2086,26 @@ class MainMenuView:
             padx=0,
             pady=0,
             wraplength=900,
-        ).pack(fill="x", anchor="w", pady=(0, 8))
+        ).pack(fill="x", anchor="w", pady=(0, 0))
 
-        ttk.Button(
-            summary_wrap,
-            text="編成ルールの詳細",
-            style="Menu.TButton",
-            command=self._open_roster_hr_rules_detail_window,
-        ).pack(anchor="w", pady=(0, 2))
-
-        trade_fa_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(12, 8))
-        trade_fa_wrap.pack(fill="x", pady=(0, 8))
+        trade_fa_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(10, 4))
+        trade_fa_wrap.pack(fill="x", pady=(0, 6))
+        tf_header = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
+        tf_header.pack(fill="x", anchor="w", pady=(0, 4))
         ttk.Label(
-            trade_fa_wrap,
-            text="編成操作：表で選手を選び、トレード・FA・解除・延長を行います。",
+            tf_header,
+            text="編成操作：表で選手を選び、補強・整理・延長を行います。",
             style="TopBar.TLabel",
             anchor="w",
-        ).pack(fill="x", anchor="w", pady=(0, 6))
+        ).pack(side="left", anchor="w")
+        ttk.Button(
+            tf_header,
+            text="トレード・FA案内を表示",
+            style="Menu.TButton",
+            command=self._open_roster_trade_fa_guidance_detail_window,
+        ).pack(side="right", anchor="e")
         tf_btn_row = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
-        tf_btn_row.pack(fill="x", anchor="w", pady=(0, 6))
+        tf_btn_row.pack(fill="x", anchor="w", pady=(0, 2))
         self._jpn_text_button(
             tf_btn_row,
             "トレード",
@@ -2121,7 +2134,7 @@ class MainMenuView:
             padx=(10, 0),
         )
         tf_summary = ttk.Frame(trade_fa_wrap, style="Panel.TFrame")
-        tf_summary.pack(fill="x", anchor="w", pady=(4, 0))
+        tf_summary.pack(fill="x", anchor="w", pady=(2, 0))
         self.roster_trade_fa_summary_var = tk.StringVar(value="")
         tk.Label(
             tf_summary,
@@ -2134,13 +2147,7 @@ class MainMenuView:
             padx=8,
             pady=0,
             wraplength=900,
-        ).pack(fill="x", anchor="w", pady=(0, 6))
-        ttk.Button(
-            tf_summary,
-            text="トレード・FA案内を表示",
-            style="Menu.TButton",
-            command=self._open_roster_trade_fa_guidance_detail_window,
-        ).pack(anchor="w")
+        ).pack(fill="x", anchor="w", pady=(0, 0))
 
         columns = (
             "role",
@@ -2156,9 +2163,23 @@ class MainMenuView:
             "years",
         )
 
-        tree_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=10)
+        tree_wrap = ttk.Frame(roster_main, style="Panel.TFrame", padding=(8, 6))
         # 縦は表の行数＋帯の自然高さに抑え、余白は roster_main 側で吸収（閉じる行は outer の bottom で固定）
         tree_wrap.pack(fill="x", expand=False)
+
+        roster_header = ttk.Frame(tree_wrap, style="Panel.TFrame")
+        roster_header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        ttk.Label(
+            roster_header,
+            text="ロスター",
+            style="SectionTitle.TLabel",
+        ).pack(side="left", anchor="w")
+        ttk.Button(
+            roster_header,
+            text="詳細ロスターを表示",
+            style="Menu.TButton",
+            command=self._open_roster_gm_text_list_detail_window,
+        ).pack(side="right", anchor="e")
 
         self.roster_tree = ttk.Treeview(
             tree_wrap,
@@ -2180,60 +2201,52 @@ class MainMenuView:
             "years": "残年数",
         }
         widths = {
-            "role": 110,
-            "name": 170,
-            "pos": 70,
-            "ovr": 70,
-            "pot": 70,
-            "age": 70,
-            "nat_bucket": 100,
-            "fatigue": 70,
-            "morale": 70,
-            "salary": 130,
-            "years": 80,
+            "role": 85,
+            "name": 190,
+            "pos": 52,
+            "ovr": 55,
+            "pot": 52,
+            "age": 52,
+            "nat_bucket": 98,
+            "fatigue": 56,
+            "morale": 56,
+            "salary": 115,
+            "years": 65,
+        }
+        minwidths = {
+            "role": 65,
+            "name": 150,
+            "pos": 40,
+            "ovr": 48,
+            "pot": 45,
+            "age": 45,
+            "nat_bucket": 85,
+            "fatigue": 48,
+            "morale": 48,
+            "salary": 95,
+            "years": 58,
         }
 
         for key in columns:
             self.roster_tree.heading(key, text=headings[key])
             anchor = "center" if key not in ("name", "nat_bucket") else "w"
-            self.roster_tree.column(key, width=widths[key], anchor=anchor, stretch=(key == "name"))
+            self.roster_tree.column(
+                key,
+                width=widths[key],
+                minwidth=minwidths[key],
+                anchor=anchor,
+                stretch=(key == "name"),
+            )
 
         vsb = ttk.Scrollbar(tree_wrap, orient="vertical", command=self.roster_tree.yview)
         hsb = ttk.Scrollbar(tree_wrap, orient="horizontal", command=self.roster_tree.xview)
         self.roster_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
 
-        self.roster_tree.grid(row=0, column=0, sticky="nsew")
-        vsb.grid(row=0, column=1, sticky="ns")
-        hsb.grid(row=1, column=0, columnspan=2, sticky="ew")
+        self.roster_tree.grid(row=1, column=0, sticky="nsew")
+        vsb.grid(row=1, column=1, sticky="ns")
+        hsb.grid(row=2, column=0, columnspan=2, sticky="ew")
         tree_wrap.columnconfigure(0, weight=1)
-        tree_wrap.rowconfigure(0, weight=0)
-
-        detail_band = ttk.Frame(tree_wrap, style="Panel.TFrame", padding=(0, 10, 0, 0))
-        detail_band.grid(row=2, column=0, columnspan=2, sticky="ew")
-        ttk.Label(
-            detail_band,
-            text="詳細ロスター（テキスト一覧・閲覧専用）",
-            style="TopBar.TLabel",
-            anchor="w",
-        ).pack(fill="x", anchor="w", pady=(0, 4))
-        tk.Label(
-            detail_band,
-            text="詳細ロスターは「詳細ロスターを表示」から確認できます。表と同じメンバーをテキスト一覧で閲覧できます（閲覧専用）。",
-            bg="#1d2129",
-            fg="#d6dbe3",
-            anchor="w",
-            justify="left",
-            font=("Yu Gothic UI", 9),
-            padx=0,
-            pady=0,
-            wraplength=900,
-        ).pack(fill="x", anchor="w", pady=(0, 6))
-        ttk.Button(
-            detail_band,
-            text="詳細ロスターを表示",
-            style="Menu.TButton",
-            command=self._open_roster_gm_text_list_detail_window,
-        ).pack(anchor="w")
+        tree_wrap.rowconfigure(1, weight=0)
 
         self._roster_window = window
         window.protocol("WM_DELETE_WINDOW", self._on_close_roster_window)
@@ -3780,24 +3793,7 @@ class MainMenuView:
                     rs.set("")
             else:
                 rs.set("")
-        unlocked = self.inseason_roster_moves_allowed()
-        lock_line_release = (
-            "契約解除: 実行可（要選手選択）。"
-            if unlocked
-            else "契約解除: レギュラー後半はロック（トレード／インシーズンFA と同じ期限）。"
-        )
-        self.roster_hint_var.set(
-            "【詳細ロスター】「詳細ロスターを表示」で全文テキスト一覧（閲覧専用）を開けます。表と同一メンバーで、並びは GM 表示ルールに準拠します。\n"
-            "並び: ポジション順(PG→C)→同ポジ内OVR降順（docs/GM_ROSTER_DISPLAY_RULES.md と共通）。"
-            "先発・6th・控え番号は Team の起用ロジックに基づきます。\n"
-            "【今できる操作（人事画面）】閲覧。＋1年延長は上部の「＋1年延長」から（年俸据え置き・残年数が 1 年以上かつ"
-            f" {MAX_CONTRACT_YEARS_DEFAULT} 年未満のときのみ）。{lock_line_release}\n"
-            "【トレード】ウィンドウ上部の「トレード」から（1〜3名の入替、現金・RB は双方向。1対1相当は人数を1対1で指定）。"
-            " CLI からも同様のトレードメニューで実行できます（「8. GMメニュー」→「10. トレード」）。"
-            "【インシーズンFA】FA プールから 1 人だけ獲得する場合は「インシーズンFA（1人）」ボタンから。"
-            "期限はトレードと同じルールです（上部の案内を参照）。\n"
-            "【契約解除（FA送り）】表で選手を選び、上部の編成操作ボタンから実行（最低人数・ロックは上記）。"
-        )
+        self.roster_hint_var.set("補足：詳細説明は各詳細ボタンから確認できます。")
 
         summary_var = getattr(self, "roster_trade_fa_summary_var", None)
         if summary_var is not None:
