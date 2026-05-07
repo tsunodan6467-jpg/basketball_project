@@ -282,6 +282,7 @@ class Offseason:
         pre_conduct_free_agency_ui_prompt: Optional[Callable[..., Any]] = None,
         scout_dispatch_ui_prompt: Optional[Callable[..., Any]] = None,
         scout_focus_ui_prompt: Optional[Callable[..., Any]] = None,
+        special_designation_ui_prompt: Optional[Callable[..., Any]] = None,
     ):
         self.teams = teams
         self.free_agents = free_agents
@@ -293,6 +294,9 @@ class Offseason:
         )
         self._scout_dispatch_ui_prompt: Optional[Callable[..., Any]] = scout_dispatch_ui_prompt
         self._scout_focus_ui_prompt: Optional[Callable[..., Any]] = scout_focus_ui_prompt
+        self._special_designation_ui_prompt: Optional[Callable[..., Any]] = (
+            special_designation_ui_prompt
+        )
         self.draft_pool: List[Player] = []
         # 来年のドラフト候補（次オフのドラフトで使う）をリーグ状態として保持するための一時バッファ
         self.future_draft_pool: List[Player] = []
@@ -482,22 +486,43 @@ class Offseason:
                 print("0. 見送る")
                 for i, p in enumerate(shortlist, 1):
                     print(f"{i}. {self._build_special_designation_visible_row(p, team)}")
-                while True:
+                if callable(self._special_designation_ui_prompt):
+                    picked = None
                     try:
-                        raw = input("番号: ").strip()
-                    except EOFError:
-                        raw = "0"
-                    if raw == "0":
-                        picked = None
-                        break
-                    try:
-                        idx = int(raw) - 1
-                    except ValueError:
-                        idx = -999
-                    if 0 <= idx < len(shortlist):
-                        picked = shortlist[idx]
-                        break
-                    print("正しい番号を入力してください。")
+                        choice_raw = self._special_designation_ui_prompt(team, list(shortlist))
+                    except Exception as exc:
+                        print(f"[SPECIAL-DESIGNATION] UIプロンプトでエラー: {exc} / 見送ります")
+                    else:
+                        try:
+                            if choice_raw is None:
+                                choice_int = 0
+                            else:
+                                choice_int = int(choice_raw)
+                        except (TypeError, ValueError):
+                            choice_int = -1
+                        if choice_int == 0:
+                            picked = None
+                        elif 1 <= choice_int <= len(shortlist):
+                            picked = shortlist[choice_int - 1]
+                        else:
+                            picked = None
+                else:
+                    while True:
+                        try:
+                            raw = input("番号: ").strip()
+                        except EOFError:
+                            raw = "0"
+                        if raw == "0":
+                            picked = None
+                            break
+                        try:
+                            idx = int(raw) - 1
+                        except ValueError:
+                            idx = -999
+                        if 0 <= idx < len(shortlist):
+                            picked = shortlist[idx]
+                            break
+                        print("正しい番号を入力してください。")
             else:
                 # AI: 人気・上位リーグ・勝ち筋ほど取りやすいが、育成優先チームは基本的に見送りがち。
                 # ノーリスク強化でSS級は特に引きが強い。

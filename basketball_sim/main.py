@@ -3447,6 +3447,14 @@ def run_main_menu_ui_mode(
 
                     off_kw["scout_dispatch_ui_prompt"] = _gui_scout_dispatch_default
                     off_kw["scout_focus_ui_prompt"] = _gui_scout_focus_default
+
+                    def _gui_special_designation_skip(_team: Any, _shortlist: Any) -> None:
+                        print(
+                            "GUI実行中のため、特別指定選手の招待は「見送る」を既定選択します。"
+                        )
+                        return None
+
+                    off_kw["special_designation_ui_prompt"] = _gui_special_designation_skip
                 offseason = Offseason(teams, free_agents, **off_kw)
                 offseason.run()
             except Exception as exc:
