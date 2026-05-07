@@ -744,16 +744,28 @@ class MainMenuView:
         )
         self.advance_button.grid(row=2, column=0, sticky="ew")
 
+        advance_wrap.rowconfigure(3, weight=0)
+        self.offseason_flow_overview_button = ttk.Button(
+            advance_wrap,
+            text="オフシーズンの流れを見る",
+            style="Menu.TButton",
+            command=self._open_offseason_flow_overview_window,
+        )
+        self.offseason_flow_overview_button.grid(
+            row=3, column=0, sticky="ew", pady=(6, 0)
+        )
+
         debug_skip_cb = self.menu_callbacks.get("DEBUG_SKIP_TO_OFFSEASON")
         self.debug_skip_button: Optional[ttk.Button] = None
         if callable(debug_skip_cb):
+            advance_wrap.rowconfigure(4, weight=0)
             self.debug_skip_button = ttk.Button(
                 advance_wrap,
                 text="デバッグ: オフシーズンまで飛ばす",
                 style="DebugSkip.TButton",
                 command=debug_skip_cb,
             )
-            self.debug_skip_button.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+            self.debug_skip_button.grid(row=4, column=0, sticky="ew", pady=(8, 0))
 
         # Holders updated by refresh()
         self.top_bar_var = tk.StringVar(value="読み込み中...")
@@ -1903,6 +1915,145 @@ class MainMenuView:
         finally:
             self._roster_expiring_contracts_detail_window = None
             self._roster_expiring_contracts_detail_text = None
+
+    def _format_offseason_flow_overview_text(self) -> str:
+        """オフシーズン流れ説明窓の本文（閲覧専用・Tk非依存）。
+        正本データ（OFFSEASON_PHASES / build_offseason_focus_summary）を読み取り利用するだけ。
+        """
+        from basketball_sim.systems.offseason_phases import OFFSEASON_PHASES
+        from basketball_sim.systems.offseason_progress_cli_display import (
+            build_offseason_focus_summary,
+        )
+
+        lines: List[str] = []
+        lines.append("オフシーズンの流れ（閲覧専用）")
+        lines.append("")
+        lines.append(
+            "オフシーズンでは、再契約・契約満了・FA・ドラフト・財務決算などが順に進みます。"
+        )
+        lines.append(
+            "一部のフェーズでは、再契約・ドラフト・FAの選択ダイアログが表示される場合があります。"
+        )
+        lines.append("処理中は数分ほどウィンドウが応答しないことがあります。")
+        lines.append("")
+        lines.append("実行前のおすすめ：")
+        lines.append("・人事メニューで「今オフ契約満了候補」を確認")
+        lines.append("・期待ロスター／予算余力を把握しておく")
+        lines.append("")
+        lines.append("──────────────────────────────────")
+        try:
+            phases = list(OFFSEASON_PHASES or [])
+        except Exception:
+            phases = []
+        for idx, row in enumerate(phases, start=1):
+            try:
+                pid, title = row[0], row[1]
+            except Exception:
+                continue
+            summary = build_offseason_focus_summary(None, idx)
+            main_j = str(summary.get("main_judgment") or "情報なし")
+            next_f = str(summary.get("next_focus") or "情報なし")
+            lines.append(f"[{pid}] {title}")
+            lines.append(f"  主な判断：{main_j}")
+            lines.append(f"  次に見る：{next_f}")
+            lines.append("")
+        lines.append("──────────────────────────────────")
+        lines.append("※ この窓は閲覧専用です。実行はホームの「オフシーズンを実行」から。")
+        return "\n".join(lines)
+
+    def _refresh_offseason_flow_overview_body(self) -> None:
+        tw = getattr(self, "_offseason_flow_overview_text", None)
+        if tw is None:
+            return
+        body = self._format_offseason_flow_overview_text()
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_offseason_flow_overview_window(self) -> None:
+        """オフシーズンの流れ（閲覧専用・別窓）。本文は _format_offseason_flow_overview_text に委譲。"""
+        parent = getattr(self, "root", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_offseason_flow_overview_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_offseason_flow_overview_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("オフシーズンの流れ")
+        w.geometry("720x560")
+        w.minsize(520, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            outer, text="オフシーズンの流れ", style="SectionTitle.TLabel"
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._offseason_flow_overview_window = w
+        self._offseason_flow_overview_text = tw
+        self._refresh_offseason_flow_overview_body()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_offseason_flow_overview_window,
+        ).pack(side="right")
+
+        w.protocol(
+            "WM_DELETE_WINDOW", self._on_close_offseason_flow_overview_window
+        )
+
+    def _on_close_offseason_flow_overview_window(self) -> None:
+        w = getattr(self, "_offseason_flow_overview_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        except Exception:
+            pass
+        finally:
+            self._offseason_flow_overview_window = None
+            self._offseason_flow_overview_text = None
 
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
