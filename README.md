@@ -197,6 +197,64 @@ Get-Content .\BasketballGM.exe.sha256.txt
 
 ---
 
+## Steam 版を遊ぶ前に（ユーザー向け）
+
+> **状況の前提**: 本ゲームは **開発中**のプロジェクトであり、現行 v1 方針では **Steam クラウドセーブと Rich Presence は対象外**です。Steam ストアでの一般公開・発売前後で挙動が変わる可能性があるため、本節は**現時点（v1）の運用**を案内するものです。
+
+### A. Steam クライアントからの起動
+
+- **想定**: Steam クライアントから本ゲームを起動する形を想定しています（販売ビルドの場合）。
+- **Steamworks 機能（実績・ライセンスチェック・診断ログなど）は、Steam クライアントが起動中で、かつ DLL とアプリ ID の組み合わせが揃っている環境でのみ有効**になります。Steam クライアントを介さずに直接 exe を起動した場合は、これらの機能は無効として扱われます（ゲーム本体の起動・セーブ・ロードは可能）。
+- **`steam_appid.txt` を exe と同階層に置く運用**は、開発・検証時のみのオプションです。Steam パートナー画面で正式に配信する場合の取り扱いは `basketball_sim/integrations/STEAMWORKS_DESIGN.md` を参照してください。
+- **SmartScreen が出たとき**: 未署名 exe の場合、初回起動時に SmartScreen が表示されることがあります。「詳細情報」→「実行」で続行できます（コード署名済みのリリースでは出にくくなります）。
+
+### B. セーブはローカル PC 保存（Steam クラウド非対応）
+
+- **v1 ではセーブデータは Steam クラウドに同期されません**。すべて**お使いの PC のローカル**に保存されます。
+- 既定の保存先（Windows）:
+
+| 種類 | 場所 |
+|------|------|
+| 設定 | `%USERPROFILE%\.basketball_sim\settings.json` |
+| セーブ | `%USERPROFILE%\.basketball_sim\saves\<スロット名>.sav` |
+| ログ | `%USERPROFILE%\.basketball_sim\logs\game.log`（ローテーションあり） |
+| クラッシュ全文 | `%USERPROFILE%\.basketball_sim\logs\last_crash.txt` |
+
+- 既定スロット名は `quicksave` で、ファイル名は `quicksave.sav` になります（pickle 形式）。
+- エクスプローラーのアドレスバーに `%USERPROFILE%\.basketball_sim` と入力するとフォルダを開けます。
+- **Steam クラウドや OneDrive 等の自動同期に依存しない前提**で運用してください（クラウドセーブは将来オプションとして検討されていますが、v1 では未対応です）。
+
+### C. バックアップ（PC 移行・再インストール前）
+
+- **PC を買い替える／OS を再インストールする／ゲームをアンインストールする前**には、手動でバックアップを取ることを推奨します。
+- バックアップ手順（推奨）:
+  1. **ゲームを終了する**（プレイ中・セーブ書き込み中のバックアップは破損リスクがあるため）。
+  2. エクスプローラーで `%USERPROFILE%\.basketball_sim` フォルダを開く。
+  3. **`saves\` フォルダ全体**を別ドライブやクラウドストレージにコピーする（手動アップロード）。
+  4. （任意）`settings.json` も合わせてコピーすると、設定もそのまま引き継げます。
+- 復元したいときは、新しい PC の同じ場所（`%USERPROFILE%\.basketball_sim\saves\`）にコピーすれば認識されます。
+- **バックアップ前にゲームを終了**すること、および **書き込み途中の `*.sav.tmp` ファイルはバックアップ対象から除外**してください（途中状態のため）。
+
+### D. トラブルシュート（よくある状況）
+
+| 症状 | まず確認すること |
+|------|-----------------|
+| **セーブが見つからない** | エクスプローラーで `%USERPROFILE%\.basketball_sim\saves\` を開き、`*.sav` ファイルがあるかを確認。誤って `.basketball_sim` フォルダを削除していないか、別ユーザーアカウントでプレイしていないかを確認。 |
+| **起動できない** | `%USERPROFILE%\.basketball_sim\logs\game.log` の末尾と `last_crash.txt` を確認。`game.log` が無い場合は、フォルダ作成権限・アンチウイルスのブロックを疑う。 |
+| **Steamworks 機能（実績など）が反応しない** | Steam クライアントがログイン状態で起動しているかを確認。`BasketballGM.exe --steam-diag` を実行し、`try_init_steam: True` が出るかを確認（`False` のままの場合は DLL 同梱・App ID・Steam クライアント条件が揃っていない）。 |
+| **実績が反映されない** | `--steam-diag` で初期化成功を確認したうえで、実績解除条件を満たしたかをゲーム内で再確認。Steam パートナー画面の実績設定と API 名（`basketball_sim/config/steam_achievements.py`）が一致している必要があります（**開発者向け**）。 |
+| **ログが必要** | 不具合報告時は `%USERPROFILE%\.basketball_sim\logs\last_crash.txt` と、可能なら `game.log` の末尾を添付してください（前述の「不具合報告・問い合わせ用」を参照）。 |
+
+### E. v1 対象外機能（決定事項）
+
+- **Steam クラウドセーブ**: v1 では対象外です（2026-04-05 決定）。セーブは PC ローカルのみ。将来アップデートで対応する可能性はありますが、現時点では予定を確約しません。
+- **Rich Presence（フレンドへの「現在のプレイ状態」表示）**: v1 では未実装です（2026-04-05 決定）。
+- これらの方針は `docs/PHASE0_COMPLETION_TEMPLATE.md` および `basketball_sim/integrations/STEAMWORKS_DESIGN.md` と整合します。
+
+> **更新時の注意**: 本節の保存先・拡張子・既定スロット名は実装（`basketball_sim/utils/paths.py` / `basketball_sim/persistence/save_load.py`）に基づいています。実装が変わった場合は、本節と `docs/PHASE0_COMPLETION_TEMPLATE.md` の「セーブ・設定」節を同時に更新してください。
+
+---
+
 ## Steamworks（開発者向け）
 
 Steam 実装の優先度（ライセンス・実績・クラウド要否）、`steam_api64.dll` と `steam_appid.txt` の配置、tkinter とのコールバック統合の考え方は **`basketball_sim/integrations/STEAMWORKS_DESIGN.md`** にまとめています。`steamworks_bridge.py` は **Windows で DLL が見つかり `SteamAPI_Init` が成功したとき** ctypes 実接続し、主画面では約 100ms ごとに `RunCallbacks` を回します。DLL が無い・Init 失敗・`BASKETBALL_SIM_DISABLE_STEAM` では従来どおり影響しません。Steam 販売ビルドでは `%USERPROFILE%\.basketball_sim\settings.json` の `steam_require_license` または `BASKETBALL_SIM_REQUIRE_STEAM_LICENSE=1` で、未購入時に起動終了するポリシーを有効にできます（詳細は `STEAMWORKS_DESIGN.md` と `steamworks_bridge.py` 先頭コメント）。実績は `unlock_achievement` のみを経由し、API 名は `basketball_sim/config/steam_achievements.py` でダッシュボードと揃えます。**セーブは初回リリースまでローカル（`%USERPROFILE%\.basketball_sim\saves`）のみ**とし、Steam クラウドは `STEAMWORKS_DESIGN.md` の方針どおり将来オプションとして検討します。**Rich Presence（フレンド表示用のプレイ状態）は v1 では未対応**です。**Steam オーバーレイ**はクライアント既定（通常オン）のまま利用可能ですが、tkinter とショートカットが競合する場合は Steam のゲームプロパティでオーバーレイをオフにできる旨は `STEAMWORKS_DESIGN.md` §5 と FAQ たたき台を参照してください。
