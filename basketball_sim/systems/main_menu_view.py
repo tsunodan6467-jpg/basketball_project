@@ -584,6 +584,38 @@ class MainMenuView:
             btn.pack(fill="x", pady=5)
             self._menu_buttons[label] = btn
 
+        # 補助: 閲覧専用窓・デバッグ補助の置き場（既存 MENU_ITEMS は変更せず別枠で追加する）
+        ttk.Label(left_panel, text="補助", style="SectionTitle.TLabel").pack(
+            anchor="w", pady=(18, 6)
+        )
+
+        self.offseason_flow_overview_button = ttk.Button(
+            left_panel,
+            text="オフシーズンの流れを見る",
+            style="Menu.TButton",
+            command=self._open_offseason_flow_overview_window,
+        )
+        self.offseason_flow_overview_button.pack(fill="x", pady=5)
+
+        self.future_draft_pool_overview_button = ttk.Button(
+            left_panel,
+            text="来年ドラフト候補を見る",
+            style="Menu.TButton",
+            command=self._open_future_draft_pool_overview_window,
+        )
+        self.future_draft_pool_overview_button.pack(fill="x", pady=5)
+
+        debug_skip_cb = self.menu_callbacks.get("DEBUG_SKIP_TO_OFFSEASON")
+        self.debug_skip_button: Optional[ttk.Button] = None
+        if callable(debug_skip_cb):
+            self.debug_skip_button = ttk.Button(
+                left_panel,
+                text="デバッグ: オフシーズンまで飛ばす",
+                style="DebugSkip.TButton",
+                command=debug_skip_cb,
+            )
+            self.debug_skip_button.pack(fill="x", pady=5)
+
         # Center / right: 行高は各列フレーム内で独立。横は Panedwindow＋初期サッシュで
         # 「次の試合・クラブ状況」を広く、「今やること・ニュース・次へ」を狭く固定（weight だけだと
         # ScrolledText 既定幅などで列の最小幅が釣り合い、半々に見えやすい）。
@@ -743,29 +775,6 @@ class MainMenuView:
             command=self._on_advance,
         )
         self.advance_button.grid(row=2, column=0, sticky="ew")
-
-        advance_wrap.rowconfigure(3, weight=0)
-        self.offseason_flow_overview_button = ttk.Button(
-            advance_wrap,
-            text="オフシーズンの流れを見る",
-            style="Menu.TButton",
-            command=self._open_offseason_flow_overview_window,
-        )
-        self.offseason_flow_overview_button.grid(
-            row=3, column=0, sticky="ew", pady=(6, 0)
-        )
-
-        debug_skip_cb = self.menu_callbacks.get("DEBUG_SKIP_TO_OFFSEASON")
-        self.debug_skip_button: Optional[ttk.Button] = None
-        if callable(debug_skip_cb):
-            advance_wrap.rowconfigure(4, weight=0)
-            self.debug_skip_button = ttk.Button(
-                advance_wrap,
-                text="デバッグ: オフシーズンまで飛ばす",
-                style="DebugSkip.TButton",
-                command=debug_skip_cb,
-            )
-            self.debug_skip_button.grid(row=4, column=0, sticky="ew", pady=(8, 0))
 
         # Holders updated by refresh()
         self.top_bar_var = tk.StringVar(value="読み込み中...")
@@ -2054,6 +2063,290 @@ class MainMenuView:
         finally:
             self._offseason_flow_overview_window = None
             self._offseason_flow_overview_text = None
+
+    def _collect_future_draft_pool_candidates(self) -> List[Any]:
+        """来年ドラフト候補（閲覧専用）の読み取り。
+        正本は `team.league_future_draft_pool`（team_id 最小のチームに保持される設計）。
+        self.team に無い場合は Season 経由で他クラブを横断的に確認する。
+        破壊・生成はせず、見つけたリストをそのまま返す（呼び出し側で `list()` 化済）。
+        """
+        team = getattr(self, "team", None)
+        if team is not None:
+            try:
+                pool = list(getattr(team, "league_future_draft_pool", []) or [])
+                if pool:
+                    return pool
+            except Exception:
+                pass
+
+        candidates_teams: List[Any] = []
+        season = getattr(self, "season", None)
+        if season is not None:
+            try:
+                at = getattr(season, "all_teams", None)
+                if isinstance(at, list):
+                    candidates_teams.extend(at)
+            except Exception:
+                pass
+            if not candidates_teams:
+                try:
+                    leagues = getattr(season, "leagues", None)
+                    if isinstance(leagues, dict):
+                        seen: set = set()
+                        for _lvl_key in sorted(
+                            leagues.keys(),
+                            key=lambda k: (not isinstance(k, int), k),
+                        ):
+                            for t in leagues.get(_lvl_key) or []:
+                                if id(t) in seen:
+                                    continue
+                                seen.add(id(t))
+                                candidates_teams.append(t)
+                except Exception:
+                    pass
+
+        if not candidates_teams:
+            try:
+                candidates_teams = list(self._iter_league_teams())
+            except Exception:
+                candidates_teams = []
+
+        for t in candidates_teams:
+            try:
+                pool = list(getattr(t, "league_future_draft_pool", []) or [])
+                if pool:
+                    return pool
+            except Exception:
+                continue
+        return []
+
+    def _format_future_draft_pool_overview_text(
+        self, pool: Optional[List[Any]] = None
+    ) -> str:
+        """来年ドラフト候補の閲覧専用本文（Tk非依存）。
+        - pool が None の場合は `_collect_future_draft_pool_candidates()` から取得。
+        - 元リストは破壊せず、表示用にコピーしてソートする。
+        - スカウト精度・隠し能力など新規公開ルールは導入しない（既存属性のみ参照）。
+        """
+        if pool is None:
+            try:
+                pool = self._collect_future_draft_pool_candidates()
+            except Exception:
+                pool = []
+        pool_list: List[Any] = list(pool or [])
+
+        lines: List[str] = []
+        lines.append("来年ドラフト候補（閲覧専用）")
+        lines.append("")
+
+        if not pool_list:
+            lines.append("現在、表示できる来年ドラフト候補はいません。")
+            lines.append(
+                "オフシーズンのスカウト派遣後に候補が生成される場合があります。"
+            )
+            lines.append("")
+            lines.append(
+                "※ この窓は閲覧専用です。指名・入札はドラフト本番で行います。"
+            )
+            return "\n".join(lines)
+
+        lines.append(
+            "この一覧は、来年以降のドラフト候補として保持されている選手です。"
+        )
+        lines.append(
+            "候補情報はスカウト・コンバイン・オフシーズン進行で更新される場合があります。"
+        )
+        lines.append(
+            "指名・入札はドラフト本番で行います。この窓では操作できません。"
+        )
+        lines.append("")
+
+        _pot_rank = {"SS": 6, "S": 5, "A": 4, "B": 3, "C": 2, "D": 1}
+        _nat_ja = {
+            "Japan": "日本",
+            "Foreign": "外国籍",
+            "Asia": "アジア",
+            "Naturalized": "帰化",
+        }
+        _origin_ja = {
+            "college": "大学",
+            "highschool": "高校",
+            "overseas": "海外",
+            "special": "特別枠",
+        }
+
+        def _pot_rank_of(p: Any) -> int:
+            s = str(getattr(p, "potential", "") or "").upper().strip()
+            if not s:
+                return 0
+            head = s[0:2] if s.startswith("SS") else s[0:1]
+            return _pot_rank.get(head, 0)
+
+        def _safe_int(v: Any) -> int:
+            try:
+                return int(v or 0)
+            except Exception:
+                return 0
+
+        try:
+            sorted_pool = sorted(
+                pool_list,
+                key=lambda p: (
+                    -_pot_rank_of(p),
+                    -_safe_int(getattr(p, "ovr", 0)),
+                    _safe_int(getattr(p, "age", 0)),
+                    str(getattr(p, "name", "")),
+                ),
+            )
+        except Exception:
+            sorted_pool = list(pool_list)
+
+        lines.append(f"候補数：{len(sorted_pool)}人")
+        lines.append("")
+        lines.append("──────────────────────────────────")
+
+        for i, p in enumerate(sorted_pool, start=1):
+            name = str(getattr(p, "name", "?"))
+            pos = str(getattr(p, "position", "?") or "?")
+            age = _safe_int(getattr(p, "age", 0))
+            ovr = _safe_int(getattr(p, "ovr", 0))
+            pot = str(getattr(p, "potential", "?") or "?")
+            nat_key = str(getattr(p, "nationality", "") or "")
+            nat_text = _nat_ja.get(nat_key, nat_key) if nat_key else ""
+            origin_key = str(getattr(p, "draft_origin_type", "") or "")
+            origin_text = (
+                _origin_ja.get(origin_key, origin_key) if origin_key else ""
+            )
+            label = str(getattr(p, "draft_profile_label", "") or "")
+            featured = bool(getattr(p, "is_featured_prospect", False))
+            reborn = bool(getattr(p, "is_reborn", False))
+
+            base_parts = [
+                f"{i:>2}. {name}",
+                pos,
+                f"{age}歳",
+                f"OVR {ovr}",
+                f"POT {pot}",
+            ]
+            extras: List[str] = []
+            if origin_text:
+                extras.append(origin_text)
+            if nat_text and nat_key and nat_key != "Japan":
+                extras.append(nat_text)
+            if label:
+                extras.append(label)
+            flag_parts: List[str] = []
+            if featured:
+                flag_parts.append("注目")
+            if reborn:
+                flag_parts.append("再生")
+            if flag_parts:
+                extras.append(" / ".join(flag_parts))
+
+            row = " / ".join(base_parts)
+            if extras:
+                row = row + " / " + " / ".join(extras)
+            lines.append(row)
+
+        lines.append("──────────────────────────────────")
+        lines.append(
+            "※ この窓は閲覧専用です。指名・入札はドラフト本番で行います。"
+        )
+        return "\n".join(lines)
+
+    def _refresh_future_draft_pool_overview_body(self) -> None:
+        tw = getattr(self, "_future_draft_pool_overview_text", None)
+        if tw is None:
+            return
+        body = self._format_future_draft_pool_overview_text()
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_future_draft_pool_overview_window(self) -> None:
+        """来年ドラフト候補（閲覧専用・別窓）。本文は `_format_future_draft_pool_overview_text` に委譲。"""
+        parent = getattr(self, "root", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_future_draft_pool_overview_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_future_draft_pool_overview_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("来年ドラフト候補")
+        w.geometry("760x560")
+        w.minsize(560, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            outer, text="来年ドラフト候補", style="SectionTitle.TLabel"
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._future_draft_pool_overview_window = w
+        self._future_draft_pool_overview_text = tw
+        self._refresh_future_draft_pool_overview_body()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_future_draft_pool_overview_window,
+        ).pack(side="right")
+
+        w.protocol(
+            "WM_DELETE_WINDOW", self._on_close_future_draft_pool_overview_window
+        )
+
+    def _on_close_future_draft_pool_overview_window(self) -> None:
+        w = getattr(self, "_future_draft_pool_overview_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        except Exception:
+            pass
+        finally:
+            self._future_draft_pool_overview_window = None
+            self._future_draft_pool_overview_text = None
 
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
