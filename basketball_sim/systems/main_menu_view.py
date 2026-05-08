@@ -605,6 +605,14 @@ class MainMenuView:
         )
         self.future_draft_pool_overview_button.pack(fill="x", pady=5)
 
+        self.fa_market_overview_button = ttk.Button(
+            left_panel,
+            text="FA市場を見る",
+            style="Menu.TButton",
+            command=self._open_fa_market_overview_window,
+        )
+        self.fa_market_overview_button.pack(fill="x", pady=5)
+
         debug_skip_cb = self.menu_callbacks.get("DEBUG_SKIP_TO_OFFSEASON")
         self.debug_skip_button: Optional[ttk.Button] = None
         if callable(debug_skip_cb):
@@ -2347,6 +2355,262 @@ class MainMenuView:
         finally:
             self._future_draft_pool_overview_window = None
             self._future_draft_pool_overview_text = None
+
+    def _collect_fa_market_candidates(self) -> List[Any]:
+        """FA市場（閲覧専用）の読み取り。
+        正本は `Season.free_agents`。`self.season.free_agents` を最優先で読み取り、
+        無ければ `self.free_agents` / `self.team.free_agents` の順にフォールバック。
+        破壊・生成はせず、見つけたリストを `list(...)` でコピーして返す。
+        """
+        season = getattr(self, "season", None)
+        if season is not None:
+            try:
+                fa_attr = getattr(season, "free_agents", None)
+                if isinstance(fa_attr, list):
+                    return list(fa_attr)
+            except Exception:
+                pass
+        try:
+            fa_attr = getattr(self, "free_agents", None)
+            if isinstance(fa_attr, list):
+                return list(fa_attr)
+        except Exception:
+            pass
+        team = getattr(self, "team", None)
+        if team is not None:
+            try:
+                fa_attr = getattr(team, "free_agents", None)
+                if isinstance(fa_attr, list):
+                    return list(fa_attr)
+            except Exception:
+                pass
+        return []
+
+    def _format_fa_market_overview_text(
+        self, pool: Optional[List[Any]] = None
+    ) -> str:
+        """FA市場の閲覧専用本文（Tk非依存）。
+        - pool が None の場合は `_collect_fa_market_candidates()` から取得。
+        - 元リストは破壊せず、表示用にコピーしてソートする。
+        - FA 市場ロジック・獲得処理・契約年俸ロジックには一切干渉しない。
+          属性参照のみで、`ensure_fa_market_fields` 等の副作用がある関数は呼ばない。
+        """
+        if pool is None:
+            try:
+                pool = self._collect_fa_market_candidates()
+            except Exception:
+                pool = []
+        pool_list: List[Any] = list(pool or [])
+
+        lines: List[str] = []
+        lines.append("FA市場（閲覧専用）")
+        lines.append("")
+
+        if not pool_list:
+            lines.append("現在、表示できるFA候補はいません。")
+            lines.append(
+                "契約解除やオフシーズンの契約満了後にFA候補が増える場合があります。"
+            )
+            lines.append("")
+            lines.append(
+                "※ この窓は閲覧専用です。獲得は人事メニューの「インシーズンFA」または"
+            )
+            lines.append("　オフシーズン中のFA選択から行います。")
+            return "\n".join(lines)
+
+        lines.append(
+            "この一覧は、現在FA市場にいる選手です。"
+        )
+        lines.append("この窓では獲得・契約は行えません。")
+        lines.append(
+            "獲得は、人事メニューの「インシーズンFA」または"
+            "オフシーズン中のFA選択から行います。"
+        )
+        lines.append("")
+
+        _pot_rank = {"SS": 6, "S": 5, "A": 4, "B": 3, "C": 2, "D": 1}
+        _nat_ja = {
+            "Japan": "日本",
+            "Foreign": "外国籍",
+            "Asia": "アジア",
+            "Naturalized": "帰化",
+        }
+
+        def _pot_rank_of(p: Any) -> int:
+            s = str(getattr(p, "potential", "") or "").upper().strip()
+            if not s:
+                return 0
+            head = s[0:2] if s.startswith("SS") else s[0:1]
+            return _pot_rank.get(head, 0)
+
+        def _safe_int(v: Any) -> int:
+            try:
+                return int(v or 0)
+            except Exception:
+                return 0
+
+        def _salary_estimate(p: Any) -> int:
+            """`fa_pool_market_salary` を最優先、なければ `salary` を使う。
+            どちらも 0 / 取得失敗時は 0（行から省略する側で扱う）。
+            """
+            for key in ("fa_pool_market_salary", "salary"):
+                try:
+                    v = int(getattr(p, key, 0) or 0)
+                    if v > 0:
+                        return v
+                except Exception:
+                    continue
+            return 0
+
+        try:
+            sorted_pool = sorted(
+                pool_list,
+                key=lambda p: (
+                    -_safe_int(getattr(p, "ovr", 0)),
+                    -_pot_rank_of(p),
+                    _safe_int(getattr(p, "age", 0)),
+                    str(getattr(p, "name", "")),
+                ),
+            )
+        except Exception:
+            sorted_pool = list(pool_list)
+
+        lines.append(f"候補数：{len(sorted_pool)}人")
+        lines.append("")
+        lines.append("──────────────────────────────────")
+
+        for i, p in enumerate(sorted_pool, start=1):
+            name = str(getattr(p, "name", "?"))
+            pos = str(getattr(p, "position", "?") or "?")
+            age = _safe_int(getattr(p, "age", 0))
+            ovr = _safe_int(getattr(p, "ovr", 0))
+            pot = str(getattr(p, "potential", "?") or "?")
+            nat_key = str(getattr(p, "nationality", "") or "")
+            nat_text = _nat_ja.get(nat_key, nat_key) if nat_key else ""
+            sal = _salary_estimate(p)
+
+            base_parts = [
+                f"{i:>2}. {name}",
+                pos,
+                f"{age}歳",
+                f"OVR {ovr}",
+                f"POT {pot}",
+            ]
+            extras: List[str] = []
+            if nat_text:
+                extras.append(nat_text)
+            if sal > 0:
+                try:
+                    money_text = format_money_yen_ja_readable(sal)
+                except Exception:
+                    money_text = f"{sal:,}円"
+                extras.append(f"年俸目安 {money_text}")
+
+            row = " / ".join(base_parts)
+            if extras:
+                row = row + " / " + " / ".join(extras)
+            lines.append(row)
+
+        lines.append("──────────────────────────────────")
+        lines.append(
+            "※ この窓は閲覧専用です。獲得は人事メニューの「インシーズンFA」または"
+        )
+        lines.append("　オフシーズン中のFA選択から行います。")
+        return "\n".join(lines)
+
+    def _refresh_fa_market_overview_body(self) -> None:
+        tw = getattr(self, "_fa_market_overview_text", None)
+        if tw is None:
+            return
+        body = self._format_fa_market_overview_text()
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_fa_market_overview_window(self) -> None:
+        """FA市場（閲覧専用・別窓）。本文は `_format_fa_market_overview_text` に委譲。"""
+        parent = getattr(self, "root", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_fa_market_overview_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_fa_market_overview_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("FA市場")
+        w.geometry("760x560")
+        w.minsize(560, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            outer, text="FA市場", style="SectionTitle.TLabel"
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._fa_market_overview_window = w
+        self._fa_market_overview_text = tw
+        self._refresh_fa_market_overview_body()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_fa_market_overview_window,
+        ).pack(side="right")
+
+        w.protocol(
+            "WM_DELETE_WINDOW", self._on_close_fa_market_overview_window
+        )
+
+    def _on_close_fa_market_overview_window(self) -> None:
+        w = getattr(self, "_fa_market_overview_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        except Exception:
+            pass
+        finally:
+            self._fa_market_overview_window = None
+            self._fa_market_overview_text = None
 
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
