@@ -24,6 +24,7 @@ from typing import Any, Optional
 from basketball_sim.systems.highlight_camera_system import HighlightCameraSystem
 from basketball_sim.systems.highlight_selector import build_highlight_override_events_from_match
 from basketball_sim.systems.presentation_layer import PresentationLayer
+from basketball_sim.utils.game_logging import install_tk_callback_excepthook
 
 
 class SpectateView:
@@ -47,6 +48,7 @@ class SpectateView:
         self.spectate_mode = str(spectate_mode or "full").strip().lower()
 
         self.root = tk.Tk()
+        install_tk_callback_excepthook(self.root)
         self.ui_style = ttk.Style(self.root)
         self.root.title(
             "Basketball Project - Spectate View (Highlight)"

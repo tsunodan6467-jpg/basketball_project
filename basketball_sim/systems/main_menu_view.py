@@ -367,6 +367,7 @@ from basketball_sim.utils.user_settings import (
     normalize_user_settings,
     tk_binding_for,
 )
+from basketball_sim.utils.game_logging import install_tk_callback_excepthook
 
 
 MenuCallback = Callable[[], None]
@@ -474,6 +475,7 @@ class MainMenuView:
         self._injury_autorepair_task_supplement: str = ""
 
         self.root = root or tk.Tk()
+        install_tk_callback_excepthook(self.root)
         self.root.title(title)
         cfg = user_settings if user_settings is not None else load_user_settings()
         self.user_settings = deepcopy(normalize_user_settings(cfg))

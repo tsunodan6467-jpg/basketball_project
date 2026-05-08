@@ -61,6 +61,64 @@ def _write_last_crash(exc_type, exc_value, exc_tb) -> None:
         pass
 
 
+_TK_HOOK_FLAG_ATTR = "_basketball_sim_tk_excepthook_installed"
+
+
+def install_tk_callback_excepthook(root: Any) -> None:
+    """
+    Tk root の ``report_callback_exception`` を差し替え、Tk のイベントループ内
+    （ボタン押下等の callback）で発生した未処理例外を ``game.log`` と
+    ``last_crash.txt`` に記録する。
+
+    既存の ``sys.excepthook`` / ``threading.excepthook`` は変更しない。
+    Tk 経由の例外のみが追加で拾えるようになる。
+
+    多重インストールは ``root`` 上のフラグ属性で防止する。失敗時は黙ってスキップし、
+    アプリ全体の起動を妨げない。
+
+    Args:
+        root: ``report_callback_exception`` を持つ Tk ルートウィンドウ。
+              ``None`` または ``report_callback_exception`` を持たないオブジェクトには
+              何もしない。
+    """
+    if root is None:
+        return
+    if getattr(root, _TK_HOOK_FLAG_ATTR, False):
+        return
+    if not hasattr(root, "report_callback_exception"):
+        return
+
+    try:
+        original = getattr(root, "report_callback_exception", None)
+    except Exception:
+        original = None
+
+    def _tk_hook(exc_type, exc_value, exc_tb) -> None:
+        try:
+            log = logging.getLogger(_LOGGER_NAME)
+            log.error(
+                "Tk callback で未処理の例外が発生しました。",
+                exc_info=(exc_type, exc_value, exc_tb),
+            )
+        except Exception:
+            pass
+        try:
+            _write_last_crash(exc_type, exc_value, exc_tb)
+        except Exception:
+            pass
+        if callable(original):
+            try:
+                original(exc_type, exc_value, exc_tb)
+            except Exception:
+                pass
+
+    try:
+        root.report_callback_exception = _tk_hook
+        setattr(root, _TK_HOOK_FLAG_ATTR, True)
+    except Exception:
+        pass
+
+
 def _resolve_log_level(user_settings: Optional[Dict[str, Any]]) -> int:
     """環境変数優先。未設定なら user_settings の log_level、それも無ければ INFO。"""
     env = os.environ.get("BASKETBALL_SIM_LOG_LEVEL", "").strip().upper()
