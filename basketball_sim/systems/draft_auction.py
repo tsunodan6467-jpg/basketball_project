@@ -242,6 +242,40 @@ def _set_drafted_player_contract(player: Player, slot: str, bid: int) -> None:
     player.league_years = 0
 
 
+def _record_team_auction_draft_history(
+    team: Team, player: Player, slot: str, bid: int
+) -> None:
+    """オークションドラフト指名/落札の team.history_transactions 1 行追記。
+
+    通常ドラフト側 `draft._record_team_draft_history` と同じ transaction_type="draft"
+    で吸収する。直近オフ振り返り窓・将来の Godot 表示が「draft 行」として拾える形に揃える。
+    save 構造は変更しない。
+    """
+    add_hist = getattr(team, "add_history_transaction", None)
+    if not callable(add_hist):
+        return
+    try:
+        bid_str = f"{int(bid):,}"
+    except (TypeError, ValueError):
+        bid_str = str(bid)
+    note = (
+        f"auction_draft | "
+        f"slot={slot} | "
+        f"player={getattr(player, 'name', '')} | "
+        f"bid={bid_str} | "
+        f"ovr={getattr(player, 'ovr', 0)} | "
+        f"potential={getattr(player, 'potential', '?')}"
+    )
+    try:
+        add_hist(
+            transaction_type="draft",
+            player=player,
+            note=note,
+        )
+    except Exception:
+        pass
+
+
 def _add_player_to_team_and_trim(team: Team, player: Player, free_agents: List[Player]) -> None:
     team.add_player(player, force=True)
 
@@ -519,6 +553,7 @@ def conduct_auction_draft(
             charge, _ = _compute_charge_increment(team, min_price, cap)
             _apply_rookie_budget_charge(team, charge)
             _set_drafted_player_contract(p, slot=slot, bid=min_price)
+            _record_team_auction_draft_history(team, p, slot=slot, bid=min_price)
             _add_player_to_team_and_trim(team, p, free_agents)
             won_ids[id(team)].append(pid)
             used_player_ids.add(pid)
@@ -568,6 +603,7 @@ def conduct_auction_draft(
             charge, _ = _compute_charge_increment(winner, win_bid, cap)
             _apply_rookie_budget_charge(winner, charge)
             _set_drafted_player_contract(p, slot=slot, bid=win_bid)
+            _record_team_auction_draft_history(winner, p, slot=slot, bid=win_bid)
             _add_player_to_team_and_trim(winner, p, free_agents)
             won_ids[id(winner)].append(pid)
             used_player_ids.add(pid)

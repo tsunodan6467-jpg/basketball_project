@@ -194,3 +194,42 @@ def test_does_not_mutate_history_lists():
     assert tx == tx_before
     assert fh == fh_before
     assert ms == ms_before
+
+
+def test_resign_transaction_appears_in_main_personnel_list():
+    """resign の transaction_type が「主な人事・移籍」に拾われる。"""
+    team = SimpleNamespace(
+        name="残留クラブ",
+        players=[],
+        history_transactions=[
+            {
+                "transaction_type": "resign",
+                "player_name": "佐藤 一郎",
+                "note": "resign | player=佐藤 一郎 | salary=8,000,000 | years=2",
+            }
+        ],
+        finance_history=[],
+        history_milestones=[],
+    )
+    body = _fmt(team=team)
+    assert "再契約: 佐藤 一郎 と再契約" in body
+
+
+def test_auction_draft_transaction_appears_in_main_personnel_list():
+    """auction_draft の note を持つ draft 行が「主な人事・移籍」に拾われる。"""
+    team = SimpleNamespace(
+        name="ドラフトクラブ",
+        players=[],
+        history_transactions=[
+            {
+                "transaction_type": "draft",
+                "player_name": "新人 太郎",
+                "note": "auction_draft | slot=A | player=新人 太郎 | bid=12,000,000 | ovr=72 | potential=A",
+            }
+        ],
+        finance_history=[],
+        history_milestones=[],
+    )
+    body = _fmt(team=team)
+    assert "ドラフト: 新人 太郎" in body
+    assert "auction_draft" in body

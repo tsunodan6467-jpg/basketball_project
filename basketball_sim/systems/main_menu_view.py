@@ -2694,12 +2694,13 @@ class MainMenuView:
 
         # --- 人事・移籍（history_transactions） ---
         tx_rows = list(getattr(t, "history_transactions", None) or [])
-        wanted_types = {"free_agent", "trade", "release", "draft"}
+        wanted_types = {"free_agent", "trade", "release", "draft", "resign"}
         type_label = {
             "free_agent": "FA",
             "trade": "トレード",
             "release": "解雇/離脱",
             "draft": "ドラフト",
+            "resign": "再契約",
         }
         picked: List[dict] = []
         for row in reversed(tx_rows):
@@ -2722,6 +2723,11 @@ class MainMenuView:
                     note = note[:137] + "..."
                 if tt == "free_agent":
                     line = f"・{lab}: {pname} を獲得"
+                    if note:
+                        line += f"（{note}）"
+                    lines.append(line)
+                elif tt == "resign":
+                    line = f"・{lab}: {pname} と再契約"
                     if note:
                         line += f"（{note}）"
                     lines.append(line)

@@ -658,6 +658,41 @@ def apply_contract_extension(
     return True
 
 
+def _record_team_resign_history(
+    team: object, player: object, offer_salary: int, offer_years: int
+) -> None:
+    """再契約成立時の team.history_transactions 1 行追記。
+
+    既存スキーマ（transaction_type / player / note）に吸収する読み取り専用補助。
+    save 構造は変更しない。
+    """
+    add_hist = getattr(team, "add_history_transaction", None)
+    if not callable(add_hist):
+        return
+    try:
+        salary_str = f"{int(offer_salary):,}"
+    except (TypeError, ValueError):
+        salary_str = str(offer_salary)
+    try:
+        years_str = str(int(offer_years))
+    except (TypeError, ValueError):
+        years_str = str(offer_years)
+    note = (
+        f"resign | "
+        f"player={getattr(player, 'name', '')} | "
+        f"salary={salary_str} | "
+        f"years={years_str}"
+    )
+    try:
+        add_hist(
+            transaction_type="resign",
+            player=player,
+            note=note,
+        )
+    except Exception:
+        pass
+
+
 def apply_resign(
     team: object,
     player: object,
@@ -687,6 +722,8 @@ def apply_resign(
             event="Re-sign",
             note=f"{offer_years}Y / {offer_salary:,}"
         )
+
+    _record_team_resign_history(team, player, int(offer_salary), int(offer_years))
 
 
 
