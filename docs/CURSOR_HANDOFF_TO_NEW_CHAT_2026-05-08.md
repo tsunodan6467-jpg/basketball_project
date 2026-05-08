@@ -228,7 +228,7 @@ db72d5b オフシーズン進行ヒントとスカウトGUI既定選択を整理
 | `docs/PRODUCT_ROADMAP_AND_VISION.md` | Phase 0〜6 ・ドラフト・日程・製品ビジョンの正本。Phase 0 ★ 現在地。 |
 | `docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md` | Steamworks 再開状況・最終本文同期 2026-04-06。`--steam-diag` 初期化成功確認、SteamPipe default、実績 ACH_PHASE0_TEST 解除確認。 |
 | `docs/PHASE0_COMPLETION_TEMPLATE.md` | Phase 0 完了チェックリスト。配布・SDK 系は `[x]`、**ライセンス強制実機テスト・セーブ README・ストア「セーブはローカル」明記・クラッシュログ判定・GHA 継続が `[ ]`** 残。 |
-| `docs/IMPLEMENTATION_PLAN_MASTER.md` | Phase A〜D の実装順正本。直近最優先は §5.1 Steam 関連正本 docs の同期確定。Godot は主戦場外と明記。 |
+| `docs/IMPLEMENTATION_PLAN_MASTER.md` | Phase A〜D の実装順正本。**直近最優先は §5.1「Phase 0 残の 1 件化（実作業候補 5 項目の整理）」**（2026-05-08 同期）。旧「Steam 関連正本 docs の同期確定」は §11 ステップ 0 へ「2026-04-06 完了済み」として移動。Godot は主戦場外と明記。 |
 | `docs/CURRENT_STATE_ANALYSIS_MASTER.md` | 現状分析正本。Phase 0 ★ 現在地、tk 主画面 △、`.py` 約 120 本。 |
 | `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` | Godot 移行に向けた情報設計メモ（前タスクで追加）。13 章＋付録 A/B。データ正本表、画面優先順、後工程、移行時に壊さないもの等。 |
 | `docs/TACTICS_MENU_FULL_HANDOFF_2026-04.md` | 戦術メニュー引き継ぎ書。 |
@@ -390,28 +390,41 @@ Python 側と Godot 側で同じ処理を二重実装しない。
 ### 次にやるべき具体的タスク（1 つだけ）
 
 ```txt
-「Phase 0残の1件化（PRODUCT/Steam系docsとの整合確認を兼ねる）現状確認」指示書を作る。
+Phase 0 残 5 項目から 1 件選び、最初の実作業 PR を切る。
+（推奨: 「セーブ README（ルート README.md）」または「クラッシュログ判断」）
 ```
+
+### 直前タスクの確認結果（2026-05-08 docs 同期 PR 反映後）
+
+- `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12 を **Phase 0 残の 1 件化（実作業候補 5 項目）** へ更新済み。旧「Steam 関連正本 docs の同期確定」は §11 ステップ 0 へ「2026-04-06 完了済み」として移動。
+- `docs/PRODUCT_ROADMAP_AND_VISION.md` Phase 0 節を **完了済み（◎）** と **2026-05 時点の Phase 0 残 5 項目** に細分化。最終ロードマップ照合日を **2026-05-08** に更新。
+- `docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.7 §5.13 §6 §8.1 を `a807988` / `f8898a7` / `5aeaf81` に同期。
+- `docs/PHASE0_COMPLETION_TEMPLATE.md` に **§4「2026-05 時点の Phase 0 残 集約」** を追加（§3 の `[ ]` は実機確認なしには `[x]` 化していない）。
+
+### Phase 0 残 5 項目（2026-05 時点）
+
+1. **ライセンス強制実機テスト**（実機作業＋ docs）
+2. **セーブ README**（docs のみ・コード変更なし、最も低リスク）
+3. **ストア説明文への「セーブはローカル」明記**（人間作業＋ docs ドラフト）
+4. **クラッシュログ判断**（コード棚卸し＋ docs 判定）
+5. **GHA 継続判断**（CI 棚卸し＋ docs 判定）
 
 ### その際の注意
 
-- まず **現状確認のみ**から（実装・doc 編集に飛ばない）。
-- 確認対象ファイル：
-  - `docs/PRODUCT_ROADMAP_AND_VISION.md`（Phase 0 ★ 現在地の現状）
-  - `docs/IMPLEMENTATION_PLAN_MASTER.md`（§5.1 Steam 関連正本 docs の同期確定）
-  - `docs/CURRENT_STATE_ANALYSIS_MASTER.md`（Phase 0 ★ 現在地、tk 主画面 △）
-  - `docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md`（最終本文同期 2026-04-06、再開状況）
-  - `docs/PHASE0_COMPLETION_TEMPLATE.md`（Phase 0 完了チェックリスト：ライセンス強制実機テスト・セーブ README・ストア「セーブはローカル」明記・クラッシュログ判定・GHA 継続が `[ ]` のはず）
-- 確認の論点：
-  - 4 つの docs 間で「Phase 0 残として何が残っているか」の表現がズレていないか。
-  - 直近のリアリティ強化・Godot 情報設計メモ・履歴強化 小 PR（`a807988`）が docs に反映されておらず、Phase 表に温度差が残っていないか。
-  - **「Phase 0 残の 1 件化」**にするとしたら何を Phase 0 のクロージング基準にすべきか（出荷判断系か、doc 同期完了か、両方か）。
-  - Phase 4 着手の発火条件（PRODUCT / IMPLEMENTATION_PLAN 上）。
-- **不変条件**：
-  - コードを変更しない。
-  - docs 本体も**この調査ステップでは変更しない**（必要な書き換えは別 PR で）。
-  - `reports/*.txt` をコミットしない。`git add .` を使わない。
-- 完了条件：4 つの docs の現状要約と、Phase 0 残のクロージング案（A: 出荷判断ライン、B: doc 同期ライン、C: 両方）を比較した最終 Cursor 推奨案 1 つを提示する。
+- **1 タスク 1 PR**。複数項目を 1 コミットに混ぜない。
+- **`docs/PHASE0_COMPLETION_TEMPLATE.md` §3 の `[ ]` は実機作業 PR の中で同時に更新する**（先行して `[x]` に変えない）。
+- **Phase 4 / Godot 本実装に直接進まない**。少なくとも出荷判断系（クラッシュログ・GHA・ライセンス強制）と doc 系（セーブ README・ストア文面）の方針確定が済むまで保留。
+- `reports/*.txt` をコミットしない。`git add .` を使わない。
+- **不変条件**: save 構造変更なし、コア Player/Team/Season ロジック変更なし、`Offseason.run()` 順序変更なし。
+
+### 完了条件（次タスク）
+
+- 選んだ 1 項目について、`docs/PHASE0_COMPLETION_TEMPLATE.md` §3 の対応する `[ ]` を `[x]` に更新できる根拠（実機ログ／README 文面／判定欄）が揃っている。
+- 既存テスト維持・smoke ok。
+
+### 旧版（履歴メモ）
+
+- 旧 §12 は「Phase 0 残の 1 件化（PRODUCT/Steam 系 docs との整合確認を兼ねる）現状確認」指示書を作る、という現状確認段階の指示だった。**2026-05-08 の docs 同期 PR で確認結果を 4 docs に反映済み**のため、本 §12 は実作業フェーズへ進んだ。
 
 ---
 
@@ -479,4 +492,4 @@ rg -n "Phase 0|Steamworks|Steam 配布|セーブ README|ライセンス強制|GH
 
 ---
 
-**最終確認**: 2026-05-08（commit `a807988` 反映後）。本文書は新 Chat 移行用のスナップショットであり、コード・ロジック・save 構造を変更していない。次のアクションは **§12 の現状確認指示書（Phase 0 残の 1 件化）を作る**こと。
+**最終確認**: 2026-05-08（commit `a807988` 反映後、Phase 0 残 docs 同期 PR 反映後）。本文書は新 Chat 移行用のスナップショットであり、コード・ロジック・save 構造を変更していない。次のアクションは **§12 の Phase 0 残 5 項目から 1 件選んで実作業 PR を切る**こと。

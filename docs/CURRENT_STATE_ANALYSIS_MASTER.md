@@ -1,6 +1,7 @@
 # 国内バスケGM開発 現状分析書（正本）
 
 **第1版作成日**: 2026-04-06（ワークスペース上の日付基準）  
+**最終本文同期**: 2026-05-08（commit `a807988` / `5aeaf81` / `f8898a7` 反映）  
 **文書の性質**: 理想設計・実装計画ではなく、**リポジトリと参照 docs から読み取れる現状の整理**。推測で埋めない。  
 **更新**: コード・運用・正本 docs が変わったら本書を更新する。
 
@@ -136,11 +137,11 @@
 
 | 区分 | 内容 |
 |------|------|
-| 実装済み | **1対1（選手のみ）トレードは人事 GUI**（`main_menu_view` → `main` 共用ヘルパ・`TradeSystem`、2026-04-06）。**multi（複数人・現金・RB・自分→相手）は人事 GUI**（`execute_multi_trade` 経路、2026-04-06）。**CLI** からも `run_trade_menu` → multi（`trade_logic.py`）。**オフ再契約 y/n は GUI オフ実行中ダイアログ**（`offseason.py`＋`offseason_resign_tk` 注入、2026-04-07）。**オフ・本格FA（`conduct_free_agency`）直前の FA プール手動1人**は **GUI オフ実行時のみ**（`pre_conduct_free_agency_ui_prompt` → `offseason_full_fa_tk`、`sign_free_agent`、2026-04-06）。**インシーズン FA プールからの手動獲得は人事「インシーズンFA（1人）」**（1 名・`sign_free_agent`、2026-04-06）。**契約解除（FA送り）**は表で選手選択のうえ **トレード行＋下部の同一ハンドラ**（`_on_roster_release_selected`）。FA 市場・CPU インシーズン補強（`free_agent_market.py`, `season.py` 等）。ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。1対1 の相手候補は自チーム以外の **D1/D2/D3 全クラブ**（`Season.all_teams` / `main.get_trade_candidate_teams`）。 |
+| 実装済み | **1対1（選手のみ）トレードは人事 GUI**（`main_menu_view` → `main` 共用ヘルパ・`TradeSystem`、2026-04-06）。**multi（複数人・現金・RB・自分→相手）は人事 GUI**（`execute_multi_trade` 経路、2026-04-06）。**CLI** からも `run_trade_menu` → multi（`trade_logic.py`）。**オフ再契約 y/n は GUI オフ実行中ダイアログ**（`offseason.py`＋`offseason_resign_tk` 注入、2026-04-07）。**オフ・本格FA（`conduct_free_agency`）直前の FA プール手動1人**は **GUI オフ実行時のみ**（`pre_conduct_free_agency_ui_prompt` → `offseason_full_fa_tk`、`sign_free_agent`、2026-04-06）。**インシーズン FA プールからの手動獲得は人事「インシーズンFA（1人）」**（1 名・`sign_free_agent`、2026-04-06）。**契約解除（FA送り）**は表で選手選択のうえ **トレード行＋下部の同一ハンドラ**（`_on_roster_release_selected`）。FA 市場・CPU インシーズン補強（`free_agent_market.py`, `season.py` 等）。ドラフト（`draft.py`, `draft_auction.py`）。シーズン中取引締切（`season_transaction_rules.py`）。1対1 の相手候補は自チーム以外の **D1/D2/D3 全クラブ**（`Season.all_teams` / `main.get_trade_candidate_teams`）。**履歴記録**（commit `a807988`、2026-05）: **再契約**（`apply_resign`）が `team.history_transactions` に `transaction_type="resign"` を 1 行追加するようになった（`contract_logic._record_team_resign_history`）。**オークションドラフト**（`draft_auction.py` の `conduct_auction_draft` 一本釣り／競合落札）が、通常ドラフト（`draft.py` の `_record_team_draft_history`）と同型の `transaction_type="draft"`（note に `auction_draft` を含む）を `team.history_transactions` に 1 行追加するようになった（`draft_auction._record_team_auction_draft_history`）。直近オフ振り返り窓（`MainMenuView._format_offseason_result_recap_text`）はこれらを「再契約」「ドラフト」として表示する（`wanted_types` に `"resign"` 追加、`type_label` に `"resign": "再契約"` 追加）。 |
 | 暫定 | **未確認**。 |
 | 未実装 | `PRODUCT` は GUI からの同一ガード通過を **残** と記載。編成まわりの **その他 GUI 完結**は **未**（例: 本格 FA の **全面GUI**・交渉UI。オフ手動1人は **GUI オフ済**、レギュラー手動1人は **人事済**）。 |
 | 未確認 | 全 GUI 経路でのロック整合。 |
-| 主要ファイル | `basketball_sim/main.py`, `basketball_sim/models/offseason.py`, `basketball_sim/systems/trade_logic.py`, `basketball_sim/systems/free_agent_market.py`, `basketball_sim/systems/season_transaction_rules.py`, `basketball_sim/systems/main_menu_view.py`, `basketball_sim/systems/offseason_resign_tk.py`、`basketball_sim/systems/offseason_full_fa_tk.py`、FA年俸の事実整理 `docs/FA_SALARY_ESTIMATE_AUDIT.md`、整合方針 `docs/FA_SALARY_MODEL_ALIGNMENT_POLICY.md` |
+| 主要ファイル | `basketball_sim/main.py`, `basketball_sim/models/offseason.py`, `basketball_sim/systems/trade_logic.py`, `basketball_sim/systems/free_agent_market.py`, `basketball_sim/systems/season_transaction_rules.py`, `basketball_sim/systems/main_menu_view.py`, `basketball_sim/systems/offseason_resign_tk.py`、`basketball_sim/systems/offseason_full_fa_tk.py`、`basketball_sim/systems/contract_logic.py`、`basketball_sim/systems/draft_auction.py`、FA年俸の事実整理 `docs/FA_SALARY_ESTIMATE_AUDIT.md`、整合方針 `docs/FA_SALARY_MODEL_ALIGNMENT_POLICY.md` |
 
 ### 5.8 経営
 
@@ -197,19 +198,23 @@
 
 | 区分 | 内容 |
 |------|------|
-| 実装済み | **本リポジトリに Godot プロジェクトは含まれていない**（`docs/` を `Godot` で grep しても該当なし、2026-04-06 時点）。 |
+| 実装済み | **本リポジトリに Godot プロジェクト本体は含まれていない**（コード・プロジェクトファイルとしては未追加）。**情報設計メモ** `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` は **2026-05 時点で追加済み**（commit `f8898a7`）。Tk 仮 GUI の画面棚卸し・データ正本表・Godot 移行時に壊さないものなどを 13 章＋付録 A/B で扱う **情報設計メモ**（実装決定書ではない）。 |
 | 暫定 | — |
-| 未実装 | — |
+| 未実装 | Godot プロジェクト本体（`.godot` プロジェクトファイル・`.tscn` シーン・GDScript／C# コード）。`docs/IMPLEMENTATION_PLAN_MASTER.md` §3 の通り **Godot 全面移行は計画の主戦場にしない**方針。 |
 | 未確認 | ユーザー頭出しの「別エンジン候補」は **本リポジトリの事実としては記載なし**。 |
+| 主要ファイル | `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` |
 
 ---
 
 ## 6. ここまでに直した重要修正履歴
 
-**出典**: `git log`（2026-04-06 時点で直近に見えたコミット）。日付は commit 順。
+**出典**: `git log`（2026-05-08 同期時に追加した直近コミットを冒頭に追記）。日付は commit 順（新しいものほど上）。
 
 | コミット（短） | 内容（要約） |
 |----------------|--------------|
+| `5aeaf81` | docs: 新 Chat 引き継ぎ書を最新状態へ更新（`a807988` を反映、次工程を Phase 0 残の 1 件化に切替）。 |
+| `a807988` | 履歴強化: **再契約**（`apply_resign`）と**オークションドラフト**（一本釣り／競合落札）が `team.history_transactions` に 1 行記録されるようになった。直近オフ振り返り窓は `wanted_types` に `"resign"` を追加し、再契約とドラフトを表示。save 構造変更なし、`Offseason.run()` 順序変更なし。 |
+| `f8898a7` | docs: Godot 本番 GUI 向け情報設計メモ `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` を追加（実装決定書ではなく情報設計メモ）。 |
 | `707b84c` | CLI: トレード・再契約で **プロンプトを入力前に見せる**（flush・段階見出し）。 |
 | `9317b4f` | オーナー信頼: **軽微赤字の減点緩和**・**単年減点の下限ガード**。 |
 | `ea4da85` | Phase 0 方針: **クラウドセーブなし・Rich Presence なし**（v1）。 |
@@ -266,9 +271,9 @@
 
 ### 8.1 高優先（doc またはコード上の「残」「最優先」）
 
-- Phase 0 の残（クラッシュログ・設定・配布パイプラインの継続、`PRODUCT` Phase 0 一覧）。
+- **Phase 0 残の 1 件化（実作業候補 5 項目）**（2026-05 時点）: ① ライセンス強制実機テスト ／ ② セーブ README ／ ③ ストア説明文への「セーブはローカル」明記 ／ ④ クラッシュログ判断 ／ ⑤ GHA 継続判断。詳細は `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12、`docs/PHASE0_COMPLETION_TEMPLATE.md` の「2026-05 時点の Phase 0 残 集約」を正とする。
 - **GUI 主操作への寄せ**と **CLI 依存の縮小**（`PRODUCT`・引き継ぎ doc）。
-- **Steamworks の対外状態の実務確認**（パートナー画面で**都度**確認: ストア一般公開・発売審査・表示上の必須タスク等。**断定はリポジトリ単体では不可**）。Steam **主要 docs の相互同期**は **2026-04-06 完了**（`STEAMWORKS_STATUS`・`PRODUCT`・`STEAMWORKS_DESIGN`）。
+- **Steamworks の対外状態の実務確認**（パートナー画面で**都度**確認: ストア一般公開・発売審査・表示上の必須タスク等。**断定はリポジトリ単体では不可**）。Steam **主要 docs の相互同期**は **2026-04-06 完了**（`STEAMWORKS_STATUS`・`PRODUCT`・`STEAMWORKS_DESIGN`）→ 2026-05 時点で **再同期は不要**（事実に変化なし）。
 
 ### 8.2 中優先
 
@@ -351,3 +356,4 @@ Steam 診断: 上記 `--steam-diag`。**成功/失敗は環境依存**（DLL・S
 - 2026-04-06: §5.7 に **オフ・本格FA直前の手動1人GUI**（`offseason_full_fa_tk`）を追記。未実装行を全面GUIに限定。
 - 2026-04-06: §5.7 主要ファイルに `FA_SALARY_ESTIMATE_AUDIT.md` を追加。
 - 2026-04-06: §5.7 主要ファイルに `FA_SALARY_MODEL_ALIGNMENT_POLICY.md` を追加。
+- 2026-05-08: §5.7 履歴記録に commit `a807988`（再契約／オークションドラフトを `team.history_transactions` に追記）を反映。§5.13 に Godot 情報設計メモ `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`（commit `f8898a7`）追加を反映。§6 に `f8898a7` / `a807988` / `5aeaf81` を追加。§8.1 を「Phase 0 残の 1 件化（5 項目）」へ更新（`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 と整合）。

@@ -14,7 +14,7 @@
 **全体の流れ**  
 基盤完成 → 試合リアリティ強化 → GM モード・経営 → UI・演出 → 公開準備 → Steam 販売
 
-**コードベース**: `basketball_sim/` 配下（Python 約 34 ファイル規模）。**最終ロードマップ照合日: 2026-04-06**（Steam/Phase 0 運用記述を `docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md` と同期。ファイル数の目安句は旧記載のままなら `docs/CURRENT_STATE_ANALYSIS_MASTER.md` を参照）。
+**コードベース**: `basketball_sim/` 配下（Python **約 120 本規模**、`docs/CURRENT_STATE_ANALYSIS_MASTER.md` §1 を正）。**最終ロードマップ照合日: 2026-05-08**（Phase 0 残の現在地を `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12 と同期。Steam 主要 docs の相互同期は 2026-04-06 完了済み、`docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md` を正）。
 
 ---
 
@@ -33,13 +33,39 @@
 
 ## Phase 0〜6 の項目（一覧）
 
-### Phase 0: Steam 販売の技術・商業前提（□〜△）（★ 現在地・最優先）
+### Phase 0: Steam 販売の技術・商業前提（★ 現在地・最優先）
 
-- パッケージング（PyInstaller・Inno `installer/BasketballGM.iss`・署名スクリプト・CI）と依存関係の固定（requirements / pyproject）
-- セーブ・設定の永続化と検証
-- Steamworks SDK 統合（実績・クラウドセーブは要否決定）
-- クラッシュレポート・ログ（△ `logs/game.log` ローテーション・`last_crash.txt`・未処理例外フック）
-- キーバインド・ウィンドウ・解像度の最低限仕様
+**進捗ラベル**（2026-05-08 同期）: 配布・SDK ランタイム系は **◎**。出荷判断系・文言整備系は **△〜□**。詳細は `docs/PHASE0_COMPLETION_TEMPLATE.md` のチェック表と「2026-05 時点の Phase 0 残 集約」を参照。
+
+#### 完了済み（◎）
+
+- パッケージング（PyInstaller・`BasketballGM.exe`・`steam_api64.dll` 同階層・`steam_appid.txt` のデポ除外）
+- SteamPipe アップロード／default ブランチへのライブ設定
+- Steamworks SDK ランタイム導線（`SteamAPI_Init/Shutdown/RunCallbacks`、`pump_steam_callbacks`、`InitFlat` フォールバック）
+- 実績テスト（`ACH_PHASE0_TEST` を `RequestCurrentStats` 後に解除する経路で実機確認済み）
+- `--steam-diag` 経路（DLL 同階層・有効 App ID・Steam クライアント起動下で初期化成功ログ）
+- セーブ／設定の永続化と検証（pickle・`PAYLOAD_SCHEMA_VERSION`・移行フック・`test_phase0_smoke.py` 等）
+- v1 方針決定: クラウドセーブ／Rich Presence は **v1 対象外**（2026-04-05 決定。`PHASE0_COMPLETION_TEMPLATE.md` 上表）
+- Steam 主要 docs 相互同期（`PRODUCT_ROADMAP_AND_VISION.md` / `STEAMWORKS_STATUS_AND_RESUME_MEMO.md` / `STEAMWORKS_DESIGN.md`、2026-04-06 完了。`docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.12 §8.1 を正）
+
+#### 2026-05 時点の Phase 0 残（実作業候補 5 項目・1 件ずつチケット化する）
+
+1. **ライセンス強制実機テスト**（`enforce_steam_license` の未購入時挙動・強制終了ポリシー）
+2. **セーブ README**（ルート `README.md` に Steam 版起動・セーブ所在・トラブルシュート追記）
+3. **ストア説明文への「セーブはローカル」明記**（パートナー画面、人間作業）
+4. **クラッシュログ判断**（`game.log` ローテ・`last_crash.txt`・未処理例外フックの「出荷してよい水準か」判定）
+5. **GHA 継続判断**（`.github/workflows/` の pytest ＋ Win ビルド継続方針の判定）
+
+#### 後工程・人間作業（パートナー画面で都度確認、本 Phase 0 残の対象外）
+
+- ストア一般公開
+- 最終発売審査
+- 税務／本人確認の現在表示確認
+
+#### 補足
+
+- キーバインド・ウィンドウ・解像度の最低限仕様（`settings.json` の window / fullscreen、`key_bindings.close_subwindow` 既定 `<Escape>`）は実装済（`CURRENT_STATE_ANALYSIS_MASTER.md` §1 を正）。
+- **Phase 4 / Godot 本実装に進む前**に、上記 Phase 0 残 5 項目のうち少なくとも出荷判断系（クラッシュログ・GHA・ライセンス強制）と doc 系（セーブ README・ストア文面）の方針確定を済ませる。`docs/IMPLEMENTATION_PLAN_MASTER.md` §11 と整合。
 
 ### Phase 1: 基盤構築（△〜◎）
 
