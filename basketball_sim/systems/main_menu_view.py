@@ -589,40 +589,64 @@ class MainMenuView:
             anchor="w", pady=(18, 6)
         )
 
+        aux_buttons_frame = ttk.Frame(left_panel, style="Root.TFrame")
+        aux_buttons_frame.pack(fill="x", pady=(0, 2))
+        aux_buttons_frame.columnconfigure(0, weight=1)
+        aux_buttons_frame.columnconfigure(1, weight=1)
+        _aux_pad = {"padx": 3, "pady": 3}
+
         self.offseason_flow_overview_button = ttk.Button(
-            left_panel,
-            text="オフシーズンの流れを見る",
+            aux_buttons_frame,
+            text="オフの流れ",
             style="Menu.TButton",
             command=self._open_offseason_flow_overview_window,
         )
-        self.offseason_flow_overview_button.pack(fill="x", pady=5)
+        self.offseason_flow_overview_button.grid(
+            row=0, column=0, sticky="ew", **_aux_pad
+        )
 
         self.future_draft_pool_overview_button = ttk.Button(
-            left_panel,
-            text="来年ドラフト候補を見る",
+            aux_buttons_frame,
+            text="来年候補",
             style="Menu.TButton",
             command=self._open_future_draft_pool_overview_window,
         )
-        self.future_draft_pool_overview_button.pack(fill="x", pady=5)
+        self.future_draft_pool_overview_button.grid(
+            row=0, column=1, sticky="ew", **_aux_pad
+        )
 
         self.fa_market_overview_button = ttk.Button(
-            left_panel,
-            text="FA市場を見る",
+            aux_buttons_frame,
+            text="FA市場",
             style="Menu.TButton",
             command=self._open_fa_market_overview_window,
         )
-        self.fa_market_overview_button.pack(fill="x", pady=5)
+        self.fa_market_overview_button.grid(
+            row=1, column=0, sticky="ew", **_aux_pad
+        )
+
+        self.offseason_result_recap_button = ttk.Button(
+            aux_buttons_frame,
+            text="直近オフ",
+            style="Menu.TButton",
+            command=self._open_offseason_result_recap_window,
+        )
+        self.offseason_result_recap_button.grid(
+            row=1, column=1, sticky="ew", **_aux_pad
+        )
 
         debug_skip_cb = self.menu_callbacks.get("DEBUG_SKIP_TO_OFFSEASON")
         self.debug_skip_button: Optional[ttk.Button] = None
         if callable(debug_skip_cb):
             self.debug_skip_button = ttk.Button(
-                left_panel,
+                aux_buttons_frame,
                 text="デバッグ: オフシーズンまで飛ばす",
                 style="DebugSkip.TButton",
                 command=debug_skip_cb,
             )
-            self.debug_skip_button.pack(fill="x", pady=5)
+            self.debug_skip_button.grid(
+                row=2, column=0, columnspan=2, sticky="ew", **_aux_pad
+            )
 
         # Center / right: 行高は各列フレーム内で独立。横は Panedwindow＋初期サッシュで
         # 「次の試合・クラブ状況」を広く、「今やること・ニュース・次へ」を狭く固定（weight だけだと
@@ -2611,6 +2635,410 @@ class MainMenuView:
         finally:
             self._fa_market_overview_window = None
             self._fa_market_overview_text = None
+
+    def _format_offseason_result_recap_text(
+        self, team: Any = None, season: Any = None
+    ) -> str:
+        """直近オフの振り返り本文（閲覧専用・Tk非依存）。
+
+        `team` / `season` はテスト用に差し替え可能。未指定時は `self.team` を参照する。
+        永続データの読み取りのみ。リストは破壊しない。
+        """
+        _ = season  # 将来: シーズン文脈での絞り込み用に予約
+        t = team if team is not None else getattr(self, "team", None)
+
+        lines: List[str] = []
+        lines.append("直近オフシーズンの振り返り（閲覧専用）")
+        lines.append("")
+        lines.append(
+            "この画面は、現在保存されているクラブ履歴・取引履歴・財務履歴・昇降格記録から"
+            "確認できる範囲をまとめたものです。"
+        )
+        lines.append(
+            "再契約やオークションドラフト指名など、一部の出来事は現状の履歴データだけでは"
+            "詳細表示できない場合があります。"
+        )
+        lines.append("")
+
+        if t is None:
+            lines.append("【クラブ】（チーム未設定）")
+            lines.append("")
+            lines.append("【主な人事・移籍】")
+            lines.append("・確認できる取引履歴はまだありません（チーム未設定）。")
+            lines.append("")
+            lines.append("【ドラフト・新人】")
+            lines.append(
+                "・現状の履歴データだけでは、オークションドラフト指名結果の詳細は限定的です。"
+            )
+            lines.append("")
+            lines.append("【財務決算】")
+            lines.append("・直近の財務履歴はまだ確認できません。")
+            lines.append("")
+            lines.append("【昇降格・クラブ史】")
+            lines.append("・直近の昇降格記録は確認できません。")
+            lines.append("")
+            lines.append("【注記】")
+            lines.append(
+                "・再契約の詳細は、チーム取引履歴（history_transactions）からは限定的です。"
+            )
+            lines.append(
+                "・オークション形式のドラフト指名は、チームの draft 取引行が無い場合が多く、"
+                "ロスター上の新人フラグで分かる範囲に留まります。"
+            )
+            lines.append("・この窓は閲覧専用です。結果の保存方式や処理ロジックは変更していません。")
+            return "\n".join(lines)
+
+        club_name = str(getattr(t, "name", "") or "").strip() or "（名称不明）"
+        lines.append(f"【クラブ】{club_name}")
+        lines.append("")
+
+        # --- 人事・移籍（history_transactions） ---
+        tx_rows = list(getattr(t, "history_transactions", None) or [])
+        wanted_types = {"free_agent", "trade", "release", "draft"}
+        type_label = {
+            "free_agent": "FA",
+            "trade": "トレード",
+            "release": "解雇/離脱",
+            "draft": "ドラフト",
+        }
+        picked: List[dict] = []
+        for row in reversed(tx_rows):
+            if not isinstance(row, dict):
+                continue
+            tt = str(row.get("transaction_type", "") or "").strip().lower()
+            if tt in wanted_types:
+                picked.append(row)
+            if len(picked) >= 12:
+                break
+
+        lines.append("【主な人事・移籍】")
+        if picked:
+            for row in picked:
+                tt = str(row.get("transaction_type", "") or "").strip().lower()
+                lab = type_label.get(tt, tt or "取引")
+                pname = str(row.get("player_name", "") or "").strip() or "（選手名不明）"
+                note = str(row.get("note", "") or "").strip()
+                if len(note) > 140:
+                    note = note[:137] + "..."
+                if tt == "free_agent":
+                    line = f"・{lab}: {pname} を獲得"
+                    if note:
+                        line += f"（{note}）"
+                    lines.append(line)
+                else:
+                    frag = f"・{lab}: {pname}"
+                    if note:
+                        frag += f" — {note}"
+                    lines.append(frag)
+        else:
+            lines.append("・該当する取引履歴はまだありません。")
+
+        # 選手キャリアから再契約・延長の痕跡（読める場合のみ）
+        resign_lines: List[str] = []
+        players = list(getattr(t, "players", None) or [])
+        for p in players:
+            ch = getattr(p, "career_history", None) or []
+            if not isinstance(ch, list) or not ch:
+                continue
+            for row in ch[-2:]:
+                if not isinstance(row, dict):
+                    continue
+                ev = str(row.get("event", "") or "").strip()
+                if ev not in ("Re-sign", "Contract Extension"):
+                    continue
+                note = str(row.get("note", "") or "").strip()
+                tail = f" — {note}" if note else ""
+                resign_lines.append(
+                    f"・（選手キャリア）{getattr(p, 'name', '?')} : {ev}{tail}"
+                )
+                if len(resign_lines) >= 5:
+                    break
+            if len(resign_lines) >= 5:
+                break
+        if resign_lines:
+            lines.append("・再契約・延長の記録（選手キャリアから読み取れる範囲）:")
+            lines.extend(resign_lines[:5])
+        else:
+            lines.append(
+                "・再契約の詳細は、現状のチーム取引履歴からは限定的です。"
+                "（選手キャリアに Re-sign / Contract Extension があれば上に表示されます）"
+            )
+        lines.append("")
+
+        # --- ドラフト・新人 ---
+        lines.append("【ドラフト・新人】")
+        has_draft_tx = any(
+            isinstance(r, dict)
+            and str(r.get("transaction_type", "") or "").strip().lower() == "draft"
+            for r in tx_rows
+        )
+        if not has_draft_tx:
+            lines.append(
+                "・現状の履歴データだけでは、オークションドラフト指名結果の詳細は限定的です。"
+            )
+        else:
+            lines.append("・取引履歴にドラフト（draft）行があります（上の人事・移籍を参照）。")
+
+        rookie_rows: List[str] = []
+        seen_players: set[int] = set()
+        for p in players:
+            acq = str(getattr(p, "acquisition_type", "") or "").strip().lower()
+            is_rookie = bool(getattr(p, "is_draft_rookie_contract", False))
+            if not (acq == "draft" or is_rookie):
+                continue
+            oid = id(p)
+            if oid in seen_players:
+                continue
+            seen_players.add(oid)
+            nm = str(getattr(p, "name", "") or "?")
+            note = str(getattr(p, "acquisition_note", "") or "").strip()
+            lock = getattr(p, "draft_rookie_locked_salary", None)
+            bits = []
+            if note:
+                bits.append(note)
+            if lock is not None:
+                try:
+                    bits.append(f"ルーキー年俸ロック: {int(lock):,}円")
+                except (TypeError, ValueError):
+                    bits.append(f"ルーキー年俸ロック: {lock}")
+            tail = " / ".join(bits) if bits else "（詳細ノートなし）"
+            rookie_rows.append(f"・{nm} — {tail}")
+
+        if rookie_rows:
+            lines.append("・ロスター上の新人契約フラグから確認できる範囲:")
+            lines.extend(rookie_rows[:10])
+        else:
+            if not has_draft_tx:
+                lines.append(
+                    "・ロスターから新人ドラフト扱いと判定できる選手は見つかりませんでした。"
+                )
+        lines.append("")
+
+        # --- 財務 ---
+        lines.append("【財務決算】")
+        fh = list(getattr(t, "finance_history", None) or [])
+        if fh:
+            latest = fh[-1]
+            if isinstance(latest, dict):
+                rev = latest.get("revenue")
+                exp = latest.get("expense")
+                cf = latest.get("cashflow")
+                end_m = latest.get("ending_money")
+                try:
+                    cf_int = int(cf) if cf is not None else None
+                except (TypeError, ValueError):
+                    cf_int = None
+                if cf_int is None and rev is not None and exp is not None:
+                    try:
+                        cf_int = int(rev) - int(exp)
+                    except (TypeError, ValueError):
+                        pass
+                if cf_int is not None:
+                    if cf_int > 0:
+                        cf_label = "黒字"
+                    elif cf_int < 0:
+                        cf_label = "赤字"
+                    else:
+                        cf_label = "収支ゼロ"
+                    lines.append(f"・直近決算（finance_history 最新）: {cf_label}（収支 {cf_int:+,} 円）")
+                else:
+                    lines.append("・直近決算: 収支の数値は finance_history から読み取れませんでした。")
+                parts = []
+                if rev is not None:
+                    try:
+                        parts.append(f"売上 {int(rev):,} 円")
+                    except (TypeError, ValueError):
+                        parts.append(f"売上 {rev}")
+                if exp is not None:
+                    try:
+                        parts.append(f"支出 {int(exp):,} 円")
+                    except (TypeError, ValueError):
+                        parts.append(f"支出 {exp}")
+                if end_m is not None:
+                    try:
+                        parts.append(f"締め後所持金 {int(end_m):,} 円")
+                    except (TypeError, ValueError):
+                        parts.append(f"締め後所持金 {end_m}")
+                if parts:
+                    lines.append("・" + " / ".join(parts))
+                nnote = str(latest.get("note", "") or "").strip()
+                if nnote and len(nnote) <= 200:
+                    lines.append(f"・メモ: {nnote}")
+            else:
+                lines.append("・財務履歴の最新要素の形式が想定外です。")
+        else:
+            rev_ls = getattr(t, "revenue_last_season", None)
+            exp_ls = getattr(t, "expense_last_season", None)
+            cf_ls = getattr(t, "cashflow_last_season", None)
+            money = getattr(t, "money", None)
+            if any(x is not None for x in (rev_ls, exp_ls, cf_ls, money)):
+                try:
+                    cf_int = int(cf_ls) if cf_ls is not None else None
+                except (TypeError, ValueError):
+                    cf_int = None
+                if cf_int is not None:
+                    cf_label = "黒字" if cf_int > 0 else ("赤字" if cf_int < 0 else "収支ゼロ")
+                    lines.append(
+                        f"・直近シーズン締め（チーム集計フィールド）: {cf_label} "
+                        f"（収支 {cf_int:+,} 円）"
+                    )
+                else:
+                    lines.append("・直近シーズン締め: 収支は数値として確認できませんでした。")
+                frag = []
+                if rev_ls is not None:
+                    try:
+                        frag.append(f"売上 {int(rev_ls):,} 円")
+                    except (TypeError, ValueError):
+                        frag.append(f"売上 {rev_ls}")
+                if exp_ls is not None:
+                    try:
+                        frag.append(f"支出 {int(exp_ls):,} 円")
+                    except (TypeError, ValueError):
+                        frag.append(f"支出 {exp_ls}")
+                if money is not None:
+                    try:
+                        frag.append(f"現在資金 {int(money):,} 円")
+                    except (TypeError, ValueError):
+                        frag.append(f"現在資金 {money}")
+                if frag:
+                    lines.append("・" + " / ".join(frag))
+            else:
+                lines.append("・直近の財務履歴はまだ確認できません。")
+        lines.append("")
+
+        # --- 昇降格 ---
+        lines.append("【昇降格・クラブ史】")
+        ms = list(getattr(t, "history_milestones", None) or [])
+        pr_rows: List[dict] = []
+        for row in reversed(ms):
+            if not isinstance(row, dict):
+                continue
+            mt = str(row.get("milestone_type") or row.get("type") or "").strip().lower()
+            if mt in ("promoted", "relegated"):
+                pr_rows.append(row)
+            if len(pr_rows) >= 6:
+                break
+        if pr_rows:
+            for row in pr_rows:
+                mt = str(row.get("milestone_type") or row.get("type") or "").strip().lower()
+                title = str(row.get("title", "") or "").strip()
+                detail = str(row.get("detail", "") or "").strip()
+                if mt == "promoted":
+                    head = "昇格"
+                elif mt == "relegated":
+                    head = "降格"
+                else:
+                    head = mt or "記録"
+                body = " / ".join(x for x in (title, detail) if x) or "（詳細なし）"
+                lines.append(f"・{head}: {body}")
+        else:
+            lines.append("・直近の昇降格記録は確認できません。")
+        lines.append("")
+
+        lines.append("【注記】")
+        lines.append(
+            "・再契約の詳細は、チーム取引履歴（history_transactions）からは限定的です。"
+        )
+        lines.append(
+            "・オークション形式のドラフト指名は、チームの draft 取引行が無い場合が多く、"
+            "ロスター上の新人フラグで分かる範囲に留まります。"
+        )
+        lines.append("・この窓は閲覧専用です。結果の保存方式や処理ロジックは変更していません。")
+        return "\n".join(lines)
+
+    def _refresh_offseason_result_recap_body(self) -> None:
+        tw = getattr(self, "_offseason_result_recap_text", None)
+        if tw is None:
+            return
+        body = self._format_offseason_result_recap_text()
+        try:
+            tw.configure(state="normal")
+            tw.delete("1.0", tk.END)
+            tw.insert("1.0", body)
+            tw.configure(state="disabled")
+        except tk.TclError:
+            pass
+
+    def _open_offseason_result_recap_window(self) -> None:
+        """直近オフの振り返り（閲覧専用・別窓）。本文は `_format_offseason_result_recap_text` に委譲。"""
+        parent = getattr(self, "root", None)
+        try:
+            if parent is None or not parent.winfo_exists():
+                parent = self.root
+        except Exception:
+            parent = self.root
+
+        existing = getattr(self, "_offseason_result_recap_window", None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                self._refresh_offseason_result_recap_body()
+                return
+        except Exception:
+            pass
+
+        w = tk.Toplevel(parent)
+        w.title("直近オフシーズンの振り返り")
+        w.geometry("780x580")
+        w.minsize(560, 360)
+        w.configure(bg="#15171c")
+        try:
+            w.transient(parent)
+        except Exception:
+            pass
+
+        outer = ttk.Frame(w, style="Root.TFrame", padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.rowconfigure(1, weight=1)
+        outer.columnconfigure(0, weight=1)
+
+        ttk.Label(
+            outer, text="直近オフシーズンの振り返り", style="SectionTitle.TLabel"
+        ).grid(row=0, column=0, sticky="w", pady=(0, 8))
+
+        tw = scrolledtext.ScrolledText(
+            outer,
+            height=24,
+            wrap="word",
+            bg="#222834",
+            fg="#d6dbe3",
+            insertbackground="#d6dbe3",
+            font=("Yu Gothic UI", 10),
+            relief="flat",
+            borderwidth=0,
+            highlightthickness=0,
+            padx=10,
+            pady=10,
+        )
+        tw.grid(row=1, column=0, sticky="nsew")
+        self._offseason_result_recap_window = w
+        self._offseason_result_recap_text = tw
+        self._refresh_offseason_result_recap_body()
+
+        btn_row = ttk.Frame(outer, style="Panel.TFrame", padding=(0, 8, 0, 0))
+        btn_row.grid(row=2, column=0, sticky="ew")
+        ttk.Button(
+            btn_row,
+            text="閉じる",
+            style="Menu.TButton",
+            command=self._on_close_offseason_result_recap_window,
+        ).pack(side="right")
+
+        w.protocol(
+            "WM_DELETE_WINDOW", self._on_close_offseason_result_recap_window
+        )
+
+    def _on_close_offseason_result_recap_window(self) -> None:
+        w = getattr(self, "_offseason_result_recap_window", None)
+        try:
+            if w is not None and w.winfo_exists():
+                w.destroy()
+        except Exception:
+            pass
+        finally:
+            self._offseason_result_recap_window = None
+            self._offseason_result_recap_text = None
 
     def _refresh_next_game(self) -> None:
         info = self._build_next_game_info()
