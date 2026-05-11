@@ -114,7 +114,7 @@ func _clear_rows() -> void:
 
 func _add_table_header_row() -> void:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 8)
 	var headers: Array[String] = [
 		"#", "選手名", "Pos", "年齢", "OVR", "年俸", "契約", "区分", "状態",
 	]
@@ -122,8 +122,9 @@ func _add_table_header_row() -> void:
 		var h: String = headers[i]
 		var lab := Label.new()
 		lab.text = h
-		lab.add_theme_color_override("font_color", Color(0.72, 0.78, 0.88, 1))
-		lab.add_theme_font_size_override("font_size", 11)
+		# データ行と同じサイズで、色だけ少し明るくして区別（背景・テーマ追加はしない）
+		lab.add_theme_color_override("font_color", Color(0.82, 0.88, 0.96, 1))
+		lab.add_theme_font_size_override("font_size", 12)
 		lab.custom_minimum_size.x = _col_width(i)
 		lab.clip_text = true
 		row.add_child(lab)
@@ -134,7 +135,8 @@ func _add_table_header_row() -> void:
 
 
 func _col_width(idx: int) -> float:
-	var w: Array[float] = [28.0, 148.0, 36.0, 44.0, 52.0, 100.0, 72.0, 100.0, 120.0]
+	# # / 選手名 / Pos / 年齢 / OVR / 年俸 / 契約 / 区分 / 状態（1280幅内・横スクロールなし前提）
+	var w: Array[float] = [32.0, 176.0, 36.0, 44.0, 52.0, 106.0, 80.0, 100.0, 136.0]
 	if idx >= 0 and idx < w.size():
 		return w[idx]
 	return 80.0
@@ -142,9 +144,9 @@ func _col_width(idx: int) -> float:
 
 func _add_player_row(p: Dictionary) -> void:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 8)
 
-	var order_s := _str_cell(p.get("order", null))
+	var order_s := _order_cell(p.get("order", null))
 	var name_s := _str_cell(p.get("name", null))
 	var pos_s := _str_cell(p.get("position", null))
 	var age_s := _age_cell(p.get("age", null))
@@ -167,6 +169,13 @@ func _add_player_row(p: Dictionary) -> void:
 		lab.add_theme_font_size_override("font_size", 12)
 		lab.custom_minimum_size.x = _col_width(i)
 		lab.clip_text = true
+		if i == 1:
+			# 長い名前が clip されたとき全文を確認できるようにする（autowrap は使わない）
+			var name_raw := p.get("name", null)
+			if name_s != "-" and name_raw != null:
+				var tip := str(name_raw).strip_edges()
+				if not tip.is_empty():
+					lab.tooltip_text = tip
 		row.add_child(lab)
 	_row_list.add_child(row)
 
@@ -202,6 +211,26 @@ func _str_cell(v: Variant) -> String:
 		return "-"
 	var s := str(v).strip_edges()
 	return s if not s.is_empty() else "-"
+
+
+func _order_cell(v: Variant) -> String:
+	## JSON パース後に order が float になる環境でも「1.0」表記を避け、整数として表示する。
+	if v == null:
+		return "-"
+	if typeof(v) == TYPE_INT:
+		return str(v)
+	if typeof(v) == TYPE_FLOAT:
+		return str(int(v))
+	if typeof(v) == TYPE_STRING:
+		var st := str(v).strip_edges()
+		if st.is_empty():
+			return "-"
+		if st.is_valid_int():
+			return str(st.to_int())
+		if st.is_valid_float():
+			return str(int(st.to_float()))
+		return "-"
+	return "-"
 
 
 func _age_cell(v: Variant) -> String:
