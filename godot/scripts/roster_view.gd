@@ -116,7 +116,7 @@ func _add_table_header_row() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	var headers: Array[String] = [
-		"#", "選手名", "Pos", "年齢", "OVR", "年俸", "契約", "区分", "状態",
+		"#", "選手名", "Pos", "年齢", "OVR", "年俸", "残り契約", "区分", "状態",
 	]
 	for i in range(headers.size()):
 		var h: String = headers[i]
@@ -135,7 +135,7 @@ func _add_table_header_row() -> void:
 
 
 func _col_width(idx: int) -> float:
-	# # / 選手名 / Pos / 年齢 / OVR / 年俸 / 契約 / 区分 / 状態（1280幅内・横スクロールなし前提）
+	# # / 選手名 / Pos / 年齢 / OVR / 年俸 / 残り契約 / 区分 / 状態（1280幅内・横スクロールなし前提）
 	var w: Array[float] = [32.0, 176.0, 36.0, 44.0, 52.0, 106.0, 80.0, 100.0, 136.0]
 	if idx >= 0 and idx < w.size():
 		return w[idx]
@@ -154,9 +154,7 @@ func _add_player_row(p: Dictionary) -> void:
 	var sal_s := _str_cell(p.get("salary_label", null))
 	if sal_s == "-":
 		sal_s = _str_cell(p.get("salary", null))
-	var con_s := _str_cell(p.get("contract_label", null))
-	if con_s == "-":
-		con_s = _str_cell(p.get("contract", null))
+	var con_s := _contract_cell(p)
 	var nat_s := _str_cell(p.get("nationality_slot", null))
 	var st_s := _str_cell(p.get("status", null))
 
@@ -169,6 +167,8 @@ func _add_player_row(p: Dictionary) -> void:
 		lab.add_theme_font_size_override("font_size", 12)
 		lab.custom_minimum_size.x = _col_width(i)
 		lab.clip_text = true
+		if i == 5:
+			lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if i == 1:
 			# 長い名前が clip されたとき全文を確認できるようにする（autowrap は使わない）
 			var name_raw: Variant = p.get("name", null)
@@ -246,8 +246,34 @@ func _ovr_cell(v: Variant) -> String:
 	if v == null:
 		return "-"
 	if typeof(v) in [TYPE_INT, TYPE_FLOAT]:
-		return "OVR %d" % int(v)
+		return str(int(v))
 	return "-"
+
+
+func _contract_cell(p: Dictionary) -> String:
+	## contract_years_left を優先し、無ければ contract_label / contract を「N年」表記に寄せる（DTOは変更しない）。
+	var cy: Variant = p.get("contract_years_left", null)
+	if cy != null:
+		if typeof(cy) in [TYPE_INT, TYPE_FLOAT]:
+			var n: int = int(cy)
+			if n >= 0:
+				return "%d年" % n
+		elif typeof(cy) == TYPE_STRING:
+			var cys: String = str(cy).strip_edges()
+			if cys.is_valid_int():
+				var ni: int = cys.to_int()
+				if ni >= 0:
+					return "%d年" % ni
+
+	var lab_s := _str_cell(p.get("contract_label", null))
+	if lab_s == "-":
+		lab_s = _str_cell(p.get("contract", null))
+	if lab_s == "-" or lab_s.is_empty():
+		return "-"
+	var display: String = lab_s.strip_edges().trim_prefix("残り").strip_edges()
+	if display.is_empty():
+		return "-"
+	return display
 
 
 func _on_home_nav_button_pressed() -> void:
