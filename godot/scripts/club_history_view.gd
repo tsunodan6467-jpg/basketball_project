@@ -164,12 +164,18 @@ func _fill_scroll_body(d: Dictionary) -> void:
 		for item in events:
 			if typeof(item) != TYPE_DICTIONARY:
 				continue
-			var ev := item as Dictionary
-			var ord_s := _str_cell(ev.get("order", null))
-			var lab := _str_cell(ev.get("label", null))
-			var body := _str_cell(ev.get("text", null))
-			var line := "%s. [%s] %s" % [ord_s, lab, body]
-			_add_scroll_paragraph(line, 12, Color(0.86, 0.9, 0.96, 1))
+			var ev: Dictionary = item as Dictionary
+			var ord_s: String = _order_cell(ev.get("order", null))
+			var raw_label: Variant = ev.get("label", null)
+			var label_s: String = str(raw_label).strip_edges()
+			if label_s.is_empty():
+				label_s = "出来事"
+			var raw_text: Variant = ev.get("text", null)
+			var text_s: String = _str_cell(raw_text)
+			var heading: String = "%s. %s" % [ord_s, label_s]
+			_add_scroll_paragraph(heading, 12, Color(0.9, 0.94, 0.99, 1))
+			var body_line: String = "   %s" % text_s
+			_add_scroll_paragraph(body_line, 12, Color(0.72, 0.76, 0.84, 1))
 
 
 func _add_scroll_heading(text: String) -> void:
@@ -281,6 +287,26 @@ func _str_cell(v: Variant) -> String:
 		return "-"
 	var s := str(v).strip_edges()
 	return s if not s.is_empty() else "-"
+
+
+func _order_cell(v: Variant) -> String:
+	## JSON パース後に order が float になる環境でも「1.0」表記を避け、整数として表示する。
+	if v == null:
+		return "-"
+	if typeof(v) == TYPE_INT:
+		return str(v)
+	if typeof(v) == TYPE_FLOAT:
+		return str(int(v))
+	if typeof(v) == TYPE_STRING:
+		var st: String = str(v).strip_edges()
+		if st.is_empty():
+			return "-"
+		if st.is_valid_int():
+			return str(st.to_int())
+		if st.is_valid_float():
+			return str(int(st.to_float()))
+		return "-"
+	return "-"
 
 
 func _int_display(v: Variant) -> String:
