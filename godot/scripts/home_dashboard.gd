@@ -1,12 +1,12 @@
 extends Control
 
-## ホーム表示用データの取得元（将来: Python 生成 JSON 用のキーを追加）。
-const _DATA_URIS := {
-	"mock": "res://data/home_dashboard_mock.json",
-}
+## ホーム用 JSON の読み込み候補（先頭ほど優先）。Python 生成物のパスを差し替える場合はここだけ触ればよい。
+const _HOME_JSON_CANDIDATE_PATHS: PackedStringArray = PackedStringArray([
+	"res://data/home_dashboard_from_python.json",
+	"res://data/home_dashboard_mock.json",
+])
 
-## 第1弾は mock のみ。差し替えはこの変数と _DATA_URIS のみ触る想定。
-var _active_source_key: String = "mock"
+const _LOAD_FAILED_MESSAGE := "データ読込に失敗しました"
 
 @onready var _status_label: Label = %StatusLabel
 @onready var _club_name: Label = %ClubNameLabel
@@ -32,24 +32,26 @@ func _ready() -> void:
 	_apply_snapshot(_load_home_snapshot())
 
 
-func _resolve_data_uri() -> String:
-	return String(_DATA_URIS.get(_active_source_key, _DATA_URIS["mock"]))
-
-
 func _load_home_snapshot() -> Dictionary:
-	var path := _resolve_data_uri()
-	if not FileAccess.file_exists(path):
-		return {"_error": "データファイルが見つかりません: " + path}
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return {"_error": "データ読込に失敗しました（ファイルを開けません）。"}
-	var text := f.get_as_text()
-	var data = JSON.parse_string(text)
-	if data == null:
-		return {"_error": "データ読込に失敗しました（JSON形式が不正です）。"}
-	if typeof(data) != TYPE_DICTIONARY:
-		return {"_error": "データ読込に失敗しました（オブジェクトではありません）。"}
-	return data
+	for path in _HOME_JSON_CANDIDATE_PATHS:
+		if not FileAccess.file_exists(path):
+			continue
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f == null:
+			push_warning("[home_dashboard] Cannot open JSON, trying next: %s" % path)
+			continue
+		var text := f.get_as_text()
+		var parsed = JSON.parse_string(text)
+		if parsed == null:
+			push_warning("[home_dashboard] JSON parse failed, trying next: %s" % path)
+			continue
+		if typeof(parsed) != TYPE_DICTIONARY:
+			push_warning("[home_dashboard] JSON root is not an object, trying next: %s" % path)
+			continue
+		var data := parsed as Dictionary
+		print("[home_dashboard] Loaded JSON from: ", path)
+		return data
+	return {"_error": _LOAD_FAILED_MESSAGE}
 
 
 func _apply_snapshot(d: Dictionary) -> void:

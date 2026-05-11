@@ -1,2 +1,5 @@
 # Godot 4+ editor-local cache and imports
 .godot/
+
+# Python CLI で生成する開発用 JSON（手動配置・コミットしない）
+data/home_dashboard_from_python.json
