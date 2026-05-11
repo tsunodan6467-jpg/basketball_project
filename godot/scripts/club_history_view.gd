@@ -8,6 +8,8 @@ var _club_history_json_paths: Array[String] = [
 
 const _LOAD_FAILED_MESSAGE := "クラブ史データ読込に失敗しました"
 
+const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
+
 var _last_loaded_uri: String = ""
 
 @onready var _status_label: Label = %StatusLabel
@@ -295,3 +297,10 @@ func _int_display(v: Variant) -> String:
 		if t.is_valid_float():
 			return str(int(float(t)))
 	return "不明"
+
+
+func _on_home_nav_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_HOME_DASHBOARD_SCENE_PATH)
+	if err != OK:
+		push_warning("[club_history_view] change_scene_to_file failed: %s err=%s" % [_HOME_DASHBOARD_SCENE_PATH, err])

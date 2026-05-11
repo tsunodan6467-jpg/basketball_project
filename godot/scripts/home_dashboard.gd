@@ -9,6 +9,7 @@ var _home_json_candidate_paths: Array[String] = [
 const _LOAD_FAILED_MESSAGE := "データ読込に失敗しました"
 
 const _ROSTER_VIEW_SCENE_PATH := "res://scenes/roster_view.tscn"
+const _CLUB_HISTORY_VIEW_SCENE_PATH := "res://scenes/club_history_view.tscn"
 
 ## 直近で読み取りに成功した `res://` パス（表示用）
 var _last_loaded_uri: String = ""
@@ -151,3 +152,10 @@ func _on_roster_view_button_pressed() -> void:
 	var err := get_tree().change_scene_to_file(_ROSTER_VIEW_SCENE_PATH)
 	if err != OK:
 		push_warning("[home_dashboard] change_scene_to_file failed: %s err=%s" % [_ROSTER_VIEW_SCENE_PATH, err])
+
+
+func _on_club_history_view_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_CLUB_HISTORY_VIEW_SCENE_PATH)
+	if err != OK:
+		push_warning("[home_dashboard] change_scene_to_file failed: %s err=%s" % [_CLUB_HISTORY_VIEW_SCENE_PATH, err])
