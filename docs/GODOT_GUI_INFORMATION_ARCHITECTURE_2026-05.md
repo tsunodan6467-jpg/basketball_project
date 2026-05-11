@@ -3,8 +3,8 @@
 **位置づけ**: これは **Godot 実装そのものではない**。Tk 仮 GUI で固まってきた情報設計を、Godot 本番 GUI へ移すための **再整理メモ**。CLI / Tk で確認できている**正本データ・正本ロジックを壊さず**、画面構成だけを本番向けに描き直すための叩き台。
 
 - 関連: `docs/PRODUCT_ROADMAP_AND_VISION.md`（Phase 0〜6）／`docs/IMPLEMENTATION_PLAN_MASTER.md`（§5.1 §11 §12）／`docs/PHASE0_COMPLETION_TEMPLATE.md`（§4 Phase 0 残 集約）／`docs/IDEAL_GAME_DESIGN_MASTER.md`／`docs/INFORMATION_MENU_SPEC_V1.md`／`docs/SCHEDULE_MENU_SPEC_V1.md`／`docs/SYSTEM_MENU_SPEC_V1.md`／`docs/PERSONNEL_GUI_MINOPS.md`／`docs/TACTICS_MENU_FULL_HANDOFF_2026-04.md`
-- 直近コミット: `daef1e2 FA市場の閲覧専用窓を追加` → `154c114 直近オフ振り返り窓と補助ボタン配置を整理` → `f8898a7 Godot本番GUI向け情報設計メモを追加`（本ファイル）→ `a807988 再契約とオークションドラフトの履歴記録を追加` → `5aeaf81 新Chat引き継ぎ書を最新状態へ更新`
-- **本実装着手の前提**（2026-05-08 同期）: 本メモは情報設計メモであり、Godot 本実装の決定書ではない。`docs/IMPLEMENTATION_PLAN_MASTER.md` §11 の通り、**Phase 0 残の 1 件化（5 項目）**のうち少なくとも出荷判断系（クラッシュログ・GHA・ライセンス強制）と doc 系（セーブ README・ストア文面）の方針が決まった後に、Godot 本番 GUI 実装準備へ進む位置づけを保つ。
+- 直近コミット（2026-05-11 同期）: `daef1e2 FA市場の閲覧専用窓を追加` → `154c114 直近オフ振り返り窓と補助ボタン配置を整理` → `f8898a7 Godot本番GUI向け情報設計メモを追加`（本ファイル）→ `a807988 再契約とオークションドラフトの履歴記録を追加` → `5aeaf81 新Chat引き継ぎ書を最新状態へ更新` → `2fe7651 Phase 0残現状をdocsに同期` → `48ecbaa セーブREADME反映` → `4b2401b クラッシュログ判断` → `b0a8f75 Tk callback例外フック追加` → `44910f1 GHA継続判断` → `7c0d7d6 ストア説明文ドラフト` → `1bce4c9 ライセンス手順書` → `8dec1f1 ストア説明文ローカルセーブ反映` → **`a650444 ライセンス強制実機テスト結果を記録`（Phase 0 必須項目すべて完了の最終 commit）**
+- **本実装着手の前提**（2026-05-11 同期）: 本メモは情報設計メモであり、Godot 本実装の決定書ではない。**Phase 0 必須項目（旧 5 項目：ライセンス強制実機テスト・セーブ README・ストア説明文ローカルセーブ表記・クラッシュログ判断・GHA 継続判断）は 2026-05-11 までに完了**（`docs/PHASE0_COMPLETION_TEMPLATE.md` §2 冒頭 2026-05-11 追記・§4.2 残作業表・改訂履歴 2026-05-11）。**したがって本メモ §0「Godot 本番 GUI 実装準備へ進む位置づけ」は 2026-05-11 時点で前提を満たした**。次は `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1（Phase 4 / Godot 本番 GUI 実装準備）・§11 ステップ 3 に沿って、本メモの章立て（特に §10「データ正本一覧」と §9「Godot 実装中のゲーム性改善ルール」）を再レビューする段階に移行する。**ただし、Godot プロジェクトの実コード着手はまだしない**：実装着手判定はユーザー側の意思決定が別途必要で、本書 §1「Godot 実装そのものではない」「確定版ではない」の位置づけは維持する。**継続管理項目**（v1 出荷判断の必須項目ではない）として `docs/PHASE0_COMPLETION_TEMPLATE.md` §5「ストア説明文への実績の有無明記」`[ ]` が残るが、Godot 着手判定の前提条件ではない。
 
 ---
 

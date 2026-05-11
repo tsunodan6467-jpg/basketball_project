@@ -14,7 +14,7 @@
 **全体の流れ**  
 基盤完成 → 試合リアリティ強化 → GM モード・経営 → UI・演出 → 公開準備 → Steam 販売
 
-**コードベース**: `basketball_sim/` 配下（Python **約 120 本規模**、`docs/CURRENT_STATE_ANALYSIS_MASTER.md` §1 を正）。**最終ロードマップ照合日: 2026-05-08**（Phase 0 残の現在地を `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12 と同期。Steam 主要 docs の相互同期は 2026-04-06 完了済み、`docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md` を正）。
+**コードベース**: `basketball_sim/` 配下（Python **約 120 本規模**、`docs/CURRENT_STATE_ANALYSIS_MASTER.md` §1 を正）。**最終ロードマップ照合日: 2026-05-11**（**Phase 0 必須項目は 2026-05-11 までに完了**。詳細は `docs/PHASE0_COMPLETION_TEMPLATE.md` §2 冒頭 2026-05-11 追記・§4.2 残作業表・改訂履歴 2026-05-11、`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12、commit `a650444`（ライセンス強制実機テスト結果を記録）まで反映。Steam 主要 docs の相互同期は 2026-04-06 完了済み、`docs/STEAMWORKS_STATUS_AND_RESUME_MEMO.md` を正）。
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Phase 0〜6 の項目（一覧）
 
-### Phase 0: Steam 販売の技術・商業前提（★ 現在地・最優先）
+### Phase 0: Steam 販売の技術・商業前提（◎ **必須項目は 2026-05-11 までに完了**）
 
-**進捗ラベル**（2026-05-08 同期）: 配布・SDK ランタイム系は **◎**。出荷判断系・文言整備系は **△〜□**。詳細は `docs/PHASE0_COMPLETION_TEMPLATE.md` のチェック表と「2026-05 時点の Phase 0 残 集約」を参照。
+**進捗ラベル**（2026-05-11 同期）: 配布・SDK ランタイム系は **◎**、出荷判断系・文言整備系も **◎**（`#4.2` 残 5 項目はすべて完了）。詳細は `docs/PHASE0_COMPLETION_TEMPLATE.md` のチェック表・§2 冒頭 2026-05-11 追記・改訂履歴 2026-05-11 を参照。継続管理項目（v1 出荷判断の必須ではないもの）として **ストア説明文（日本語）への「実績の有無」明記** が `[ ]` のまま残るが、本書の Phase 0 残扱いではない。**Phase 0 ★ の現在地は外し、次工程は Phase 4 / Godot 本番 GUI 実装準備** に進める段階に到達した（`docs/IMPLEMENTATION_PLAN_MASTER.md` §11、`docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` §0）。
 
 #### 完了済み（◎）
 
@@ -48,13 +48,15 @@
 - v1 方針決定: クラウドセーブ／Rich Presence は **v1 対象外**（2026-04-05 決定。`PHASE0_COMPLETION_TEMPLATE.md` 上表）
 - Steam 主要 docs 相互同期（`PRODUCT_ROADMAP_AND_VISION.md` / `STEAMWORKS_STATUS_AND_RESUME_MEMO.md` / `STEAMWORKS_DESIGN.md`、2026-04-06 完了。`docs/CURRENT_STATE_ANALYSIS_MASTER.md` §5.12 §8.1 を正）
 
-#### 2026-05 時点の Phase 0 残（実作業候補 5 項目・1 件ずつチケット化する）
+#### 2026-05 時点の Phase 0 残 → **2026-05-11 にすべて完了**
 
-1. **ライセンス強制実機テスト**（`enforce_steam_license` の未購入時挙動・強制終了ポリシー）
-2. **セーブ README**（ルート `README.md` に Steam 版起動・セーブ所在・トラブルシュート追記）
-3. **ストア説明文への「セーブはローカル」明記**（パートナー画面、人間作業）
-4. **クラッシュログ判断**（`game.log` ローテ・`last_crash.txt`・未処理例外フックの「出荷してよい水準か」判定）
-5. **GHA 継続判断**（`.github/workflows/` の pytest ＋ Win ビルド継続方針の判定）
+> 旧「実作業候補 5 項目」は **2026-05-11 までに 5 件すべて完了**。本節は記録として残す（詳細は各 commit と `docs/PHASE0_COMPLETION_TEMPLATE.md` §4.2 残作業表・改訂履歴を正とする）。
+
+1. **ライセンス強制実機テスト**（`enforce_steam_license` の未購入時挙動・強制終了ポリシー） — **完了**（2026-05-11、commit `a650444`。Case A 購入済み・B 未購入・C Steam 未起動の実機結果を `docs/STEAM_LICENSE_REAL_DEVICE_TEST_PROCEDURE_2026-05.md` §7 判定表に記録。Case B は実機で `BIsSubscribed: False` ＋ exit 3 ではなく Steam API 初期化失敗 ＋ exit 2 で起動拒否され、ゲームメニュー未到達のため合格扱い／同 §8 注 1）
+2. **セーブ README**（ルート `README.md` に Steam 版起動・セーブ所在・トラブルシュート追記） — **完了**（2026-05-08、commit `48ecbaa`）
+3. **ストア説明文への「セーブはローカル」明記**（パートナー画面、人間作業） — **完了**（2026-05-09、commit `8dec1f1`。採用文言は `docs/PHASE0_COMPLETION_TEMPLATE.md` §4.7「採用文言（2026-05-09 反映）」）
+4. **クラッシュログ判断**（`game.log` ローテ・`last_crash.txt`・未処理例外フックの「出荷してよい水準か」判定） — **完了**（2026-05-08、commit `b0a8f75`。`install_tk_callback_excepthook(root)` を追加し Tk callback 例外も `game.log` / `last_crash.txt` に記録）
+5. **GHA 継続判断**（`.github/workflows/` の pytest ＋ Win ビルド継続方針の判定） — **完了**（2026-05-08、commit `44910f1`。判定 **A：継続**）
 
 #### 後工程・人間作業（パートナー画面で都度確認、本 Phase 0 残の対象外）
 
@@ -62,10 +64,14 @@
 - 最終発売審査
 - 税務／本人確認の現在表示確認
 
+#### 継続管理項目（v1 出荷判断の必須項目ではない）
+
+- **ストア説明文（日本語）への「実績の有無」明記** — 未反映（`[ ]`）。`basketball_sim/config/steam_achievements.py` の登録状況とパートナー画面の実績ダッシュボードを照合する別タスクとして、Phase 4 検討と並行して別途進める。
+
 #### 補足
 
 - キーバインド・ウィンドウ・解像度の最低限仕様（`settings.json` の window / fullscreen、`key_bindings.close_subwindow` 既定 `<Escape>`）は実装済（`CURRENT_STATE_ANALYSIS_MASTER.md` §1 を正）。
-- **Phase 4 / Godot 本実装に進む前**に、上記 Phase 0 残 5 項目のうち少なくとも出荷判断系（クラッシュログ・GHA・ライセンス強制）と doc 系（セーブ README・ストア文面）の方針確定を済ませる。`docs/IMPLEMENTATION_PLAN_MASTER.md` §11 と整合。
+- **Phase 4 / Godot 本実装準備に進む前提条件は 2026-05-11 までに満たされた**（出荷判断系：クラッシュログ・GHA・ライセンス強制／doc 系：セーブ README・ストア文面の方針確定）。次は `docs/IMPLEMENTATION_PLAN_MASTER.md` §11 の次ステップ（Phase 4 / Godot 本番 GUI 実装準備の検討）へ移行する。
 
 ### Phase 1: 基盤構築（△〜◎）
 

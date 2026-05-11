@@ -24,8 +24,8 @@
 | 対象プラットフォーム | 開発・配布は **Windows** を主に想定（Steam / PyInstaller / `steam_api64.dll` 言及はコード・docs に基づく）。他 OS の動作保証は **未確認**。 |
 | 主言語 | **Python**。GUI は **tkinter**（`docs/PRODUCT_ROADMAP_AND_VISION.md`・`basketball_sim/systems/main_menu_view.py`）。 |
 | コード規模（目安） | `basketball_sim/` 配下に **`.py` が 120 本前後**（2026-04-06 時点のワークスペースでのファイル一覧）。`PRODUCT_ROADMAP_AND_VISION.md` にある「約34ファイル」表記は **旧い可能性**あり（本書では上記実数を優先）。 |
-| 現在の開発段階 | `docs/PRODUCT_ROADMAP_AND_VISION.md` 上 **Phase 0（★現在地・最優先）** と明記。並行して Phase 1 相当のシミュ・リーグは厚い（同 doc の「レビュー反映」節）。 |
-| 現在の最優先テーマ（doc 上） | **安定性**、セーブ・ビルド・Steam 販売の技術・商業前提（Phase 0）。 |
+| 現在の開発段階 | `docs/PRODUCT_ROADMAP_AND_VISION.md` 上 **Phase 0 必須項目は 2026-05-11 までに完了**（commit `a650444` まで）。**次工程は Phase 4 / Godot 本番 GUI 実装準備**（実コード着手前の docs 整合・情報設計メモのレビュー段階）。並行して Phase 1 相当のシミュ・リーグは厚い（同 doc の「レビュー反映」節）。詳細は本書 §8.1・`docs/PHASE0_COMPLETION_TEMPLATE.md` §2 冒頭 2026-05-11 追記・`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 を正とする。 |
+| 現在の最優先テーマ（doc 上） | **安定性**、セーブ・ビルド・Steam 販売の技術・商業前提（Phase 0）— **必須項目は完了済み**。次は **Phase 4 / Godot 本番 GUI 実装準備**（docs 整合・情報設計メモのレビュー）。継続管理項目として `docs/PHASE0_COMPLETION_TEMPLATE.md` §5「ストア説明文（日本語）への実績の有無明記」`[ ]` が残るが、v1 出荷判断の必須項目ではない。 |
 
 ---
 
@@ -33,7 +33,7 @@
 
 | 項目 | 事実 |
 |------|------|
-| ロードマップ上の位置 | **Phase 0 が★現在地**（`docs/PRODUCT_ROADMAP_AND_VISION.md`）。 |
+| ロードマップ上の位置 | **Phase 0 必須項目は完了**（2026-05-11、commit `a650444` まで）／**次工程は Phase 4 / Godot 本番 GUI 実装準備**（`docs/PRODUCT_ROADMAP_AND_VISION.md` Phase 0 節・`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 ステップ 3）。継続管理項目（`docs/PHASE0_COMPLETION_TEMPLATE.md` §5「ストア説明文の実績の有無」`[ ]`）は v1 出荷判断の必須項目ではないため別管理。 |
 | だいたい固まっているもの（doc 記載ベース） | 48チーム3部リーグ・Season/Offseason ループ・試合シミュ・CLI 長期周回・pytest スモーク等（同 doc「Phase 1 相当: △〜◎」）。日本独自ルール・カップ/国際・クラブ史・GM/経済の一部・tkinter 主画面は **△** 表現（同 doc）。 |
 | 今の主戦場（傾向） | `docs/CHATGPT_NEW_CHAT_HANDOFF_FOR_CURSOR_SYNC.md` に、主画面 tkinter・日程表示・大会表示名・各メニュー情報設計が「直近の主戦場（傾向）」として列挙されている（要約文書の記述）。 |
 | 次の大きな節目（doc 記載） | ストア・デポ・発売に関する手続き、Phase 0 でのクラウドセーブ/Rich Presence の要否（`docs/PRODUCT_ROADMAP_AND_VISION.md` Phase 0 節・**2026-04-05 決定で v1 にクラウド/Rich Presence は含めない**と明記）。 |
@@ -208,10 +208,19 @@
 
 ## 6. ここまでに直した重要修正履歴
 
-**出典**: `git log`（2026-05-08 同期時に追加した直近コミットを冒頭に追記）。日付は commit 順（新しいものほど上）。
+**出典**: `git log`（2026-05-11 同期時に追加した直近コミットを冒頭に追記）。日付は commit 順（新しいものほど上）。
 
 | コミット（短） | 内容（要約） |
 |----------------|--------------|
+| `a650444` | docs: ライセンス強制実機テスト結果を記録（Case A／B／C を `docs/STEAM_LICENSE_REAL_DEVICE_TEST_PROCEDURE_2026-05.md` §7 判定表に反映、`docs/PHASE0_COMPLETION_TEMPLATE.md` §3 ランタイム「ライセンス」`[x]` 化・§4.2 #1 完了化・§2 冒頭 2026-05-11 追記）。**Phase 0 必須項目すべて完了**。コード差分・README 差分・workflow 差分ゼロ。 |
+| `8dec1f1` | docs: ストア説明文へのローカルセーブ表記反映を記録（Steam パートナー画面のストア説明文へ反映済み、§5 ストア説明文チェックを「セーブの所在（ローカル）」と「実績の有無」の 2 行に分離、前者のみ `[x]` 化）。 |
+| `1bce4c9` | docs: ライセンス強制実機テスト手順を整理（`docs/STEAM_LICENSE_REAL_DEVICE_TEST_PROCEDURE_2026-05.md` 新規作成）。 |
+| `7c0d7d6` | docs: ストア説明文用のローカルセーブ表記を整理（`docs/PHASE0_COMPLETION_TEMPLATE.md` §4.7 にドラフト追加）。 |
+| `44910f1` | docs: GHA 継続判断を Phase 0 に記録（`.github/workflows/ci.yml` ＋ `balance-guard.yml` の 2 本構成を判定 A：継続として確定。`PHASE0_COMPLETION_TEMPLATE.md` §3 品質・運用「GitHub Actions」`[x]` 化）。 |
+| `b0a8f75` | コード＋docs: Tk callback 例外フック追加／クラッシュログ判断の完了化（`basketball_sim/utils/game_logging.py` に `install_tk_callback_excepthook(root)` 追加、`MainMenuView` / `SpectateView` で適用、`test_game_logging.py` に 3 件追加。`PHASE0_COMPLETION_TEMPLATE.md` §3 品質・運用「クラッシュログ」`[x]` 化）。 |
+| `4b2401b` | docs: クラッシュログ運用の出荷可否を記録（Tk callback 例外フック不足による据え置き判定 → 次 PR で対応へ）。 |
+| `48ecbaa` | docs: Steam 配布向け README にセーブ所在を明記（ルート `README.md` §「Steam 版を遊ぶ前に（ユーザー向け）」§A〜§E 追加、`PHASE0_COMPLETION_TEMPLATE.md` §3 セーブ・§5 ルート `README.md` `[x]` 化）。 |
+| `2fe7651` | docs: Phase 0 残の現状を docs に同期（`IMPLEMENTATION_PLAN_MASTER.md` / `PRODUCT_ROADMAP_AND_VISION.md` / `CURRENT_STATE_ANALYSIS_MASTER.md` / `PHASE0_COMPLETION_TEMPLATE.md` に Phase 0 残 5 項目を整理）。 |
 | `5aeaf81` | docs: 新 Chat 引き継ぎ書を最新状態へ更新（`a807988` を反映、次工程を Phase 0 残の 1 件化に切替）。 |
 | `a807988` | 履歴強化: **再契約**（`apply_resign`）と**オークションドラフト**（一本釣り／競合落札）が `team.history_transactions` に 1 行記録されるようになった。直近オフ振り返り窓は `wanted_types` に `"resign"` を追加し、再契約とドラフトを表示。save 構造変更なし、`Offseason.run()` 順序変更なし。 |
 | `f8898a7` | docs: Godot 本番 GUI 向け情報設計メモ `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` を追加（実装決定書ではなく情報設計メモ）。 |
@@ -271,9 +280,10 @@
 
 ### 8.1 高優先（doc またはコード上の「残」「最優先」）
 
-- **Phase 0 残の 1 件化（実作業候補 5 項目）**（2026-05 時点）: ① ライセンス強制実機テスト ／ ② セーブ README ／ ③ ストア説明文への「セーブはローカル」明記 ／ ④ クラッシュログ判断 ／ ⑤ GHA 継続判断。詳細は `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12、`docs/PHASE0_COMPLETION_TEMPLATE.md` の「2026-05 時点の Phase 0 残 集約」を正とする。
+- **【完了】Phase 0 残の 1 件化（実作業候補 5 項目）→ Phase 0 必須項目すべて完了**（2026-05-11 同期、commit `a650444` まで）: ① ライセンス強制実機テスト（`a650444`） ／ ② セーブ README（`48ecbaa`） ／ ③ ストア説明文への「セーブはローカル」明記（`8dec1f1`） ／ ④ クラッシュログ判断 ＋ Tk callback 例外フック追加（`b0a8f75`） ／ ⑤ GHA 継続判断（`44910f1`）。詳細は `docs/PHASE0_COMPLETION_TEMPLATE.md` §2 冒頭 2026-05-11 追記・§4.2 残作業表・改訂履歴 2026-05-11、`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12、`docs/PRODUCT_ROADMAP_AND_VISION.md` Phase 0 節を正とする。**継続管理項目**（v1 出荷判断の必須項目ではない）として `docs/PHASE0_COMPLETION_TEMPLATE.md` §5「ストア説明文（日本語）への実績の有無明記」`[ ]` が残るが、Phase 0 必須残件ではない。
+- **Phase 4 / Godot 本番 GUI 実装準備**（2026-05-11 同期）: 情報設計メモ `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` の §0 着手前提を「Phase 0 必須項目完了済み」へ同期し、Tk 並走ルール・データ正本表を再確認するフェーズ。`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 ステップ 3 と整合。**Godot プロジェクトの実コード着手はまだしない**（本書 §5.13 と本書 §11 の方針維持）。
 - **GUI 主操作への寄せ**と **CLI 依存の縮小**（`PRODUCT`・引き継ぎ doc）。
-- **Steamworks の対外状態の実務確認**（パートナー画面で**都度**確認: ストア一般公開・発売審査・表示上の必須タスク等。**断定はリポジトリ単体では不可**）。Steam **主要 docs の相互同期**は **2026-04-06 完了**（`STEAMWORKS_STATUS`・`PRODUCT`・`STEAMWORKS_DESIGN`）→ 2026-05 時点で **再同期は不要**（事実に変化なし）。
+- **Steamworks の対外状態の実務確認**（パートナー画面で**都度**確認: ストア一般公開・発売審査・表示上の必須タスク等。**断定はリポジトリ単体では不可**）。Steam **主要 docs の相互同期**は **2026-04-06 完了**（`STEAMWORKS_STATUS`・`PRODUCT`・`STEAMWORKS_DESIGN`）→ 2026-05 時点で **再同期は不要**（事実に変化なし）。**ライセンス強制実機テスト**は 2026-05-11 に実機実施・完了（`docs/STEAM_LICENSE_REAL_DEVICE_TEST_PROCEDURE_2026-05.md` §7 判定表）。
 
 ### 8.2 中優先
 
@@ -357,3 +367,4 @@ Steam 診断: 上記 `--steam-diag`。**成功/失敗は環境依存**（DLL・S
 - 2026-04-06: §5.7 主要ファイルに `FA_SALARY_ESTIMATE_AUDIT.md` を追加。
 - 2026-04-06: §5.7 主要ファイルに `FA_SALARY_MODEL_ALIGNMENT_POLICY.md` を追加。
 - 2026-05-08: §5.7 履歴記録に commit `a807988`（再契約／オークションドラフトを `team.history_transactions` に追記）を反映。§5.13 に Godot 情報設計メモ `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`（commit `f8898a7`）追加を反映。§6 に `f8898a7` / `a807988` / `5aeaf81` を追加。§8.1 を「Phase 0 残の 1 件化（5 項目）」へ更新（`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 と整合）。
+- 2026-05-11: **Phase 0 必須項目完了**を反映（2026-05-08〜2026-05-11 の連続 PR で旧 Phase 0 残 5 項目すべて完了、最終 commit `a650444`）。§1「現在の開発段階」「現在の最優先テーマ」と §2「ロードマップ上の位置」を「Phase 0 必須完了／Phase 4 準備」へ更新。§6 直近修正履歴表に `a650444` / `8dec1f1` / `1bce4c9` / `7c0d7d6` / `44910f1` / `b0a8f75` / `4b2401b` / `48ecbaa` / `2fe7651` の 9 件を追加。§8.1 を「Phase 0 必須完了／Phase 4 / Godot 本番 GUI 実装準備」へ更新し、継続管理項目（ストア説明文の実績の有無 `[ ]`）が Phase 0 必須残件として誤読されない位置に明記。`docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1 §11 §12 と整合。**コード差分・README 差分・workflow 差分ゼロ、docs 差分のみ**。
