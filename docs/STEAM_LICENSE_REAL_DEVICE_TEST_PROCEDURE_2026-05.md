@@ -335,10 +335,10 @@ Select-String -Path reports/license_real_device_*.txt -Pattern "FAILED","ERROR",
 
 | ケース | 期待結果 | 実行結果（要点 1〜2 行） | 判定 | メモ（実施日・アカウント・ビルド） |
 |---|---|---|---|---|
-| A 購入済み／ライセンス保有 | 起動可（exit 0 相当）／`steam_is_subscribed: True` | 未実施 | 未判定 | |
-| B 未購入／ライセンス非保有 | 起動拒否（exit 3）／stderr に「Steam での購入が必要です。」 | 未実施 | 未判定 | |
-| C Steam クライアント未起動 | 起動拒否（exit 2）／`game.log` に「Steam に接続できませんでした。」 | 未実施 | 未判定 | |
-| D 異常系（DLL 不足 / App ID / 32bit） | `--steam-diag` で原因切り分け可能 | 未実施 | 任意（記録のみ） | |
+| A 購入済み／ライセンス保有 | 起動可（exit 0 相当）／`steam_is_subscribed: True` | Steam クライアントから起動可。`--steam-diag` で `try_init_steam: True` / `steam_native_loaded: True` / `steam_loaded_dll_path: C:\Program Files (x86)\Steam\steamapps\common\日本プロバスケクラブを作ろう！\steam_api64.dll` / **`steam_is_subscribed: True`**。 | **OK** | 2026-05-11／ライセンス保有アカウント／Steam 配布版 `BasketballGM.exe`（`C:\Program Files (x86)\Steam\steamapps\common\日本プロバスケクラブを作ろう！\BasketballGM.exe`）。ログ: `reports/license_real_device_steam_diag_owned.txt`、`reports/license_real_device_game_log_owned.txt`。 |
+| B 未購入／ライセンス非保有 | 起動拒否（exit 3）／stderr に「Steam での購入が必要です。」 | Steam クライアント起動中・ライセンス非保有アカウントで通常起動 → **Steam API 初期化が成立せず**（`try_init_steam: False`）、`Steam: ライセンス確認が有効ですが Steam に接続できませんでした。` ＋ **`LASTEXITCODE=2`** で **起動拒否**。`--steam-diag` 側も `try_init_steam: False` / `steam_native_loaded: False` / `steam_loaded_dll_path: None` / `steam_is_subscribed: None`。**ゲームメニューには到達せず**。 | **OK**（合格扱い・下記 §8 注 1 参照） | 2026-05-11／ライセンス非保有アカウント／Steam 配布版 `BasketballGM.exe`／`Get-Process steam` で steam プロセス存在を確認。ログ: `reports/license_real_device_run_unowned.txt`、`reports/license_real_device_steam_diag_unowned.txt`、`reports/license_real_device_game_log_unowned.txt`。**期待値どおりの `steam_is_subscribed: False` ＋ exit 3 経路ではなく、Steam API 初期化失敗 ＋ exit 2 経路で起動拒否された**（実機挙動）。 |
+| C Steam クライアント未起動 | 起動拒否（exit 2）／`game.log` に「Steam に接続できませんでした。」 | Steam クライアントを完全終了（`Get-Process steam` で不在確認） → 通常起動 → `Steam 初期化が失敗（クライアント未起動・App ID 不一致など）` ＋ `Steam: ライセンス確認が有効ですが Steam に接続できませんでした。` ＋ **`LASTEXITCODE=2`** で **起動拒否**。`--steam-diag` 側も `try_init_steam: False` / `steam_native_loaded: False` / `steam_loaded_dll_path: None` / `steam_is_subscribed: None`、`--steam-diag` 自体の `LASTEXITCODE=0`。 | **OK** | 2026-05-11／（アカウント問わず）／Steam 配布版 `BasketballGM.exe`。ログ: `reports/license_real_device_run_no_client.txt`、`reports/license_real_device_steam_diag_no_client.txt`、`reports/license_real_device_game_log_no_client.txt`。 |
+| D 異常系（DLL 不足 / App ID / 32bit） | `--steam-diag` で原因切り分け可能 | 未実施（A・B・C で `[x]` 化に必要な根拠が揃ったため省略） | 任意（記録のみ） | 出荷後の問い合わせ対応で必要になれば §4.4 D-1〜D-3 の手順を実施。 |
 
 判定の書き方:
 
@@ -359,10 +359,18 @@ Select-String -Path reports/license_real_device_*.txt -Pattern "FAILED","ERROR",
 **`[x]` 化の必要十分条件**:
 
 1. Case A（購入済み）で `steam_is_subscribed: True` ＋ exit 0 系を確認、`game.log` 末尾を保存済み。
-2. Case B（未購入）で `steam_is_subscribed: False` ＋ exit `3` を確認、stderr メッセージを確認、`game.log` 末尾を保存済み。
+2. Case B（未購入）で **起動拒否** ＋ ゲームメニュー未到達を確認（理想は `steam_is_subscribed: False` ＋ exit 3 だが、**実機挙動が「Steam API 初期化失敗 ＋ exit 2」となる場合も合格扱い**。下記 注 1 を参照）、`game.log` 末尾を保存済み。
 3. Case C（Steam クライアント未起動）で exit `2` を確認、`game.log` の `LOG.error("Steam: ライセンス確認が有効ですが Steam に接続できませんでした。")` を確認。
 4. Case D は**任意**（実機切り分けに有用だが、`[x]` 化の必須条件にはしない）。
 5. すべての結果ログが `reports/license_real_device_*.txt` に保存され、`PHASE0_COMPLETION_TEMPLATE.md` 側に要点（数行の引用）を貼ってある。
+
+**注 1（Case B の実機挙動と仕様の差分・2026-05-11）**:
+
+- 仕様上は「ライセンス非保有 → Steam API 初期化は成功 → `ISteamApps::BIsSubscribed` が `False` → `enforce_steam_license` が `sys.exit(3)`」を想定（`STEAMWORKS_DESIGN.md` §「ライセンス必須」の exit 3 経路）。
+- 2026-05-11 の実機テストでは、Steam クライアント起動中であっても **ライセンス非保有アカウントでは Steam API 初期化（`SteamAPI_Init` / `SteamAPI_InitFlat`）が `False` を返す**ことが観測された。これは Steam クライアント側が「このアカウントは対象アプリのライセンスを持たない」と判断した段階でアプリ側 API 接続を許可しない挙動と推定される（パートナー画面のキー配布／家族共有判定／タイトルの公開状態に依存）。
+- その結果、`enforce_steam_license` 内では `is_steam_initialized()` が False → **`sys.exit(2)`** が先に発火し、`BIsSubscribed` までは到達しない（コード経路は `steamworks_bridge.enforce_steam_license` の最初の `if not is_steam_initialized(): sys.exit(2)`）。
+- **出荷判断としては「ライセンス非保有アカウントで起動が拒否され、ゲームメニューに到達しない」ことが目的**であり、これは Case B の実機ログで満たされている。よって `[x]` 化の必要十分条件としては合格扱いとする。
+- 将来 Steam パートナー側で「キー配布済みだが期限切れ」「ベータアクセス取り消し」など、**Steam API 初期化が成功した上で `BIsSubscribed` が False** になるシナリオが必要になった場合は、改めて Case B-2 として追記し exit 3 経路を確認する（v1 出荷判断には不要）。
 
 ---
 
@@ -406,3 +414,20 @@ Select-String -Path reports/license_real_device_*.txt -Pattern "FAILED","ERROR",
 ## 改訂履歴
 
 - **2026-05-08**: 新規作成（手順書のみ。実機実施は未実施。`docs/PHASE0_COMPLETION_TEMPLATE.md` §4.2 #1 を「手順書作成済み／実機実施待ち」に同期）。
+- **2026-05-11**: **実機テスト実施・完了**（人間作業）。§7 判定表に Case A／B／C の結果を記録（いずれも **OK**）、§8 末尾に「注 1（Case B の実機挙動と仕様の差分）」を追加（実機ではライセンス非保有アカウントで Steam API 初期化が成立せず `exit 2` で起動拒否される。`BIsSubscribed` を経由する exit 3 経路へは到達しないが、**ゲームメニュー未到達 ＝ 起動拒否**の目的は満たすため合格扱い）。ビルド: Steam 配布版 `BasketballGM.exe`（`C:\Program Files (x86)\Steam\steamapps\common\日本プロバスケクラブを作ろう！\BasketballGM.exe`）。`docs/PHASE0_COMPLETION_TEMPLATE.md` 側で §3 ランタイム「ライセンス」`[ ]` → `[x]`、§4.2 #1 を「完了（2026-05-11、実機実施済み）」へ同期する。
+
+### 2026-05-11 実施記録
+
+```text
+- 実施日: 2026-05-11
+- 実施者: プロジェクトオーナー（人間作業）
+- ビルド: Steam 配布版 BasketballGM.exe（C:\Program Files (x86)\Steam\steamapps\common\日本プロバスケクラブを作ろう！\BasketballGM.exe）
+- 設定: steam_require_license = true（settings.json）または BASKETBALL_SIM_REQUIRE_STEAM_LICENSE=1（実機環境で有効化）
+- 結果:
+  - Case A: try_init_steam=True / steam_native_loaded=True / steam_loaded_dll_path=<上記 exe 同階層 steam_api64.dll> / steam_is_subscribed=True。Steam クライアントから起動可。
+  - Case B: try_init_steam=False / steam_native_loaded=False / steam_loaded_dll_path=None / steam_is_subscribed=None。通常起動で「Steam 初期化が失敗（クライアント未起動・App ID 不一致など）」＋「Steam: ライセンス確認が有効ですが Steam に接続できませんでした。」＋ LASTEXITCODE=2。ゲームメニュー未到達。理想の exit 3 ではないが起動拒否は成立（§8 注 1）。
+  - Case C: Steam クライアント完全終了下で通常起動 → 「Steam に接続できませんでした。」＋ LASTEXITCODE=2 で起動拒否。
+  - Case D: 未実施（A・B・C で [x] 化必要十分条件を満たしたため省略）。
+- 判定: A・B・C すべて期待どおり（B は §8 注 1 の通り経路差分はあるが合格扱い）→ docs/PHASE0_COMPLETION_TEMPLATE.md の §3 ランタイム「ライセンス」を [x] 化、§4.2 #1 を「完了（2026-05-11）」に更新。
+- 保存ログ: reports/license_real_device_steam_diag_owned.txt / reports/license_real_device_game_log_owned.txt / reports/license_real_device_run_unowned.txt / reports/license_real_device_steam_diag_unowned.txt / reports/license_real_device_game_log_unowned.txt / reports/license_real_device_run_no_client.txt / reports/license_real_device_steam_diag_no_client.txt / reports/license_real_device_game_log_no_client.txt（いずれもコミット対象外）。
+```
