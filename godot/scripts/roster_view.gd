@@ -171,9 +171,9 @@ func _add_player_row(p: Dictionary) -> void:
 		lab.clip_text = true
 		if i == 1:
 			# 長い名前が clip されたとき全文を確認できるようにする（autowrap は使わない）
-			var name_raw := p.get("name", null)
+			var name_raw: Variant = p.get("name", null)
 			if name_s != "-" and name_raw != null:
-				var tip := str(name_raw).strip_edges()
+				var tip: String = str(name_raw).strip_edges()
 				if not tip.is_empty():
 					lab.tooltip_text = tip
 		row.add_child(lab)
