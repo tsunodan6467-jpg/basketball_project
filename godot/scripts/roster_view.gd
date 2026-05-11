@@ -77,7 +77,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 	if lv != null:
 		lv_s = str(lv)
 
-	var summary := _dict_or_empty(d, "summary")
+	var summary := _dict_or_empty(d.get("summary", {}))
 	var rc := _int_or(summary.get("roster_count", null), -1)
 	var dom := _int_or(summary.get("domestic_count", null), -1)
 	var fr := _int_or(summary.get("foreign_count", null), -1)
