@@ -8,7 +8,11 @@ var _home_json_candidate_paths: Array[String] = [
 
 const _LOAD_FAILED_MESSAGE := "データ読込に失敗しました"
 
+## 直近で読み取りに成功した `res://` パス（表示用）
+var _last_loaded_uri: String = ""
+
 @onready var _status_label: Label = %StatusLabel
+@onready var _data_source_label: Label = %DataSourceLabel
 @onready var _club_name: Label = %ClubNameLabel
 @onready var _season: Label = %SeasonLabel
 @onready var _division: Label = %DivisionLabel
@@ -22,6 +26,8 @@ const _LOAD_FAILED_MESSAGE := "データ読込に失敗しました"
 @onready var _recent_row: HBoxContainer = %RecentFormRow
 @onready var _warnings: Label = %WarningsLabel
 @onready var _warnings_row: HBoxContainer = %WarningsRow
+@onready var _warnings_card: PanelContainer = %CardWarnings
+@onready var _extras_card: PanelContainer = %CardTeamExtras
 @onready var _next_game: Label = %NextGameLabel
 @onready var _club_summary: Label = %ClubSummaryLabel
 @onready var _tasks: Label = %TasksLabel
@@ -33,6 +39,7 @@ func _ready() -> void:
 
 
 func _load_home_snapshot() -> Dictionary:
+	_last_loaded_uri = ""
 	for path in _home_json_candidate_paths:
 		if not FileAccess.file_exists(path):
 			continue
@@ -49,18 +56,29 @@ func _load_home_snapshot() -> Dictionary:
 			push_warning("[home_dashboard] JSON root is not an object, trying next: %s" % path)
 			continue
 		var data := parsed as Dictionary
+		_last_loaded_uri = path
 		print("[home_dashboard] Loaded JSON from: ", path)
 		return data
 	return {"_error": _LOAD_FAILED_MESSAGE}
+
+
+func _data_source_caption(uri: String) -> String:
+	if uri.is_empty():
+		return ""
+	if uri.ends_with("home_dashboard_from_python.json"):
+		return "読込元: Python生成JSON（手動配置・優先） / " + uri
+	return "読込元: 同梱モックJSON / " + uri
 
 
 func _apply_snapshot(d: Dictionary) -> void:
 	if d.has("_error"):
 		_status_label.text = str(d["_error"])
 		_status_label.visible = true
+		_data_source_label.text = ""
 		_clear_body()
 		return
 	_status_label.visible = false
+	_data_source_label.text = _data_source_caption(_last_loaded_uri)
 	_club_name.text = _txt(d, "club_name")
 	_season.text = _txt(d, "season_label")
 	_division.text = _txt(d, "division")
@@ -74,6 +92,8 @@ func _apply_snapshot(d: Dictionary) -> void:
 	_set_optional_row(_salary_row, _salary_cap, _txt(d, "salary_cap"))
 	_set_optional_row(_recent_row, _recent_form, _txt(d, "recent_form"))
 	_set_optional_row(_warnings_row, _warnings, _txt(d, "warnings"))
+	_extras_card.visible = _owner_row.visible or _salary_row.visible or _recent_row.visible
+	_warnings_card.visible = _warnings_row.visible
 
 
 func _clear_body() -> void:
@@ -90,6 +110,8 @@ func _clear_body() -> void:
 	_salary_row.visible = false
 	_recent_row.visible = false
 	_warnings_row.visible = false
+	_extras_card.visible = false
+	_warnings_card.visible = false
 
 
 func _txt(d: Dictionary, key: String) -> String:
@@ -103,14 +125,16 @@ func _join_lines(d: Dictionary, key: String, max_lines: int = 0) -> String:
 	var raw = d.get(key, null)
 	if raw == null or typeof(raw) != TYPE_ARRAY:
 		return ""
-	var lines: PackedStringArray = PackedStringArray()
+	var acc := ""
 	var n := 0
 	for item in raw:
 		if max_lines > 0 and n >= max_lines:
 			break
-		lines.append("・" + str(item))
+		if acc.length() > 0:
+			acc += "\n"
+		acc += "・" + str(item)
 		n += 1
-	return "\n".join(lines)
+	return acc
 
 
 func _set_optional_row(row: HBoxContainer, value_label: Label, text: String) -> void:
