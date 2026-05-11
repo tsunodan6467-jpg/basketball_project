@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://clubhistoryproto01"]
+[gd_scene format=3 uid="uid://dh7f7x3wncuam"]
 
 [ext_resource type="Script" path="res://scripts/club_history_view.gd" id="1_script"]
 
