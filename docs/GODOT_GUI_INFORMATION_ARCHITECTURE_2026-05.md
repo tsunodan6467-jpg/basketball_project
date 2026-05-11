@@ -4,7 +4,7 @@
 
 - 関連: `docs/PRODUCT_ROADMAP_AND_VISION.md`（Phase 0〜6）／`docs/IMPLEMENTATION_PLAN_MASTER.md`（§5.1 §11 §12）／`docs/PHASE0_COMPLETION_TEMPLATE.md`（§4 Phase 0 残 集約）／`docs/IDEAL_GAME_DESIGN_MASTER.md`／`docs/INFORMATION_MENU_SPEC_V1.md`／`docs/SCHEDULE_MENU_SPEC_V1.md`／`docs/SYSTEM_MENU_SPEC_V1.md`／`docs/PERSONNEL_GUI_MINOPS.md`／`docs/TACTICS_MENU_FULL_HANDOFF_2026-04.md`
 - 直近コミット（2026-05-11 同期）: `daef1e2 FA市場の閲覧専用窓を追加` → `154c114 直近オフ振り返り窓と補助ボタン配置を整理` → `f8898a7 Godot本番GUI向け情報設計メモを追加`（本ファイル）→ `a807988 再契約とオークションドラフトの履歴記録を追加` → `5aeaf81 新Chat引き継ぎ書を最新状態へ更新` → `2fe7651 Phase 0残現状をdocsに同期` → `48ecbaa セーブREADME反映` → `4b2401b クラッシュログ判断` → `b0a8f75 Tk callback例外フック追加` → `44910f1 GHA継続判断` → `7c0d7d6 ストア説明文ドラフト` → `1bce4c9 ライセンス手順書` → `8dec1f1 ストア説明文ローカルセーブ反映` → **`a650444 ライセンス強制実機テスト結果を記録`（Phase 0 必須項目すべて完了の最終 commit）**
-- **本実装着手の前提**（2026-05-11 同期）: 本メモは情報設計メモであり、Godot 本実装の決定書ではない。**Phase 0 必須項目（旧 5 項目：ライセンス強制実機テスト・セーブ README・ストア説明文ローカルセーブ表記・クラッシュログ判断・GHA 継続判断）は 2026-05-11 までに完了**（`docs/PHASE0_COMPLETION_TEMPLATE.md` §2 冒頭 2026-05-11 追記・§4.2 残作業表・改訂履歴 2026-05-11）。**したがって本メモ §0「Godot 本番 GUI 実装準備へ進む位置づけ」は 2026-05-11 時点で前提を満たした**。次は `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1（Phase 4 / Godot 本番 GUI 実装準備）・§11 ステップ 3 に沿って、本メモの章立て（特に §10「データ正本一覧」と §9「Godot 実装中のゲーム性改善ルール」）を再レビューする段階に移行する。**ただし、Godot プロジェクトの実コード着手はまだしない**：実装着手判定はユーザー側の意思決定が別途必要で、本書 §1「Godot 実装そのものではない」「確定版ではない」の位置づけは維持する。**継続管理項目**（v1 出荷判断の必須項目ではない）として `docs/PHASE0_COMPLETION_TEMPLATE.md` §5「ストア説明文への実績の有無明記」`[ ]` が残るが、Godot 着手判定の前提条件ではない。
+- **本実装着手の前提**（2026-05-11 同期）: 本メモは情報設計メモであり、Godot 本実装の決定書ではない。**Phase 0 必須項目（旧 5 項目：ライセンス強制実機テスト・セーブ README・ストア説明文ローカルセーブ表記・クラッシュログ判断・GHA 継続判断）は 2026-05-11 までに完了**（`docs/PHASE0_COMPLETION_TEMPLATE.md` §2 冒頭 2026-05-11 追記・§4.2 残作業表・改訂履歴 2026-05-11）。**したがって本メモ §0「Godot 本番 GUI 実装準備へ進む位置づけ」は 2026-05-11 時点で前提を満たした**。次は `docs/IMPLEMENTATION_PLAN_MASTER.md` §5.1（Phase 4 / Godot 本番 GUI 実装準備）・§11 ステップ 3 に沿って、本メモの章立て（特に §10「データ正本一覧」・§13「Godot 移行時に壊してはいけないもの」）を再レビューする段階に移行する。§9「経営・強化・戦術・情報・歴史の整理」は画面割当・メニュー構造の整理メモとして参照する。**ただし、Godot プロジェクトの実コード着手はまだしない**：実装着手判定はユーザー側の意思決定が別途必要で、本書 §1「Godot 実装そのものではない」「確定版ではない」の位置づけは維持する。**継続管理項目**（v1 出荷判断の必須項目ではない）として `docs/PHASE0_COMPLETION_TEMPLATE.md` §5「ストア説明文への実績の有無明記」`[ ]` が残るが、Godot 着手判定の前提条件ではない。
 
 ---
 
@@ -281,6 +281,60 @@
 
 ---
 
+## 14. Godot / Python ランタイム連携方針（Phase 4 初期）
+
+本節は **2026-05** 時点の方針メモである。運用手順の詳細は `godot/README.md`、export 実装は `basketball_sim/export/home_dashboard_readonly.py` を正とする。
+
+### 14.1 現在の接続方式（手動 JSON）
+
+- Python CLI（`python -m basketball_sim.export.home_dashboard_readonly --save <.sav> --output <.json>`）で **読み取り専用のホーム用 JSON** を手動生成する。処理は `load_world` による **セーブの読み取りのみ**であり、**セーブファイルを書き換えない**。
+- Godot は **`res://data/home_dashboard_from_python.json`** を優先して読み、無ければ **`res://data/home_dashboard_mock.json`** にフォールバックする（`godot/scripts/home_dashboard.gd` の `_home_json_candidate_paths`）。
+- **Godot から Python プロセスを起動する処理は、本節の時点では入れない**。
+- 生成物 `home_dashboard_from_python.json` は開発用であり、`godot/.gitignore` で **コミット対象外**。
+
+### 14.2 今すぐ実装しないこと
+
+次は **Phase 4 初期の範囲外**とし、ランタイム連携の実装は行わない。
+
+- Godot から Python を **自動起動して JSON を生成する**こと
+- Godot から **ゲーム進行**すること
+- Godot から **セーブ / ロード**を本番同様に接続すること
+- Godot から **人事・経営・強化・戦術**などの正本操作を行うこと
+- **`Offseason.run()` を Godot から呼ぶ**こと
+- Python の正本ロジックを **Godot 側へ二重実装**すること
+- **`format_version` / `PAYLOAD_SCHEMA_VERSION` を変更すること**（不要な変更は行わない）
+- **MainMenuView / Tk の実行中状態を横取り**すること
+
+### 14.3 自動起動を実装する場合に想定されるリスク（調査メモ）
+
+以下は実装前調査で洗い出した留意点であり、**本節では解決策を確定しない**。
+
+- Windows で `python` が PATH に通っているとは限らない
+- venv 利用時は **`venv\Scripts\python.exe` をどう指定するか**が課題になり得る
+- 作業ディレクトリ（cwd）が異なると **`basketball_sim` の import に失敗**し得る
+- Godot の **`res://` と OS 実パス**の対応、および **書き込み可否**（エクスポート配布時は別検証が必要）
+- PowerShell の `$env:USERPROFILE` と Godot の環境変数取得は **別系統**の扱いになる
+- **日本語パス・スペース入りパス**の子プロセス引数は要検証
+- **stdout / stderr** の取得・閲覧方法は未決（ログファイル化等は後工程）
+- 自動生成に失敗した場合、**古い JSON が残り誤表示**につながる可能性
+- **Steam 配布**で Python をユーザーに要求するか、**同梱 exe 化**するかは **未決**
+
+### 14.4 将来候補（実装判断は後工程）
+
+- **開発限定**: Godot から OS 経由で Python CLI を呼び、成功後に JSON を再読込する案
+- **本番寄り**: Python ロジック（または export 専用）を **exe 化**し、Godot から呼ぶ案
+- **通信**: ローカル HTTP / RPC で Godot がデータを取得する案
+- **当面継続**: 手動 JSON のまま、**ホーム見た目**・**DTO 品質**・**次の読み取り専用画面**で足場を広げる案
+
+### 14.5 現時点の推奨方針
+
+- Phase 4 初期では **Godot から Python 自動起動は実装しない**
+- 開発中は **手動 JSON 生成 + Godot 優先読込**で十分とする
+- 先に **ホームの見た目改善**、**DTO 品質改善**、**次の読み取り専用 Godot 画面**でパターンを積む
+- **自動起動**は、Python 実行環境の前提・対象 save の決め方・JSON 出力先（`res://` vs `user://` 等）・**配布方針**を固めてから **実装するかを判断**する
+
+---
+
 ## 付録 A: 補助枠 → Godot 卒業先 早見
 
 ```txt
@@ -293,6 +347,7 @@
 
 ## 付録 B: 関連ドキュメント
 
+- `godot/README.md`（Phase 4 最小 Godot プロジェクトの運用・手動 JSON 手順）
 - `docs/PRODUCT_ROADMAP_AND_VISION.md`（Phase 0〜6 ／製品ビジョン）
 - `docs/IDEAL_GAME_DESIGN_MASTER.md`（理想形のドメイン設計）
 - `docs/INFORMATION_MENU_SPEC_V1.md`／`docs/SCHEDULE_MENU_SPEC_V1.md`／`docs/SYSTEM_MENU_SPEC_V1.md`
