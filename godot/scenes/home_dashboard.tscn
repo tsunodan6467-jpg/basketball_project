@@ -19,10 +19,10 @@ corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header"]
-content_margin_left = 18.0
-content_margin_top = 16.0
-content_margin_right = 18.0
-content_margin_bottom = 16.0
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
 bg_color = Color(0.09, 0.1, 0.13, 1)
 border_width_left = 1
 border_width_top = 1
@@ -92,14 +92,14 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 16
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 12
 
 [node name="RootCol" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 12
 
 [node name="HeaderCard" type="PanelContainer" parent="Margin/RootCol"]
 layout_mode = 2
@@ -141,7 +141,7 @@ text = "進行・セーブ/ロード・各メニュー操作は今後実装予�
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
-theme_override_font_sizes/font_size = 28
+theme_override_font_sizes/font_size = 26
 text = "（クラブ名）"
 
 [node name="SeasonLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
@@ -170,12 +170,14 @@ text = "データ読込に失敗しました"
 [node name="Scroll" type="ScrollContainer" parent="Margin/RootCol"]
 layout_mode = 2
 size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
 horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
 
 [node name="Inner" type="VBoxContainer" parent="Margin/RootCol/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 16
+theme_override_constants/separation = 14
 
 [node name="SecMetricsTitle" type="Label" parent="Margin/RootCol/Scroll/Inner"]
 layout_mode = 2
