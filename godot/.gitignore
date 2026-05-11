@@ -4,3 +4,4 @@
 # Python CLI で生成する開発用 JSON（手動配置・コミットしない）
 data/home_dashboard_from_python.json
 data/roster_from_python.json
+data/club_history_from_python.json
