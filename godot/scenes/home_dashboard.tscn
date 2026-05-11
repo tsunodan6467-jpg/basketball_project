@@ -1,0 +1,260 @@
+[gd_scene load_steps=2 format=3 uid="uid://bkgmhomeproto01"]
+
+[ext_resource type="Script" path="res://scripts/home_dashboard.gd" id="1_script"]
+
+[node name="HomeDashboard" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.0823529, 0.0941176, 0.1254902, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 16
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.95, 1)
+theme_override_font_sizes/font_size = 22
+text = "ホーム / ダッシュボード（Phase 4 プロトタイプ）"
+
+[node name="HintProto" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.7, 0.78, 1)
+theme_override_font_sizes/font_size = 12
+text = "仮データ表示のみ。進行・セーブ/ロード・各メニュー操作は未接続です。"
+
+[node name="StatusLabel" type="Label" parent="Margin/VBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.55, 0.55, 1)
+theme_override_font_sizes/font_size = 14
+text = "データ読込に失敗しました"
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="Inner" type="VBoxContainer" parent="Margin/VBox/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="SecClub" type="Label" parent="Margin/VBox/Scroll/Inner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "■ クラブ"
+
+[node name="ClubNameLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.94, 0.98, 1)
+theme_override_font_sizes/font_size = 18
+text = "（クラブ名）"
+
+[node name="SecSeason" type="Label" parent="Margin/VBox/Scroll/Inner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "■ シーズン / 所属 / 順位"
+
+[node name="SeasonLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 14
+text = "（シーズン）"
+
+[node name="DivisionLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 14
+text = "（ディビジョン）"
+
+[node name="RankRecordLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 14
+text = "（順位 / 戦績）"
+
+[node name="MoneyLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 14
+text = "（資金）"
+
+[node name="OwnerTrustRow" type="HBoxContainer" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="OwnerKey" type="Label" parent="Margin/VBox/Scroll/Inner/OwnerTrustRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "オーナー信頼"
+
+[node name="OwnerTrustLabel" type="Label" parent="Margin/VBox/Scroll/Inner/OwnerTrustRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = ""
+
+[node name="SalaryCapRow" type="HBoxContainer" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="CapKey" type="Label" parent="Margin/VBox/Scroll/Inner/SalaryCapRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "給与キャップ"
+
+[node name="SalaryCapLabel" type="Label" parent="Margin/VBox/Scroll/Inner/SalaryCapRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = ""
+
+[node name="RecentFormRow" type="HBoxContainer" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="RecentKey" type="Label" parent="Margin/VBox/Scroll/Inner/RecentFormRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.88, 1)
+theme_override_font_sizes/font_size = 13
+text = "直近の調子"
+
+[node name="RecentFormLabel" type="Label" parent="Margin/VBox/Scroll/Inner/RecentFormRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = ""
+
+[node name="WarningsRow" type="HBoxContainer" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="WarnKey" type="Label" parent="Margin/VBox/Scroll/Inner/WarningsRow"]
+custom_minimum_size = Vector2(140, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.75, 0.55, 1)
+theme_override_font_sizes/font_size = 13
+text = "注意 / 警告"
+
+[node name="WarningsLabel" type="Label" parent="Margin/VBox/Scroll/Inner/WarningsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.98, 0.82, 0.65, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = ""
+
+[node name="SecNext" type="Label" parent="Margin/VBox/Scroll/Inner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "■ 次戦 / 次イベント"
+
+[node name="NextGameLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.92, 0.96, 1)
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 2
+text = "（次戦）"
+
+[node name="SecSummary" type="Label" parent="Margin/VBox/Scroll/Inner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "■ クラブ状況サマリー"
+
+[node name="ClubSummaryLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.9, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = "（サマリー）"
+
+[node name="SecTasks" type="Label" parent="Margin/VBox/Scroll/Inner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "■ 今やること（最大3件）"
+
+[node name="TasksLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.9, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = "（タスク）"
+
+[node name="SecNews" type="Label" parent="Margin/VBox/Scroll/Inner"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.75, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+text = "■ ニュース見出し"
+
+[node name="NewsLabel" type="Label" parent="Margin/VBox/Scroll/Inner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.9, 0.94, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = "（ニュース）"
+
+[node name="Footer" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.62, 1)
+theme_override_font_sizes/font_size = 11
+text = "【プレースホルダ】進行ボタン・メニュー・セーブ/ロード：今後実装予定（操作不可のプロトタイプ）"

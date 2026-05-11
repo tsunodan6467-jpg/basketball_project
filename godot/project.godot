@@ -1,0 +1,21 @@
+; Godot 4.x — Phase 4 read-only home prototype (mock JSON only).
+; Open this folder as a project in the Godot editor.
+
+config_version=5
+
+[application]
+
+config/name="Basketball GM Home Proto"
+config/description="Phase 4 UI prototype: mock home dashboard only. No Python / save integration."
+run/main_scene="res://scenes/home_dashboard.tscn"
+config/features=PackedStringArray("4.2")
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=780
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
