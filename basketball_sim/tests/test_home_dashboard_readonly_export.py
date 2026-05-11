@@ -32,6 +32,80 @@ REQUIRED_KEYS = (
 )
 
 
+def test_season_label_annual_menu_with_season_count() -> None:
+    team = SimpleNamespace(
+        name="X",
+        league_level=1,
+        regular_wins=0,
+        regular_losses=0,
+        money=0,
+        owner_trust=None,
+        players=[],
+        facility_upgrade_points=0,
+        fa_shortlist=[],
+        owner_mission=None,
+    )
+    d = build_home_dashboard_readonly_dict(
+        None, team, at_annual_menu=True, season_count=3
+    )
+    assert d["season_label"] == "年度メニュー（シーズン 3）"
+
+
+def test_season_label_annual_menu_without_season_count() -> None:
+    team = SimpleNamespace(
+        name="X",
+        league_level=1,
+        regular_wins=0,
+        regular_losses=0,
+        money=0,
+        owner_trust=None,
+        players=[],
+        facility_upgrade_points=0,
+        fa_shortlist=[],
+        owner_mission=None,
+    )
+    d = build_home_dashboard_readonly_dict(
+        None, team, at_annual_menu=True, season_count=None
+    )
+    assert d["season_label"] == "年度メニュー"
+
+
+def test_season_label_season_count_only_not_annual_menu() -> None:
+    team = SimpleNamespace(
+        name="X",
+        league_level=1,
+        regular_wins=0,
+        regular_losses=0,
+        money=0,
+        owner_trust=None,
+        players=[],
+        facility_upgrade_points=0,
+        fa_shortlist=[],
+        owner_mission=None,
+    )
+    d = build_home_dashboard_readonly_dict(
+        None, team, at_annual_menu=False, season_count=5
+    )
+    assert d["season_label"] == "シーズン 5（進行情報未接続）"
+
+
+def test_season_label_no_meta_unchanged_fallback() -> None:
+    team = SimpleNamespace(
+        name="X",
+        league_level=1,
+        regular_wins=0,
+        regular_losses=0,
+        money=0,
+        owner_trust=None,
+        players=[],
+        facility_upgrade_points=0,
+        fa_shortlist=[],
+        owner_mission=None,
+    )
+    d = build_home_dashboard_readonly_dict(None, team)
+    assert d["season_label"] == "シーズン未接続"
+
+
 def test_build_home_dashboard_returns_dict_with_required_keys() -> None:
     team = SimpleNamespace(
         name="テストFC",
@@ -118,5 +192,7 @@ def test_export_home_dashboard_json_from_world_roundtrip_minimal_save(tmp_path: 
     snap = export_home_dashboard_json_from_world(sav, out)
     assert out.is_file()
     assert snap["club_name"] == "セーブ出口FC"
+    assert snap["season_label"] == "年度メニュー（シーズン 1）"
     body = json.loads(out.read_text(encoding="utf-8"))
     assert body["division"].startswith("D")
+    assert body["season_label"] == "年度メニュー（シーズン 1）"

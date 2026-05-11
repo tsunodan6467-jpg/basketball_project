@@ -104,25 +104,43 @@ def _money_text(team: Any) -> str:
         return f"資金: {raw}"
 
 
-def _season_progress_label(season: Any) -> str:
-    if season is None:
-        return "シーズン未接続"
-    try:
-        from basketball_sim.systems.schedule_display import main_top_bar_progress_label
+def _season_progress_label(
+    season: Any,
+    *,
+    season_count: Optional[int] = None,
+    at_annual_menu: Optional[bool] = None,
+) -> str:
+    if season is not None:
+        try:
+            from basketball_sim.systems.schedule_display import main_top_bar_progress_label
 
-        sn = int(_safe_get(season, "season_no", 1) or 1)
-        cr = int(_safe_get(season, "current_round", 0) or 0)
-        tr = int(_safe_get(season, "total_rounds", 0) or 0)
-        fin = bool(_safe_get(season, "season_finished", False))
-        return main_top_bar_progress_label(
-            season,
-            season_year=sn,
-            current_round=cr,
-            total_rounds=tr,
-            season_finished=fin,
-        )
-    except Exception:
-        return "シーズン進行中"
+            sn = int(_safe_get(season, "season_no", 1) or 1)
+            cr = int(_safe_get(season, "current_round", 0) or 0)
+            tr = int(_safe_get(season, "total_rounds", 0) or 0)
+            fin = bool(_safe_get(season, "season_finished", False))
+            return main_top_bar_progress_label(
+                season,
+                season_year=sn,
+                current_round=cr,
+                total_rounds=tr,
+                season_finished=fin,
+            )
+        except Exception:
+            return "シーズン進行中"
+
+    if at_annual_menu is True:
+        if season_count is not None:
+            try:
+                return f"年度メニュー（シーズン {int(season_count)}）"
+            except (TypeError, ValueError):
+                return "年度メニュー"
+        return "年度メニュー"
+    if season_count is not None:
+        try:
+            return f"シーズン {int(season_count)}（進行情報未接続）"
+        except (TypeError, ValueError):
+            pass
+    return "シーズン未接続"
 
 
 def _division_text(team: Any) -> str:
@@ -321,14 +339,21 @@ def build_home_dashboard_readonly_dict(
     *,
     max_tasks: int = 3,
     max_news: int = 3,
+    season_count: Optional[int] = None,
+    at_annual_menu: Optional[bool] = None,
 ) -> Dict[str, Any]:
     """
     Godot `home_dashboard_mock.json` と同一キーの dict を返す（読み取り専用）。
 
     season が None の場合（年度メニュー直後のセーブ等）は、シーズン依存項目をフォールバックする。
+    season_count / at_annual_menu はセーブ payload のメタ（読み取り）を渡すと season_label が具体化される。
     """
     club_name = _team_display_name(team)
-    season_label = _season_progress_label(season)
+    season_label = _season_progress_label(
+        season,
+        season_count=season_count,
+        at_annual_menu=at_annual_menu,
+    )
     division = _division_text(team)
     rank = _compute_rank_text(season, team)
     wins = int(_safe_get(team, "regular_wins", 0) or 0)
@@ -387,7 +412,24 @@ def export_home_dashboard_json_from_world(save_path: Path | str, output_path: Pa
     teams = payload["teams"]
     user = find_user_team(teams, int(payload["user_team_id"]))
     season = payload.get("resume_season")
-    snap = build_home_dashboard_readonly_dict(season, user, max_tasks=3, max_news=3)
+    raw_sc = payload.get("season_count")
+    try:
+        season_count_i: Optional[int] = int(raw_sc) if raw_sc is not None else None
+    except (TypeError, ValueError):
+        season_count_i = None
+    raw_am = payload.get("at_annual_menu")
+    if raw_am is None:
+        at_annual_i: Optional[bool] = None
+    else:
+        at_annual_i = bool(raw_am)
+    snap = build_home_dashboard_readonly_dict(
+        season,
+        user,
+        max_tasks=3,
+        max_news=3,
+        season_count=season_count_i,
+        at_annual_menu=at_annual_i,
+    )
     write_home_dashboard_json(snap, output_path)
     return snap
 
