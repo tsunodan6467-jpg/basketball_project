@@ -24,6 +24,9 @@ __pycache__/
 # Local pytest probe logs
 reports/pytest_*.txt
 
+# Local simulation / CI / ad-hoc logs under reports/ (untracked only; already-tracked *.txt stay tracked)
+reports/*.txt
+
 # Local Steam build/upload artifacts
 steam_api64.dll
 steam_upload_content/
