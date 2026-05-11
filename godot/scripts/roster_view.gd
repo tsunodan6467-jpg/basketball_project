@@ -8,6 +8,8 @@ var _roster_json_paths: Array[String] = [
 
 const _LOAD_FAILED_MESSAGE := "ロスターデータ読込に失敗しました"
 
+const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
+
 var _last_loaded_uri: String = ""
 
 @onready var _title_label: Label = %TitleLabel
@@ -217,3 +219,10 @@ func _ovr_cell(v: Variant) -> String:
 	if typeof(v) in [TYPE_INT, TYPE_FLOAT]:
 		return "OVR %d" % int(v)
 	return "-"
+
+
+func _on_home_nav_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_HOME_DASHBOARD_SCENE_PATH)
+	if err != OK:
+		push_warning("[roster_view] change_scene_to_file failed: %s err=%s" % [_HOME_DASHBOARD_SCENE_PATH, err])

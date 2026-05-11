@@ -105,6 +105,15 @@ theme_override_colors/font_color = Color(0.55, 0.6, 0.68, 1)
 theme_override_font_sizes/font_size = 11
 text = "ロスター閲覧プロトタイプ（操作不可）"
 
+[node name="HeaderNavRow" type="HBoxContainer" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HomeNavButton" type="Button" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderNavRow"]
+layout_mode = 2
+text = "ホームへ戻る（表示のみ）"
+tooltip_text = "ホーム画面へ切り替えます。セーブ・進行・契約などの操作は含みません。"
+
 [node name="TitleLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -162,3 +171,5 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 6
+
+[connection signal="pressed" from="Margin/RootCol/HeaderCard/HeaderInner/HeaderNavRow/HomeNavButton" to="." method="_on_home_nav_button_pressed"]
