@@ -93,7 +93,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 	else:
 		_meta_label.text = "所属: D%s ／ 登録人数 不明" % lv_s
 
-	_footer_note_label.text = "読み取り専用表示。契約・移籍・起用変更などの操作は今後実装予定です。"
+	_footer_note_label.text = "読み取り専用です。契約・移籍・起用変更などの操作は行いません（未接続）。"
 
 	var players_raw = d.get("players", null)
 	var rows: Array = []
