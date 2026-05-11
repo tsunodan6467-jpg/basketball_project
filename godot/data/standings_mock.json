@@ -1,0 +1,138 @@
+{
+  "screen_title": "順位表（閲覧）",
+  "team_name": "北氷原ユナイテッドBC",
+  "league_level": 1,
+  "season_label": "シーズン進行中（mock・表示検証用）",
+  "summary": {
+    "current_division": "D1",
+    "division_count": 3,
+    "has_season": true
+  },
+  "columns": [
+    "rank",
+    "team_name",
+    "wins",
+    "losses",
+    "points_for",
+    "points_against",
+    "point_diff",
+    "is_user_row"
+  ],
+  "divisions": [
+    {
+      "level": 1,
+      "division_label": "D1",
+      "rows": [
+        {
+          "rank": 1,
+          "team_name": "架空シティ・サザンクロス",
+          "wins": 38,
+          "losses": 12,
+          "points_for": 4120,
+          "points_against": 3890,
+          "point_diff": 230,
+          "is_user_row": false
+        },
+        {
+          "rank": 2,
+          "team_name": "北氷原ユナイテッドBC",
+          "wins": 35,
+          "losses": 15,
+          "points_for": 4010,
+          "points_against": 3920,
+          "point_diff": 90,
+          "is_user_row": true
+        },
+        {
+          "rank": 3,
+          "team_name": "東港ベイサイド・アスレチックス（架空の長いクラブ名テスト用ラベルで折返しとclip耐性を確認）",
+          "wins": 33,
+          "losses": 17,
+          "points_for": 3980,
+          "points_against": 4010,
+          "point_diff": -30,
+          "is_user_row": false
+        },
+        {
+          "rank": 4,
+          "team_name": "西丘陵ロイヤルズ",
+          "wins": 30,
+          "losses": 20,
+          "points_for": 3880,
+          "points_against": 3950,
+          "point_diff": -70,
+          "is_user_row": false
+        }
+      ],
+      "empty_message": ""
+    },
+    {
+      "level": 2,
+      "division_label": "D2",
+      "rows": [
+        {
+          "rank": 1,
+          "team_name": "湖畔ブルーウェーブ",
+          "wins": 36,
+          "losses": 14,
+          "points_for": 3920,
+          "points_against": 3810,
+          "point_diff": 110,
+          "is_user_row": false
+        },
+        {
+          "rank": 2,
+          "team_name": "中央平原ストーム",
+          "wins": 34,
+          "losses": 16,
+          "points_for": 3850,
+          "points_against": 3820,
+          "point_diff": 30,
+          "is_user_row": false
+        },
+        {
+          "rank": 3,
+          "team_name": "南湾シーガルズ",
+          "wins": 31,
+          "losses": 19,
+          "points_for": 3780,
+          "points_against": 3840,
+          "point_diff": -60,
+          "is_user_row": false
+        }
+      ],
+      "empty_message": ""
+    },
+    {
+      "level": 3,
+      "division_label": "D3",
+      "rows": [
+        {
+          "rank": 1,
+          "team_name": "山麓グリズリーズ",
+          "wins": 37,
+          "losses": 13,
+          "points_for": 3750,
+          "points_against": 3600,
+          "point_diff": 150,
+          "is_user_row": false
+        },
+        {
+          "rank": 2,
+          "team_name": "河川敷ランナーズ",
+          "wins": 29,
+          "losses": 21,
+          "points_for": 3620,
+          "points_against": 3680,
+          "point_diff": -60,
+          "is_user_row": false
+        }
+      ],
+      "empty_message": ""
+    }
+  ],
+  "notes": [
+    "読み取り専用。操作は含みません。",
+    "mockデータです。Python生成JSONがある場合はそちらを優先します。"
+  ]
+}
