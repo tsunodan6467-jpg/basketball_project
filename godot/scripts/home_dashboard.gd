@@ -1,10 +1,10 @@
 extends Control
 
 ## ホーム用 JSON の読み込み候補（先頭ほど優先）。Python 生成物のパスを差し替える場合はここだけ触ればよい。
-const _HOME_JSON_CANDIDATE_PATHS: PackedStringArray = PackedStringArray([
+var _home_json_candidate_paths: Array[String] = [
 	"res://data/home_dashboard_from_python.json",
 	"res://data/home_dashboard_mock.json",
-])
+]
 
 const _LOAD_FAILED_MESSAGE := "データ読込に失敗しました"
 
@@ -33,7 +33,7 @@ func _ready() -> void:
 
 
 func _load_home_snapshot() -> Dictionary:
-	for path in _HOME_JSON_CANDIDATE_PATHS:
+	for path in _home_json_candidate_paths:
 		if not FileAccess.file_exists(path):
 			continue
 		var f := FileAccess.open(path, FileAccess.READ)
