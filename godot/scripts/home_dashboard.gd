@@ -8,6 +8,8 @@ var _home_json_candidate_paths: Array[String] = [
 
 const _LOAD_FAILED_MESSAGE := "データ読込に失敗しました"
 
+const _ROSTER_VIEW_SCENE_PATH := "res://scenes/roster_view.tscn"
+
 ## 直近で読み取りに成功した `res://` パス（表示用）
 var _last_loaded_uri: String = ""
 
@@ -142,3 +144,10 @@ func _set_optional_row(row: HBoxContainer, value_label: Label, text: String) -> 
 	row.visible = show
 	if show:
 		value_label.text = text
+
+
+func _on_roster_view_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_ROSTER_VIEW_SCENE_PATH)
+	if err != OK:
+		push_warning("[home_dashboard] change_scene_to_file failed: %s err=%s" % [_ROSTER_VIEW_SCENE_PATH, err])
