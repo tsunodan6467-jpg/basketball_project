@@ -1,0 +1,153 @@
+{
+  "screen_title": "財務サマリー（閲覧）",
+  "team_name": "dlasjfasfjd2",
+  "league_level": 1,
+  "summary": {
+    "money": 50762597814,
+    "money_label": "507億6200万円",
+    "revenue_last_season": 973483326,
+    "revenue_last_season_label": "9億7300万円",
+    "expense_last_season": 935306468,
+    "expense_last_season_label": "9億3500万円",
+    "cashflow_last_season": 38176858,
+    "cashflow_last_season_label": "+3800万円",
+    "salary_cap": 1200000000,
+    "salary_cap_label": "12億円",
+    "salary_total": 918880500,
+    "salary_total_label": "9億1800万円",
+    "salary_cap_room": 281119500,
+    "salary_cap_room_label": "+2億8100万円",
+    "finance_history_count": 3,
+    "has_finance_history": true,
+    "season_count": 2,
+    "at_annual_menu": true
+  },
+  "finance_items": [
+    {
+      "key": "money",
+      "label": "現在資金",
+      "value": 50762597814,
+      "display_value": "507億6200万円",
+      "memo": ""
+    },
+    {
+      "key": "revenue_last_season",
+      "label": "前季収入",
+      "value": 973483326,
+      "display_value": "9億7300万円",
+      "memo": ""
+    },
+    {
+      "key": "expense_last_season",
+      "label": "前季支出",
+      "value": 935306468,
+      "display_value": "9億3500万円",
+      "memo": ""
+    },
+    {
+      "key": "cashflow_last_season",
+      "label": "前季収支",
+      "value": 38176858,
+      "display_value": "+3800万円",
+      "memo": ""
+    },
+    {
+      "key": "salary_cap",
+      "label": "サラリー上限（ソフトキャップ）",
+      "value": 1200000000,
+      "display_value": "12億円",
+      "memo": ""
+    },
+    {
+      "key": "salary_total",
+      "label": "選手年俸合計",
+      "value": 918880500,
+      "display_value": "9億1800万円",
+      "memo": ""
+    },
+    {
+      "key": "salary_cap_room",
+      "label": "サラリー余力（上限−年俸合計）",
+      "value": 281119500,
+      "display_value": "+2億8100万円",
+      "memo": ""
+    }
+  ],
+  "history_rows": [
+    {
+      "order": 1,
+      "season": "シーズン1",
+      "label": "シーズン1",
+      "revenue": 920000000,
+      "revenue_label": "9億2000万円",
+      "expense": 910000000,
+      "expense_label": "9億1000万円",
+      "cashflow": 10000000,
+      "cashflow_label": "+1000万円",
+      "memo": "レギュラー終了時の締め"
+    },
+    {
+      "order": 2,
+      "season": "オフシーズン",
+      "label": "オフシーズン",
+      "revenue": 50000000,
+      "revenue_label": "5000万円",
+      "expense": 48000000,
+      "expense_label": "4800万円",
+      "cashflow": 2000000,
+      "cashflow_label": "+200万円",
+      "memo": "スポンサー更新・分配"
+    },
+    {
+      "order": 3,
+      "season": "シーズン2",
+      "label": "シーズン2",
+      "revenue": 973483326,
+      "revenue_label": "9億7300万円",
+      "expense": 935306468,
+      "expense_label": "9億3500万円",
+      "cashflow": 38176858,
+      "cashflow_label": "+3800万円",
+      "memo": "前季確定（mock）"
+    }
+  ],
+  "sections": [
+    {
+      "title": "財務概要",
+      "lines": [
+        "クラブ: dlasjfasfjd2",
+        "セーブ上のシーズン回数: 2",
+        "年度メニュー直後のセーブの可能性があります。",
+        "現在資金: 507億6200万円",
+        "サラリー上限: 12億円",
+        "選手年俸合計: 9億1800万円",
+        "サラリー余力: +2億8100万円"
+      ]
+    },
+    {
+      "title": "前季収支",
+      "lines": [
+        "前季収入: 9億7300万円",
+        "前季支出: 9億3500万円",
+        "前季収支: +3800万円"
+      ]
+    },
+    {
+      "title": "財務履歴",
+      "lines": [
+        "履歴あり: 3件",
+        "表示件数: 3件（ストレージ順の末尾から最大5件・並べ替えなし）"
+      ]
+    },
+    {
+      "title": "注意",
+      "lines": [
+        "読み取り専用です。",
+        "予算変更・投資・契約更新などの操作は未接続です。"
+      ]
+    }
+  ],
+  "notes": [
+    "読み取り専用。予算変更・投資・契約更新などの操作は含みません。"
+  ]
+}
