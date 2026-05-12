@@ -1,6 +1,6 @@
 extends Control
 
-## 戦術・ローテーションサマリー閲覧（第9画面プロトタイプ・単独確認用）。
+## 戦術・ローテーションサマリー閲覧（第9画面・読み取り専用）。
 ## Python 手動配置 JSON を優先し、無ければ同梱モックを読み込む。
 
 var _tactics_summary_json_paths: Array[String] = [
@@ -9,6 +9,8 @@ var _tactics_summary_json_paths: Array[String] = [
 ]
 
 const _LOAD_FAILED_MESSAGE := "戦術・ローテーション情報を読み込めませんでした。"
+
+const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _last_loaded_uri: String = ""
 
@@ -236,6 +238,11 @@ func _txt(d: Dictionary, key: String, default_s: String) -> String:
 	return s if s != "" else default_s
 
 
-func _on_back_stub_pressed() -> void:
-	# 単独プロトタイプ: ホーム遷移は未接続（ボタンは無効化推奨）
-	pass
+func _on_home_nav_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_HOME_DASHBOARD_SCENE_PATH)
+	if err != OK:
+		push_warning(
+			"[tactics_summary_view] change_scene_to_file failed: %s err=%s"
+			% [_HOME_DASHBOARD_SCENE_PATH, err]
+		)

@@ -119,13 +119,12 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_chip")
 layout_mode = 2
 theme_override_colors/font_color = Color(0.55, 0.6, 0.68, 1)
 theme_override_font_sizes/font_size = 11
-text = "戦術・ローテーション閲覧（mock単独・ホーム未接続）"
+text = "戦術・ローテーション閲覧（読み取り専用・ホームから遷移可）"
 
-[node name="BackStubButton" type="Button" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow"]
-disabled = true
+[node name="HomeNavButton" type="Button" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow"]
 layout_mode = 2
-text = "戻る（未接続）"
-tooltip_text = "単独プロトタイプのためホーム遷移は未接続です。"
+text = "ホームへ戻る（表示のみ）"
+tooltip_text = "ホーム画面へ表示切替します。保存・進行・編集・戦術変更は行いません。Python 自動起動は行いません。"
 
 [node name="ScreenTitleLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
@@ -322,4 +321,4 @@ theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 text = "（注意）"
 
-[connection signal="pressed" from="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow/BackStubButton" to="." method="_on_back_stub_pressed"]
+[connection signal="pressed" from="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow/HomeNavButton" to="." method="_on_home_nav_button_pressed"]
