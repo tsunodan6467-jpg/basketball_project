@@ -14,6 +14,7 @@ const _STANDINGS_VIEW_SCENE_PATH := "res://scenes/standings_view.tscn"
 const _SCHEDULE_VIEW_SCENE_PATH := "res://scenes/schedule_view.tscn"
 const _FACILITY_SUMMARY_VIEW_SCENE_PATH := "res://scenes/facility_summary_view.tscn"
 const _FINANCE_SUMMARY_VIEW_SCENE_PATH := "res://scenes/finance_summary_view.tscn"
+const _OWNER_MISSION_VIEW_SCENE_PATH := "res://scenes/owner_mission_view.tscn"
 
 ## 直近で読み取りに成功した `res://` パス（表示用）
 var _last_loaded_uri: String = ""
@@ -191,3 +192,10 @@ func _on_finance_summary_view_button_pressed() -> void:
 	var err := get_tree().change_scene_to_file(_FINANCE_SUMMARY_VIEW_SCENE_PATH)
 	if err != OK:
 		push_warning("[home_dashboard] change_scene_to_file failed: %s err=%s" % [_FINANCE_SUMMARY_VIEW_SCENE_PATH, err])
+
+
+func _on_owner_mission_view_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_OWNER_MISSION_VIEW_SCENE_PATH)
+	if err != OK:
+		push_warning("[home_dashboard] change_scene_to_file failed: %s err=%s" % [_OWNER_MISSION_VIEW_SCENE_PATH, err])

@@ -1,6 +1,8 @@
 extends Control
 
-## オーナーミッション閲覧用（第8画面プロトタイプ）。Python 手動配置 JSON を優先し、無ければ同梱 mock。ホーム遷移は未接続。
+## オーナーミッション閲覧用（第8画面プロトタイプ）。Python 手動配置 JSON を優先し、無ければ同梱 mock。
+
+const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _owner_mission_json_paths: Array[String] = [
 	"res://data/owner_mission_from_python.json",
@@ -233,6 +235,11 @@ func _txt(d: Dictionary, key: String, default_s: String) -> String:
 	return s if s != "" else default_s
 
 
-func _on_back_unlinked_pressed() -> void:
-	# 単独シーン確認用。ホームへは未接続。
-	push_warning("[owner_mission_view] 戻る（未接続）: ホーム遷移は未実装です。")
+func _on_home_nav_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_HOME_DASHBOARD_SCENE_PATH)
+	if err != OK:
+		push_warning(
+			"[owner_mission_view] change_scene_to_file failed: %s err=%s"
+			% [_HOME_DASHBOARD_SCENE_PATH, err]
+		)
