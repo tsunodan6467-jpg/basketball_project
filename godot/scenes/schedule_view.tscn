@@ -135,7 +135,16 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_chip")
 layout_mode = 2
 theme_override_colors/font_color = Color(0.55, 0.6, 0.68, 1)
 theme_override_font_sizes/font_size = 11
-text = "日程閲覧プロトタイプ（読み取り専用・単独シーン確認用）"
+text = "日程閲覧プロトタイプ（読み取り専用・ホームから遷移可）"
+
+[node name="HeaderNavRow" type="HBoxContainer" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HomeNavButton" type="Button" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderNavRow"]
+layout_mode = 2
+text = "ホームへ戻る（表示のみ）"
+tooltip_text = "ホーム画面へ表示切替します。保存・進行・編集は行いません。Python 自動起動は行いません。"
 
 [node name="ScreenTitleLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
@@ -288,3 +297,5 @@ unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
+
+[connection signal="pressed" from="Margin/RootCol/HeaderCard/HeaderInner/HeaderNavRow/HomeNavButton" to="." method="_on_home_nav_button_pressed"]
