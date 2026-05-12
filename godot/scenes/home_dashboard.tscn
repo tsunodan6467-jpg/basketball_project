@@ -206,7 +206,7 @@ vertical_scroll_mode = 1
 [node name="Inner" type="VBoxContainer" parent="Margin/RootCol/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 14
+theme_override_constants/separation = 12
 
 [node name="CardNavMenu" type="PanelContainer" parent="Margin/RootCol/Scroll/Inner"]
 layout_mode = 2
