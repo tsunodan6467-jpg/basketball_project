@@ -92,7 +92,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 	var hs_text: String = _has_season_label(summary.get("has_season", null))
 	var uc_s: String = _int_display_cell(summary.get("upcoming_count", null))
 	var season_line: String = _txt(d, "season_label", "—")
-	_context_meta.text = "シーズン: %s\n現在ラウンド: %s ／ 総ラウンド: %s ／ シーズン接続: %s\nupcoming 件数（summary）: %s" % [season_line, cr_s, tr_s, hs_text, uc_s]
+	_context_meta.text = "シーズン: %s\nラウンド %s／%s ・ 接続: %s ・ upcoming（summary）: %s" % [season_line, cr_s, tr_s, hs_text, uc_s]
 
 	_readonly_strip.text = "読み取り専用表示（進行・編集・保存は行いません）"
 
@@ -103,13 +103,19 @@ func _apply_snapshot(d: Dictionary) -> void:
 		_footer_note.text = "読み取り専用。進行・編集・保存は行いません。"
 	else:
 		var sb: String = ""
-		var first: bool = true
+		var first_note: bool = true
 		for n in notes:
-			if not first:
-				sb += "\n"
-			first = false
-			sb += _str_cell(n)
-		_footer_note.text = sb
+			var cell: String = _str_cell(n)
+			if cell.is_empty() or cell == "-":
+				continue
+			if not first_note:
+				sb += " ／ "
+			first_note = false
+			sb += cell
+		if sb.is_empty():
+			_footer_note.text = "読み取り専用。進行・編集・保存は行いません。"
+		else:
+			_footer_note.text = sb
 
 	var ng: Dictionary = _dict_or_empty(d.get("next_game", {}))
 	_apply_next_game_card(ng)
