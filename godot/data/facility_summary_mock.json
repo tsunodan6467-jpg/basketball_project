@@ -1,0 +1,75 @@
+{
+  "screen_title": "施設サマリー（閲覧）",
+  "team_name": "東京ベイ・架空クラブ",
+  "league_level": 1,
+  "summary": {
+    "facility_upgrade_points": 3,
+    "average_level": 3.3,
+    "max_level": 10,
+    "facility_count": 4
+  },
+  "facilities": [
+    {
+      "key": "arena",
+      "label": "アリーナ",
+      "level": 4,
+      "max_level": 10,
+      "level_label": "Lv.4 / 10",
+      "effect_hint": "集客・収入・ホーム環境に関わる施設です。"
+    },
+    {
+      "key": "training",
+      "label": "練習施設",
+      "level": 3,
+      "max_level": 10,
+      "level_label": "Lv.3 / 10",
+      "effect_hint": "育成・練習環境に関わる施設です。"
+    },
+    {
+      "key": "medical",
+      "label": "メディカル",
+      "level": 2,
+      "max_level": 10,
+      "level_label": "Lv.2 / 10",
+      "effect_hint": "負傷・疲労ケアに関わる施設です。"
+    },
+    {
+      "key": "front_office",
+      "label": "フロントオフィス",
+      "level": 4,
+      "max_level": 10,
+      "level_label": "Lv.4 / 10",
+      "effect_hint": "経営・編成・クラブ運営に関わる施設です。"
+    }
+  ],
+  "sections": [
+    {
+      "title": "施設概要",
+      "lines": [
+        "施設強化ポイント: 3",
+        "平均施設レベル: 3.3 / 10",
+        "最高施設レベル: 4 / 10"
+      ]
+    },
+    {
+      "title": "現在の施設",
+      "lines": [
+        "アリーナ Lv.4",
+        "練習施設 Lv.3",
+        "メディカル Lv.2",
+        "フロントオフィス Lv.4"
+      ]
+    },
+    {
+      "title": "注意",
+      "lines": [
+        "読み取り専用です。",
+        "施設投資・レベルアップ操作は未接続です。"
+      ]
+    }
+  ],
+  "notes": [
+    "読み取り専用。施設投資やレベルアップ操作は含みません。",
+    "mockデータです。Python生成JSONがある場合はそちらを優先します。"
+  ]
+}
