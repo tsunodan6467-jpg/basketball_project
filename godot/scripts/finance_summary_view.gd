@@ -8,6 +8,8 @@ var _finance_summary_json_paths: Array[String] = [
 
 const _LOAD_FAILED_MESSAGE := "財務サマリー情報を読み込めませんでした。"
 
+const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
+
 var _last_loaded_uri: String = ""
 
 @onready var _status_label: Label = %StatusLabel
@@ -221,3 +223,13 @@ func _str_cell(v: Variant) -> String:
 		return "—"
 	var s: String = str(v).strip_edges()
 	return s if not s.is_empty() else "—"
+
+
+func _on_home_nav_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_HOME_DASHBOARD_SCENE_PATH)
+	if err != OK:
+		push_warning(
+			"[finance_summary_view] change_scene_to_file failed: %s err=%s"
+			% [_HOME_DASHBOARD_SCENE_PATH, err]
+		)
