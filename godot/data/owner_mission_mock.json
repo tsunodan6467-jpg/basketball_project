@@ -1,0 +1,174 @@
+{
+  "screen_title": "オーナーミッション（閲覧）",
+  "team_name": "dlasjfasfjd2",
+  "league_level": 1,
+  "summary": {
+    "owner_trust": 52,
+    "owner_trust_label": "52（普通）",
+    "owner_trust_rank": "普通",
+    "mission_count": 5,
+    "active_mission_count": 5,
+    "completed_mission_count": 0,
+    "failed_mission_count": 0,
+    "has_owner_missions": true,
+    "season_count": 2,
+    "at_annual_menu": true
+  },
+  "mission_items": [
+    {
+      "order": 1,
+      "id": "wins_target",
+      "title": "40勝以上を確保",
+      "category": "results",
+      "status": "active",
+      "status_label": "進行中",
+      "target": 40,
+      "progress": null,
+      "progress_label": "未評価",
+      "reward": "6",
+      "penalty": "-7",
+      "memo": "レギュラーシーズンで一定以上の勝ち星を積み、競争力を示す。"
+    },
+    {
+      "order": 2,
+      "id": "attendance_push",
+      "title": "観客動員を伸ばす",
+      "category": "results",
+      "status": "active",
+      "status_label": "進行中",
+      "target": null,
+      "progress": null,
+      "progress_label": "-",
+      "reward": "4",
+      "penalty": "-4",
+      "memo": "ホームの集客とブランド力を高め、収益基盤を強化する。"
+    },
+    {
+      "order": 3,
+      "id": "youth_minutes",
+      "title": "若手の出場機会を確保",
+      "category": "development",
+      "status": "active",
+      "status_label": "進行中",
+      "target": 2,
+      "progress": null,
+      "progress_label": "-",
+      "reward": "5",
+      "penalty": "-5",
+      "memo": "24歳以下の選手に十分な経験を積ませ、将来の核を育てる。"
+    },
+    {
+      "order": 4,
+      "id": "finance_black",
+      "title": "財務黒字を維持",
+      "category": "finance",
+      "status": "active",
+      "status_label": "進行中",
+      "target": 0,
+      "progress": null,
+      "progress_label": "-",
+      "reward": "5",
+      "penalty": "-6",
+      "memo": "単年収支を健全に保ち、補強の余力を残す。"
+    },
+    {
+      "order": 5,
+      "id": "d1_stay",
+      "title": "D1残留圏を維持",
+      "category": "results",
+      "status": "active",
+      "status_label": "進行中",
+      "target": 10,
+      "progress": null,
+      "progress_label": "-",
+      "reward": "6",
+      "penalty": "-7",
+      "memo": "順位面で下位に沈み込まず、リーグ内の立ち位置を守る。"
+    }
+  ],
+  "evaluation_items": [
+    {
+      "key": "owner_trust",
+      "label": "オーナー信頼",
+      "value": 52,
+      "display_value": "52（普通）",
+      "memo": "オーナー期待: PO争い"
+    },
+    {
+      "key": "active_missions",
+      "label": "進行中ミッション",
+      "value": 5,
+      "display_value": "5",
+      "memo": "status が進行系とみなした件数（読取のみ）"
+    },
+    {
+      "key": "completed_missions",
+      "label": "達成済みミッション",
+      "value": 0,
+      "display_value": "0",
+      "memo": "-"
+    },
+    {
+      "key": "failed_missions",
+      "label": "未達ミッション",
+      "value": 0,
+      "display_value": "0",
+      "memo": "-"
+    },
+    {
+      "key": "club_evaluation",
+      "label": "クラブ評価",
+      "value": null,
+      "display_value": "オーナー信頼ベース: 普通（参考表示・読取のみ）",
+      "memo": "専用フィールド club_evaluation はセーブに存在しません（owner_trust 帯からの読取表示のみ）。"
+    },
+    {
+      "key": "mission_total",
+      "label": "ミッション総数",
+      "value": 5,
+      "display_value": "5",
+      "memo": "max_missions による表示切り詰め前の総数"
+    }
+  ],
+  "sections": [
+    {
+      "title": "オーナー信頼",
+      "lines": [
+        "オーナー信頼: 52 / 100（普通）",
+        "オーナー期待: PO争い"
+      ]
+    },
+    {
+      "title": "今季ミッション",
+      "lines": [
+        "1. 40勝以上を確保 — 進行中",
+        "   進捗: 未評価",
+        "2. 観客動員を伸ばす — 進行中",
+        "3. 若手の出場機会を確保 — 進行中",
+        "4. 財務黒字を維持 — 進行中",
+        "5. D1残留圏を維持 — 進行中"
+      ]
+    },
+    {
+      "title": "クラブ評価",
+      "lines": [
+        "オーナー信頼: 52（普通）",
+        "進行中ミッション: 5",
+        "達成済みミッション: 0",
+        "未達ミッション: 0",
+        "クラブ評価: オーナー信頼ベース: 普通（参考表示・読取のみ）",
+        "ミッション総数: 5"
+      ]
+    },
+    {
+      "title": "注意",
+      "lines": [
+        "読み取り専用です。",
+        "ミッションの再生成・評価確定・信頼度の変更は行いません。"
+      ]
+    }
+  ],
+  "notes": [
+    "読み取り専用。ミッション生成・評価更新・報酬付与などの操作は含みません。"
+  ]
+}
