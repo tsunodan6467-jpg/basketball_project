@@ -1,0 +1,74 @@
+{
+  "screen_title": "戦術・ローテーションサマリー（閲覧）",
+  "team_name": "dlasjfasfjd2",
+  "league_level": 1,
+  "summary": {
+    "tactic_preset": null,
+    "tactic_preset_label": null,
+    "play_style": "three_point",
+    "play_style_label": "3ポイント重視",
+    "offense_tempo": "standard",
+    "offense_tempo_label": "標準",
+    "offense_focus": "balanced",
+    "offense_focus_label": "バランス",
+    "offense_build": "ball_move",
+    "offense_build_label": "ボールムーブ",
+    "defense_style": "balanced",
+    "defense_style_label": "バランス",
+    "rebound_style": "balanced",
+    "rebound_style_label": "バランス",
+    "transition_style": "situational",
+    "transition_style_label": "状況次第",
+    "rotation_policy": null,
+    "rotation_policy_label": null,
+    "starter_count": 5,
+    "target_minutes_count": 0,
+    "has_team_tactics": true,
+    "has_rotation_settings": true,
+    "three_point_policy_label": "-",
+    "paint_policy_label": "-",
+    "season_count": 2,
+    "at_annual_menu": true
+  },
+  "tactic_items": [
+    {"key": "tactic_preset", "label": "戦術プリセット", "value": null, "display_value": "未設定", "memo": "preset_meta.playstyle_preset_id"},
+    {"key": "play_style", "label": "プレイスタイル", "value": "three_point", "display_value": "3ポイント重視", "memo": "Team.strategy"},
+    {"key": "offense_tempo", "label": "オフェンステンポ", "value": "standard", "display_value": "標準", "memo": ""},
+    {"key": "offense_style", "label": "オフェンス傾向", "value": "balanced", "display_value": "バランス", "memo": ""},
+    {"key": "offense_creation", "label": "オフェンス組み立て", "value": "ball_move", "display_value": "ボールムーブ", "memo": ""},
+    {"key": "defense_style", "label": "ディフェンス方針", "value": "balanced", "display_value": "バランス", "memo": ""},
+    {"key": "rebound_style", "label": "リバウンド方針", "value": "balanced", "display_value": "バランス", "memo": ""},
+    {"key": "transition_style", "label": "速攻方針", "value": "situational", "display_value": "状況次第", "memo": ""},
+    {"key": "three_point_policy", "label": "3P方針", "value": null, "display_value": "-", "memo": ""},
+    {"key": "paint_policy", "label": "ペイント方針", "value": null, "display_value": "-", "memo": ""}
+  ],
+  "rotation_items": [
+    {"key": "sub_policy", "label": "ローテーション方針（交代）", "value": "standard", "display_value": "スタンダード", "memo": "rotation.sub_policy"},
+    {"key": "usage_priority", "label": "起用方針（優先度）", "value": null, "display_value": "標準", "memo": "usage_policy.priority"},
+    {"key": "starter_slots_filled", "label": "先発設定数", "value": 5, "display_value": "5 スロット", "memo": ""},
+    {"key": "target_minutes_slots", "label": "目標出場時間設定数", "value": 0, "display_value": "0 名分", "memo": ""},
+    {"key": "bench_order_configured", "label": "ベンチ起用順の設定", "value": 5, "display_value": "あり", "memo": "rotation.bench_order"},
+    {"key": "age_balance", "label": "若手起用方針（年齢バランス）", "value": null, "display_value": "-", "memo": ""},
+    {"key": "injury_care", "label": "コンディション重視（負債管理）", "value": null, "display_value": "-", "memo": ""},
+    {"key": "fatigue_policy", "label": "疲労方針", "value": "standard", "display_value": "標準", "memo": ""},
+    {"key": "foul_policy", "label": "ファウル方針", "value": "standard", "display_value": "標準", "memo": ""},
+    {"key": "clutch_policy", "label": "クラッチ方針", "value": "stars", "display_value": "スター中心", "memo": ""}
+  ],
+  "player_role_items": [
+    {"order": 1, "player_name": "Player_416", "role": "none", "role_label": "未設定", "position": "PG", "target_minutes": null, "target_minutes_label": "-", "starter": true, "starter_label": "先発", "memo": "先発 PG"},
+    {"order": 2, "player_name": "Player_417", "role": "none", "role_label": "未設定", "position": "SG", "target_minutes": null, "target_minutes_label": "-", "starter": true, "starter_label": "先発", "memo": "先発 SG"},
+    {"order": 3, "player_name": "Player_418", "role": "none", "role_label": "未設定", "position": "SF", "target_minutes": null, "target_minutes_label": "-", "starter": true, "starter_label": "先発", "memo": "先発 SF"},
+    {"order": 4, "player_name": "Player_419", "role": "none", "role_label": "未設定", "position": "PF", "target_minutes": null, "target_minutes_label": "-", "starter": true, "starter_label": "先発", "memo": "先発 PF"},
+    {"order": 5, "player_name": "Player_420", "role": "none", "role_label": "未設定", "position": "C", "target_minutes": null, "target_minutes_label": "-", "starter": true, "starter_label": "先発", "memo": "先発 C"}
+  ],
+  "sections": [
+    {"title": "戦術概要", "lines": ["dlasjfasfjd2 / D1", "戦術プリセット: 未設定", "プレイスタイル: 3ポイント重視", "has_team_tactics: true", "has_rotation_settings: true"]},
+    {"title": "攻撃方針", "lines": ["テンポ: 標準", "攻撃傾向: バランス", "組み立て: ボールムーブ", "3P/ペイント系の読み: -"]},
+    {"title": "守備方針", "lines": ["ディフェンス: バランス", "リバウンド: バランス", "速攻: 状況次第"]},
+    {"title": "ローテーション", "lines": ["ローテーション方針（交代）: スタンダード", "先発設定数: 5", "目標出場時間設定数: 0", "ベンチ順: あり"]},
+    {"title": "注意", "lines": ["読み取り専用。戦術変更・ローテーション保存・先発自動決定などの操作は含みません。"]}
+  ],
+  "notes": [
+    "読み取り専用。戦術変更・ローテーション保存・先発自動決定などの操作は含みません。"
+  ]
+}
