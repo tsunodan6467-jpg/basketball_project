@@ -176,6 +176,9 @@ func _add_player_row(p: Dictionary) -> void:
 				var tip: String = str(name_raw).strip_edges()
 				if not tip.is_empty():
 					lab.tooltip_text = tip
+		if i == 8 and st_s != "-":
+			# 状態列が clip されたとき全文を確認できるようにする（表示文字と同じ）
+			lab.tooltip_text = st_s
 		row.add_child(lab)
 	_row_list.add_child(row)
 
