@@ -1,0 +1,135 @@
+{
+  "screen_title": "日程（閲覧）",
+  "team_name": "サンプル都市クラブ（mock）",
+  "league_level": 1,
+  "season_label": "シーズン 3　12月2週目　ラウンド 31/60",
+  "summary": {
+    "has_season": true,
+    "current_round": 30,
+    "total_rounds": 60,
+    "upcoming_count": 8
+  },
+  "next_game": {
+    "label": "第31節 vs 架空クラブA（HOME）",
+    "competition": "D1リーグ",
+    "round_label": "ラウンド 31/60",
+    "opponent": "架空クラブA",
+    "home_away": "HOME",
+    "status": "from_upcoming"
+  },
+  "upcoming_games": [
+    {
+      "round": 31,
+      "round_label": "ラウンド 31/60",
+      "month_label": "12月2週目",
+      "competition_type": "regular_season",
+      "competition_label": "日本リーグ",
+      "opponent": "架空クラブA",
+      "home_away": "ホーム",
+      "detail": "ラウンド: 31\nあと 1 ラウンドで到来（シーズン進行ベース）\n時期目安: 12月2週目\n大会: 日本リーグ\nH/A: ホーム (H)\n対戦相手: 架空クラブA",
+      "event_id": "mock_r31_league_a",
+      "label": "-",
+      "is_user_team_game": true
+    },
+    {
+      "round": 32,
+      "round_label": "ラウンド 32/60",
+      "month_label": "12月3週目",
+      "competition_type": "regular_season",
+      "competition_label": "日本リーグ",
+      "opponent": "架空クラブBルージョン（長文名称テスト：北地区シックスティーンアンダードッグスコミッティー）",
+      "home_away": "アウェイ",
+      "detail": "ラウンド: 32\n時期目安: 12月3週目\n大会: 日本リーグ\nH/A: アウェイ (A)\n対戦相手: 架空クラブB…",
+      "event_id": "mock_r32_long_away",
+      "label": "-",
+      "is_user_team_game": true
+    },
+    {
+      "round": 33,
+      "round_label": "ラウンド 33/60",
+      "month_label": "12月4週目",
+      "competition_type": "emperor_cup",
+      "competition_label": "全日本カップ",
+      "opponent": "（同ラウンド進行で消化・対戦は抽選）",
+      "home_away": "（大会週）",
+      "detail": "ラウンド: 33\n大会: 全日本カップ\n※この行は SeasonEvent に無い大会…の表示補完です。",
+      "event_id": "emperor_cup_week_r33",
+      "label": "-",
+      "is_user_team_game": true
+    },
+    {
+      "round": 34,
+      "round_label": "ラウンド 34/60",
+      "month_label": "1月1週目",
+      "competition_type": "easl",
+      "competition_label": "東アジア・トップリーグ",
+      "opponent": "（同ラウンド進行で消化・組み合わせは抽選）",
+      "home_away": "（大会週）",
+      "detail": "ラウンド: 34\n大会: 東アジア・トップリーグ\nH/A: （大会週）",
+      "event_id": "easl_week_r34_group_md1",
+      "label": "group_md1",
+      "is_user_team_game": true
+    },
+    {
+      "round": 35,
+      "round_label": "ラウンド 35/60",
+      "month_label": "1月2週目",
+      "competition_type": "national_team_window",
+      "competition_label": "アジアカップ予選（代表ウィンドウ）",
+      "opponent": "（日本リーグの対戦カードはありません）",
+      "home_away": "（代表ウィンドウ）",
+      "detail": "代表ウィンドウ週の表示補完（mock）",
+      "event_id": "national_window_r35",
+      "label": "window_1",
+      "is_user_team_game": true
+    },
+    {
+      "round": 36,
+      "round_label": "ラウンド 36/60",
+      "month_label": "1月3週目",
+      "competition_type": "all_star_break",
+      "competition_label": "オールスター",
+      "opponent": "（日本リーグの対戦カードはありません）",
+      "home_away": "（オールスター週）",
+      "detail": "オールスター週の表示補完（mock）",
+      "event_id": "all_star_week_r36",
+      "label": "-",
+      "is_user_team_game": true
+    },
+    {
+      "round": 37,
+      "round_label": "ラウンド 37/60",
+      "month_label": "1月4週目",
+      "competition_type": "regular_season",
+      "competition_label": "日本リーグ",
+      "opponent": "架空クラブC",
+      "home_away": "ホーム",
+      "detail": "ラウンド: 37\n対戦相手: 架空クラブC",
+      "event_id": "mock_r37_league_c",
+      "label": "-",
+      "is_user_team_game": true
+    },
+    {
+      "round": 38,
+      "round_label": "ラウンド 38/60",
+      "month_label": "2月1週目",
+      "competition_type": "regular_season",
+      "competition_label": "日本リーグ",
+      "opponent": "-",
+      "home_away": "—",
+      "detail": "プレースホルダー行（対戦未定想定・mock）",
+      "event_id": "mock_r38_placeholder",
+      "label": "tbd",
+      "is_user_team_game": true
+    }
+  ],
+  "advance_hint": {
+    "block": "次に進むと第13節の試合が行われます。\n同じラウンド内では、試合と試合のあいだに個別で戦術を変えることはできません。",
+    "one_line": "次に進むとD1リーグ第13節を実施します。"
+  },
+  "empty_message": "",
+  "notes": [
+    "読み取り専用。操作は含みません。",
+    "mockデータです。Python生成JSONがある場合はそちらを優先します。"
+  ]
+}
