@@ -34,7 +34,7 @@
   - `data/finance_summary_from_python.json`
   - `data/owner_mission_from_python.json`
   - `data/tactics_summary_from_python.json`
-- **mock 表示**はユーザー環境の **Godot 4.6.2** で確認済み。**Python 生成 JSON の優先表示**も各画面で確認済み（CLI はリポジトリルートから `python -m basketball_sim.export.*_readonly` を実行し、`godot/data/` へ出力する運用）。
+- **mock 表示**はユーザー環境の **Godot 4.6.2** で確認済み。**Python 生成 JSON の優先表示**も各画面で確認済み。個別画面用 CLI はリポジトリルートから `python -m basketball_sim.export.*_readonly` で `godot/data/` に出力する運用に加え、**9 画面分をまとめて書き出す一括コマンド** `python -m basketball_sim.export.godot_readonly_bundle` も利用できる（**Godot からの自動起動ではなく**、**PowerShell 等で手動実行**。詳細は後述の **「9画面分の `*_from_python.json` を一括生成（Python のみ・手動）」** 節）。
 
 ### 財務サマリー（第7画面）のファイル構成（参照）
 
@@ -92,6 +92,7 @@
 ### 確認済み（ユーザー環境 Godot 4.6.2 の目安）
 
 - ホーム → 戦術サマリー → ホーム、ホーム → オーナーミッション → ホーム、**既存8画面往復**、**HeaderNavRow 未変更**（戦術サマリーは **チーム** カード列のみ）、`from_python` 優先・mock フォールバック、**UID 参照エラー解消**、実行後の不要な追跡差分なし、など。
+- **Python 一括 export**（`godot_readonly_bundle`）を **PowerShell から手動実行**し、**9 件すべて `Wrote` → `Bundle complete: 9 succeeded, 0 failed`**、生成 9 JSON が **`git status --ignored` で `!!`（ignored）**、通常の `git status --short` は **handoff 未追跡のみ**、まで確認済み（`8822b87`）。
 
 ### Phase 4 ロードマップ上の位置（手元メモ）
 
@@ -112,7 +113,11 @@
   ◎ Python生成JSON優先読込
   ◎ ホームカード型メニュー経由の遷移
   ◎ README/docs 9画面到達点更新
-□ Python自動起動設計
+  ◎ Python自動JSON生成設計調査
+  ◎ Python一括exportコマンド追加
+  ◎ ユーザー環境で一括export確認
+  ◎ README/docsに一括export運用を記録
+□ ホーム「データ更新」ボタン検討
 □ 本格ナビ次段階
 □ Godot本番GUI一本化
 □ グラフィック・音楽などの演出実装
@@ -131,7 +136,7 @@
 
 ### まだ未実装であること（明示）
 
-- Godot から Python を **自動起動して JSON を生成する**こと
+- Godot から Python を **自動起動して JSON を生成する**こと（**一括 export は PowerShell 等から手動実行する Python CLI のみ**。**ホームの「データ更新」ボタンや画面遷移トリガによる自動起動は未実装**）
 - Godot から **ゲーム進行**すること
 - Godot から **セーブ / ロード**すること
 - Godot から **人事・経営・強化・戦術**や **施設投資・施設レベルアップ**などの操作をすること
@@ -140,6 +145,10 @@
 - **財務画面・オーナーミッション画面・戦術サマリー画面の本格ビジュアル調整**（現状は読み取りプロトタイプ優先）
 - **ミッション生成・評価更新・報酬付与・オーナー評価の操作 UI**
 - **戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択 UI**
+- **ホームに「データ更新」ボタンを置き、Godot から Python export を起動する**こと（**未実装**。現状は **ターミナルで `godot_readonly_bundle` を手動実行**する運用）
+- **画面遷移の直前に個別 export を自動実行する**こと（未実装）
+- **配布用に export 専用 exe を同梱し Godot から起動する**こと（未実装）
+- **`generated_at` を全 DTO に一斉追加する**こと、**Godot 側で JSON の更新時刻だけを常時表示する**こと（未実装・要別判断）
 - **Godot 本番 GUI の一本化**
 
 ## ファイル構成（抜粋）
@@ -194,6 +203,52 @@ python -m basketball_sim.export.home_dashboard_readonly --save "$env:USERPROFILE
 財務サマリーは履歴件数を変える場合: `--max-history 8` など（既定 5）。戦術サマリーは選手ロール表示件数など: `--max-players 8` など（エクスポート CLI のヘルプを参照）。
 
 - 生成物は **開発用** です。**Git にコミットしない**でください（上記 **9** 種の `*_from_python.json` は `godot/.gitignore` で除外）。
+
+### 9画面分の `*_from_python.json` を一括生成（Python のみ・手動）
+
+**位置づけ**: `basketball_sim.export.godot_readonly_bundle` は **Python 側だけ**の CLI です。**Godot が Python を自動起動する処理ではありません**。Phase 4 時点では **PowerShell（またはターミナル）から手動で実行**し、`godot/data/` に **9 ファイルまとめて**書き出してから Godot エディタで各画面を開く運用です（**自動更新パイプラインの完成ではない**）。
+
+**標準形**（リポジトリルートで、`--save` と `--output-dir` を環境に合わせて置き換え）:
+
+```powershell
+py -m basketball_sim.export.godot_readonly_bundle --save <path\to\your.sav> --output-dir godot\data
+```
+
+**ユーザー環境で確認済みの例**（財務・オーナーミッション・戦術の件数上限を揃えたい場合の任意引数付き）:
+
+```powershell
+py -m basketball_sim.export.godot_readonly_bundle --save "$env:USERPROFILE\.basketball_sim\saves\debug_user_boost_d1_user_cellb.sav" --output-dir "godot\data" --max-history 8 --max-missions 8 --max-players 8
+```
+
+**`--output-dir` に書き出す固定ファイル名（9 件）**:
+
+- `home_dashboard_from_python.json`
+- `roster_from_python.json`
+- `club_history_from_python.json`
+- `standings_from_python.json`
+- `schedule_from_python.json`
+- `facility_summary_from_python.json`
+- `finance_summary_from_python.json`
+- `owner_mission_from_python.json`
+- `tactics_summary_from_python.json`
+
+**Godot 側の読込**: 各画面は引き続き **`res://data/<上記ファイル名>` を優先**し、無ければ同梱の `*_mock.json` にフォールバックします。
+
+**成功時のコンソール例**: 9 行の `Wrote ...` のあと `Bundle complete: 9 succeeded, 0 failed`。
+
+**git 運用（生成物はコミットしない）**: `godot/.gitignore` により `*_from_python.json` は **ignored**。生成後に次のように **9 パスすべて `!!`** になることを確認できる（`facility_summary` は **1 回だけ**列挙）:
+
+```powershell
+git status --short --ignored -- godot/data/home_dashboard_from_python.json godot/data/roster_from_python.json godot/data/club_history_from_python.json godot/data/standings_from_python.json godot/data/schedule_from_python.json godot/data/facility_summary_from_python.json godot/data/finance_summary_from_python.json godot/data/owner_mission_from_python.json godot/data/tactics_summary_from_python.json
+```
+
+通常の `git status --short` では、生成 JSON は **表示されない**想定です（未追跡の handoff ドキュメントのみ出ることがある）。
+
+**実装参照**: `8822b87`（一括 export 追加）。設計調査メモ: `reports/godot_phase4_python_auto_export_design_2026-05.txt`（**参照用**。当該 `reports/*.txt` はルート `.gitignore` により追跡されない場合がある）。
+
+**まだ未実装**（本節の範囲外・誤解防止）: **Godot から Python を自動起動する処理**、**ホームの「データ更新」ボタン**、**画面遷移直前の個別 export**、**配布用 exe 化**、**`generated_at` の全 DTO 一斉追加**、**Godot で JSON 更新時刻のみ常時表示**。
+
+**次工程候補（メモ）**: ホーム「データ更新」ボタンは **検討段階**（未実装）。本格ナビ・Godot 本番 GUI 一本化は **後工程**。
 
 ### 通常の動き
 

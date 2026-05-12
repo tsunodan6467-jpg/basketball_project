@@ -283,15 +283,16 @@
 
 ## 14. Godot / Python ランタイム連携方針（Phase 4 初期）
 
-本節は **2026-05** 時点の方針メモである。運用手順の詳細は `godot/README.md`、読み取り専用 export の実装は `basketball_sim/export/` の `home_dashboard_readonly.py` / `roster_readonly.py` / `club_history_readonly.py` / `standings_readonly.py` / **`schedule_readonly.py`** / **`facility_summary_readonly.py`** / **`finance_summary_readonly.py`** / **`owner_mission_readonly.py`** / **`tactics_summary_readonly.py`** を正とする（§15）。
+本節は **2026-05** 時点の方針メモである。運用手順の詳細は `godot/README.md`、読み取り専用 export の実装は `basketball_sim/export/` の `home_dashboard_readonly.py` / `roster_readonly.py` / `club_history_readonly.py` / `standings_readonly.py` / **`schedule_readonly.py`** / **`facility_summary_readonly.py`** / **`finance_summary_readonly.py`** / **`owner_mission_readonly.py`** / **`tactics_summary_readonly.py`** に加え、**9 画面分を一括で `godot/data/` に書き出す** **`godot_readonly_bundle.py`**（モジュール `basketball_sim.export.godot_readonly_bundle`）を正とする（§15）。
 
 ### 14.1 現在の接続方式（手動 JSON）
 
 - Python CLI（`python -m basketball_sim.export.home_dashboard_readonly --save <.sav> --output <.json>`）で **読み取り専用のホーム用 JSON** を手動生成する。処理は `load_world` による **セーブの読み取りのみ**であり、**セーブファイルを書き換えない**。
 - Godot は **`res://data/home_dashboard_from_python.json`** を優先して読み、無ければ **`res://data/home_dashboard_mock.json`** にフォールバックする（`godot/scripts/home_dashboard.gd` の `_home_json_candidate_paths`）。
 - ロスター・クラブ史・順位表・日程・施設・財務・**オーナーミッション**・**戦術サマリー**など **他画面も同型**（`_*_from_python.json` 優先・`*_mock.json` フォールバック）。CLI とファイル名は `godot/README.md` を正とする。
+- **9 画面分を一度に更新**するには、`py -m basketball_sim.export.godot_readonly_bundle --save <.sav> --output-dir godot\data` のように **Python のみの CLI を手動実行**する（**Godot が Python を自動起動する実装ではない**。PowerShell 等からの運用。任意の `--max-history` / `--max-missions` / `--max-players` などは `godot/README.md` と CLI ヘルプを参照）。
 - **Godot から Python プロセスを起動する処理は、本節の時点では入れない**。
-- 生成物 `home_dashboard_from_python.json` は開発用であり、`godot/.gitignore` で **コミット対象外**。
+- 生成物 `*_from_python.json`（ホーム用に限らず **9 種**）は開発用であり、`godot/.gitignore` で **コミット対象外**。
 
 ### 14.2 今すぐ実装しないこと
 
@@ -330,7 +331,7 @@
 ### 14.5 現時点の推奨方針
 
 - Phase 4 初期では **Godot から Python 自動起動は実装しない**
-- 開発中は **手動 JSON 生成 + Godot 優先読込**で十分とする
+- 開発中は **手動 JSON 生成**（画面単体の export に加え、必要なら **`godot_readonly_bundle` による一括 export**）**+ Godot 優先読込**で十分とする
 - 先に **ホームの見た目改善**、**DTO 品質改善**、**次の読み取り専用 Godot 画面**でパターンを積む
 - **自動起動**は、Python 実行環境の前提・対象 save の決め方・JSON 出力先（`res://` vs `user://` 等）・**配布方針**を固めてから **実装するかを判断**する
 
@@ -367,10 +368,11 @@
 - **読込仕様（オーナーミッション）**: **`owner_mission_from_python.json` を優先**し、無い／読めないとき **`owner_mission_mock.json` にフォールバック**。**Godot から Python 自動起動は未実装**。生成 JSON は **コミットしない**。
 - **読込仕様（戦術サマリー）**: **`tactics_summary_from_python.json` を優先**し、無い／読めないとき **`tactics_summary_mock.json` にフォールバック**。**Godot から Python 自動起動は未実装**。生成 JSON は **コミットしない**。
 - **データ経路**: いずれも **Python export（`load_world` による読み取りのみ）→ JSON → Godot 表示** の型。各画面は **`_*_from_python.json` 優先・同梱 `*_mock.json` フォールバック**（§14.1 の手動 JSON 方針と同じ運用）。
+- **一括 export（Python CLI・手動）**: `godot_readonly_bundle` で **9 件**の `*_from_python.json` を **`godot/data/` にまとめて書き出し**できる（`8822b87`）。**ユーザー環境では** 9 行 `Wrote` のあと **`Bundle complete: 9 succeeded, 0 failed`**、9 ファイルが **`git status --short --ignored` で `!!`**（ignored）になることを確認済み。**Godot からの自動起動・自動更新パイプラインの完成ではない**（詳細は `godot/README.md`）。
 - **導線**: **ホーム上部 `HeaderNavRow` は 5 ボタンのまま**（財務・オーナーミッション・**戦術サマリー**は **HeaderNavRow に追加していない**）。**ホーム内カード型メニュー**の **「チーム」** カテゴリから **「ロスター」**・**「戦術サマリー」**（第9画面）、**「経営」** カテゴリから **「財務サマリー」**（第7画面）・**「オーナーミッション」**（第8画面）へ遷移。各閲覧画面から **ホームへ戻る**（`change_scene_to_file` のみ）。**経営カテゴリにだけあった補足説明ラベルは削除**し、他カテゴリとボタン位置を揃えた（`56bcd9e Godotホーム経営カテゴリの説明文を削除`）。関連実装の足場（戦術）: `f6f5434`（DTO）→ `b2d5e5c`（mock）→ `1be9e1d`（UID）→ `33a26ac`（from_python 優先）→ `f91757d`（ホーム導線）。財務・オーナーミッション側: `ca79138`（DTO）→ `d876227`（mock）→ `de912f2`（UID）→ `bdcb163`（from_python 優先）→ `14cc572`（ホーム導線）。
 - **確認済み（ユーザー環境 Godot 4.6.2 の目安）**: ホーム → 財務サマリー → ホーム、**ホーム → オーナーミッション → ホーム**、**ホーム → 戦術サマリー → ホーム**、**既存8画面往復**、`from_python` 優先・mock フォールバック、**HeaderNavRow 未変更**、**UID 参照エラー解消**、実行後の追跡差分なし、など（詳細は `godot/README.md`）。
 - **仮ナビ**: ホームを起点に **ホーム → 各閲覧画面 → ホーム**（画面切替のみ。本格ナビゲーションではない）。**ホーム内のカード型メニュー（読み取り）**からも各閲覧画面へ遷移可能（**HeaderNavRow と併用の二重導線**）。
-- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI（**ミッション生成 UI・評価更新 UI・報酬付与 UI・オーナー評価の操作 UI**、**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択 UI** を含む）、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Godot 本番 GUI の一本化**、**Steam 向け本番レイアウト**の確定、**財務・オーナーミッション・戦術サマリー画面の本格ビジュアル調整**。
+- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、**ホームの「データ更新」ボタン**、**画面遷移直前の個別 export**、**配布用 export 専用 exe 化と Godot からの起動**、**`generated_at` の全 DTO 一斉追加**、**Godot で JSON 更新時刻（mtime）のみ常時表示**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI（**ミッション生成 UI・評価更新 UI・報酬付与 UI・オーナー評価の操作 UI**、**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択 UI** を含む）、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Godot 本番 GUI の一本化**、**Steam 向け本番レイアウト**の確定、**財務・オーナーミッション・戦術サマリー画面の本格ビジュアル調整**。
 
 ---
 
@@ -386,7 +388,7 @@
 
 ## 付録 B: 関連ドキュメント
 
-- `godot/README.md`（Phase 4 最小 Godot プロジェクトの運用・手動 JSON 手順）
+- `godot/README.md`（Phase 4 最小 Godot プロジェクトの運用・手動 JSON 手順・**`godot_readonly_bundle` 一括 export**）
 - `docs/PRODUCT_ROADMAP_AND_VISION.md`（Phase 0〜6 ／製品ビジョン）
 - `docs/IDEAL_GAME_DESIGN_MASTER.md`（理想形のドメイン設計）
 - `docs/INFORMATION_MENU_SPEC_V1.md`／`docs/SCHEDULE_MENU_SPEC_V1.md`／`docs/SYSTEM_MENU_SPEC_V1.md`
