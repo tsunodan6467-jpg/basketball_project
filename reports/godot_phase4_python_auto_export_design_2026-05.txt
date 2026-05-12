@@ -1,0 +1,268 @@
+================================================================================
+Godot Phase 4 — Python から *_from_python.json を自動生成する設計調査
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11（調査実施時点のローカルリポジトリ状態に基づく）
+参照した主なコミット（git log より）: d0a53ad（9画面到達点記録）以降の履歴を確認。
+調査時点の HEAD: 調査実行時のワーキングツリー（本レポート作成のみの差分を除き、コード未変更）。
+
+本ファイルは「設計判断材料」用の調査メモであり、実装仕様書ではない。
+実装・docs・README・Godot/Python の変更は本調査では行っていない。
+
+
+2. 現在の到達点（要約）
+--------------------------------------------------------------------------------
+- Godot 読み取り専用画面は 9 画面（ホーム〜戦術サマリー）まで到達。
+- 各画面は res://data/*_from_python.json を優先し、無ければ *_mock.json。
+- Godot から Python を自動起動する処理は未実装（FileAccess + JSON.parse_string のみ）。
+- 生成 JSON は godot/.gitignore でコミット対象外。
+- basketball_sim/export/*_readonly.py がそれぞれ CLI（python -m basketball_sim.export.<module>）を提供。
+
+
+3. 既存 export / JSON / Godot 読込一覧
+--------------------------------------------------------------------------------
+※ パスはリポジトリルートからの相対表記。Godot 内は res://data/ 相当。
+
+以下、画面ごとの一覧。
+
+| # | 画面名 | Python export モジュール | 生成 JSON（想定ファイル名） | mock JSON | CLI 基本形 | 追加 CLI 引数 | 既存 pytest |
+|---|--------|---------------------------|----------------------------|-------------|--------------|----------------|-------------|
+| 1 | ホーム | basketball_sim.export.home_dashboard_readonly | godot/data/home_dashboard_from_python.json | home_dashboard_mock.json | --save, --output | なし | test_home_dashboard_readonly_export.py |
+| 2 | ロスター | basketball_sim.export.roster_readonly | roster_from_python.json | roster_mock.json | --save, --output | なし | test_roster_readonly_export.py |
+| 3 | クラブ史 | basketball_sim.export.club_history_readonly | club_history_from_python.json | club_history_mock.json | --save, --output | なし | test_club_history_readonly_export.py |
+| 4 | 順位表 | basketball_sim.export.standings_readonly | standings_from_python.json | standings_mock.json | --save, --output | なし | test_standings_readonly_export.py |
+| 5 | 日程 | basketball_sim.export.schedule_readonly | schedule_from_python.json | schedule_mock.json | --save, --output | --max-upcoming（既定 8） | test_schedule_readonly_export.py |
+| 6 | 施設サマリー | basketball_sim.export.facility_summary_readonly | facility_summary_from_python.json | facility_summary_mock.json | --save, --output | なし | test_facility_summary_readonly_export.py |
+| 7 | 財務サマリー | basketball_sim.export.finance_summary_readonly | finance_summary_from_python.json | finance_summary_mock.json | --save, --output | --max-history（既定 5） | test_finance_summary_readonly_export.py |
+| 8 | オーナーミッション | basketball_sim.export.owner_mission_readonly | owner_mission_from_python.json | owner_mission_mock.json | --save, --output | --max-missions（既定 8） | test_owner_mission_readonly_export.py |
+| 9 | 戦術サマリー | basketball_sim.export.tactics_summary_readonly | tactics_summary_from_python.json | tactics_summary_mock.json | --save, --output | --max-players（既定 8） | test_tactics_summary_readonly_export.py |
+
+共通の実装パターン（grep より）:
+- いずれも load_world(save) → validate_payload → find_user_team でユーザーチームを取得し、DTO を構築。
+- セーブファイルは読み取りのみ（各モジュール先頭コメントと load_world 利用で整合）。
+
+Godot 側（grep より）:
+- 全 *view.gd / home_dashboard.gd で from_python → mock の候補配列 + FileAccess + JSON.parse_string。
+- OS.execute / create_process 等の外部プロセス起動コードは godot/scripts/*.gd に存在しない（今回未実装の裏付け）。
+
+basketball_sim/export/__init__.py:
+- パッケージ説明のみ。一括バンドル用の新規モジュールを追加する場合、__init__.py を変更不要にできる（空の __init__ のまま、兄弟モジュールから既存 export_*_from_world を import して呼ぶ形）。
+
+3.1 Godot 4.x での外部プロセス起動（調査メモ・実装前確認必須）
+--------------------------------------------------------------------------------
+現状コード: godot/scripts 配下に OS.execute / create_process の使用は見つかっていない（未実装の確認）。
+
+Godot 4.x でよく検討される API（エンジン版で API 差異あり。4.6.2 の公式ドキュメントで要確認）:
+- OS.execute(program, arguments, blocking=true, ...): ブロッキング実行。blocking=true の場合、メインスレッドが待機し UI が固まりやすい。
+- OS.create_process(program, arguments, ...): 非同期起動寄りの利用が文脈上検討されやすい（プラットフォーム・引数配列の扱いに注意）。
+- 別スレッド（WorkerThreadPool / Thread）内でブロッキング実行し、完了後に MainThread で JSON 再読込するパターン: UI フリーズ回避に有効だが、シーンライフサイクルとの同期設計が必要。
+
+Windows における起動形態の比較:
+- 直接 `py` / `python.exe` をフルパス指定: PowerShell 経由より引数インジェクション・エンコーディングのリスクを抑えやすい。
+- `powershell -Command ...`: 複雑なクォートや cd が必要なときは柔軟だが、エスケープと cwd の明示が難しくなりがち。
+
+UI 固まりリスク:
+- ホーム起動時に同期 9 連打（方式 B）は、OS.execute ブロッキングと相性が悪い。非同期 + プログレス UI がないと体験が厳しい。
+
+
+4. 方式 A：手動 CLI 継続
+--------------------------------------------------------------------------------
+利点:
+- 失敗が分離されやすい（どの export が落ちたかターミナルで即確認）。
+- Godot 実行環境に Python PATH を要求しない。
+- 配布版 Godot と開発用 Python の結合を避けられる。
+
+欠点:
+- 9 コマンド（＋引数差）の運用負荷。セーブを変えるたびに再実行の手間。
+
+リスク:
+- 運用ミス（古い JSON のまま Godot を開く）による「見た目は動くが中身が古い」状態。
+
+
+5. 方式 B：ホーム起動時に全 JSON 一括生成
+--------------------------------------------------------------------------------
+利点:
+- Godot を開けば常に同一セーブ由来のスナップショットに揃えやすい。
+
+欠点:
+- 起動待ちが長くなる（9 回分の load_world + JSON 書き込み。ホーム表示前なら体感が悪化しやすい）。
+- 失敗時に「ホームすら出ない」設計にするとデバッグが難しい。mock に落とすなら分岐設計が必要。
+
+リスク:
+- メインスレッドで同期 subprocess を叩くと UI フリーズ（Godot の OS.execute 等がブロッキングの場合）。
+- 開発者の Python パス・cwd・セーブパスがマシン依存で、他環境で再現性が落ちる。
+
+触りそうなファイル（実装時の想定）:
+- godot/scripts/home_dashboard.gd（_ready 前後）
+- 新規 autoload またはユーティリティ .gd
+- project.godot（autoload 登録の場合）
+- docs / godot/README.md（運用手順）
+
+
+6. 方式 C：各画面遷移前に個別 JSON 生成
+--------------------------------------------------------------------------------
+利点:
+- 必要な分だけ生成するため、平均待ち時間は B より短くなり得る。
+- 画面ごとに失敗を隔離しやすい（その画面だけ mock）。
+
+欠点:
+- 画面遷移のたびに待ちが発生しうる（UX）。
+- 9 画面それぞれに「生成→読込」の二段が重複実装しやすい。
+
+リスク:
+- ホーム → A → ホーム → B のとき、A 用 JSON は新しく B 用は古い、などセッション内の鮮度不整合。
+- 非同期 subprocess + シーン遷移の競合（生成完了前に change_scene）の扱いが難しい。
+
+触りそうなファイル:
+- godot/scripts/home_dashboard.gd（各 _on_*_pressed の直前）
+- 各 *_view.gd の _ready 直前をフックするなら各ファイル
+
+
+7. 方式 D：ホームに「データ更新」ボタン
+--------------------------------------------------------------------------------
+利点:
+- 自動起動より明示的。ユーザーが「今から再生成する」と決められる。
+- 起動時フリーズを避けやすい（ボタン押下後にバックグラウンド生成などの設計余地）。
+
+欠点:
+- ボタンを押し忘れると古い JSON のまま。
+- 実装しても「Python パス・セーブパス」の設定 UI が別途必要になりがち。
+
+リスク:
+- 生成中の二重押し、生成失敗時のメッセージ設計。
+
+触りそうなファイル:
+- godot/scenes/home_dashboard.tscn（ボタン）
+- godot/scripts/home_dashboard.gd
+
+
+8. 方式 E：Python 側に一括 export コマンドを先に作る
+--------------------------------------------------------------------------------
+利点:
+- Godot を触らずに「1 コマンドで 9 ファイル」を検証できる。CI に載せやすい。
+- 既存 export_*_from_world を順に呼ぶだけにできるため、ロジック重複を避けやすい。
+- Godot 自動起動より前の安全な中間段階として最適になりやすい。
+
+欠点:
+- バンドル CLI の引数設計（出力ディレクトリ、各 max-* の一括既定、失敗時に中断か継続か）が必要。
+
+リスク:
+- 一部 export が失敗したときに「部分だけ更新された JSON」が残る。ロールバック方針の明文化が必要。
+
+触りそうなファイル:
+- 新規 basketball_sim/export/godot_readonly_bundle.py（仮名）など
+- basketball_sim/tests/test_godot_readonly_bundle.py（新規）
+- basketball_sim/export/__init__.py は空のままでも可（パッケージ外から -m で起動するモジュール追加）
+
+既存関数を呼ぶだけで作れるか:
+- 各モジュールに export_*_json_from_world と write_* が既にあるため、バンドルは「ループで import して呼ぶ」で十分可能に見える。
+
+追加テストの目安:
+- 最小セーブで 9 ファイルが生成されるスモーク 1 本 + 失敗時挙動（モックは不要だが、オプションで一部スキップ）程度から開始可能。
+
+Godot 自動起動より前に作るべきか:
+- はい。Python 単体で安定してから Godot 連携に進むのがリスク低減に有効（本調査の推奨順でも後述）。
+
+
+9. 方式 F：将来の配布用方式
+--------------------------------------------------------------------------------
+Python 同梱:
+- Steam クライアントに Python ランタイムを要求するのは現実的でないことが多い。
+- 開発ビルド限定の「同梱 python」はサイズ・ライセンス・更新の負債が大きい。
+
+exe 化:
+- export 専用の小さな CLI exe を同梱し、Godot から OS.create_process で叩く案は配布向けでは有力候補。
+- ビルドパイプライン（PyInstaller 等）とバージョン固定が別タスク。
+
+Godot 本番移行時の考え方:
+- res:// はエクスポート後に読み取り専用になりやすい。生成物は user:// や OS ドキュメントフォルダに出し、Godot はそこを読む設計へ移行する案がよくある（別調査が必要）。
+- 本番では「セーブスロット」「クラウドセーブ」との整合が別途必要。
+
+
+10. save path / Python 実行ファイル / 失敗時フォールバックの整理
+--------------------------------------------------------------------------------
+10.1 save path
+- 現状 CLI は --save に任意パス。ユーザーの標準例: %USERPROFILE%\.basketball_sim\saves\*.sav
+- Godot 側で固定パスを埋め込むと他開発者で即死するため、開発用は EditorSettings / ProjectSettings のカスタムプロパティ、または user://config.json（手動）などが候補。
+- 将来本番ではセーブスロット選択 UI が必要になりうる。
+- save が無い場合: 生成をスキップし mock のみ、またはホームに警告ラベル。既存各画面は「JSON 読めなければエラー表示＋mock フォールバック」のパターンを踏襲可能。
+
+10.2 Python 実行ファイル
+- Windows 開発: `py -3` または venv の python.exe を明示するのが再現性高い。`python` 単体は Store エイリアス問題の報告がある。
+- Steam 配布: エンドユーザーに py/python を要求しない設計が無難。開発専用分岐（DEBUG フラグで OS.execute を有効）と本番（exe または JSON のみ）を分ける案が安全。
+
+10.3 失敗時フォールバック（整理表）
+
+| 事象 | 推奨挙動（案） |
+|------|----------------|
+| Python 起動失敗（PATH・権限） | ログ出力 + mock 継続 + UI に「自動生成スキップ」メッセージ |
+| save なし | 生成スキップ、mock のみ。設定パスが空なら明示 |
+| export 中例外 | その画面分のみ古い JSON を残すか削除するかを方針化。部分更新は混乱の元 |
+| JSON が古い | generated_at またはファイル mtime 表示で緩和（後述） |
+| JSON 破損 | 既存ロジックどおり次候補へ／最終 mock（各 *.gd のループ） |
+| 生成成功だが parse 失敗 | 同上（現状の「ルートが Dictionary でない」扱い） |
+
+「失敗時に古い from_python を残すか消すか」はプロダクト判断。消すと必ず mock に落ちるが、成功したと誤認しにくい。
+
+
+11. generated_at や JSON 鮮度表示の要否
+--------------------------------------------------------------------------------
+- 全 DTO に generated_at を足すのはスキーマ変更になり、Godot・テスト・ドキュメント波及が広い。今すぐ必須とは言いにくい。
+- 代替: OS 側のファイル更新時刻を Godot で FileAccess.get_modified_time（該当 API の有無は Godot 版で要確認）や、export 完了後に別の sidecar .meta を書く。
+- DataSourceLabel に「ファイル日時」を出す案は、開発体験向上には有効だが UI ノイズにもなる。Phase4 仮 GUIでは任意。
+
+推奨（調査時点）:
+- 大規模 DTO 変更の前に、方式 E の一括 CLI + 運用ドキュメントで鮮度問題を緩和。
+- generated_at は「本番に近づく段階」で DTO 共通フィールドとして設計レビューするのがよい。
+
+
+12. Cursor としてのおすすめ順（実装するなら）
+--------------------------------------------------------------------------------
+1位: 方式 E（Python 一括 export モジュール + スモークテスト）— Godot 非依存で価値が出る。
+2位: 方式 D（ホームに「データ更新」ボタン）— 方式 E の CLI を OS.execute 等で叩く薄いラッパにしやすい。
+3位: 方式 A の継続（並行して README に一括コマンド例を載せるだけでも負荷軽減）。
+4位: 方式 C（画面遷移直前の個別生成）— 実装・鮮度・UX の複雑さが高い。
+5位: 方式 B（ホーム起動時一括）— 体感遅延と失敗時挙動の設計コストが高い。
+6位: 方式 F（配布 exe 化）は E/D が安定してから別ロードマップで。
+
+
+13. いま実装すべきこと / まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+いま実装すべき（方針レベル）:
+- 特になし（ユーザー指示どおり今回は実装しない）。次工程としては方式 E の是非判断が先。
+
+まだ実装しない方がよいこと:
+- Godot からのいきなり OS.execute 本番同梱（PATH・配布・cwd・res:// 書き込み可否の未整理）。
+- ホーム _ready での同期 9 連打（UI フリーズ・失敗時の半端な JSON 残存）。
+
+
+14. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- 開発専用機能として Godot から Python を呼ぶか、あくまでターミナル運用に留めるか。
+- 一括 export の失敗時: 全ファイルロールバック vs ベストエフォート部分更新。
+- 生成先を res://godot/data のままにするか、将来 user:// へ移すか（Steam ビルド前提）。
+- max-history / max-missions / max-players / max-upcoming のバンドル既定値を誰が決めるか（ゲームデザイン vs Godot 表示上限）。
+
+
+15. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査および本レポート作成において、以下は変更していない（grep / 読取のみ）:
+- godot/scenes/* godot/scripts/* godot/project.godot godot/data/*
+- basketball_sim/*（export モジュールは読取のみ）
+- docs/* README.md（ルートおよび godot/README.md）
+- セーブファイル、生成済み JSON
+- docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md
+
+作成したファイル:
+- reports/godot_phase4_python_auto_export_design_2026-05.txt（本ファイルのみ）
+
+補足:
+- リポジトリ .gitignore に「reports/*.txt」があり、本ファイルは通常 git status に未追跡または無視として出る可能性がある。
+- コミットする場合は git add -f reports/godot_phase4_python_auto_export_design_2026-05.txt を想定（git add . は使用しない）。
+
+
+================================================================================
+（以上）
+================================================================================
