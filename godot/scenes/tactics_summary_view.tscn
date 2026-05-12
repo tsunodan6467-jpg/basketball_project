@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://c6tacticssumv01"]
 
-[ext_resource type="Script" uid="uid://bdtacticssummv01" path="res://scripts/tactics_summary_view.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/tactics_summary_view.gd" id="1_script"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header"]
 content_margin_left = 16.0
