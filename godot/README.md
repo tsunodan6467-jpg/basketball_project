@@ -1,23 +1,25 @@
-# Godot — Phase 4 読み取り専用プロトタイプ（ホーム／ロスター／クラブ史／順位表／日程）
+# Godot — Phase 4 読み取り専用プロトタイプ（ホーム／ロスター／クラブ史／順位表／日程／施設サマリー）
 
 このフォルダは **Phase 4 / Godot 本番 GUI 実装準備** 用の **最小 Godot プロジェクト** です。**本番 GUI の完成ではなく**、読み取り専用の **仮 GUI 足場** を置いています。
 
 ## 位置づけ
 
-- **ホーム・ロスター閲覧・クラブ史閲覧・順位表（リーグ状況）閲覧・日程（スケジュール）閲覧**の 5 画面はいずれも **JSON を読んで表示するだけ**です。ゲームの正本ロジックは **Python 側の `basketball_sim/`** にあり、このプロジェクトでは **再実装しません**。
+- **ホーム・ロスター閲覧・クラブ史閲覧・順位表（リーグ状況）閲覧・日程（スケジュール）閲覧・施設サマリー（アリーナ等）閲覧**の 6 画面はいずれも **JSON を読んで表示するだけ**です。ゲームの正本ロジックは **Python 側の `basketball_sim/`** にあり、このプロジェクトでは **再実装しません**。
 - **Godot から Python を自動起動する処理はありません**（子プロセス呼び出し、HTTP/RPC 等は未実装）。**手動で配置した JSON ファイルだけ**を読みます。
 - **`save` 構造・`format_version` / `PAYLOAD_SCHEMA_VERSION` には触れません**。
 
-## Phase 4 初期の到達点（5画面の足場）
+## Phase 4 初期の到達点（6画面の足場）
 
-**仮 GUI 導線**として、次まであります（いずれも **画面切替のみ**。進行・保存・契約・トレード・経営・育成・戦術保存などの操作は **未接続**）。
+**仮 GUI 導線**として、次まであります（いずれも **画面切替のみ**。進行・保存・契約・トレード・経営・育成・戦術保存・**施設投資・施設レベルアップ**などの操作は **未接続**）。
 
 - **ホーム**（`scenes/home_dashboard.tscn`）: クラブ状況サマリー。**現在の仮ハブ**（メインシーンは `project.godot` でホームのまま）。
 - **ロスター閲覧**（`scenes/roster_view.tscn`）: 現在の編成の表形式閲覧。
 - **クラブ史閲覧**（`scenes/club_history_view.tscn`）: 長期プレイの蓄積（履歴）閲覧。
 - **順位表（リーグ状況）閲覧**（`scenes/standings_view.tscn`）: D1/D2/D3 の順位表を JSON で閲覧。
 - **日程（スケジュール）閲覧**（`scenes/schedule_view.tscn`）: 次戦・今後の予定・進行ヒントなどを JSON で閲覧（**第1弾の読み取り専用表示**。大会別フル・過去結果・本格スケジュール管理は未接続）。
-- **仮ナビ**: ホーム → ロスター → ホーム、ホーム → クラブ史 → ホーム、**ホーム → 順位表 → ホーム**、**ホーム → 日程 → ホーム**（各画面の **閲覧／戻る** ボタンはシーン切替のみ）。
+- **施設サマリー閲覧**（`scenes/facility_summary_view.tscn`）: アリーナ・練習施設・メディカル・フロントオフィス・施設強化ポイントなどを JSON で閲覧（**第6画面の第1弾**。現状レベルの表示のみ。**施設投資・レベルアップ・施設プロジェクト制は未接続**）。
+- **仮ナビ**: ホーム → ロスター → ホーム、ホーム → クラブ史 → ホーム、**ホーム → 順位表 → ホーム**、**ホーム → 日程 → ホーム**、**ホーム → 施設サマリー → ホーム**（各サブ画面の **閲覧／戻る** はシーン切替のみ）。
+- **ホーム内「画面メニュー（読み取り）」カード**: チーム（ロスター）／リーグ（順位表・日程）／クラブ（クラブ史・**施設**）からも上記閲覧画面へ遷移可能（**HeaderNavRow と併用の二重導線**。本格ナビではない）。
 - **JSON 運用（共通）**: 各画面とも **`*_from_python.json` を優先**し、無い／読めないとき **同梱の `*_mock.json` にフォールバック**（各 `scripts/*.gd` の候補パス配列を参照）。
 - **手動生成した次のファイルは Git にコミットしない**（`godot/.gitignore` で除外）:
   - `data/home_dashboard_from_python.json`
@@ -25,6 +27,7 @@
   - `data/club_history_from_python.json`
   - `data/standings_from_python.json`
   - `data/schedule_from_python.json`
+  - `data/facility_summary_from_python.json`
 - **mock 表示**はユーザー環境の **Godot 4.6.2** で確認済み。**Python 生成 JSON の優先表示**も各画面で確認済み（CLI はリポジトリルートから `python -m basketball_sim.export.*_readonly` を実行し、`godot/data/` へ出力する運用）。
 
 ## 含まれないもの（Phase 4 初期の範囲外）
@@ -41,7 +44,7 @@
 - Godot から Python を **自動起動して JSON を生成する**こと
 - Godot から **ゲーム進行**すること
 - Godot から **セーブ / ロード**すること
-- Godot から **人事・経営・強化・戦術**などの操作をすること
+- Godot から **人事・経営・強化・戦術**や **施設投資・施設レベルアップ**などの操作をすること
 - **`Offseason.run()` を Godot から呼ぶ**こと
 - **本格ナビゲーション**（左メニュー統合・画面管理の一本化など）
 
@@ -55,6 +58,7 @@
 | `scenes/club_history_view.tscn` / `scripts/club_history_view.gd` | クラブ史閲覧・JSON 表示 |
 | `scenes/standings_view.tscn` / `scripts/standings_view.gd` | 順位表（リーグ状況）閲覧・JSON 表示 |
 | `scenes/schedule_view.tscn` / `scripts/schedule_view.gd` | 日程（スケジュール）閲覧・JSON 表示 |
+| `scenes/facility_summary_view.tscn` / `scripts/facility_summary_view.gd` | 施設サマリー閲覧・JSON 表示 |
 | `data/home_dashboard_mock.json` 等 | 各画面の **同梱モック**（正本データではない） |
 | `data/*_from_python.json` | **任意**。CLI で生成する開発用 JSON（無ければ mock） |
 
@@ -63,7 +67,7 @@
 1. [Godot 4.2 以降](https://godotengine.org/) をインストールする（本リポジトリでは **Godot 4.6.2** での動作確認実績あり）。
 2. Godot エディタで **「プロジェクトを編集」** から、この `godot/` フォルダを選ぶ（`project.godot` が入っているディレクトリ）。
 3. 実行（F5）でメインシーン（ホーム）が開き、各画面の **優先順** で JSON が読み込まれれば成功です。
-4. ロスター／クラブ史／**順位表**／**日程**からホームへ戻るときは、各画面上部の **「ホームへ戻る（表示のみ）」** を使います（ホームへ戻る目的でプロジェクト全体を再実行する必要はありません）。
+4. ロスター／クラブ史／**順位表**／**日程**／**施設サマリー**からホームへ戻るときは、各画面上部の **「ホームへ戻る（表示のみ）」** を使います（ホームへ戻る目的でプロジェクト全体を再実行する必要はありません）。
 
 ## ホーム用 JSON の読み込み（手動接続）
 
@@ -88,9 +92,9 @@ PowerShell の一例（パスは環境に合わせて読み替え）:
 python -m basketball_sim.export.home_dashboard_readonly --save "$env:USERPROFILE\.basketball_sim\saves\debug_user_boost_d1_user_cellb.sav" --output "godot\data\home_dashboard_from_python.json"
 ```
 
-**ロスター**・**クラブ史**・**順位表**・**日程**も同様に、`basketball_sim.export.roster_readonly` / `club_history_readonly` / **`standings_readonly`** / **`schedule_readonly`** で `godot/data/roster_from_python.json` / `club_history_from_python.json` / **`standings_from_python.json`** / **`schedule_from_python.json`** を生成して配置します（**まだ Godot から自動実行しません**）。
+**ロスター**・**クラブ史**・**順位表**・**日程**・**施設サマリー**も同様に、`basketball_sim.export.roster_readonly` / `club_history_readonly` / **`standings_readonly`** / **`schedule_readonly`** / **`facility_summary_readonly`** で `godot/data/roster_from_python.json` / `club_history_from_python.json` / **`standings_from_python.json`** / **`schedule_from_python.json`** / **`facility_summary_from_python.json`** を生成して配置します（**まだ Godot から自動実行しません**）。
 
-- 生成物は **開発用** です。**Git にコミットしない**でください（上記 5 ファイルは `godot/.gitignore` で除外）。
+- 生成物は **開発用** です。**Git にコミットしない**でください（上記 **6** ファイルは `godot/.gitignore` で除外）。
 
 ### 通常の動き
 
