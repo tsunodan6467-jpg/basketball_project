@@ -1,0 +1,184 @@
+================================================================================
+Godot Phase 4 — 第9 readonly 画面候補 比較調査レポート
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11（エージェント実行時点・ユーザ情報の日付に準拠）
+リポジトリ HEAD 参考: c5750a3（Godot8画面到達点を記録）以降の既存コード・ドキュメントを読取調査。
+本レポート作成にあたり Python / Godot / docs / README のソースは変更していない。
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+Godot 読み取り専用プロトタイプは次の8画面まで到達済み（docs / godot/README.md と整合）。
+ 1 ホーム           — home_dashboard_readonly
+ 2 ロスター         — roster_readonly
+ 3 クラブ史         — club_history_readonly
+ 4 順位表           — standings_readonly
+ 5 日程             — schedule_readonly
+ 6 施設サマリー     — facility_summary_readonly
+ 7 財務サマリー     — finance_summary_readonly
+ 8 オーナーミッション — owner_mission_readonly
+
+共通パターン: load_world による読取のみ → *_from_python.json 優先 → *_mock.json フォールバック。
+Godot からの Python 自動起動・save_world・進行系 API 接続は未実装。
+
+3. 第9候補の比較表
+--------------------------------------------------------------------------------
+凡例 おすすめ度: A=第9に最適寄り … E=後回し推奨寄り（相対評価）。
+
+|候補|既存データ|readonly安全性|既存8画面との重複|商品価値|Godot実装難度|おすすめ度|
+|A 戦術/ローテサマリー|Team.team_tactics / Team.strategy / team_tactics.py の正規化ルール。セーブに通常存在。|ensure 系を「チームへ書き戻さず」設計すれば可。get_safe_team_tactics は内部で ensure を呼びメモリ上は正規化代入あり→export では getattr+コピー+normalize の方が無難。|ロスターは表のみ。ホーム tasks に戦術言及あり。|高い（GMゲームの核）。|中。文言で「閲覧」「変更不可」を強調すれば誤解は減らせる。|A|
+|B 選手詳細/注目|Player に age/ovr/position/salary/contract 等が豊富。ロスター export が主要列を既に列挙。|getter のみなら高い。固定3人なら選択UI不要。|ロスターと重複大。差別化は「深掘り1枚」か統計サマリーが必要。|中〜高（差別化次第）。|低〜中（固定表示なら）。|B|
+|C ニュース/情報一覧|home_dashboard の tasks/news は簡易。club_history は milestones/transactions 等だが get_club_history_* は export で避けている。|分散ソースを1 DTOにまとめる設計が必要。副作用関数に注意。|ホーム・クラブ史と被りやすい。専用画面の価値は「集約・フィルタ」次第。|中（ヘッドライン程度なら低）。|中（データ境界の整理が本体）。|C|
+|D 契約/人事サマリー|Player/Team の契約・年俸・キャップ系。finance_summary にサラリー枠・履歴。roster に salary/contract 列。|getter + 集計のみなら可。contract_logic の「副作用なし」関数選定が要る。|財務・ロスターと部分重複。差別化は「期限切れ」「FA予定」「リスク一覧」。|高い（判断材料）。|中。|B|
+|E FA/人事候補|season.free_agents / free_agent_market / Tk の FA市場閲覧パターン。readonly 専用 export は未整備。|閲覧のみは可能だが「獲得に見える」リスク最大。ensure_fa_market_fields 等の副作用要調査。|ロスター・ホーム FA候補行と被る。|高いが誤解コスト同士。|中〜高。|E|
+|F ドラフト/スカウト|Team.league_future_draft_pool 等（情報設計メモ参照）。オフ中 draft_pool は Season/Offseason 依存。|Season なしセーブでは薄くなりやすい。読取のみは可能。|クラブ史・日程・将来情報と境界が曖昧になりやすい。|長期プレイでは高い。|中〜高。|C|
+|G 大会/カップ/国際|schedule_display に emperor_cup 等。Season にログ・結果。オフの国際杯 milestone も offseason 側。|Season 必須が多い。未接続セーブでは空欄多発リスク。|日程の competition_type / label で一部表現済み。専用画面は「杯専用ダイジェスト」で差別化。|特定ユーザーには高い。|中（データ欠損 UX）。|C|
+|H タスク/GMメモ|home_dashboard_readonly._task_lines が施設PT/負傷/FA shortlist/owner_mission 等を合成。|既存ヘルパー拡張で実装は軽いが、ホームと完全二重になりやすい。|ホームと強く被る。専用化の価値は「履歴・スヌーズ・優先度」等を付ける場合のみ。|低〜中（現状は低）。|低。|D|
+
+4. 候補A：戦術 / ローテーションサマリー詳細
+--------------------------------------------------------------------------------
+【データ】
+- 正本: basketball_sim/systems/team_tactics.py（TACTICS_SCHEMA_VERSION, ROTATION_DEFAULTS,
+  team_strategy / playbook / rotation / usage_policy / preset_meta 等）
+- Team: models/team.py に team_tactics: Dict、strategy 等。
+- 先発キー: STARTER_POSITIONS = ("PG","SG","SF","PF","C")。bench_order / target_minutes / sub_policy 等。
+
+【ensure_team_tactics_on_team と readonly】
+- ensure_team_tactics_on_team(team) は「Team.team_tactics を正規化した dict で setattr 置換」する（インプレース）。
+- get_safe_team_tactics も doc は「読み取り専用用途」だが実装は ensure 呼び出し後に dict コピーを返すため、
+  ロード済み Team オブジェクトはメモリ上は書き換わる（save しない export でも方針上は嫌われやすい）。
+- roster_readonly.py 冒頭コメント: format_gm_roster_text / compute_auto_role_tags_for_team 等、
+  ensure_team_tactics_on_team を呼び得る経路は使わない、と明記済み。
+- test_finance_summary_readonly_export.py / test_owner_mission_readonly_export.py に
+  export ソースに "ensure_team_tactics" が含まれないことの検査あり → 新 export でも同様の規律が自然。
+
+【安全な readonly DTO の方向性】
+- getattr(team, "team_tactics", {}) を copy.deepcopy 等でコピーした上で normalize_team_tactics(raw_copy, valid_player_ids)
+  の戻り値のみを JSON 化し、Team には setattr しない（normalize_team_tactics 自体は新 dict を返す設計）。
+- valid_player_ids は roster の player_id 列挙から作る（読取のみ）。
+- 欠損時は正規化結果でデフォルト埋めされるため「空で落ちる」より「既定表示」に寄る。
+
+【操作UIに見える問題】
+- 画面タイトル・注意文を「戦術・ローテーション（閲覧）」「変更は本ゲームの戦術メニューから」等に固定し、
+  Godot 側はボタンを増やさない（既存8画面と同型）とリスク低減。
+
+5. 候補B：選手詳細 / 注目選手プロフィール詳細
+--------------------------------------------------------------------------------
+【Player モデル】
+- basketball_sim/models/player.py: salary, contract_years_left, contract_total_years,
+  ovr 系属性、age、position、疲労・怪我系、fa_priority_*、acquisition_type 等、プロフィール向きフィールドが豊富。
+
+【ロスターとの差別化】
+- roster_readonly は order/name/position/age/ovr/salary/contract/nationality_slot/status の表形式に特化。
+- 第9で「1選手の深掘り」はロスター行をクリックできない現状の Godot では、選択UIが要ると難度が跳ねる。
+- 「OVR 上位3人」「最年長/最年少」「契約残1年」など **ルール固定の複数カード**なら選択UI不要で Phase4 パターンに合う。
+
+【Season なし】
+- 選手オブジェクト自体は team.players に載っていれば成立。シーズン非依存でよい。
+
+6. 候補C：ニュース / 情報一覧詳細
+--------------------------------------------------------------------------------
+【既存ソース】
+- home_dashboard_readonly._news_lines: 順位・勝敗・汎用文言中心。リーグ全体のニュースフィードではない。
+- home_dashboard_readonly._task_lines: 施設PT、負傷数、fa_shortlist、owner_mission、定型「戦術確認」行など。
+- club_history_readonly: milestones / transactions / finance 断片などを **get_club_history_report_text を使わず**
+  自力イテレーションでDTO化（_ensure_history_fields 回避が明記）。
+
+【課題】
+- 「ニュース」という1語に集約できる単一正本が無く、DTO は複数 attr の合成設計になる。
+- ホーム・クラブ史と被るため、第9の価値は「カテゴリ分け」「期間フィルタ」「重要度」など編集方針の確定が必要。
+
+7. 候補D：契約 / 人事サマリー詳細
+--------------------------------------------------------------------------------
+【データ】
+- Player: 契約年数・年俸・desired_salary、FA志向、獲得経路など。
+- finance_summary_readonly: サラリー上限・年俸合計・余力・財務履歴（チーム金計）。
+- roster_readonly: 各行 salary / contract 文字列。
+
+【重複と差別化】
+- 純粋に表を再掲するだけならロスター/財務と重複し第9として弱い。
+- 「契約満了ウィンドウ」「翌年 FA 予備軍」「日本規制枠ストレス」など **集約指標** に振ると価値が出る。
+- contract_logic.get_expiring_players 等の利用可否は、**import 先が副作用なし**であることを個別に要確認（本調査では未深掘り）。
+
+【交渉UI誤解】
+- 画面名を「契約状況（閲覧）」とし、交渉・更新ボタンを出さない Godot 方針で抑制可能。
+
+8. 候補E：FA / 人事候補詳細
+--------------------------------------------------------------------------------
+【既存】
+- systems/free_agent_market.py / free_agency.py / fa_logic.py に市場・評価ロジック。
+- MainMenuView に FA市場閲覧系（閲覧のみ設計の記述が GODOT 情報設計メモにあり）。
+- **fa_market_readonly.py は export 一覧に存在しない**（2026-05-11 時点）→ 新規 DTO からの着手。
+
+【リスク】
+- ユーザーに「ここから獲得できる」と誤解されやすい。ツールチップ・注意文・画面構成の要求が最も厳しい。
+- free_agent 側の ensure_* がプレイヤー dict を補完する場合、readonly 規律（オブジェクト非変異）の検証が必要。
+
+9. 候補F：ドラフト / スカウト詳細
+--------------------------------------------------------------------------------
+【データ】
+- docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md に来年プール等の正本参照が整理済み。
+- 当年ドラフトプールは Offseason コンテキスト依存で、通常シーズン中セーブでは空・未使用になりやすい。
+
+【長期価値】
+- スカウト方針・プール閲覧は GM ゲームらしさに直結するが、制度説明と空データ UX の両立が重い。
+
+10. 候補G：大会 / カップ / 国際戦詳細
+--------------------------------------------------------------------------------
+【データ】
+- systems/schedule_display.py: emperor_cup の次戦行・過去ログ digest・結果行など Season 依存。
+- models/offseason.py: オフの国際杯 milestone 記録（クラブ史と接続）。
+
+【日程画面との関係】
+- schedule_readonly は upcoming_rows の competition_type / competition_label を既に持つ。
+  杯専用の「トーナメント表」までは行っていない余地はある。
+
+【Season なし】
+- schedule_readonly は season None 時に「日程は表示できません」系メッセージ（_MSG_NO_SEASON）。
+- 杯専用第9も同様にシーズン未接続セーブでは薄くなりがち。
+
+11. Cursorとしてのおすすめ順（第9 readonly 向き）
+--------------------------------------------------------------------------------
+1位: A（戦術/ローテーション閲覧）— データは Team に直結しシーズン非依存。export では ensure を呼ばない方針で
+     finance/owner と同じ安全文化に乗せやすい。商品価値が高い。
+2位: D（契約/人事サマリー）— 財務・ロスターと被るが「集約ダッシュ」に振れば第9として成立しやすい。
+3位: B（注目選手固定スナップショット）— 選択UIを避ける前提なら実装難度は低い。差別化コピーが要る。
+4位: F（ドラフト/スカウト）— 価値は高いが空データ・Season 依存の説明コストが上がる。
+5位: C（ニュース一覧）— 設計・データ境界の整理が先。第9より「DTO仕様の会議」が重い。
+6位: G（杯/国際）— 日程・クラブ史・Season 前提と三方向に引っ張られる。
+7位: H（タスク専用）— 現状の home tasks ではホームと二重になりやすく第9のインパクトが薄い。
+8位: E（FA市場閲覧）— 価値は高いが誤解リスクと export 新設の検証コストが最も重い → 第9より後でも可。
+
+12. 第9として避けた方がよい候補と理由
+--------------------------------------------------------------------------------
+- E（FA / 人事候補）を「最優先で第9」にするのは非推奨寄り: 閲覧専用と誤認されにくく、
+  既存の「FA市場は人事の閲覧タブ」という Tk 由来の説明責務とも整合が要る。export・Godot の両方でガードが重い。
+- H（タスク専用）を第9にするのは非推奨寄り: 中身が home_dashboard の tasks 拡張に留まるなら、
+  専用画面を増やすよりホームDTOの拡張で足りる可能性が高い。
+
+13. 次にChatGPT/ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- 第9のプロダクト宣言: 「シーズン未接続セーブでも常に意味がある画面」を最優先にするか、
+  「シーズン進行中セーブに特化した画面」を許容するか。
+- 戦術DTOを採用する場合: Team オブジェクトをメモリ上で正規化してよいか（ensure 禁止の厳格モード）か、
+  dict コピーのみ正規化で十分か（推奨: 後者）。
+- 契約サマリー（D）を採用する場合: finance + roster と被らない「1枚の要約」の定義（KPI 3〜6個など）。
+- FA（E）を第10以降に回す場合、Godot カード導線を「人事」列に寄せるかどうか（ナビ設計との兼ね合い）。
+
+14. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査および本レポート作成により、以下は変更していない。
+- basketball_sim/（Python ソース・テストの変更なし）
+- godot/scenes/ godot/scripts/ godot/project.godot
+- docs/ ルート README.md
+- docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md
+- セーブファイル・生成 JSON
+
+補足: reports/*.txt はリポジトリ .gitignore で除外されているため、バージョン管理に載せる場合は
+git add -f reports/godot_phase4_screen9_candidate_survey_2026-05.txt が必要。
+
+================================================================================
+EOF
+================================================================================
