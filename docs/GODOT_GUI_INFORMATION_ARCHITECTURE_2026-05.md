@@ -283,12 +283,13 @@
 
 ## 14. Godot / Python ランタイム連携方針（Phase 4 初期）
 
-本節は **2026-05** 時点の方針メモである。運用手順の詳細は `godot/README.md`、読み取り専用 export の実装は `basketball_sim/export/` の `home_dashboard_readonly.py` / `roster_readonly.py` / `club_history_readonly.py` / `standings_readonly.py` / **`schedule_readonly.py`** / **`facility_summary_readonly.py`** を正とする（§15）。
+本節は **2026-05** 時点の方針メモである。運用手順の詳細は `godot/README.md`、読み取り専用 export の実装は `basketball_sim/export/` の `home_dashboard_readonly.py` / `roster_readonly.py` / `club_history_readonly.py` / `standings_readonly.py` / **`schedule_readonly.py`** / **`facility_summary_readonly.py`** / **`finance_summary_readonly.py`** を正とする（§15）。
 
 ### 14.1 現在の接続方式（手動 JSON）
 
 - Python CLI（`python -m basketball_sim.export.home_dashboard_readonly --save <.sav> --output <.json>`）で **読み取り専用のホーム用 JSON** を手動生成する。処理は `load_world` による **セーブの読み取りのみ**であり、**セーブファイルを書き換えない**。
 - Godot は **`res://data/home_dashboard_from_python.json`** を優先して読み、無ければ **`res://data/home_dashboard_mock.json`** にフォールバックする（`godot/scripts/home_dashboard.gd` の `_home_json_candidate_paths`）。
+- ロスター・クラブ史・順位表・日程・施設・財務など **他画面も同型**（`_*_from_python.json` 優先・`*_mock.json` フォールバック）。CLI とファイル名は `godot/README.md` を正とする。
 - **Godot から Python プロセスを起動する処理は、本節の時点では入れない**。
 - 生成物 `home_dashboard_from_python.json` は開発用であり、`godot/.gitignore` で **コミット対象外**。
 
@@ -337,9 +338,9 @@
 
 ## 15. Phase 4 初期プロトタイプ到達点（Godot / 読み取り専用）
 
-**位置づけ**: 本節は **`godot/` 上の仮 GUI 足場** の記録であり、本番 GUI 完成・確定仕様の宣言ではない。詳細な運用手順は `godot/README.md` を正とする。
+**位置づけ**: 本節は **`godot/` 上の仮 GUI 足場** の記録であり、本番 GUI 完成・確定仕様の宣言ではない。詳細な運用手順は `godot/README.md` を正とする。ナビの整理方針は `docs/GODOT_NAVIGATION_PHASE4_2026-05.md` と併読。
 
-- **2026-05 時点の到達点**: `godot/` に **ホーム・ロスター閲覧・クラブ史閲覧・順位表（リーグ状況）閲覧・日程（スケジュール）閲覧・施設サマリー閲覧** の 6 画面があり、いずれも **読み取り専用プロトタイプ**（進行・保存・契約・トレード・経営・育成・戦術保存・**施設投資・施設レベルアップ**などの **状態変更系 UI は未接続**）。
+- **2026-05 時点の到達点**: `godot/` に **ホーム・ロスター閲覧・クラブ史閲覧・順位表（リーグ状況）閲覧・日程（スケジュール）閲覧・施設サマリー閲覧・財務サマリー（経営）閲覧** の **7 画面**があり、いずれも **読み取り専用プロトタイプ**（進行・保存・契約・トレード・経営・育成・戦術保存・**施設投資・施設レベルアップ**・**財務の予算変更・投資・契約更新**などの **状態変更系 UI は未接続**）。
 - **画面の役割（仮）**:
   - **ホーム**: **仮ハブ**およびクラブ状況サマリー（`home_dashboard_readonly` DTO に相当する JSON）。
   - **ロスター閲覧**: **現在のチーム編成**の表形式閲覧（`roster_readonly` DTO）。
@@ -347,9 +348,17 @@
   - **順位表 / リーグ状況閲覧**: **D1/D2/D3 の順位・リーグ状況**の閲覧（`standings_readonly` DTO）。
   - **日程 / スケジュール閲覧**: **次戦・今後の予定・進行ヒント**などの閲覧（`schedule_readonly` DTO。**第1弾の読み取り専用表示**であり、大会別フル・過去結果・本格スケジュール管理は未接続）。
   - **施設サマリー閲覧**: **アリーナ・練習施設・メディカル・フロントオフィス・施設強化ポイント**などの閲覧（`facility_summary_readonly` DTO。**第6画面の第1弾**。**施設投資・レベルアップ・施設プロジェクト制は未接続**）。
+  - **財務サマリー閲覧**: **現在資金・前季収入・前季支出・前季収支・サラリー上限・選手年俸合計・サラリー余力・財務履歴**などの閲覧（`finance_summary_readonly` DTO。**第7画面の第1弾**。**予算変更・投資・契約更新などの操作は未接続**）。
+- **ファイル構成（財務サマリー）**:
+  - Python: `basketball_sim/export/finance_summary_readonly.py`、テスト: `basketball_sim/tests/test_finance_summary_readonly_export.py`
+  - Godot: `godot/scenes/finance_summary_view.tscn`、`godot/scripts/finance_summary_view.gd`、`godot/scripts/finance_summary_view.gd.uid`（エディタ UID）、`godot/data/finance_summary_mock.json`
+  - 手動生成: `godot/data/finance_summary_from_python.json`（**`godot/.gitignore` 対象・コミットしない**）
+- **読込仕様（財務サマリー）**: **`finance_summary_from_python.json` を優先**し、無い／読めないとき **`finance_summary_mock.json` にフォールバック**（`finance_summary_view.gd` の候補パス配列）。**Godot から Python 自動起動は未実装**。
 - **データ経路**: いずれも **Python export（`load_world` による読み取りのみ）→ JSON → Godot 表示** の型。各画面は **`_*_from_python.json` 優先・同梱 `*_mock.json` フォールバック**（§14.1 の手動 JSON 方針と同じ運用）。
-- **仮ナビ**: ホームを起点に **ホーム → ロスター → ホーム**、**ホーム → クラブ史 → ホーム**、**ホーム → 順位表 → ホーム**、**ホーム → 日程 → ホーム**、**ホーム → 施設サマリー → ホーム**（画面切替のみ。本格ナビゲーションではない）。**ホーム内のカード型メニュー（読み取り）**からも各閲覧画面へ遷移可能（**HeaderNavRow と併用の二重導線**）。
-- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Steam 向け本番レイアウト**の確定。
+- **導線**: **ホーム上部 `HeaderNavRow` は 5 ボタンのまま**（財務は **追加していない**）。**ホーム内カード型メニュー**に **「経営」** カテゴリを置き、**「財務サマリー」** から第7画面へ遷移。財務サマリー画面から **ホームへ戻る**（`change_scene_to_file` のみ）。
+- **確認済み（ユーザー環境 Godot 4.6.2 の目安）**: ホーム → 財務サマリー → ホーム、既存6画面往復、`from_python` 優先・mock フォールバック、実行後の追跡差分なし、など（詳細は `godot/README.md`）。
+- **仮ナビ**: ホームを起点に **ホーム → 各閲覧画面 → ホーム**（画面切替のみ。本格ナビゲーションではない）。**ホーム内のカード型メニュー（読み取り）**からも各閲覧画面へ遷移可能（**HeaderNavRow と併用の二重導線**）。
+- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Godot 本番 GUI の一本化**、**Steam 向け本番レイアウト**の確定、**財務画面の本格ビジュアル調整**。
 
 ---
 
