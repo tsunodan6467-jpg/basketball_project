@@ -1,0 +1,318 @@
+================================================================================
+Godot 契約・人事サマリー: ヘッダー以外カードへの白ベース Theme 限定適用 候補調査
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11（調査実施時点のリポジトリ HEAD）
+対象コミット: 4c1cb08b82dffb69875614845efff30b7f0ed298
+  （直近確認済み流れ: 26fa722 preview → b319af3 ヘッダー適用 → b572a7e 白ベース Theme
+   → 8bf6788 OnDark ラベル → 4c1cb08 契約人事ヘッダー文字色）
+
+参照ファイル（読取のみ・本調査では未変更）:
+  - godot/scenes/contract_personnel_summary_view.tscn
+  - godot/scripts/contract_personnel_summary_view.gd
+  - godot/themes/phase4_readonly_core.tres
+
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 第1〜第10読み取り専用画面、from_python 優先 + mock フォールバック、ホーム導線、
+  一括 export、共通 Theme 第0段 preview、契約・人事サマリーへの限定適用まで完了。
+- 白ベース検証 Theme（phase4_readonly_core.tres）と theme_preview、OnDark 系
+  variation により preview の可読性は改善済み。
+- 契約・人事サマリーは HeaderCard に Phase4HeaderCard を適用し、ヘッダー内静的
+  Label の font_color を濃色に調整済み（4c1cb08）。
+
+
+3. 契約・人事サマリーの現在の Theme 適用状況
+--------------------------------------------------------------------------------
+- ルート Control に theme = phase4_readonly_core.tres（全子が既定で Theme を継承）。
+- HeaderCard: theme_type_variation = Phase4HeaderCard。panel の scene override は無し。
+- ヘッダー内チップ（ReadonlyBadge / ModeStrip）: theme_override_styles/panel =
+  SubResource("StyleBoxFlat_chip")（暗めチップ専用・ヘッダー限定）。
+- Scroll 配下の 5 カード（Contract / Risk / Players / Balance / Caution）いずれも
+  theme_type_variation 無し、いずれも同一の
+  theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+  （紺系ダークパネル）を共有。
+- 各カード内の静的 Label は、タイトル・本文とも scene 側で明色の
+  theme_override_colors/font_color が付与されている（ダーク Summary 向け）。
+- StatusLabel は RootCol 直下（ヘッダー外）、暗背景上のエラー表示用の明るい赤系。
+
+scene の SubResource:
+  - StyleBoxFlat_chip … ヘッダーのみ使用。
+  - StyleBoxFlat_summary … 上記 5 PanelContainer で共有参照。
+
+Theme 側（phase4_readonly_core.tres）で本体画面がまだ使っていない variation:
+  - Phase4SummaryCard（PanelContainer / SubResource 3 と同等の白〜青灰パネル）
+  - Phase4WarningCard（クリーム + 琥珀枠）
+  - Phase4ChipPanel（淡青チップ）
+  - Phase4TableHead / Phase4TableCell（濃色・白カード向け）
+  - Phase4NoteText（濃い琥珀系・12px）
+  - Phase4Subtitle / Phase4Muted / Phase4Title 等（白カード向け濃色）
+
+
+4. 契約概要カード（ContractCard）への適用評価
+--------------------------------------------------------------------------------
+概要: SummaryCard 相当。本文は単一 Label（%ContractCardBody）+ 静的タイトル。
+
+利点:
+  - 表示が静的で、動的ノード生成が無い（リスク・選手行と比べ単純）。
+  - 適用先は ContractCard の Panel のみ + 同カード内 2 Label の色調整で完結しやすい。
+  - JSON の contract_items は文字列化のみでレイアウトノードを増やさない。
+
+欠点:
+  - ContractTitle / ContractCardBody は現状「明色 override」。白パネルにすると
+    ヘッダー同様、濃色への差し替えまたは variation 化が必須（読みにくさ）。
+  - 5 カードが同一 SubResource("StyleBoxFlat_summary") を共有しているため、
+    ContractCard だけ Theme variation に切り替えると「summary の override を
+    残すか／全カードで外すか」の判断が必要。1 枚だけ外すと、他 4 枚は従来の
+    ダークのまま → 視覚的なちらつきは許容できるが、SubResource の参照数が
+    減り未使用化しやすい。
+
+触りそうなファイル:
+  - 原則 contract_personnel_summary_view.tscn のみで panel + 当該 Label の色。
+  - load_steps は SubResource を削除できれば減らせる（他カード未変更なら
+    StyleBoxFlat_summary はまだ 4 カードで必要）。
+
+差分規模:
+  - 小〜中（1 PanelContainer + 2 Label + 必要なら load_steps 行）。
+
+文字色リスク:
+  - 高（対策必須）。現状タイトル 0.94 系・本文 0.86 系は白背景と非相性。
+
+今やるべきか:
+  - 「最初の 1 枚だけ白カード化」するなら最有力候補。ただし上記色修正は
+    同一コミットか直後コミットでセットにすることが安全。
+
+
+5. 人事リスクカード（RiskCard）への適用評価
+--------------------------------------------------------------------------------
+概要: RiskRows に対し、GDScript が Label.new() + _style_body_label で
+  明色（0.86,0.9,0.95 等）をコード付与。severity 等はテキストブロック内に含む。
+
+利点:
+  - カード枠だけ Summary と揃えれば「注意喚起ブロック」の雰囲気は Theme で統一可能。
+  - Phase4WarningCard ではなく Summary のままにすれば意味の色分けを壊しにくい。
+
+欠点:
+  - 白 Summary にした瞬間、動的 Label の明色がそのままではコントラスト崩壊。
+  - 読みやすさを保つには .gd の _style_body_label 引数の色変更、または
+    override をやめて theme_type_variation（Phase4TableCell / Phase4Muted 等）に
+    切り替える .gd 変更がほぼ必須。
+  - 「severity の色分け」を将来 Theme の色で表現する場合は設計が広がる。
+
+触りそうなファイル:
+  - .tscn（RiskCard panel、RiskTitle、RiskHint の色）
+  - contract_personnel_summary_view.gd（_fill_risk_rows / _style_body_label）
+
+差分規模:
+  - 中〜大（scene + script）。
+
+文字色リスク:
+  - 非常に高。script 未対応のままパネルだけ白にすると不可読。
+
+今やるべきか:
+  - 契約概要の次に検証するなら可。ただし初回「.tscn のみ」では完結しにくい。
+
+
+6. 注意カード（CautionCard）への適用評価
+--------------------------------------------------------------------------------
+概要: Phase4WarningCard（クリーム + 琥珀枠）と意味的に最も近い。
+  本文は %CautionCardBody の単一 Label + 静的タイトル。JSON の notes / sections
+  は _build_caution_text で文字列連結のみ。
+
+利点:
+  - Theme の Phase4WarningCard / Phase4NoteText と役割が一致しやすい。
+  - 変更範囲は Panel + タイトル・本文の色が中心で、動的ノード無し。
+
+欠点:
+  - CautionTitle / CautionCardBody も現状明色 override → 白/クリーム上では
+    NoteText 系の濃色へ寄せる必要あり。
+  - 他カードがダークのままだと「注意だけクリーム」は意図的に目立つ（良い面と
+    チグハグ面の両方）。
+
+触りそうなファイル:
+  - 主に .tscn。Phase4NoteText を variation で当てるなら Theme 定義と整合確認。
+
+差分規模:
+  - 小（1 カード + 2 Label）。
+
+文字色リスク:
+  - 中（静的のみなら .tscn で吸収しやすい）。
+
+今やるべきか:
+  - 「Theme の Warning のキャラを実画面で見せる」目的には最適。ヘッダー次の
+    デモとして有効。ただし一覧の中でだけ色が跳ねるので UX は要確認。
+
+
+7. 主要契約選手カード（PlayersCard）への適用評価
+--------------------------------------------------------------------------------
+概要: PlayerRows に最大 8 行の Label をコード生成。いずれも _style_body_label で
+  明色固定。情報量多行。
+
+利点:
+  - 白カード + 濃色 + 小さめ行間の「表風」に寄せる余地あり（将来 Phase4TableCell
+    相当へ）。
+
+欠点:
+  - 動的生成が多く、.tscn だけでは読みやすさを担保できない。
+  - 第 1 回適用先としては重い（必ず .gd か、生成時に variation を付与する変更）。
+
+触りそうなファイル:
+  - .tscn（PlayersCard panel、PlayersTitle）
+  - .gd（_fill_player_rows、_style_body_label）
+
+差分規模:
+  - 大。
+
+文字色リスク:
+  - 非常に高（script 同時変更が前提）。
+
+今やるべきか:
+  - 単体では非推奨。契約概要 + 色方針が固まった後でもよい。
+
+
+8. ロスター構成カード（BalanceCard）への適用評価
+--------------------------------------------------------------------------------
+概要: BalanceCardBody は単一 Label で _build_balance_text の結果を表示。
+  動的ノード無し。
+
+利点:
+  - 契約概要と同型で、.tscn の panel + タイトル + 本文色でほぼ完結。
+  - SummaryCard variation と相性が良い。
+
+欠点:
+  - Contract と同様、StyleBoxFlat_summary 共有のため部分適用時の見た目の統一
+    方針が必要。
+
+触りそうなファイル:
+  - 主に .tscn。
+
+差分規模:
+  - 小〜中。
+
+文字色リスク:
+  - 高（明色 override の修正必須）。
+
+今やるべきか:
+  - 契約概要と同順位で「2 枚目」候補として妥当。
+
+
+9. ヘッダー以外はまだ触らない案（F）
+--------------------------------------------------------------------------------
+安全性: 最高。差分・UID・回帰範囲ゼロ。
+Theme 検証: 実画面ではヘッダーのみ白化のまま → カード群の Theme キャラは preview
+  頼みになり、本番 GUI 一本化の手応えは限定的。
+おすすめ: 次のマイルストーンまで様子見する場合。
+
+
+10. 全カード一括適用案（G）
+--------------------------------------------------------------------------------
+効果: 画面全体のトーンが一気に白ベース寄りになり、Theme の意図は最も分かりやすい。
+リスク:
+  - 5 枚すべてで StyleBoxFlat_summary を外せば SubResource が未使用化 → 削除と
+    load_steps 更新がまとまって入る（機械的だが差分行数は増える）。
+  - Risk / Players は .gd の明色 override が残ると一括でも不可読 → 必ず script
+    対応がセット。
+  - 一度にレビュー・手動確認の負荷が大きい。
+
+初回として: 危険度は高め。分割適用が無難。
+
+
+11. 既存 StyleBoxFlat との衝突・削除リスク
+--------------------------------------------------------------------------------
+- 現状、Summary 系 5 カードはすべて SubResource("StyleBoxFlat_summary") を参照。
+  これを外して Phase4SummaryCard に置き換えると、5 箇所すべてで override が
+  不要になるまで SubResource は削除できない。
+- 片方のカードだけ variation にし、他は summary のまま → SubResource は維持。
+  未参照削除は「全カード移行完了後」にまとめると安全。
+- StyleBoxFlat_chip はヘッダー専用のため、カード側の変更では触らないのがよい。
+- Theme の PanelContainer 既定（SubResource 3）をルートが継承しているが、
+  個別ノードの override があればそちらが優先される（衝突というより上書き優先）。
+
+
+12. .gd 変更が必要になりそうな箇所
+--------------------------------------------------------------------------------
+- _fill_risk_rows: Label に add_theme_color_override で明色を付与。
+- _fill_player_rows: 同上。
+- 空行時の empty Label も _style_body_label(..., Color(0.62, 0.66, 0.74)) 等。
+- 対策案: (a) 濃色系 Color に変更する最小修正、(b) override をやめ
+  theme_type_variation を Phase4TableCell / Phase4Muted 等に設定する、(c)
+  共通ヘルパーで「白カード用」「ダーク用」を切替（将来用）。
+
+契約概要・ロスター・注意の静的本文のみを先に白化する場合は .gd 不要。
+選手・リスクを白カードに載せる段階で .gd が必須。
+
+
+13. UID / scene 再シリアライズ注意点
+--------------------------------------------------------------------------------
+- contract_personnel_summary_view.tscn の uid://c8contractpsview1 は維持推奨。
+- SubResource 削除や load_steps 変更時に Godot がノード順を再書き出しする場合、
+  差分が広がることがある → 意図した変更以外が混ざっていないか diff で確認。
+- ext_resource の Theme uid は現状維持でよい。
+
+
+14. 白ベース Theme の本番 GUI 効果
+--------------------------------------------------------------------------------
+- カードを Phase4SummaryCard / Phase4WarningCard に寄せると、preview で検証した
+  トーンが実画面に乗り、Steam 向け「読み取り専用 UI の統一感」の説得力が上がる。
+- Phase4TableHead/Cell を将来の表レイアウトに使う道筋と整合。
+- ホーム等への横展開は、同 Theme + OnDark 系の使い分けパターンを契約人事で
+  一度固めると再現しやすい。
+
+
+15. Cursor としてのおすすめ順
+--------------------------------------------------------------------------------
+1. 契約概要（A）… 静的のみ、学習コスト低い。
+2. ロスター構成（E）… 同様に静的。Balance と Contract の順序はどちら先でも可。
+3. 注意カード（C）… Warning の見本として有効。色の意味は要目視。
+4. 人事リスク（B）… .gd 同梱が前提。
+5. 主要契約選手（D）… 情報量・行数が多く最後が無難。
+6. 全カード一括（G）… 上記の個別検証後。
+7. 何もしない（F）… リスク最小・検証は preview 継続。
+
+
+16. 今すぐ実装してよい最小案
+--------------------------------------------------------------------------------
+- ContractCard のみ: theme_type_variation = Phase4SummaryCard を付与し、
+  theme_override_styles/panel を削除。ContractTitle / ContractCardBody の
+  font_color をヘッダーと同系の濃色（または Phase4Subtitle / Phase4TableCell
+  variation）へ。StyleBoxFlat_summary は他 4 カードが参照するため残す。
+- 同一コミット内で pytest（既存 export テスト）を通す。
+
+
+17. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- Players / Risk のパネルだけ白くして script の明色を残すこと。
+- 5 カード一括 + .gd 未対応の同時マージ。
+- Theme ファイルの色トーンを本番確定として大きく振ること（本調査スコープ外）。
+
+
+18. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- 実画面で「ダーク Summary のままのカード」と「白 Summary」を何枚まで混在させるか。
+- 注意カードを Phase4WarningCard にするタイミング（デモ優先か、全体統一後か）。
+- 動的行の色を .gd で濃色に寄せる方針（最小 Color 差し替え vs variation 化）。
+- pytest に scene の見た目は載らないため、Godot 手動確認のチェックリストを
+  誰が回すか（from_python / mock の両方推奨）。
+
+
+19. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査レポート作成時点で、以下は読取のみ・編集していない:
+  - godot/scenes/contract_personnel_summary_view.tscn
+  - godot/scripts/contract_personnel_summary_view.gd
+  - godot/themes/phase4_readonly_core.tres
+  - godot/scenes/theme_preview.tscn
+  - godot/project.godot
+  - basketball_sim/（Python）
+  - docs/ / README / 生成 JSON / セーブ
+  - docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md
+
+本ファイル reports/godot_phase4_contract_theme_card_application_survey_2026-05.txt
+のみ新規作成対象とする。
+
+================================================================================
+END
+================================================================================
