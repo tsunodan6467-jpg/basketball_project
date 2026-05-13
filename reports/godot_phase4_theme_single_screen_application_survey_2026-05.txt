@@ -1,0 +1,223 @@
+================================================================================
+Godot 共通 Theme / Style を既存 1 画面へ限定適用する候補調査（Phase 4）
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11
+Git HEAD: 26fa7227b73b19bd821cd23c306ee6a63d0d0b4a（Godot共通ThemeStyleプレビューを追加）
+参照リソース: godot/themes/phase4_readonly_core.tres（uid://c9phase4rocore01）
+参照シーン: contract_personnel_summary_view / roster_view / home_dashboard / finance_summary_view / owner_mission_view の .tscn と対応 .gd（読取のみ）
+本レポート作成以外のリポジトリ変更: なし
+
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 読み取り専用 10 画面 + ホームが稼働。preview（theme_preview.tscn）で phase4_readonly_core.tres をユーザー環境 Godot 4.6.2 で確認済み。
+- 既存 10 画面には Theme 未適用。第 1 回の「本番シーンへの限定適用」先は未決。
+
+
+3. 既存 Theme / Style 第 0 段の状況
+--------------------------------------------------------------------------------
+- phase4_readonly_core.tres は Theme 型。StyleBoxFlat を 6 本 SubResource 化し、[resource] で
+  Panel/PanelContainer 既定、Button 全状態、Label 既定、および型バリエーション
+  Phase4HeaderCard / Phase4ChipPanel / Phase4SummaryCard / Phase4WarningCard、
+  Phase4Title / Phase4Subtitle / Phase4Muted / Phase4DataSource / Phase4TableHead / Phase4TableCell / Phase4NoteText
+  を定義済み。
+- theme_preview.tscn はルート Control に theme を割当し、上記バリエーションを目視確認する用途。
+- 注意（ユーザー報告）: エディタ再保存で theme_preview.tscn の先頭行（load_steps / uid）が揺れる事例あり。
+  本番シーン適用時も **意図しない再シリアライズ差分**に注意（後述 §12）。
+
+
+4. 候補 A：契約・人事サマリーへ限定適用
+--------------------------------------------------------------------------------
+利点:
+  - シーン構造が finance / tactics 等と同型（HeaderTopRow + ReadonlyBadge + ModeStrip + HomeNav、複数 Summary 系 Panel、Scroll）。
+  - phase4_readonly_core のバリエーション（Header / Chip / Summary / Warning / DataSource / Table 系）と **対応関係が取りやすい**。
+  - ホーム・他画面への **波及が限定的**（ハブの見た目は変わらない）。
+  - 直近追加で「第 10 画面として」検証対象として自然。
+
+欠点:
+  - .tscn 内の `theme_override_styles/panel = SubResource("StyleBoxFlat_*")` が **多数**（summary カードが複数ブロック）。正本化には削減 or 置換作業が必要。
+  - contract_personnel_summary_view.gd に **動的 Label**（リスク行・選手行）と `add_theme_*_override` あり。Theme だけでは表部分の統一は **限定的**（§11）。
+
+触りそうなファイル:
+  - 主: godot/scenes/contract_personnel_summary_view.tscn
+  - 任意（表の色を Theme に寄せる場合）: godot/scripts/contract_personnel_summary_view.gd
+  - 任意（トークン微調整）: godot/themes/phase4_readonly_core.tres
+
+差分規模（実装時の目安）:
+  - **最小**: ext_resource（Theme）追加 + ルート Control に `theme = ExtResource(...)` のみ → **見た目はほぼ不変**（各 Panel の `theme_override_styles/panel` が優先されるため。§9〜10 参照）。
+  - **効果あり**: ヘッダー Panel 等から `theme_override_styles/panel` を外し `theme_type_variation = &"Phase4HeaderCard"` 等に置換 + 未使用 SubResource 削除 → **中規模 .tscn diff**（数十行〜）。
+  - **フル**: 全 Panel の override 撤去 + Label の per-node override をバリエーションへ移行 → **大**。
+
+安全性:
+  - 導線（ホーム ↔ 契約人事）は .gd のシーンパスに依存。Theme 適用のみなら **壊しにくい**。
+  - UID は既存 uid://c8contractpsview1。編集で先頭行が揺れるリスクは **全シーン共通**だが対象ファイルは 1 本に限定しやすい。
+
+今やるべきか:
+  ◎ **第 1 本番シーンへの適用先として最優先クラス**（preview と構造が近く、ホームより安全、ロスターより .tscn 中心で進めやすい）。
+
+
+5. 候補 B：ロスターへ限定適用
+--------------------------------------------------------------------------------
+利点:
+  - GM 体験の中核。表主体の本番化への **商品価値が最大級**。
+  - .tscn 内 StyleBoxFlat は **2 本のみ**（header, chip）。summary 用 SubResource が無く、カード類が薄い。
+
+欠点:
+  - 表本体は **GDScript で Label 行生成**し、**コード側で font_color / font_size を上書き**。Theme の Label 既定や Phase4TableCell を活かすには **.gd 変更がほぼ必須**。
+  - 行数・列数がデータ依存のため、**1280 での折り返し・高さ**の回帰テストが重い。
+
+触りそうなファイル:
+  - godot/scenes/roster_view.tscn（ルート theme + ヘッダ周りの override 整理）
+  - godot/scripts/roster_view.gd（動的ラベルの theme_type_variation 化 or override 削除）
+
+差分規模:
+  - .tscn 単体は小さくできるが、**見た目を変えるなら .gd 同梱が現実的** → 1 PR の表面積は A より大きくなりがち。
+
+安全性:
+  - ゲーム体験の要。表示崩れの **体感インパクトが大きい**。
+  - HeaderNavRow は .tscn 内にあり、Theme 適用で **意図せず Button 見た目が変わる**可能性（ルート theme が子 Button に伝播）。要確認。
+
+今やるべきか:
+  △ **技術的には第 2 候補**（A で Theme 運用を固めた後、表 + コードのセットで取り組む方が安全）。
+
+
+6. 候補 C：ホームへ限定適用
+--------------------------------------------------------------------------------
+利点:
+  - 商品の「顔」。90 年代 GM 風の高密度化の **最終的な主戦場**。
+  - StyleBoxFlat が **4 種**（card/header/warn/chip）とカード量が多く、Theme 正本化の **効果デモは最大**。
+
+欠点:
+  - **ノード数・override 数が最大**。HeaderNavRow + NavColumns + 多数カード。1 画面限定でも **差分・回帰の表面積が最大級**。
+  - 経営 3 ボタン・カード導線・ヘッダ 5 ボタンの **誤クリック領域・コントラスト**に波及しやすい。
+
+触りそうなファイル:
+  - godot/scenes/home_dashboard.tscn（主戦場）
+  - 必要なら godot/scripts/home_dashboard.gd（現状 Theme 系の動的生成は無し grep 確認）
+
+差分規模:
+  - 実質 **大**。第 1 回限定適用としては重すぎる見込み。
+
+安全性:
+  - 全サブ画面への入口のため、**見た目バグの影響範囲が最広**。
+
+今やるべきか:
+  × **第 1 回の限定適用先には非推奨**（A/B で手順を固めてから）。
+
+
+7. 候補 D：中規模画面（財務 / オーナーミッション / 施設等）へ限定適用
+--------------------------------------------------------------------------------
+利点:
+  - contract と **同型のヘッダ + 複数 summary カード**を持つ画面が多く（finance, owner_mission, tactics, facility…）、A と **同じ手順で機械的に適用**しやすい。
+  - ホームより独立度高い。
+
+欠点:
+  - 「なぜ契約人事より先に財務か」の **プロダクト理由は弱い**（検証手順の複製には向く）。
+
+候補画面:
+  - finance_summary_view.tscn / owner_mission_view.gd+tscn / facility_summary_view.tscn 等。
+
+安全性:
+  - A と同程度（単一サブ画面）。
+
+今やるべきか:
+  ○ **A と同列の「代替実験台」**（チーム分割で並行検証する用途）。単独プロダクトとしては A が自然。
+
+
+8. 候補 E：preview 改善のみ継続
+--------------------------------------------------------------------------------
+利点:
+  - **最も安全**。既存 10 画面に一切触れない。
+
+欠点:
+  - 本番シーンへの **前進が止まる**。
+
+今やるべきか:
+  △ 次のリリース前に **短期のみ**許容。中期的には A へ進むのがよい。
+
+
+9. Theme を root に適用した場合の効果見込み
+--------------------------------------------------------------------------------
+- Godot の Theme は子孫に伝播するが、**各ノードの `theme_override_*` は親 Theme より優先**される。
+- 現状の各 readonly シーンでは、PanelContainer に **`theme_override_styles/panel = SubResource("StyleBoxFlat_*")`** が明示されているケースが多い。
+  → ルートに `theme = ExtResource("phase4_readonly_core.tres")` を付けた **だけ**では、これらの Panel は **従来の SubResource の見た目のまま**の可能性が高い。
+- **効果が出やすいノード**: override を付けていない Label/Button、または override を削った後のノード。
+- **Phase4*** バリエーションは `theme_type_variation` を付与したノードにのみ適用される（Theme 定義済み）。
+
+
+10. 既存 StyleBoxFlat との衝突・差分リスク
+--------------------------------------------------------------------------------
+- **衝突というより「上書き優先」**: 同じ見た目を Theme に寄せるには、シーン側 SubResource 参照の **解除が必要**。
+- SubResource を削除する場合、**load_steps と SubResource ブロック全体**の整合を取る必要があり、.tscn の **構造 diff が読みにくくなる**リスク。
+- 段階戦略: (1) ext_resource + root theme のみ（見た目ほぼ据え置きで「配線確認」）→ (2) HeaderCard だけ variation + override 削除の **パイロット** → (3) 他 Panel へ展開。
+- Theme の PanelContainer 既定（summary）と既存 summary の StyleBox は **数値同一**のため、override 解除後も **見た目差分は小さく抑えられる**設計になっている（preview で確認済みの方向性）。
+
+
+11. script 変更が必要になりそうな箇所
+--------------------------------------------------------------------------------
+- **必須になりやすい**: roster_view.gd（動的 Label の色・サイズを Theme / variation に寄せる場合）。
+- **任意**: contract_personnel_summary_view.gd（動的行を Phase4TableCell に揃える場合。現状も `_style_cell` 的なヘルパで add_theme しており、Theme だけでは二重管理になりうる）。
+- **ほぼ不要**: home_dashboard.gd（grep で Label.new / add_theme 無し。主に .tscn の整理）。
+- finance_summary_view.gd / owner_mission_view.gd は動的 Label あり。**表・履歴を Theme 化するなら** contract と同様に .gd 触りうる。
+
+
+12. UID / scene 再シリアライズの注意点
+--------------------------------------------------------------------------------
+- 先頭 `[gd_scene load_steps=N format=3 uid="..."]` がエディタ保存で **load_steps 欠落・uid 再採番**される事例あり（ユーザー報告: theme_preview）。本番シーン編集時も同様の可能性。
+- 対策案: **手編集とエディタ保存の運用ルール**、レビューで先頭行を必ず確認、必要なら `git checkout --` で戻す。
+- ext_resource に Theme を足すと **load_steps インクリメント**が必要。数え違いでロード失敗しうるため、保存後に Godot で再オープン確認を推奨。
+
+
+13. 90 年代〜 PS1 / セガサターン風 GM 画面への効果
+--------------------------------------------------------------------------------
+- 第 1 回の 1 画面適用は **トーンの統一（暗色・カード・チップ）**が主効果。レトロ特有のパレット・枠・ロゴ密度は **まだ別工程**。
+- 契約人事・財務系は「表とカード」が多く、**将来のレトロ高密度 UI への橋**にはなりやすい。
+
+
+14. Steam 販売品質に向けた効果
+--------------------------------------------------------------------------------
+- 一画面でも **コントラスト・フォント階層の一貫性**を実データ上で検証できると、品質下限の引き上げに寄与。
+- ただし Steam 品質の本丸（入力・スケール・ローカライズ・ビルド）は **別軸**。
+
+
+15. Cursor としてのおすすめ順
+--------------------------------------------------------------------------------
+ 1. A（契約・人事サマリー）… 第 1 本番適用先として最適バランス
+ 2. D（財務 or オーナーミッション）… A と同手順の検証複製用
+ 3. B（ロスター）… A 成功後、.gd 込みで第 2 波
+ 4. C（ホーム）… 手順確立後の後期
+ 5. E（preview のみ）… 短期の保留用
+
+
+16. 今すぐ実装してよい最小案（1 本の PR 単位）
+--------------------------------------------------------------------------------
+**契約・人事サマリー（contract_personnel_summary_view.tscn）に限定し、(1) Theme の ext_resource + ルート Control の `theme` 割当のみ、または (2) さらに HeaderCard（HeaderTopRow を含む Panel）1 ブロックだけ `theme_type_variation = &"Phase4HeaderCard"` にし、当該 Panel の `theme_override_styles/panel` のみ削除（見た目は preview と整合するはず）。.gd は触らない。**
+
+→ (1) は差分極小だが見た目変化も極小（配線・ロード確認向け）。(2) は **効果が目視で分かり**、SubResource はまだ 2 本残せるため戻しやすい。
+
+
+17. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- ホームへの一発適用（候補 C のフル整理）。
+- 10 画面同時に SubResource 削除。
+- project.godot の global Theme 化（波及が読めないうちは避ける）。
+
+
+18. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- 第 1 回を **(1) 配線のみ**にするか **(2) ヘッダ 1 ブロックの見た目変更まで**含めるか。
+- contract で問題なければ、**finance / owner_mission を同じパッチパターンで機械展開するか**、**ロスターに早めに進むか**の優先順位。
+- 動的行の Typography を **Theme のみ**に寄せるか、**ui_style_constants.gd（別タスク）**と併用するか。
+
+
+19. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査では **reports/godot_phase4_theme_single_screen_application_survey_2026-05.txt の追加のみ**を行う予定（他ファイルは読取のみ）。
+godot/scenes / godot/scripts / godot/themes / project.godot / docs / README / Python / 生成 JSON / handoff ドキュメントは **未変更**。
+
+================================================================================
+EOF
+================================================================================
