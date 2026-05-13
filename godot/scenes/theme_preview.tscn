@@ -1,0 +1,225 @@
+[gd_scene load_steps=2 format=3 uid="uid://c9themepreview01"]
+
+[ext_resource type="Theme" uid="uid://c9phase4rocore01" path="res://themes/phase4_readonly_core.tres" id="1_theme"]
+
+[node name="ThemePreview" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("1_theme")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.06, 0.07, 0.09, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 12
+
+[node name="Scroll" type="ScrollContainer" parent="Margin"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4Title"
+text = "共通Theme / Style確認"
+
+[node name="PreviewNote" type="Label" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "これは既存10画面には未適用のpreviewです。"
+
+[node name="HeaderCard" type="PanelContainer" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4HeaderCard"
+
+[node name="HeaderInner" type="VBoxContainer" parent="Margin/Scroll/VBox/HeaderCard"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeaderTopRow" type="HBoxContainer" parent="Margin/Scroll/VBox/HeaderCard/HeaderInner"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ReadonlyBadge" type="PanelContainer" parent="Margin/Scroll/VBox/HeaderCard/HeaderInner/HeaderTopRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4ChipPanel"
+
+[node name="ReadonlyBadgeLabel" type="Label" parent="Margin/Scroll/VBox/HeaderCard/HeaderInner/HeaderTopRow/ReadonlyBadge"]
+layout_mode = 2
+theme_type_variation = &"Phase4TableHead"
+text = "読み取り専用"
+
+[node name="Spacer" type="Control" parent="Margin/Scroll/VBox/HeaderCard/HeaderInner/HeaderTopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DataSourceHint" type="Label" parent="Margin/Scroll/VBox/HeaderCard/HeaderInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4DataSource"
+text = "読込元: res://themes/phase4_readonly_core.tres（preview / 第0段）"
+
+[node name="HeaderCaption" type="Label" parent="Margin/Scroll/VBox/HeaderCard/HeaderInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "ヘッダーカード"
+
+[node name="SummaryCard" type="PanelContainer" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4SummaryCard"
+
+[node name="SummaryInner" type="MarginContainer" parent="Margin/Scroll/VBox/SummaryCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="SummaryCol" type="VBoxContainer" parent="Margin/Scroll/VBox/SummaryCard/SummaryInner"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SummaryTitle" type="Label" parent="Margin/Scroll/VBox/SummaryCard/SummaryInner/SummaryCol"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "サマリーカード"
+
+[node name="SummaryBody" type="Label" parent="Margin/Scroll/VBox/SummaryCard/SummaryInner/SummaryCol"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "既存の standings / finance 等で使っている summary 系 StyleBoxFlat に近い見た目です。"
+
+[node name="ChipRow" type="HBoxContainer" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ChipBadge" type="PanelContainer" parent="Margin/Scroll/VBox/ChipRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4ChipPanel"
+
+[node name="ChipLabel" type="Label" parent="Margin/Scroll/VBox/ChipRow/ChipBadge"]
+layout_mode = 2
+theme_type_variation = &"Phase4TableHead"
+text = "チップ / バッジ"
+
+[node name="ChipCaption" type="Label" parent="Margin/Scroll/VBox/ChipRow"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "小さな PanelContainer（chip 風）"
+
+[node name="ButtonRow" type="HBoxContainer" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SampleButton" type="Button" parent="Margin/Scroll/VBox/ButtonRow"]
+layout_mode = 2
+text = "ボタン見本"
+
+[node name="DisabledButton" type="Button" parent="Margin/Scroll/VBox/ButtonRow"]
+layout_mode = 2
+disabled = true
+text = "無効ボタン見本"
+
+[node name="WarningCard" type="PanelContainer" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4WarningCard"
+
+[node name="WarnInner" type="MarginContainer" parent="Margin/Scroll/VBox/WarningCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="WarnLabel" type="Label" parent="Margin/Scroll/VBox/WarningCard/WarnInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4NoteText"
+text = "注意カード（warning 系トーン。ホームの warn カードに近い色味）"
+
+[node name="TableCaption" type="Label" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "表風サンプル"
+
+[node name="TableHead" type="HBoxContainer" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Th1" type="Label" parent="Margin/Scroll/VBox/TableHead"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+theme_type_variation = &"Phase4TableHead"
+text = "POS"
+
+[node name="Th2" type="Label" parent="Margin/Scroll/VBox/TableHead"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Phase4TableHead"
+text = "名前"
+
+[node name="Th3" type="Label" parent="Margin/Scroll/VBox/TableHead"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_type_variation = &"Phase4TableHead"
+text = "年俸(例)"
+
+[node name="Th4" type="Label" parent="Margin/Scroll/VBox/TableHead"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+theme_type_variation = &"Phase4TableHead"
+text = "OVR"
+
+[node name="TableRow" type="HBoxContainer" parent="Margin/Scroll/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Td1" type="Label" parent="Margin/Scroll/VBox/TableRow"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+theme_type_variation = &"Phase4TableCell"
+text = "PG"
+
+[node name="Td2" type="Label" parent="Margin/Scroll/VBox/TableRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Phase4TableCell"
+text = "#12 プレビュー選手"
+
+[node name="Td3" type="Label" parent="Margin/Scroll/VBox/TableRow"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+theme_type_variation = &"Phase4TableCell"
+text = "1,200万"
+
+[node name="Td4" type="Label" parent="Margin/Scroll/VBox/TableRow"]
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+theme_type_variation = &"Phase4TableCell"
+text = "78"
