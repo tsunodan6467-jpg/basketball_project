@@ -270,7 +270,7 @@ text = "（ロスター構成）"
 [node name="CautionCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4WarningCard"
 
 [node name="CautionVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard"]
 layout_mode = 2
@@ -278,14 +278,14 @@ theme_override_constants/separation = 6
 
 [node name="CautionTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard/CautionVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.2, 0.12, 0.04, 1)
 theme_override_font_sizes/font_size = 16
 text = "注意"
 
 [node name="CautionCardBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard/CautionVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_colors/font_color = Color(0.48, 0.32, 0.12, 1)
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 text = "（注意）"
