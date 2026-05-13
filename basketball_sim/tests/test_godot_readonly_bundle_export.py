@@ -26,6 +26,7 @@ EXPECTED_JSON_NAMES: List[str] = [
     "finance_summary_from_python.json",
     "owner_mission_from_python.json",
     "tactics_summary_from_python.json",
+    "contract_personnel_summary_from_python.json",
 ]
 
 
@@ -51,9 +52,10 @@ def _minimal_save(path: Path) -> None:
 
 
 def test_expected_output_filenames_list() -> None:
-    assert len(EXPECTED_JSON_NAMES) == 9
+    assert len(EXPECTED_JSON_NAMES) == 10
     assert "home_dashboard_from_python.json" in EXPECTED_JSON_NAMES
     assert "tactics_summary_from_python.json" in EXPECTED_JSON_NAMES
+    assert "contract_personnel_summary_from_python.json" in EXPECTED_JSON_NAMES
 
 
 def test_bundle_result_contains_output_paths(tmp_path: Path) -> None:
@@ -61,7 +63,7 @@ def test_bundle_result_contains_output_paths(tmp_path: Path) -> None:
     out_dir = tmp_path / "out"
     _minimal_save(sav)
     result = export_godot_readonly_bundle(sav, out_dir)
-    assert result["success_count"] == 9
+    assert result["success_count"] == 10
     assert result["failed_count"] == 0
     assert Path(result["output_dir"]) == out_dir.resolve()
     keys = {e["key"] for e in result["succeeded"]}
@@ -75,12 +77,13 @@ def test_bundle_result_contains_output_paths(tmp_path: Path) -> None:
         "finance_summary",
         "owner_mission",
         "tactics_summary",
+        "contract_personnel_summary",
     }
     for name in EXPECTED_JSON_NAMES:
         assert (out_dir / name).is_file()
 
 
-def test_bundle_writes_nine_json_files_minimal_save(tmp_path: Path) -> None:
+def test_bundle_writes_ten_json_files_minimal_save(tmp_path: Path) -> None:
     sav = tmp_path / "m.sav"
     out_dir = tmp_path / "godot_data"
     _minimal_save(sav)
@@ -148,8 +151,9 @@ def test_continue_on_error_records_and_continues(monkeypatch: pytest.MonkeyPatch
     _minimal_save(sav)
     result = export_godot_readonly_bundle(sav, out_dir, continue_on_error=True)
     assert result["failed_count"] == 1
-    assert result["success_count"] == 8
+    assert result["success_count"] == 9
     assert (out_dir / "tactics_summary_from_python.json").is_file()
+    assert (out_dir / "contract_personnel_summary_from_python.json").is_file()
     assert not (out_dir / "roster_from_python.json").exists()
 
 
@@ -177,7 +181,7 @@ def test_cli_main_prints_wrote_and_bundle_complete(capsys: pytest.CaptureFixture
     assert code == 0
     out = capsys.readouterr().out
     assert "Wrote" in out
-    assert "Bundle complete: 9 succeeded, 0 failed" in out
+    assert "Bundle complete: 10 succeeded, 0 failed" in out
 
 
 def test_cli_nonzero_when_bundle_has_failures(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -235,9 +239,11 @@ def test_max_upcoming_schedule(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 def test_max_missions_and_max_players_passed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     m_m: Dict[str, Any] = {}
     m_p: Dict[str, Any] = {}
+    m_c: Dict[str, Any] = {}
 
     real_o = godot_readonly_bundle.export_owner_mission_json_from_world
     real_t = godot_readonly_bundle.export_tactics_summary_json_from_world
+    real_c = godot_readonly_bundle.export_contract_personnel_summary_json_from_world
 
     def _wo(save: Path | str, op: Path | str, *, max_missions: int = 8) -> Dict[str, Any]:
         m_m["v"] = max_missions
@@ -247,10 +253,16 @@ def test_max_missions_and_max_players_passed(monkeypatch: pytest.MonkeyPatch, tm
         m_p["v"] = max_players
         return real_t(save, op, max_players=max_players)
 
+    def _wc(save: Path | str, op: Path | str, *, max_players: int = 8) -> Dict[str, Any]:
+        m_c["v"] = max_players
+        return real_c(save, op, max_players=max_players)
+
     monkeypatch.setattr(godot_readonly_bundle, "export_owner_mission_json_from_world", _wo)
     monkeypatch.setattr(godot_readonly_bundle, "export_tactics_summary_json_from_world", _wt)
+    monkeypatch.setattr(godot_readonly_bundle, "export_contract_personnel_summary_json_from_world", _wc)
     sav = tmp_path / "m.sav"
     _minimal_save(sav)
     export_godot_readonly_bundle(sav, tmp_path / "mpout", max_missions=3, max_players=4)
     assert m_m.get("v") == 3
     assert m_p.get("v") == 4
+    assert m_c.get("v") == 4
