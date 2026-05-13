@@ -199,7 +199,7 @@ text = "データ読込に失敗しました"
 [node name="Scroll" type="ScrollContainer" parent="Margin/RootCol"]
 layout_mode = 2
 size_flags_vertical = 3
-custom_minimum_size = Vector2(0, 120)
+custom_minimum_size = Vector2(0, 128)
 horizontal_scroll_mode = 0
 vertical_scroll_mode = 1
 
@@ -214,7 +214,7 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_card")
 
 [node name="VBoxNav" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardNavMenu"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 10
 
 [node name="NavTitle" type="Label" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav"]
 layout_mode = 2
@@ -231,12 +231,12 @@ text = "読み取り専用の各画面へ移動します。進行・保存・編
 
 [node name="NavColumns" type="HBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 14
 
 [node name="ColTeam" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
 [node name="CatTeam" type="Label" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColTeam"]
 layout_mode = 2
@@ -246,18 +246,22 @@ text = "チーム"
 
 [node name="MenuCardRosterButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColTeam"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "ロスター"
 tooltip_text = "ロスター閲覧へ別画面切替（読み取り専用）。進行・保存・契約・編成・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
 [node name="MenuCardTacticsSummaryButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColTeam"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "戦術サマリー"
 tooltip_text = "戦術・ローテーションサマリー閲覧へ別画面切替（読み取り専用）。進行・保存・編集・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
 [node name="ColLeague" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
 [node name="CatLeague" type="Label" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColLeague"]
 layout_mode = 2
@@ -267,18 +271,22 @@ text = "リーグ"
 
 [node name="MenuCardStandingsButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColLeague"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "順位表"
 tooltip_text = "順位表閲覧へ別画面切替（読み取り専用）。進行・保存・編集・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
 [node name="MenuCardScheduleButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColLeague"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "日程"
 tooltip_text = "日程閲覧へ別画面切替（読み取り専用）。進行・保存・編集・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
 [node name="ColClub" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
 [node name="CatClub" type="Label" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColClub"]
 layout_mode = 2
@@ -288,18 +296,22 @@ text = "クラブ"
 
 [node name="MenuCardClubHistoryButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColClub"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "クラブ史"
 tooltip_text = "クラブ史閲覧へ別画面切替（読み取り専用）。進行・保存・編集・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
 [node name="MenuCardFacilityButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColClub"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "施設"
 tooltip_text = "施設サマリー閲覧へ別画面切替（読み取り専用）。進行・保存・編集・施設投資・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
 [node name="ColMgmt" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
 [node name="CatMgmt" type="Label" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColMgmt"]
 layout_mode = 2
@@ -309,11 +321,15 @@ text = "経営"
 
 [node name="MenuCardFinanceSummaryButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColMgmt"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "財務サマリー"
 tooltip_text = "財務サマリー閲覧へ別画面切替（読み取り専用）。進行・保存・編集・予算変更・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
 [node name="MenuCardOwnerMissionButton" type="Button" parent="Margin/RootCol/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColMgmt"]
 layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 36)
 text = "オーナーミッション"
 tooltip_text = "オーナーミッション閲覧へ別画面切替（読み取り専用）。オーナー信頼、今季目標、クラブ評価を確認します。進行・保存・編集・Python自動起動は行いません。戻るは「ホームへ戻る（表示のみ）」。"
 
