@@ -1,0 +1,306 @@
+[gd_scene load_steps=4 format=3 uid="uid://c8contractpsview1"]
+
+[ext_resource type="Script" path="res://scripts/contract_personnel_summary_view.gd" id="1_script"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header"]
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
+bg_color = Color(0.09, 0.1, 0.13, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.26, 0.32, 0.4, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chip"]
+content_margin_left = 10.0
+content_margin_top = 6.0
+content_margin_right = 10.0
+content_margin_bottom = 6.0
+bg_color = Color(0.14, 0.16, 0.2, 0.85)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.38, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_summary"]
+content_margin_left = 14.0
+content_margin_top = 12.0
+content_margin_right = 14.0
+content_margin_bottom = 12.0
+bg_color = Color(0.118, 0.133, 0.169, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.22, 0.26, 0.32, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="ContractPersonnelSummaryView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.06, 0.07, 0.09, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 12
+
+[node name="RootCol" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderCard" type="PanelContainer" parent="Margin/RootCol"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_header")
+
+[node name="HeaderInner" type="VBoxContainer" parent="Margin/RootCol/HeaderCard"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HeaderTopRow" type="HBoxContainer" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ReadonlyBadge" type="PanelContainer" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_chip")
+
+[node name="ReadonlyBadgeLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow/ReadonlyBadge"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.78, 0.88, 1)
+theme_override_font_sizes/font_size = 11
+text = "読み取り専用"
+
+[node name="ModeStrip" type="PanelContainer" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_chip")
+
+[node name="ModeStripLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow/ModeStrip"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.6, 0.68, 1)
+theme_override_font_sizes/font_size = 11
+text = "契約・人事サマリー閲覧（mock 単独シーン確認）"
+
+[node name="BackStubButton" type="Button" parent="Margin/RootCol/HeaderCard/HeaderInner/HeaderTopRow"]
+layout_mode = 2
+disabled = true
+text = "戻る（未接続）"
+tooltip_text = "ホームへの遷移は未接続です。このシーンは mock JSON の表示確認のみです。"
+
+[node name="ScreenTitleLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_font_sizes/font_size = 22
+text = "（画面タイトル）"
+
+[node name="TeamNameLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 20
+text = "（チーム名）"
+
+[node name="LeagueMetaLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.76, 0.84, 1)
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 2
+text = "（クラブ / D）"
+
+[node name="ReadonlyStripLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 2
+text = "読み取り専用表示"
+
+[node name="DataSourceLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.52, 0.58, 0.66, 1)
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 2
+text = ""
+
+[node name="StatusLabel" type="Label" parent="Margin/RootCol"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.52, 0.48, 1)
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 2
+text = "契約・人事情報を読み込めませんでした。"
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/RootCol"]
+layout_mode = 2
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 380)
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+
+[node name="ScrollContent" type="VBoxContainer" parent="Margin/RootCol/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="ContractCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+
+[node name="ContractVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/ContractCard"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ContractTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/ContractCard/ContractVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_font_sizes/font_size = 16
+text = "契約概要"
+
+[node name="ContractCardBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/ContractCard/ContractVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = "（契約概要）"
+
+[node name="RiskCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+
+[node name="RiskVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/RiskCard"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RiskTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/RiskCard/RiskVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_font_sizes/font_size = 16
+text = "人事リスク（簡易目安）"
+
+[node name="RiskHint" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/RiskCard/RiskVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 2
+text = "以下は表示用の簡易判定です。厳密な契約査定や市場シミュレーションは含みません。"
+
+[node name="RiskRows" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/RiskCard/RiskVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="PlayersCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+
+[node name="PlayersVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/PlayersCard"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PlayersTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/PlayersCard/PlayersVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_font_sizes/font_size = 16
+text = "主要契約選手"
+
+[node name="PlayerRows" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/PlayersCard/PlayersVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="BalanceCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+
+[node name="BalanceVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/BalanceCard"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BalanceTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/BalanceCard/BalanceVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_font_sizes/font_size = 16
+text = "ロスター構成"
+
+[node name="BalanceCardBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/BalanceCard/BalanceVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = "（ロスター構成）"
+
+[node name="CautionCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+
+[node name="CautionVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CautionTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard/CautionVBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_font_sizes/font_size = 16
+text = "注意"
+
+[node name="CautionCardBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard/CautionVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 2
+text = "（注意）"

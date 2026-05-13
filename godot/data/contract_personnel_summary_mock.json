@@ -1,0 +1,445 @@
+{
+  "screen_title": "契約・人事サマリー（閲覧）",
+  "team_name": "dlasjfasfjd2",
+  "league_level": 1,
+  "summary": {
+    "roster_count": 12,
+    "salary_total": 918880500,
+    "salary_total_label": "9億1800万円",
+    "salary_cap": 1200000000,
+    "salary_cap_label": "12億円",
+    "salary_cap_room": 281119500,
+    "salary_cap_room_label": "+2億8100万円",
+    "average_salary": 76573375,
+    "average_salary_label": "7600万円",
+    "max_salary": 99125000,
+    "max_salary_label": "9900万円",
+    "expiring_contract_count": 3,
+    "fa_candidate_count": 0,
+    "high_salary_count": 0,
+    "rookie_contract_count": 0,
+    "veteran_contract_count": 2,
+    "foreign_player_count": 0,
+    "asian_player_count": 0,
+    "naturalized_player_count": 0,
+    "domestic_player_count": 12,
+    "has_contract_data": true,
+    "has_salary_data": true,
+    "season_count": 2,
+    "at_annual_menu": true
+  },
+  "contract_items": [
+    {
+      "key": "roster_count",
+      "label": "ロスター人数",
+      "value": 12,
+      "display_value": "12",
+      "memo": ""
+    },
+    {
+      "key": "salary_total",
+      "label": "年俸合計",
+      "value": 918880500,
+      "display_value": "9億1800万円",
+      "memo": ""
+    },
+    {
+      "key": "salary_cap",
+      "label": "サラリーキャップ",
+      "value": 1200000000,
+      "display_value": "12億円",
+      "memo": ""
+    },
+    {
+      "key": "salary_cap_room",
+      "label": "サラリー余力",
+      "value": 281119500,
+      "display_value": "+2億8100万円",
+      "memo": ""
+    },
+    {
+      "key": "average_salary",
+      "label": "平均年俸",
+      "value": 76573375,
+      "display_value": "7600万円",
+      "memo": ""
+    },
+    {
+      "key": "max_salary",
+      "label": "最高年俸",
+      "value": 99125000,
+      "display_value": "9900万円",
+      "memo": ""
+    },
+    {
+      "key": "expiring_contracts",
+      "label": "契約満了予定",
+      "value": 3,
+      "display_value": "3名（残契約1年以内の目安）",
+      "memo": ""
+    },
+    {
+      "key": "fa_shortlist",
+      "label": "FA予備軍",
+      "value": 0,
+      "display_value": "0件（fa_shortlist 件数）",
+      "memo": ""
+    },
+    {
+      "key": "high_salary_players",
+      "label": "高年俸選手数",
+      "value": 0,
+      "display_value": "0名（平均の1.3倍以上の目安）",
+      "memo": ""
+    },
+    {
+      "key": "contract_data_status",
+      "label": "契約データ",
+      "value": "ok",
+      "display_value": "接続済み",
+      "memo": ""
+    }
+  ],
+  "risk_items": [
+    {
+      "key": "expiring_contract_risk",
+      "label": "満了リスク",
+      "value": 3,
+      "display_value": "3名（残契約1年以内の目安）",
+      "severity": "warn",
+      "memo": "contract_years_left が 0〜1 の選手数による簡易目安。"
+    },
+    {
+      "key": "high_salary_skew",
+      "label": "高年俸偏重リスク",
+      "value": 0,
+      "display_value": "0名（平均年俸の1.3倍以上の目安）",
+      "severity": "info",
+      "memo": "平均年俸が取れない場合は件数0扱い。簡易目安。"
+    },
+    {
+      "key": "position_skew",
+      "label": "ポジション偏り",
+      "value": 2,
+      "display_value": "最大−最小=2",
+      "severity": "info",
+      "memo": "各ポジション人数の差による簡易目安。"
+    },
+    {
+      "key": "foreign_slot_pressure",
+      "label": "外国籍枠の偏り",
+      "value": 0,
+      "display_value": "外国籍ラベル: 0名",
+      "severity": "info",
+      "memo": "登録ルールの上限とは照合していない簡易目安。"
+    },
+    {
+      "key": "youth_shortage",
+      "label": "若手不足",
+      "value": 4,
+      "display_value": "U23相当: 4名",
+      "severity": "info",
+      "memo": "年齢22以下をU23相当。簡易目安。"
+    },
+    {
+      "key": "veteran_heavy",
+      "label": "ベテラン偏重",
+      "value": 2,
+      "display_value": "30歳以上: 2名",
+      "severity": "info",
+      "memo": "年齢30以上の人数。簡易目安。"
+    },
+    {
+      "key": "salary_cap_room_shortage",
+      "label": "サラリー余力不足",
+      "value": 281119500,
+      "display_value": "+2億8100万円",
+      "severity": "info",
+      "memo": "ソフトキャップ−年俸合計。取得できない場合は未接続表示。簡易目安。"
+    }
+  ],
+  "player_contract_rows": [
+    {
+      "order": 1,
+      "player_name": "Fictional_762",
+      "position": "PF",
+      "age": 29,
+      "overall": 77,
+      "potential": "C",
+      "salary": 99125000,
+      "salary_label": "9900万円",
+      "contract_years": 2,
+      "contract_years_label": "残り2年",
+      "contract_status": "known",
+      "contract_status_label": "契約残あり",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": false,
+      "fa_flag_label": "-",
+      "risk_label": "-",
+      "memo": "-"
+    },
+    {
+      "order": 2,
+      "player_name": "Fictional_701",
+      "position": "C",
+      "age": 27,
+      "overall": 75,
+      "potential": "B",
+      "salary": 85200000,
+      "salary_label": "8500万円",
+      "contract_years": 1,
+      "contract_years_label": "残り1年",
+      "contract_status": "known",
+      "contract_status_label": "契約残あり",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": true,
+      "fa_flag_label": "満了近い",
+      "risk_label": "契約満了近辺",
+      "memo": "-"
+    },
+    {
+      "order": 3,
+      "player_name": "Fictional_655",
+      "position": "SF",
+      "age": 26,
+      "overall": 72,
+      "potential": "B",
+      "salary": 72000000,
+      "salary_label": "7200万円",
+      "contract_years": 2,
+      "contract_years_label": "残り2年",
+      "contract_status": "known",
+      "contract_status_label": "契約残あり",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": false,
+      "fa_flag_label": "-",
+      "risk_label": "-",
+      "memo": "-"
+    },
+    {
+      "order": 4,
+      "player_name": "Fictional_612",
+      "position": "SG",
+      "age": 24,
+      "overall": 70,
+      "potential": "C",
+      "salary": 61000000,
+      "salary_label": "6100万円",
+      "contract_years": 3,
+      "contract_years_label": "残り3年",
+      "contract_status": "known",
+      "contract_status_label": "契約残あり",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": false,
+      "fa_flag_label": "-",
+      "risk_label": "-",
+      "memo": "-"
+    },
+    {
+      "order": 5,
+      "player_name": "Fictional_588",
+      "position": "PG",
+      "age": 23,
+      "overall": 68,
+      "potential": "B",
+      "salary": 48000000,
+      "salary_label": "4800万円",
+      "contract_years": 2,
+      "contract_years_label": "残り2年",
+      "contract_status": "known",
+      "contract_status_label": "契約残あり",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": false,
+      "fa_flag_label": "-",
+      "risk_label": "-",
+      "memo": "-"
+    },
+    {
+      "order": 6,
+      "player_name": "Fictional_540",
+      "position": "PF",
+      "age": 31,
+      "overall": 66,
+      "potential": "C",
+      "salary": 39500000,
+      "salary_label": "3950万円",
+      "contract_years": 0,
+      "contract_years_label": "満了シーズン",
+      "contract_status": "known",
+      "contract_status_label": "満了シーズン",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": true,
+      "fa_flag_label": "満了近い",
+      "risk_label": "契約満了近辺",
+      "memo": "-"
+    },
+    {
+      "order": 7,
+      "player_name": "Fictional_503",
+      "position": "SF",
+      "age": 22,
+      "overall": 64,
+      "potential": "A",
+      "salary": 28000000,
+      "salary_label": "2800万円",
+      "contract_years": 1,
+      "contract_years_label": "残り1年",
+      "contract_status": "known",
+      "contract_status_label": "契約残あり",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": true,
+      "fa_flag_label": "満了近い",
+      "risk_label": "契約満了近辺",
+      "memo": "-"
+    },
+    {
+      "order": 8,
+      "player_name": "Fictional_477",
+      "position": "C",
+      "age": 21,
+      "overall": 62,
+      "potential": "B",
+      "salary": 15500000,
+      "salary_label": "1550万円",
+      "contract_years": 4,
+      "contract_years_label": "残り4年",
+      "contract_status": "known",
+      "contract_status_label": "契約残あり",
+      "nationality_slot": "日本",
+      "nationality_slot_label": "日本",
+      "fa_flag": false,
+      "fa_flag_label": "-",
+      "risk_label": "-",
+      "memo": "-"
+    }
+  ],
+  "roster_balance_items": [
+    {
+      "key": "pg_count",
+      "label": "PG人数",
+      "value": 2,
+      "display_value": "2",
+      "memo": "ポジションはロスター表記に基づく簡易集計。"
+    },
+    {
+      "key": "sg_count",
+      "label": "SG人数",
+      "value": 2,
+      "display_value": "2",
+      "memo": ""
+    },
+    {
+      "key": "sf_count",
+      "label": "SF人数",
+      "value": 3,
+      "display_value": "3",
+      "memo": ""
+    },
+    {
+      "key": "pf_count",
+      "label": "PF人数",
+      "value": 2,
+      "display_value": "2",
+      "memo": ""
+    },
+    {
+      "key": "c_count",
+      "label": "C人数",
+      "value": 3,
+      "display_value": "3",
+      "memo": ""
+    },
+    {
+      "key": "u23_count",
+      "label": "U23人数",
+      "value": 4,
+      "display_value": "4",
+      "memo": "年齢22以下をU23相当として数える簡易目安。"
+    },
+    {
+      "key": "age30_plus_count",
+      "label": "30歳以上人数",
+      "value": 2,
+      "display_value": "2",
+      "memo": ""
+    },
+    {
+      "key": "foreign_player_count",
+      "label": "外国籍選手数",
+      "value": 0,
+      "display_value": "0",
+      "memo": ""
+    },
+    {
+      "key": "asian_slot_estimate",
+      "label": "アジア枠（概算）",
+      "value": 0,
+      "display_value": "0",
+      "memo": ""
+    },
+    {
+      "key": "naturalized_player_count",
+      "label": "帰化枠",
+      "value": 0,
+      "display_value": "0",
+      "memo": ""
+    },
+    {
+      "key": "domestic_player_count",
+      "label": "国内選手数",
+      "value": 12,
+      "display_value": "12",
+      "memo": ""
+    }
+  ],
+  "sections": [
+    {
+      "title": "契約概要",
+      "lines": [
+        "クラブ: dlasjfasfjd2",
+        "セーブ上のシーズン回数: 2 / 年度メニュー直後のセーブの可能性があります。",
+        "ロスター人数: 12名",
+        "年俸合計: 9億1800万円",
+        "サラリー上限: 12億円",
+        "サラリー余力: +2億8100万円",
+        "契約満了近辺（目安）: 3名"
+      ]
+    },
+    {
+      "title": "人事リスク",
+      "lines": [
+        "3名（残契約1年以内の目安）（満了リスク）",
+        "0名（平均年俸の1.3倍以上の目安）（高年俸偏重リスク）"
+      ]
+    },
+    {
+      "title": "主要契約選手",
+      "lines": [
+        "1. Fictional_762 PF 年俸:9900万円 契約:残り2年"
+      ]
+    },
+    {
+      "title": "ロスター構成",
+      "lines": [
+        "PG人数: 2",
+        "SG人数: 2"
+      ]
+    },
+    {
+      "title": "注意",
+      "lines": [
+        "読み取り専用。契約更新・交渉・獲得・解雇・FA操作などの操作は含みません。"
+      ]
+    }
+  ],
+  "notes": [
+    "読み取り専用。契約更新・交渉・獲得・解雇・FA操作などの操作は含みません。"
+  ]
+}
