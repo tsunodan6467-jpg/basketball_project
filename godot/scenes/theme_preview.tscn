@@ -46,12 +46,12 @@ theme_override_constants/separation = 16
 
 [node name="Title" type="Label" parent="Margin/Scroll/VBox"]
 layout_mode = 2
-theme_type_variation = &"Phase4Title"
+theme_type_variation = &"Phase4OnDarkTitle"
 text = "共通Theme / Style確認"
 
 [node name="PreviewNote" type="Label" parent="Margin/Scroll/VBox"]
 layout_mode = 2
-theme_type_variation = &"Phase4Muted"
+theme_type_variation = &"Phase4OnDarkMuted"
 text = "これは既存10画面には未適用のpreviewです。"
 
 [node name="HeaderCard" type="PanelContainer" parent="Margin/Scroll/VBox"]
@@ -165,7 +165,7 @@ text = "注意カード（warning 系トーン。ホームの warn カードに�
 
 [node name="TableCaption" type="Label" parent="Margin/Scroll/VBox"]
 layout_mode = 2
-theme_type_variation = &"Phase4Subtitle"
+theme_type_variation = &"Phase4OnDarkSubtitle"
 text = "表風サンプル"
 
 [node name="TableHead" type="HBoxContainer" parent="Margin/Scroll/VBox"]
@@ -175,25 +175,25 @@ theme_override_constants/separation = 12
 [node name="Th1" type="Label" parent="Margin/Scroll/VBox/TableHead"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
-theme_type_variation = &"Phase4TableHead"
+theme_type_variation = &"Phase4OnDarkTableHead"
 text = "POS"
 
 [node name="Th2" type="Label" parent="Margin/Scroll/VBox/TableHead"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_type_variation = &"Phase4TableHead"
+theme_type_variation = &"Phase4OnDarkTableHead"
 text = "名前"
 
 [node name="Th3" type="Label" parent="Margin/Scroll/VBox/TableHead"]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-theme_type_variation = &"Phase4TableHead"
+theme_type_variation = &"Phase4OnDarkTableHead"
 text = "年俸(例)"
 
 [node name="Th4" type="Label" parent="Margin/Scroll/VBox/TableHead"]
 custom_minimum_size = Vector2(48, 0)
 layout_mode = 2
-theme_type_variation = &"Phase4TableHead"
+theme_type_variation = &"Phase4OnDarkTableHead"
 text = "OVR"
 
 [node name="TableRow" type="HBoxContainer" parent="Margin/Scroll/VBox"]
@@ -203,23 +203,23 @@ theme_override_constants/separation = 12
 [node name="Td1" type="Label" parent="Margin/Scroll/VBox/TableRow"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
-theme_type_variation = &"Phase4TableCell"
+theme_type_variation = &"Phase4OnDarkTableCell"
 text = "PG"
 
 [node name="Td2" type="Label" parent="Margin/Scroll/VBox/TableRow"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_type_variation = &"Phase4TableCell"
+theme_type_variation = &"Phase4OnDarkTableCell"
 text = "#12 プレビュー選手"
 
 [node name="Td3" type="Label" parent="Margin/Scroll/VBox/TableRow"]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-theme_type_variation = &"Phase4TableCell"
+theme_type_variation = &"Phase4OnDarkTableCell"
 text = "1,200万"
 
 [node name="Td4" type="Label" parent="Margin/Scroll/VBox/TableRow"]
 custom_minimum_size = Vector2(48, 0)
 layout_mode = 2
-theme_type_variation = &"Phase4TableCell"
+theme_type_variation = &"Phase4OnDarkTableCell"
 text = "78"
