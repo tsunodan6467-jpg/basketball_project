@@ -115,21 +115,21 @@ tooltip_text = "ホーム画面へ表示切替します。保存・進行・編�
 [node name="ScreenTitleLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 22
 text = "（画面タイトル）"
 
 [node name="TeamNameLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.9, 0.95, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 20
 text = "（チーム名）"
 
 [node name="LeagueMetaLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.76, 0.84, 1)
+theme_override_colors/font_color = Color(0.2, 0.25, 0.36, 1)
 theme_override_font_sizes/font_size = 14
 autowrap_mode = 2
 text = "（クラブ / D）"
@@ -137,7 +137,7 @@ text = "（クラブ / D）"
 [node name="ReadonlyStripLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.2, 0.25, 0.36, 1)
 theme_override_font_sizes/font_size = 12
 autowrap_mode = 2
 text = "読み取り専用表示"
@@ -145,7 +145,7 @@ text = "読み取り専用表示"
 [node name="DataSourceLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.52, 0.58, 0.66, 1)
+theme_override_colors/font_color = Color(0.18, 0.28, 0.55, 1)
 theme_override_font_sizes/font_size = 12
 autowrap_mode = 2
 text = ""
