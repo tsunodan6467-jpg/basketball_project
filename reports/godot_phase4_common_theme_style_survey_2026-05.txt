@@ -1,0 +1,232 @@
+================================================================================
+Godot 共通 Theme / Style 正本化の最小安全実装案（調査のみ・Phase 4）
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11
+Git HEAD: 408474b（直前の節目: Godot本番GUI一本化の現状を調査）
+調査対象: godot/scenes/*.tscn, godot/scripts/*.gd, godot/project.godot（Theme有無の確認）
+備考: 本調査ではファイルを変更していない。現存の .tres / .theme は godot 配下に 0 件（glob 確認済み）。
+
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 読み取り専用 10 画面 + ホームが JSON 駆動で稼働。from_python 優先 + mock フォールバック。
+- 本番 GUI 一本化の棚卸し（reports/godot_phase4_production_gui_unification_survey_2026-05.txt）で、
+  「UI 共通化の下地（A）＋ Theme/Style 正本化（D）を短い反復で先行」が推奨とされた。
+- 左サイド全面化・全シーン一括差し替え・Godot から Python 一括実行・過度な動的 UI 一本化は避ける方針。
+
+
+3. 現在の10画面と Style / Theme 状況
+--------------------------------------------------------------------------------
+【共通】
+- プロジェクト全体に Theme リソース（.tres / .theme）の登録は無し（project.godot に theme 設定なし）。
+- 各 .tscn は SubResource として StyleBoxFlat を **シーン内埋め込み**。Panel の theme_override_styles/panel で参照。
+- Label / Button は個別に theme_override_colors / theme_override_font_sizes が大量に付与されている画面が多い。
+- 動的生成 Label には .gd 側で add_theme_*_override が散在（roster, standings, club_history, schedule, facility, finance, owner_mission, tactics, contract 等）。
+
+【StyleBoxFlat 個数（sub_resource 行の数・調査時）】
+  home_dashboard.tscn              … 4（card, header, warn, chip）
+  roster_view.tscn                 … 2（header, chip）※本文カード用 summary 無し
+  club_history, standings, facility, finance, owner_mission, tactics, contract … 各 3（header, chip, summary）
+  schedule_view.tscn               … 4（header, chip, summary, nextgame）
+
+【Theme キーワード】
+- scenes: Theme 型の sub_resource や theme = ExtResource は未使用。
+- scripts: add_theme_color_override / add_theme_font_size_override / add_theme_constant_override のみ（Control のローカル上書き）。
+
+
+4. StyleBoxFlat / 色 / 余白 / フォントの重複状況
+--------------------------------------------------------------------------------
+【StyleBoxFlat の重複】
+- 「header」「chip」「summary」の **数値ブロックは多くのシーンで同一または極めて近い**。
+  例: standings_view.tscn と roster_view.tscn の header+chip は行レベルで一致（roster は summary 未定義）。
+- home の StyleBoxFlat_card は、他画面の StyleBoxFlat_summary と **同じ bg_color / border / corner_radius 系**（0.118, 0.133, 0.169 等）で **実質同一カテゴリの別名**。
+- **例外**: schedule_view の header/chip/summary は content_margin の数値が他画面と **微妙に異なる**（header top 18 / bottom 10、chip 5px、summary 12×8 など）。外部化する際は「schedule 専用バリアント」か「schedule を標準に合わせて揃える」判断が必要。
+
+【Root Margin】
+- 多数の画面で MarginContainer: left 20 / top 16 / right 20 / bottom 12、RootCol separation 12 が一致。
+
+【フォント・色（.tscn の theme_override）】
+- バッジ Label: font_size 11、font_color (0.72, 0.78, 0.88) 等が繰り返し出現。
+- 画面タイトル: font_size 22 前後、副題 20、以降 14/12/11 の階層が似たパターン。
+- home_dashboard のみメイン見出し font_size 24 や本文 17 など **一部サイズが他画面とズレる**箇所あり（意図的か要確認）。
+
+【.gd 側の色・サイズ】
+- 表形式・可変行の画面で Color リテラルと font_size が重複（standings / club_history / roster 等）。
+- Theme 化しても **動的ラベルには別途** Font/Color の適用方針（Theme の型項目 vs コード定数）が要る。
+
+
+5. 共通化しやすいUI部品
+--------------------------------------------------------------------------------
+- StyleBoxFlat_header / chip / summary（および home の card）: **外部 .tres 1～3ファイル**にまとめる候補が最も明確。
+- Root の Margin 20/16/20/12 と Background ColorRect (0.06,0.07,0.09): 将来は親シーンまたは Theme のデフォルト化しやすい。
+- ReadonlyBadge + ModeStrip + HomeNavButton を載せる HeaderTopRow ブロック: レイアウトは似ているが **HeaderNavRow の有無で2系統**（前回棚卸し参照）— Style の正本化とは別に scene テンプレ化の候補。
+- DataSourceLabel（%）: 色は Label タイプの Theme で揃え可能（シーンの override 削減）。
+
+
+6. 共通化すると危険な部分
+--------------------------------------------------------------------------------
+- 動的 Label（Label.new + add_theme_*）: Theme のデフォルトとコード override の **二重管理**になりやすい。
+- schedule の nextgame 用 StyleBoxFlat、home の warn 用: **画面固有**のため無理に1スタイルに統合すると情報設計が損なわれる。
+- HomeDashboard の NavColumns（4 カテゴリ・多数ボタン）: 1テーマ変更で **触れ幅が広い**。小さく刻むならカード Panel のみに限定。
+- Header 構造が異なるシーン間で「同じ PackedScene」を押し付けるとシグナルパスが壊れやすい（Style 共通化とは独立リスク）。
+
+
+7. 候補A：共通 Theme リソースを新規作成（例 app_theme.tres）
+--------------------------------------------------------------------------------
+利点:
+  - Label / Button / Panel のデフォルトを一括で寄せられる。将来の本番トーン移行に直結。
+欠点:
+  - Theme の適用範囲を誤ると、**意図しないノードまで**フォント・色が変わる。既存の per-node override との優先順位整理が大きい。
+  - Godot 4.x の Theme エディタ運用・差分レビューの学習コスト。
+リスク:
+  - 中〜高（全画面一括適用時）。**1画面＋限定タイプ項目**なら中程度まで下げられる。
+触りそうなファイル:
+  - 新規 .tres、適用する各 .tscn（root に theme 設定）、必要なら project.godot（推奨はせずルート Control のみ）。
+今やるべきか:
+  △ 正しいが、**最初からフル Theme で全部**は避ける。**Panel/Label の少数項目だけ**に絞れば ◎。
+
+
+8. 候補B：共通 StyleBox リソースを新規作成（例 header_style.tres）
+--------------------------------------------------------------------------------
+利点:
+  - 現状の重複（header/chip/summary）に **ピンポイント**。既存ノード構造を変えず `theme_override_styles/panel = ExtResource(...)` に差し替えるだけで済む画面が多い。
+  - UID は主に .tscn と .tres の間の ext_resource で管理。ロジック（.gd）は触らずに済みやすい。
+欠点:
+  - シーンごとに SubResource id が消え、**差分行数は各 .tscn で発生**（10+ ファイル）。ただし機械的でレビューはしやすい。
+  - schedule の margin 差分など、**バリアント数**の設計が必要。
+リスク:
+  - 低〜中。エディタ再保存でプロパティ順が変わる程度（既存リスクと同種）。
+触りそうなファイル:
+  - 新規 godot/themes/*.tres（複数または1ファイル内に複数 StyleBox）、各対象 .tscn。
+今やるべきか:
+  ◎ **最もコストパフォーマンスが良い主役候補**（正本化の核）。
+
+
+9. 候補C：共通 GDScript 定数ファイル（ui_style_constants.gd）
+--------------------------------------------------------------------------------
+利点:
+  - 新規 .gd のみ、**シーン再シリアライズをほぼ誘発しない**。revert が容易。
+欠点:
+  - **見た目の統一効果は限定的**（動的ラベルや既存 override を手で置き換えない限り .tscn は変わらない）。
+  - autoload 化しないと各スクリプトからの参照パターンがバラける。
+リスク:
+  - 低。
+触りそうなファイル:
+  - godot/scripts/ui_style_constants.gd（+ 段階的に各 .gd の Color リテラルを置換）。
+今やるべきか:
+  ○ B/D と並行の **第0段**、または動的 UI が多い画面の **コード側整理**に向く。
+
+
+10. 候補D：ホーム1画面だけに限定して Theme / Style を試す
+--------------------------------------------------------------------------------
+利点:
+  - 商品価値の中心。成功体験を他へ展開しやすい。
+  - diff を home_dashboard.tscn（+ 新規 theme）に閉じやすい。
+欠点:
+  - home は Style 種類が多く（card/warn/chip/header）、**他画面より変更点は多め**。
+  - 他画面とのトーン差が一時的に開く。
+リスク:
+  - 中（単一ファイルだが行数・ノード数が最大級）。
+触りそうなファイル:
+  - home_dashboard.tscn、home_dashboard.gd（必要最小限）、新規 theme/style。
+今やるべきか:
+  ○ **第2段目以降**または「商品見せのデモ」を早く出したい場合。技術検証の「最初の1枚」としては E の方が安全。
+
+
+11. 候補E：新規 preview scene で Theme / Style だけ試す
+--------------------------------------------------------------------------------
+利点:
+  - **既存10画面を一切触らず**に、エディタ上で見た目・Theme 適用範囲を検証できる。リスク最小。
+欠点:
+  - 本番進捗としては「薄い」ように見える（ただし実際は安全な第0段として有効）。
+リスク:
+  - 極低。
+触りそうなファイル:
+  - godot/scenes/theme_preview.tscn（新規）、godot/themes/*.tres（新規）。project.godot は変更不要（手動で preview を開く運用でも可）。
+今やるべきか:
+  ◎ **実装フェーズの最初の1コミット**として最適。
+
+
+12. 候補F：Style 正本文書だけ先行（docs ではなく reports や設計メモ）
+--------------------------------------------------------------------------------
+利点:
+  - 実装ゼロで合意形成。palette / タイポ階層 / 角丸ルールを固定できる。
+欠点:
+  - 画面上の改善は進まない。
+リスク:
+  - 低（ドキュメントドリフトのみ）。
+今やるべきか:
+  ○ 実装着手直前の **1セッション分**は有効。長期だけ F に留まるのは ×。
+
+
+13. 候補G：全10画面へ一括適用
+--------------------------------------------------------------------------------
+利点:
+  - 見た目の統一が一気に進む。
+欠点:
+  - diff 面積最大、レビュー・回帰コスト最大。schedule の margin 差分など **隠れた仕様差**を踏みやすい。
+リスク:
+  - 高。UID/参照切れ、見切れ、1280×720 でのボタン折り返し等。
+今やるべきか:
+  × 前提どおり避ける。段階適用後の最終段で検討。
+
+
+14. 90年代〜PS1/セガサターン風 GM 画面との関係
+--------------------------------------------------------------------------------
+- 現状の StyleBoxFlat は **暗色フラット＋細ボーダー＋角丸**で「現代的ダッシュボード」の方向。レトロ GM 風の「太枠・低解像感・パレット少数」には **まだ遠い**。
+- Theme/Style 正本化は、まず **トークン（色・余白・角丸・フォント階層）を1か所に集約**する工程であり、
+  その後にパレット差し替えで 90 年代風へ寄せる **足場になる**。正本化自体がレトロ化ではない。
+
+
+15. Steam 販売品質に向けた効果
+--------------------------------------------------------------------------------
+- 意味がある: **一貫したコントラスト・読みやすさ・将来のローカライズ長文化への耐性**（Theme で最小/最大フォントを管理しやすい）。
+- 限界: 演出・入力・オーディオ・ビルド配布は別軸。Theme だけでは「1500円×1万本」の説得力には直結しないが、**品質の下限引き上げ**には効く。
+
+
+16. Cursor としてのおすすめ順
+--------------------------------------------------------------------------------
+ 1. E（preview + 外部 Style/Theme 試験）… 検証コスト最小
+ 2. B（header/chip/summary を .tres 化）… 1画面から順次、schedule はバリアント扱い
+ 3. A（Theme の限定項目＝Label 本文・Button のみ等）… B の後に拡張
+ 4. C（定数 .gd）… 動的 UI 中心の画面から段階導入
+ 5. D（ホームのみ本格調整）… トークンが固まってから
+ 6. F（短い正本メモ）… E/B と同じ週に数ページで十分
+ 7. G（一括）… 最後か never
+
+
+17. 今すぐ実装してよい最小案（1つに絞る）
+--------------------------------------------------------------------------------
+**「E と B を同一コミット単位の第0段とする：新規 `godot/themes/phase4_readonly_core.tres`（少なくとも StyleBoxFlat header/chip/summary の外部化）＋ 新規 `godot/scenes/theme_preview.tscn` で参照確認のみ。既存10画面の .tscn はまだ変更しない。」**
+
+理由（観点への適合）:
+- 変更ファイルが少ない（新規のみ）／既存画面を壊さない／Godot 4.6.2 でプレビュー実行のみで確認可／git revert が単純／次工程で roster 等へ ext_resource 差し替え（B）へ直結。
+
+
+18. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- 全 .tscn への Theme 一括割当（候補 G に相当）。
+- project.godot の global Theme 設定（意図せぬノードへの波及を検証なしで入れること）。
+- 動的 Label の全面 Theme 化（設計なしに突入するとデバッグ地獄）。
+
+
+19. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- schedule の header/chip/summary を **標準値に揃えるか**、**別バリアント .tres を用意するか**。
+- Theme（A）で取り込む **型の範囲**（Panel のみ / Label+Button まで / Separator 等まで）。
+- preview 検証後、**最初に置換する本番シーンを roster にするか home にするか**（技術リスク重視なら roster、商品インパクト重視なら home）。
+
+
+20. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+変更・新規作成したのは **本レポートファイルのみ**（調査後に reports 配下へ追加予定）。
+以下は **読取のみ** で未変更:
+  godot/scenes, godot/scripts, godot/data, godot/project.godot, basketball_sim, docs, README, セーブ, 生成 JSON、
+  docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05.md
+
+================================================================================
+EOF
+================================================================================
