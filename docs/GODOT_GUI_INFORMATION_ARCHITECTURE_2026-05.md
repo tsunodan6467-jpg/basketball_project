@@ -283,16 +283,16 @@
 
 ## 14. Godot / Python ランタイム連携方針（Phase 4 初期）
 
-本節は **2026-05** 時点の方針メモである。運用手順の詳細は `godot/README.md`、読み取り専用 export の実装は `basketball_sim/export/` の `home_dashboard_readonly.py` / `roster_readonly.py` / `club_history_readonly.py` / `standings_readonly.py` / **`schedule_readonly.py`** / **`facility_summary_readonly.py`** / **`finance_summary_readonly.py`** / **`owner_mission_readonly.py`** / **`tactics_summary_readonly.py`** に加え、**9 画面分を一括で `godot/data/` に書き出す** **`godot_readonly_bundle.py`**（モジュール `basketball_sim.export.godot_readonly_bundle`）を正とする（§15）。
+本節は **2026-05** 時点の方針メモである。運用手順の詳細は `godot/README.md`、読み取り専用 export の実装は `basketball_sim/export/` の `home_dashboard_readonly.py` / `roster_readonly.py` / `club_history_readonly.py` / `standings_readonly.py` / **`schedule_readonly.py`** / **`facility_summary_readonly.py`** / **`finance_summary_readonly.py`** / **`owner_mission_readonly.py`** / **`tactics_summary_readonly.py`** / **`contract_personnel_summary_readonly.py`** に加え、**10 画面分を一括で `godot/data/` に書き出す** **`godot_readonly_bundle.py`**（モジュール `basketball_sim.export.godot_readonly_bundle`）を正とする（§15）。
 
 ### 14.1 現在の接続方式（手動 JSON）
 
 - Python CLI（`python -m basketball_sim.export.home_dashboard_readonly --save <.sav> --output <.json>`）で **読み取り専用のホーム用 JSON** を手動生成する。処理は `load_world` による **セーブの読み取りのみ**であり、**セーブファイルを書き換えない**。
 - Godot は **`res://data/home_dashboard_from_python.json`** を優先して読み、無ければ **`res://data/home_dashboard_mock.json`** にフォールバックする（`godot/scripts/home_dashboard.gd` の `_home_json_candidate_paths`）。
-- ロスター・クラブ史・順位表・日程・施設・財務・**オーナーミッション**・**戦術サマリー**など **他画面も同型**（`_*_from_python.json` 優先・`*_mock.json` フォールバック）。CLI とファイル名は `godot/README.md` を正とする。
-- **9 画面分を一度に更新**するには、`py -m basketball_sim.export.godot_readonly_bundle --save <.sav> --output-dir godot\data` のように **Python のみの CLI を手動実行**する（**Godot が Python を自動起動する実装ではない**。PowerShell 等からの運用。任意の `--max-history` / `--max-missions` / `--max-players` などは `godot/README.md` と CLI ヘルプを参照）。
+- ロスター・クラブ史・順位表・日程・施設・財務・**オーナーミッション**・**戦術サマリー**・**契約 / 人事サマリー**など **他画面も同型**（`_*_from_python.json` 優先・`*_mock.json` フォールバック）。CLI とファイル名は `godot/README.md` を正とする。
+- **10 画面分を一度に更新**するには、`py -m basketball_sim.export.godot_readonly_bundle --save <.sav> --output-dir godot\data` のように **Python のみの CLI を手動実行**する（**Godot が Python を自動起動する実装ではない**。PowerShell 等からの運用。任意の `--max-history` / `--max-missions` / `--max-players` などは `godot/README.md` と CLI ヘルプを参照）。
 - **Godot から Python プロセスを起動する処理は、本節の時点では入れない**。
-- 生成物 `*_from_python.json`（ホーム用に限らず **9 種**）は開発用であり、`godot/.gitignore` で **コミット対象外**。
+- 生成物 `*_from_python.json`（ホーム用に限らず **10 種**）は開発用であり、`godot/.gitignore` で **コミット対象外**。
 
 ### 14.2 今すぐ実装しないこと
 
@@ -341,7 +341,7 @@
 
 **位置づけ**: 本節は **`godot/` 上の仮 GUI 足場** の記録であり、本番 GUI 完成・確定仕様の宣言ではない。詳細な運用手順は `godot/README.md` を正とする。ナビの整理方針は `docs/GODOT_NAVIGATION_PHASE4_2026-05.md` と併読。
 
-- **2026-05 時点の到達点**: `godot/` に **ホーム・ロスター閲覧・クラブ史閲覧・順位表（リーグ状況）閲覧・日程（スケジュール）閲覧・施設サマリー閲覧・財務サマリー（経営）閲覧・オーナーミッション / クラブ評価閲覧・戦術 / ローテーションサマリー閲覧** の **9 画面**があり、いずれも **読み取り専用プロトタイプ**（進行・保存・契約・トレード・経営・育成・戦術保存・**施設投資・施設レベルアップ**・**財務の予算変更・投資・契約更新**・**ミッション生成・評価更新・報酬付与・オーナー評価の操作**・**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択**などの **状態変更系 UI は未接続**）。
+- **2026-05 時点の到達点**: `godot/` に **ホーム・ロスター閲覧・クラブ史閲覧・順位表（リーグ状況）閲覧・日程（スケジュール）閲覧・施設サマリー閲覧・財務サマリー（経営）閲覧・オーナーミッション / クラブ評価閲覧・戦術 / ローテーションサマリー閲覧・契約 / 人事サマリー閲覧** の **10 画面**があり、いずれも **読み取り専用プロトタイプ**（進行・保存・契約・トレード・経営・育成・戦術保存・**施設投資・施設レベルアップ**・**財務の予算変更・投資・契約更新**・**ミッション生成・評価更新・報酬付与・オーナー評価の操作**・**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択**などの **状態変更系 UI は未接続**）。
 - **画面の役割（仮）**:
   - **ホーム**: **仮ハブ**およびクラブ状況サマリー（`home_dashboard_readonly` DTO に相当する JSON）。
   - **ロスター閲覧**: **現在のチーム編成**の表形式閲覧（`roster_readonly` DTO）。
@@ -352,6 +352,7 @@
   - **財務サマリー閲覧**: **現在資金・前季収入・前季支出・前季収支・サラリー上限・選手年俸合計・サラリー余力・財務履歴**などの閲覧（`finance_summary_readonly` DTO。**第7画面の第1弾**。**予算変更・投資・契約更新などの操作は未接続**）。
   - **オーナーミッション / クラブ評価閲覧**: **オーナー信頼・今季ミッション・ミッション状態・進捗・報酬/ペナルティ・クラブ評価・注意文**などの閲覧（`owner_mission_readonly` DTO。**第8画面の第1弾**。ミッション生成・評価更新・報酬付与などの **操作は未接続**）。
   - **戦術 / ローテーションサマリー閲覧**: **戦術プリセット・プレイスタイル・オフェンステンポ/傾向/組み立て・ディフェンス方針・リバウンド方針・速攻方針・ローテーション方針・先発設定数・目標出場時間設定数・選手ロール・注意文**などの閲覧（`tactics_summary_readonly` DTO。**第9画面の第1弾**。戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択などの **操作は未接続**）。
+  - **契約 / 人事サマリー閲覧**: GM が **ロスターの契約状況・人事リスク・年俸バランス**を読むための画面（`contract_personnel_summary_readonly` DTO。**第10画面の第1弾**）。**契約交渉画面ではない**。**契約更新・交渉・獲得・解雇・FA 操作などの UI は未接続**（閲覧のみ）。**財務サマリー**（クラブ全体の資金・収支）とは役割が異なり、**選手単位の契約情報・人事リスク**に寄せた閲覧。**ロスター**（編成表）とは異なり、**年俸・契約残・満了目安・国籍枠・構成バランス**に寄せた閲覧。表示の目安: **契約概要**、**人事リスク**、**主要契約選手**、**ロスター構成**、**注意**、ロスター人数・年俸合計・サラリーキャップ・サラリー余力・平均年俸・最高年俸・契約満了予定・FA 予備軍、選手別の年俸・契約残・国籍枠・FA 目安、ポジション人数・U23・30 歳以上・外国籍/アジア/帰化/国内 など。
 - **ファイル構成（財務サマリー）**:
   - Python: `basketball_sim/export/finance_summary_readonly.py`、テスト: `basketball_sim/tests/test_finance_summary_readonly_export.py`
   - Godot: `godot/scenes/finance_summary_view.tscn`、`godot/scripts/finance_summary_view.gd`、`godot/scripts/finance_summary_view.gd.uid`（エディタ UID）、`godot/data/finance_summary_mock.json`
@@ -364,15 +365,21 @@
   - Python: `basketball_sim/export/tactics_summary_readonly.py`、テスト: `basketball_sim/tests/test_tactics_summary_readonly_export.py`
   - Godot: `godot/scenes/tactics_summary_view.tscn`、`godot/scripts/tactics_summary_view.gd`、`godot/scripts/tactics_summary_view.gd.uid`（エディタ UID）、`godot/data/tactics_summary_mock.json`
   - 手動生成: `godot/data/tactics_summary_from_python.json`（**`godot/.gitignore` 対象・コミットしない**）
+- **ファイル構成（契約 / 人事サマリー）**:
+  - Python: `basketball_sim/export/contract_personnel_summary_readonly.py`、テスト: `basketball_sim/tests/test_contract_personnel_summary_readonly_export.py`
+  - Godot: `godot/scenes/contract_personnel_summary_view.tscn`、`godot/scripts/contract_personnel_summary_view.gd`、`godot/scripts/contract_personnel_summary_view.gd.uid`（エディタ UID）、`godot/data/contract_personnel_summary_mock.json`
+  - 手動生成: `godot/data/contract_personnel_summary_from_python.json`（**`godot/.gitignore` 対象・コミットしない**）
+  - 一括 export: `basketball_sim/export/godot_readonly_bundle.py`、テスト: `basketball_sim/tests/test_godot_readonly_bundle_export.py`（**10 件目**として `contract_personnel_summary_from_python.json` を含む。`61cc09a`）
 - **読込仕様（財務サマリー）**: **`finance_summary_from_python.json` を優先**し、無い／読めないとき **`finance_summary_mock.json` にフォールバック**（`finance_summary_view.gd` の候補パス配列）。**Godot から Python 自動起動は未実装**。
 - **読込仕様（オーナーミッション）**: **`owner_mission_from_python.json` を優先**し、無い／読めないとき **`owner_mission_mock.json` にフォールバック**。**Godot から Python 自動起動は未実装**。生成 JSON は **コミットしない**。
 - **読込仕様（戦術サマリー）**: **`tactics_summary_from_python.json` を優先**し、無い／読めないとき **`tactics_summary_mock.json` にフォールバック**。**Godot から Python 自動起動は未実装**。生成 JSON は **コミットしない**。
+- **読込仕様（契約 / 人事サマリー）**: **`contract_personnel_summary_from_python.json` を優先**し、無い／読めないとき **`contract_personnel_summary_mock.json` にフォールバック**。**Godot から Python 自動起動は未実装**。生成 JSON は **コミットしない**。
 - **データ経路**: いずれも **Python export（`load_world` による読み取りのみ）→ JSON → Godot 表示** の型。各画面は **`_*_from_python.json` 優先・同梱 `*_mock.json` フォールバック**（§14.1 の手動 JSON 方針と同じ運用）。
-- **一括 export（Python CLI・手動）**: `godot_readonly_bundle` で **9 件**の `*_from_python.json` を **`godot/data/` にまとめて書き出し**できる（`8822b87`）。**ユーザー環境では** 9 行 `Wrote` のあと **`Bundle complete: 9 succeeded, 0 failed`**、9 ファイルが **`git status --short --ignored` で `!!`**（ignored）になることを確認済み。**Godot からの自動起動・自動更新パイプラインの完成ではない**（詳細は `godot/README.md`）。
-- **導線**: **ホーム上部 `HeaderNavRow` は 5 ボタンのまま**（財務・オーナーミッション・**戦術サマリー**は **HeaderNavRow に追加していない**）。**ホーム内カード型メニュー**の **「チーム」** カテゴリから **「ロスター」**・**「戦術サマリー」**（第9画面）、**「経営」** カテゴリから **「財務サマリー」**（第7画面）・**「オーナーミッション」**（第8画面）へ遷移。各閲覧画面から **ホームへ戻る**（`change_scene_to_file` のみ）。**経営カテゴリにだけあった補足説明ラベルは削除**し、他カテゴリとボタン位置を揃えた（`56bcd9e Godotホーム経営カテゴリの説明文を削除`）。関連実装の足場（戦術）: `f6f5434`（DTO）→ `b2d5e5c`（mock）→ `1be9e1d`（UID）→ `33a26ac`（from_python 優先）→ `f91757d`（ホーム導線）。財務・オーナーミッション側: `ca79138`（DTO）→ `d876227`（mock）→ `de912f2`（UID）→ `bdcb163`（from_python 優先）→ `14cc572`（ホーム導線）。
-- **確認済み（ユーザー環境 Godot 4.6.2 の目安）**: ホーム → 財務サマリー → ホーム、**ホーム → オーナーミッション → ホーム**、**ホーム → 戦術サマリー → ホーム**、**既存8画面往復**、`from_python` 優先・mock フォールバック、**HeaderNavRow 未変更**、**UID 参照エラー解消**、実行後の追跡差分なし、など（詳細は `godot/README.md`）。
+- **一括 export（Python CLI・手動）**: `godot_readonly_bundle` で **10 件**の `*_from_python.json` を **`godot/data/` にまとめて書き出し**できる（`8822b87` 一括追加、`61cc09a` で 10 本目）。例: `py -m basketball_sim.export.godot_readonly_bundle --save "$env:USERPROFILE\.basketball_sim\saves\debug_user_boost_d1_user_cellb.sav" --output-dir "godot\data" --max-history 8 --max-missions 8 --max-players 8`。**ユーザー環境では** 10 行 `Wrote` のあと **`Bundle complete: 10 succeeded, 0 failed`**、10 ファイルが **`git status --short --ignored` で `!!`**（ignored）になることを確認済み。**Godot からの自動起動・自動更新パイプラインの完成ではない**（詳細は `godot/README.md`）。
+- **導線**: **ホーム上部 `HeaderNavRow` は 5 ボタンのまま**（財務・オーナーミッション・**戦術サマリー**・**契約 / 人事サマリー**は **HeaderNavRow に追加していない**）。**ホーム内カード型メニュー**の **「チーム」** カテゴリから **「ロスター」**・**「戦術サマリー」**（第9画面）、**「経営」** カテゴリから **「財務サマリー」**（第7画面）・**「オーナーミッション」**（第8画面）・**「契約・人事サマリー」**（第10画面）へ遷移（**経営列は 3 ボタン**）。各閲覧画面から **ホームへ戻る**（`change_scene_to_file` のみ）。**経営カテゴリにだけあった補足説明ラベルは削除**し、他カテゴリとボタン位置を揃えた（`56bcd9e Godotホーム経営カテゴリの説明文を削除`）。関連実装の足場（戦術）: `f6f5434`（DTO）→ `b2d5e5c`（mock）→ `1be9e1d`（UID）→ `33a26ac`（from_python 優先）→ `f91757d`（ホーム導線）。財務・オーナーミッション側: `ca79138`（DTO）→ `d876227`（mock）→ `de912f2`（UID）→ `bdcb163`（from_python 優先）→ `14cc572`（ホーム導線）。契約・人事サマリー: `d88c8bb`（DTO）→ `689462a`（mock）→ `53f7707`（from_python 優先）→ `2f32a14`（ホーム導線）→ `61cc09a`（一括 10 本目）。
+- **確認済み（ユーザー環境 Godot 4.6.2 の目安）**: ホーム → 財務サマリー → ホーム、**ホーム → オーナーミッション → ホーム**、**ホーム → 戦術サマリー → ホーム**、**ホーム → 契約・人事サマリー → ホーム**、**経営カテゴリ 3 ボタン表示**、**既存 9 画面往復**、`from_python` 優先・mock フォールバック、**HeaderNavRow 未変更**、**UID 参照エラー解消**、実行後の追跡差分なし、**一括 export 10 件** など（詳細は `godot/README.md`）。
 - **仮ナビ**: ホームを起点に **ホーム → 各閲覧画面 → ホーム**（画面切替のみ。本格ナビゲーションではない）。**ホーム内のカード型メニュー（読み取り）**からも各閲覧画面へ遷移可能（**HeaderNavRow と併用の二重導線**）。
-- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、**ホームの「データ更新」ボタン**、**画面遷移直前の個別 export**、**配布用 export 専用 exe 化と Godot からの起動**、**`generated_at` の全 DTO 一斉追加**、**Godot で JSON 更新時刻（mtime）のみ常時表示**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI（**ミッション生成 UI・評価更新 UI・報酬付与 UI・オーナー評価の操作 UI**、**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択 UI** を含む）、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Godot 本番 GUI の一本化**、**Steam 向け本番レイアウト**の確定、**財務・オーナーミッション・戦術サマリー画面の本格ビジュアル調整**。
+- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、**ホームの「データ更新」ボタン**、**画面遷移直前の個別 export**、**配布用 export 専用 exe 化と Godot からの起動**、**`generated_at` の全 DTO 一斉追加**、**Godot で JSON 更新時刻（mtime）のみ常時表示**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI（**ミッション生成 UI・評価更新 UI・報酬付与 UI・オーナー評価の操作 UI**、**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択 UI**、**契約更新・契約交渉・獲得・解雇・FA 操作などの契約 / 人事系操作 UI** を含む）、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Godot 本番 GUI の一本化**、**Steam 向け本番レイアウト**の確定、**財務・オーナーミッション・戦術サマリー・契約 / 人事サマリー画面の本格ビジュアル調整**。
 
 ---
 
