@@ -38,6 +38,34 @@
   - `data/contract_personnel_summary_from_python.json`
 - **mock 表示**はユーザー環境の **Godot 4.6.2** で確認済み。**Python 生成 JSON の優先表示**も各画面で確認済み。個別画面用 CLI はリポジトリルートから `python -m basketball_sim.export.*_readonly` で `godot/data/` に出力する運用に加え、**10 画面分をまとめて書き出す一括コマンド** `python -m basketball_sim.export.godot_readonly_bundle` も利用できる（**Godot からの自動起動ではなく**、**PowerShell 等で手動実行**。詳細は後述の **「10画面分の `*_from_python.json` を一括生成（Python のみ・手動）」** 節）。
 
+## 共通 Theme / 白ベース検証（Phase 4・限定適用）
+
+**位置づけ**: **本番 GUI の完成や Theme の全面適用ではない**。`themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`scenes/theme_preview.tscn` による **第 0 段 preview** で、見た目と variation の確認を進めている段階である。**既存 10 画面すべてに一括で当てる予定ではない**。
+
+- **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
+- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **`.gd` 側の明色 override が暗地前提**のため、**白カード化は未着手**（別タスクで `.gd` 調整が必要）。
+- **ロスター閲覧**（`roster_view.tscn`）: **ヘッダーのみ** Theme（`Phase4HeaderCard` + ヘッダー Label 濃色）。**Scroll / `RowList` / 表ヘッダー・選手行は未着手**（`roster_view.gd` の動的 Label は暗背景向け明色のまま）。
+- **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
+- **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。
+
+**Theme 検証ロードマップ（手元メモ・2026-05 時点）**
+
+```txt
+◎ Theme preview（theme_preview.tscn）
+◎ 契約・人事サマリー・ヘッダー（Phase4HeaderCard + 文字色）
+◎ 契約・人事サマリー・契約概要カード（Phase4SummaryCard）
+◎ 契約・人事サマリー・ロスター構成カード（Phase4SummaryCard）
+◎ 契約・人事サマリー・注意カード（Phase4WarningCard）
+◎ ロスター閲覧・ヘッダー（Phase4HeaderCard + 文字色）
+□ 契約・人事サマリー・人事リスク / 主要契約選手の動的行（.gd + 色または variation）
+□ ロスター表本体（Scroll / RowList・.gd）
+□ ホーム Theme 化
+□ 左サイドナビ
+□ Theme 全面適用（10 画面一括など）
+```
+
+関連コミット（Theme 周辺・必要最小限）: `26fa722`（preview 追加）→ `b319af3`（契約人事ヘッダー適用）→ `2995a22`（契約概要）→ `77c5d04`（ロスター構成）→ `310ebed`（注意）→ `2bb594c`（ロスターヘッダー）。調査レポート: `827e6f8`（契約人事カード候補）、`c0e018e`（ロスター展開候補・`reports/`。追跡されない場合あり）。
+
 ### 財務サマリー（第7画面）のファイル構成（参照）
 
 | 種別 | パス |
@@ -142,7 +170,13 @@
   ◎ Python一括exportコマンド追加（10件）
   ◎ ユーザー環境で一括export確認（10 succeeded）
   ◎ README/docsに一括export運用を記録
-  ★ README/docs 10画面到達点更新（本コミット）
+  ◎ 共通Theme preview・白ベース検証版（`phase4_readonly_core.tres` / `theme_preview.tscn`）
+  ◎ 契約・人事サマリーへのTheme限定適用（ヘッダー・契約概要・ロスター構成・注意）
+  ◎ ロスター閲覧ヘッダーへのTheme限定適用
+  ★ README/docs 10画面到達点・Theme検証到達点の記録（本コミット）
+□ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
+□ ロスター表本体のTheme対応（.gd 前提）
+□ ホームTheme化・Theme全面適用（10画面一括など）
 □ ホーム「データ更新」表示/ボタン判断
 □ 本格ナビ次段階 / 左サイドメニュー設計
 □ 第11画面を増やすかの判断（慎重）
@@ -178,6 +212,7 @@
 - **配布用に export 専用 exe を同梱し Godot から起動する**こと（未実装）
 - **`generated_at` を全 DTO に一斉追加する**こと、**Godot 側で JSON の更新時刻だけを常時表示する**こと（未実装・要別判断）
 - **契約 / 人事サマリー画面の本格ビジュアル調整**（現状は読み取りプロトタイプ優先）
+- **10 画面すべてへの共通 Theme の一括適用**、**ホーム全体の Theme 化**（**限定適用の検証段階**であり、表や動的行の Theme 化も **未完了**）
 - **Godot 本番 GUI の一本化**
 
 ## ファイル構成（抜粋）
@@ -195,6 +230,8 @@
 | `scenes/owner_mission_view.tscn` / `scripts/owner_mission_view.gd` | オーナーミッション閲覧・JSON 表示 |
 | `scenes/tactics_summary_view.tscn` / `scripts/tactics_summary_view.gd` | 戦術 / ローテーションサマリー閲覧・JSON 表示 |
 | `scenes/contract_personnel_summary_view.tscn` / `scripts/contract_personnel_summary_view.gd` | 契約 / 人事サマリー閲覧・JSON 表示 |
+| `themes/phase4_readonly_core.tres` | 共通 Theme（白ベース検証版）。**限定適用中の画面のみ**が参照 |
+| `scenes/theme_preview.tscn` | Theme 確認用プレビュー（**本番 10 画面には未適用**） |
 | `data/home_dashboard_mock.json` 等 | 各画面の **同梱モック**（正本データではない） |
 | `data/*_from_python.json` | **任意**。CLI で生成する開発用 JSON（無ければ mock） |
 
@@ -288,7 +325,7 @@ git status --short --ignored -- godot/data/home_dashboard_from_python.json godot
 ## 将来（第2弾以降の想定）
 
 - 読み込み候補パスは各 `scripts/*.gd` の **候補パス配列**にまとめてあります。
-- 表示内容の正本・項目定義は `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` の §4 / §10 / **§15（Phase 4 初期プロトタイプ到達点）** を参照してください。
+- 表示内容の正本・項目定義は `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` の §4 / §10 / **§15（Phase 4 初期プロトタイプ到達点）** / **§15.1（Theme 検証・限定適用）** を参照してください。
 
 ## エディタ生成ファイル
 

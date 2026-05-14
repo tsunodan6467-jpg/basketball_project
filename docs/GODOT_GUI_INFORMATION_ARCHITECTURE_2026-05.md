@@ -290,6 +290,7 @@
 - Python CLI（`python -m basketball_sim.export.home_dashboard_readonly --save <.sav> --output <.json>`）で **読み取り専用のホーム用 JSON** を手動生成する。処理は `load_world` による **セーブの読み取りのみ**であり、**セーブファイルを書き換えない**。
 - Godot は **`res://data/home_dashboard_from_python.json`** を優先して読み、無ければ **`res://data/home_dashboard_mock.json`** にフォールバックする（`godot/scripts/home_dashboard.gd` の `_home_json_candidate_paths`）。
 - ロスター・クラブ史・順位表・日程・施設・財務・**オーナーミッション**・**戦術サマリー**・**契約 / 人事サマリー**など **他画面も同型**（`_*_from_python.json` 優先・`*_mock.json` フォールバック）。CLI とファイル名は `godot/README.md` を正とする。
+- **共通 Theme**（`phase4_readonly_core.tres`）は **一部の閲覧画面にのみ**割当てており、**JSON 読込パスや Python 連携方針とは独立**（§15.1）。
 - **10 画面分を一度に更新**するには、`py -m basketball_sim.export.godot_readonly_bundle --save <.sav> --output-dir godot\data` のように **Python のみの CLI を手動実行**する（**Godot が Python を自動起動する実装ではない**。PowerShell 等からの運用。任意の `--max-history` / `--max-missions` / `--max-players` などは `godot/README.md` と CLI ヘルプを参照）。
 - **Godot から Python プロセスを起動する処理は、本節の時点では入れない**。
 - 生成物 `*_from_python.json`（ホーム用に限らず **10 種**）は開発用であり、`godot/.gitignore` で **コミット対象外**。
@@ -379,7 +380,20 @@
 - **導線**: **ホーム上部 `HeaderNavRow` は 5 ボタンのまま**（財務・オーナーミッション・**戦術サマリー**・**契約 / 人事サマリー**は **HeaderNavRow に追加していない**）。**ホーム内カード型メニュー**の **「チーム」** カテゴリから **「ロスター」**・**「戦術サマリー」**（第9画面）、**「経営」** カテゴリから **「財務サマリー」**（第7画面）・**「オーナーミッション」**（第8画面）・**「契約・人事サマリー」**（第10画面）へ遷移（**経営列は 3 ボタン**）。各閲覧画面から **ホームへ戻る**（`change_scene_to_file` のみ）。**経営カテゴリにだけあった補足説明ラベルは削除**し、他カテゴリとボタン位置を揃えた（`56bcd9e Godotホーム経営カテゴリの説明文を削除`）。関連実装の足場（戦術）: `f6f5434`（DTO）→ `b2d5e5c`（mock）→ `1be9e1d`（UID）→ `33a26ac`（from_python 優先）→ `f91757d`（ホーム導線）。財務・オーナーミッション側: `ca79138`（DTO）→ `d876227`（mock）→ `de912f2`（UID）→ `bdcb163`（from_python 優先）→ `14cc572`（ホーム導線）。契約・人事サマリー: `d88c8bb`（DTO）→ `689462a`（mock）→ `53f7707`（from_python 優先）→ `2f32a14`（ホーム導線）→ `61cc09a`（一括 10 本目）。
 - **確認済み（ユーザー環境 Godot 4.6.2 の目安）**: ホーム → 財務サマリー → ホーム、**ホーム → オーナーミッション → ホーム**、**ホーム → 戦術サマリー → ホーム**、**ホーム → 契約・人事サマリー → ホーム**、**経営カテゴリ 3 ボタン表示**、**既存 9 画面往復**、`from_python` 優先・mock フォールバック、**HeaderNavRow 未変更**、**UID 参照エラー解消**、実行後の追跡差分なし、**一括 export 10 件** など（詳細は `godot/README.md`）。
 - **仮ナビ**: ホームを起点に **ホーム → 各閲覧画面 → ホーム**（画面切替のみ。本格ナビゲーションではない）。**ホーム内のカード型メニュー（読み取り）**からも各閲覧画面へ遷移可能（**HeaderNavRow と併用の二重導線**）。
-- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、**ホームの「データ更新」ボタン**、**画面遷移直前の個別 export**、**配布用 export 専用 exe 化と Godot からの起動**、**`generated_at` の全 DTO 一斉追加**、**Godot で JSON 更新時刻（mtime）のみ常時表示**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI（**ミッション生成 UI・評価更新 UI・報酬付与 UI・オーナー評価の操作 UI**、**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択 UI**、**契約更新・契約交渉・獲得・解雇・FA 操作などの契約 / 人事系操作 UI** を含む）、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Godot 本番 GUI の一本化**、**Steam 向け本番レイアウト**の確定、**財務・オーナーミッション・戦術サマリー・契約 / 人事サマリー画面の本格ビジュアル調整**。
+- **未着手**（§14.2 と整合）: Godot からの **Python 自動起動**、**ホームの「データ更新」ボタン**、**画面遷移直前の個別 export**、**配布用 export 専用 exe 化と Godot からの起動**、**`generated_at` の全 DTO 一斉追加**、**Godot で JSON 更新時刻（mtime）のみ常時表示**、本番 **セーブ／ロード** 接続、**進行処理**、状態変更系 UI（**ミッション生成 UI・評価更新 UI・報酬付与 UI・オーナー評価の操作 UI**、**戦術変更・ローテーション保存・先発変更・出場時間変更・戦術プリセット選択 UI**、**契約更新・契約交渉・獲得・解雇・FA 操作などの契約 / 人事系操作 UI** を含む）、**施設投資・施設レベルアップ・施設プロジェクト制**の UI 接続、**本格ナビゲーション**、**Godot 本番 GUI の一本化**、**Steam 向け本番レイアウト**の確定、**財務・オーナーミッション・戦術サマリー・契約 / 人事サマリー画面の本格ビジュアル調整**、**10 画面すべてへの共通 Theme 一括適用**（現状は **限定適用の検証段階**。詳細は §15.1）。
+
+### 15.1 白ベース Theme 検証（`phase4_readonly_core.tres`・限定適用）
+
+**位置づけ**: **本番 GUI の確定デザインではない**。`godot/themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`godot/scenes/theme_preview.tscn` による **第 0 段 preview** で、variation とコントラストを確認している。**既存 10 画面へ一括適用したわけではない**。
+
+- **preview**: `theme_preview.tscn` は **本番10画面に未適用**。暗背景用に `Phase4OnDarkTitle` / `Phase4OnDarkTableHead` 等を使い分け、可読性を確認している。
+- **限定適用の方針**: まず **`.tscn` のみ**で済む **静的ヘッダー**・**静的 Panel カード**から当てる。**`Label.new()` + `add_theme_color_override` で明色を付けた動的行**は暗背景前提のため、白い `Phase4SummaryCard` 内へ載せ替えるには **`.gd` で色または `theme_type_variation` を直す**必要がある（契約・人事の人事リスク／主要契約選手、ロスター表が該当）。
+- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルート Theme 割当。**`Phase4HeaderCard`**（ヘッダー）＋ヘッダー内 Label 濃色。**`Phase4SummaryCard`**: 契約概要・ロスター構成。**`Phase4WarningCard`**: 注意。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` のまま（動的行は `.gd` 未変更）。
+- **ロスター閲覧**（`roster_view.tscn`）: **ヘッダーのみ** `Phase4HeaderCard`。**Scroll / 表**は従来どおり（`roster_view.gd` の動的 Label は未着手）。
+- **読込・導線**: `from_python` / mock、**HeaderNavRow の構成変更なし**、**Godot から Python 自動起動なし**（§14.1 と同じ）。
+- **運用**: シーン保存後は **UID 参照エラー**が出ないか Godot で確認。**エディタ実行後**は `git status` で意図しない差分が混ざっていないか確認（`*_from_python.json` は **コミットしない**）。
+
+**関連コミット（Theme 周辺・必要最小限）**: `26fa722`（preview 追加）→ `b319af3`（契約人事ヘッダー）→ `2995a22`（契約概要）→ `77c5d04`（ロスター構成）→ `310ebed`（注意）→ `2bb594c`（ロスターヘッダー）。調査: `827e6f8`（契約人事カード候補）、`c0e018e`（ロスター展開候補・`reports/` は `.gitignore` で追跡されない場合あり）。文言・OnDark 調整: `b572a7e` / `8bf6788` / `4c1cb08` など（本節では列挙のみ）。
 
 ---
 
@@ -395,7 +409,7 @@
 
 ## 付録 B: 関連ドキュメント
 
-- `godot/README.md`（Phase 4 最小 Godot プロジェクトの運用・手動 JSON 手順・**`godot_readonly_bundle` 一括 export**）
+- `godot/README.md`（Phase 4 最小 Godot プロジェクトの運用・手動 JSON 手順・**`godot_readonly_bundle` 一括 export**・**共通 Theme / 白ベース検証（限定適用）**）
 - `docs/PRODUCT_ROADMAP_AND_VISION.md`（Phase 0〜6 ／製品ビジョン）
 - `docs/IDEAL_GAME_DESIGN_MASTER.md`（理想形のドメイン設計）
 - `docs/INFORMATION_MENU_SPEC_V1.md`／`docs/SCHEDULE_MENU_SPEC_V1.md`／`docs/SYSTEM_MENU_SPEC_V1.md`
