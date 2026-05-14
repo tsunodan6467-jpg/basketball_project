@@ -38,6 +38,16 @@
   - `data/contract_personnel_summary_from_python.json`
 - **mock 表示**はユーザー環境の **Godot 4.6.2** で確認済み。**Python 生成 JSON の優先表示**も各画面で確認済み。個別画面用 CLI はリポジトリルートから `python -m basketball_sim.export.*_readonly` で `godot/data/` に出力する運用に加え、**10 画面分をまとめて書き出す一括コマンド** `python -m basketball_sim.export.godot_readonly_bundle` も利用できる（**Godot からの自動起動ではなく**、**PowerShell 等で手動実行**。詳細は後述の **「10画面分の `*_from_python.json` を一括生成（Python のみ・手動）」** 節）。
 
+## 本番ホームワイヤー sandbox（`scenes/home_production_wire_preview.tscn`）
+
+**位置づけ**: 本番 GUI のレイアウト・情報密度・左レール＋上部クラブ帯の**研究用**シーン。`scenes/home_dashboard.tscn`（**10 画面導線・`from_python` / mock の正本**）とは別ファイルで、**本線を壊さず**に目視確認する。
+
+- **確認方法**: Godot エディタで当該シーンを開き、**「現在のシーンを実行」（F6）** で単体起動する。**`project.godot` の `run/main_scene` は変更しない**（既定のまま本線ホーム）。
+- **中身**: **script なし**、**固定文言のみ**。JSON 読込・Python 自動起動・`change_scene_to_file` による本線への遷移は**未実装**。
+- **試す場の例**: 左サイドナビ（大分類のみ）、上部クラブ帯、中央カードの低密度〜中密度、色味（シーン内 `StyleBoxFlat` と既存 `phase4_readonly_core.tres` の variation の組み合わせ）。
+- **UID / `load_steps`**: エディタで保存したあと **`git diff -- scenes/home_production_wire_preview.tscn`** を確認する。意図しない**先頭行付近だけ**の差分なら、必要に応じて `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻し、意図するレイアウト変更だけを再適用する（詳細方針は `reports/godot_phase4_home_wire_sandbox_policy_2026-05.txt`）。
+- **本線へ反映**: 1280×720 での破綻なし・目視合意・左の大分類確定・表示と DTO の整理・UID 運用の安定・**小さなコミット単位**で切れる、を満たしてから **別タスク・別コミット**で `home_dashboard` 側へ移植する。
+
 ## 共通 Theme / 白ベース検証（Phase 4・限定適用）
 
 **位置づけ**: **本番 GUI の完成や Theme の全面適用ではない**。`themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`scenes/theme_preview.tscn` による **第 0 段 preview** で、見た目と variation の確認を進めている段階である。**既存 10 画面すべてに一括で当てる予定ではない**。
@@ -47,7 +57,7 @@
 - **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**ヘッダー**は `Phase4HeaderCard` + ヘッダー Label 濃色。**表**（`Scroll` / `RowList` 内の動的 `Label`）は **暗背景のまま**、`roster_view.gd` で `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` の **`theme_type_variation` に寄せた最小対応**（白カード化はしていない）。
 - **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard`（PanelContainer）のみ**に `phase4_readonly_core.tres` を割当し、`Phase4HeaderCard` を適用。クラブ名・シーズン・DataSource 等は白ヘッダ上の濃色に調整。**`Scroll` 以下**（カードメニュー・主要指標・各カード等）は **従来の `StyleBoxFlat_card` 等のまま**。**HeaderNavRow** はシーン上 **ボタン数・接続・遷移先の定義を変えていない**（親に Theme が付くため、実行時の見た目は Theme 継承で変わりうる）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
-- **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。
+- **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
 
 **Theme 検証ロードマップ（手元メモ・2026-05 時点）**
 
@@ -60,10 +70,16 @@
 ◎ ロスター閲覧・ヘッダー（Phase4HeaderCard + 文字色）
 ◎ ロスター表・OnDark（動的 Label → Phase4OnDarkTableHead / Phase4OnDarkTableCell・暗背景のまま）
 ◎ ホーム・Header のみ（HeaderCard に Theme 限定・Scroll 以下は従来 StyleBox）
+◎ 本番ホームワイヤー sandbox（`home_production_wire_preview.tscn`・F6 単体・script なし）
+◎ sandbox 方針整理（`reports/godot_phase4_home_wire_sandbox_policy_2026-05.txt`）
+★ README/docs へ sandbox 位置づけ記録（本コミット）
+□ sandbox 左レール幅調整
+□ ClubBand 寸法調整
+□ 本線 `home_dashboard` への段階移植判断
 □ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
 □ ホーム・Metrics / Summary 等のカード（Scroll 以下）
 □ ホーム全体への Theme 拡大（ルート一括など）
-□ 左サイドナビ
+□ 左サイドナビ（本線未実装・sandbox でレイアウト研究可）
 □ ホーム「データ更新」表示 / ボタン判断
 □ Theme 全面適用（10 画面一括など）
 ```
@@ -179,12 +195,18 @@
   ◎ ロスター閲覧ヘッダーへのTheme限定適用
   ◎ ロスター表OnDark（動的Label・.gd）
   ◎ ホームHeaderのみTheme限定適用（.tscn・Scroll以下は従来）
-  ★ README/docs Theme展開の到達点記録（本コミット）
+  ◎ README/docs Theme展開の到達点記録（過去コミット）
+  ◎ 本番ホームワイヤーsandbox（`home_production_wire_preview.tscn`・F6単体）
+  ◎ sandbox方針整理（レポート）
+  ★ README/docsへsandbox位置づけ記録（本コミット）
+□ sandbox左レール幅調整
+□ ClubBand寸法調整
+□ 本線home_dashboardへの段階移植判断
 □ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
 □ ホーム・Scroll以下カードのTheme／本番ビジュアル調整
 □ Theme全面適用（10画面一括・ルート一括など）
 □ ホーム「データ更新」表示/ボタン判断
-□ 本格ナビ次段階 / 左サイドメニュー設計
+□ 本格ナビ次段階 / 左サイドメニュー設計（本線・sandboxは別。本線はHeaderNavRow維持）
 □ 第11画面を増やすかの判断（慎重）
 □ Godot本番GUI一本化
 □ グラフィック・音楽などの演出実装
@@ -219,6 +241,7 @@
 - **`generated_at` を全 DTO に一斉追加する**こと、**Godot 側で JSON の更新時刻だけを常時表示する**こと（未実装・要別判断）
 - **契約 / 人事サマリー画面の本格ビジュアル調整**（現状は読み取りプロトタイプ優先）
 - **10 画面すべてへの共通 Theme の一括適用**、**ホームの Scroll 以下まで含む全体 Theme 化**（**限定適用の検証段階**。ホームは **Header のみ**適用済みで、**主要指標・カードメニュー等は従来の暗色カードのまま**）
+- **本番ホームワイヤー sandbox**（`scenes/home_production_wire_preview.tscn`）を **本線ホームに自動接続**すること（**script なし・JSON なし・本線遷移なし**。研究用。詳細は「本番ホームワイヤー sandbox」節）
 - **Godot 本番 GUI の一本化**
 
 ## ファイル構成（抜粋）
@@ -227,6 +250,7 @@
 |------|------|
 | `project.godot` | Godot 4.x プロジェクト設定。メインシーンは `scenes/home_dashboard.tscn` |
 | `scenes/home_dashboard.tscn` / `scripts/home_dashboard.gd` | ホームレイアウト・JSON 表示 |
+| `scenes/home_production_wire_preview.tscn` | **本番ホームワイヤー sandbox**（script なし・固定文言・F6 単体。本線とは別） |
 | `scenes/roster_view.tscn` / `scripts/roster_view.gd` | ロスター閲覧・JSON 表示 |
 | `scenes/club_history_view.tscn` / `scripts/club_history_view.gd` | クラブ史閲覧・JSON 表示 |
 | `scenes/standings_view.tscn` / `scripts/standings_view.gd` | 順位表（リーグ状況）閲覧・JSON 表示 |

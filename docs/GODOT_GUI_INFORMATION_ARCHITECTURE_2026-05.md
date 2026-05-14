@@ -396,6 +396,19 @@
 
 **関連コミット（Theme 周辺・本節で列挙する必要最小限）**: `26fa722` → `b572a7e` → `8bf6788` → `4c1cb08` → `2995a22` → `77c5d04` → `310ebed` → `2bb594c` → `d33edb6` → `afb482d`（契約人事ヘッダー適用は `b319af3`）。他の調査・文言コミットは `godot/README.md` や履歴を参照。
 
+### 15.2 本番ホームワイヤー sandbox（`godot/scenes/home_production_wire_preview.tscn`）
+
+- **役割**: 本番ホームの**レイアウト・情報密度・左レール＋上部クラブ帯・色味**を、**JSON / Python / `change_scene_to_file` なし**で研究する固定文言 preview。**Theme と情報設計の研究用**であり、**本番 GUI が確定したわけではない**。
+- **本線 `home_dashboard.tscn` との違い**: 本線は **10 画面導線・`from_python` / mock の正本**（`home_dashboard.gd`、§15 冒頭の到達点と同じ）。sandbox は **script なし**・**実データ接続なし**。**`project.godot` の `run/main_scene` は変更しない**（エディタで当該シーンを開き **F6 / 現在のシーンを実行** で確認。運用は `godot/README.md`「本番ホームワイヤー sandbox」節）。
+- **本線へ反映する目安条件**（満たしてから **別タスク・別コミット**で本線移植を検討）:
+  - 1280×720 でレイアウトが破綻しない
+  - **目視合意**（情報の優先順位・帯の行数など）
+  - **左サイドの大分類**が確定（10 画面を左に全部並べない方針と整合）
+  - **ホーム表示情報**と **DTO 候補**の整理が済んでいる
+  - **UID / `load_steps` の再シリアライズ**の確認・復旧手順が運用として安定している
+  - 移植を **1 コミット単位**に分割できる
+- **§14 との関係**: sandbox は **手動 JSON（§14.1）や自動起動（§14.2）の対象外**。実データを載せる変更は本線側で行う。
+
 ---
 
 ## 付録 A: 補助枠 → Godot 卒業先 早見
@@ -410,7 +423,7 @@
 
 ## 付録 B: 関連ドキュメント
 
-- `godot/README.md`（Phase 4 最小 Godot プロジェクトの運用・手動 JSON 手順・**`godot_readonly_bundle` 一括 export**・**共通 Theme / 白ベース検証（限定適用）**）
+- `godot/README.md`（Phase 4 最小 Godot プロジェクトの運用・手動 JSON 手順・**`godot_readonly_bundle` 一括 export**・**共通 Theme / 白ベース検証（限定適用）**・**本番ホームワイヤー sandbox**）
 - `docs/PRODUCT_ROADMAP_AND_VISION.md`（Phase 0〜6 ／製品ビジョン）
 - `docs/IDEAL_GAME_DESIGN_MASTER.md`（理想形のドメイン設計）
 - `docs/INFORMATION_MENU_SPEC_V1.md`／`docs/SCHEDULE_MENU_SPEC_V1.md`／`docs/SYSTEM_MENU_SPEC_V1.md`
