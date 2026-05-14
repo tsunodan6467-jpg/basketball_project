@@ -32,10 +32,11 @@
 
 ### 2.1 共通 Theme（白ベース検証・限定適用）
 
-- **共通 Theme**（`godot/themes/phase4_readonly_core.tres`）と **preview**（`godot/scenes/theme_preview.tscn`）で **見た目を検証中**。**10 画面への一括適用**や **ホーム全体の Theme 化**は **していない**（**限定適用の段階**）。
-- **契約 / 人事サマリー**: ヘッダー・契約概要・ロスター構成・注意に **部分的に** Theme を当てた。**人事リスク**・**主要契約選手**（`Label.new()` 等の動的行）と **ホーム**は **この節の対象外**（従来の仮スタイルまたは暗パネル前提のまま）。
-- **ロスター閲覧**: **ヘッダーのみ** Theme。**表（Scroll / RowList）は未着手**。
-- **HeaderNavRow**: Theme 作業の範囲では **ボタン数・接続・並びを変更していない**（ホーム上部 5 ボタンのまま）。
+- **共通 Theme**（`godot/themes/phase4_readonly_core.tres`）と **preview**（`godot/scenes/theme_preview.tscn`）で **見た目を検証中**。**10 画面への一括適用**や **ホームの Scroll 以下までの Theme 化**は **していない**（**限定適用の段階**）。
+- **契約 / 人事サマリー**: ヘッダー・契約概要・ロスター構成・注意に **部分的に** Theme を当てた。**人事リスク**・**主要契約選手**（`Label.new()` 等の動的行）は **未着手**（暗パネル＋`.gd` のまま）。
+- **ロスター閲覧**: **ヘッダー**に Theme。**表**は暗背景のまま **`roster_view.gd`** で OnDark 系 **`theme_type_variation`** に寄せた最小対応（**白カード化なし**）。
+- **ホーム**: **`HeaderCard` のみ**に Theme を割当（**ルート `HomeDashboard` には付けない**）。**`Scroll` 以下**（`NavColumns`・主要指標・各カード等）は **従来の StyleBox のまま**。**HeaderNavRow** は **ボタン数・接続・遷移先のシーン定義を変更していない**（親 `HeaderCard` に Theme が付くため、**見た目**は Theme 継承で変わりうる）。
+- **左サイドナビ**・**本格ナビの全面実装**は **未着手**（§10）。**第 11 画面を急いで増やすより**、いまは **本番 GUI 化の足場**（Theme 限定適用・読み取り導線の安定）を優先する段階、という整理でよい（優先度の最終判断はチーム）。
 - 詳細・ロードマップ・運用は **`godot/README.md` の「共通 Theme / 白ベース検証」** と **`docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` §15.1** を参照。
 
 ## 3. 現行ナビ構造

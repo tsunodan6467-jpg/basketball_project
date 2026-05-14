@@ -43,8 +43,9 @@
 **位置づけ**: **本番 GUI の完成や Theme の全面適用ではない**。`themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`scenes/theme_preview.tscn` による **第 0 段 preview** で、見た目と variation の確認を進めている段階である。**既存 10 画面すべてに一括で当てる予定ではない**。
 
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
-- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **`.gd` 側の明色 override が暗地前提**のため、**白カード化は未着手**（別タスクで `.gd` 調整が必要）。
-- **ロスター閲覧**（`roster_view.tscn`）: **ヘッダーのみ** Theme（`Phase4HeaderCard` + ヘッダー Label 濃色）。**Scroll / `RowList` / 表ヘッダー・選手行は未着手**（`roster_view.gd` の動的 Label は暗背景向け明色のまま）。
+- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **暗地前提のまま**で、**白カード化・Theme 統一は未着手**（別タスクで `.gd` 調整が必要）。
+- **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**ヘッダー**は `Phase4HeaderCard` + ヘッダー Label 濃色。**表**（`Scroll` / `RowList` 内の動的 `Label`）は **暗背景のまま**、`roster_view.gd` で `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` の **`theme_type_variation` に寄せた最小対応**（白カード化はしていない）。
+- **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard`（PanelContainer）のみ**に `phase4_readonly_core.tres` を割当し、`Phase4HeaderCard` を適用。クラブ名・シーズン・DataSource 等は白ヘッダ上の濃色に調整。**`Scroll` 以下**（カードメニュー・主要指標・各カード等）は **従来の `StyleBoxFlat_card` 等のまま**。**HeaderNavRow** はシーン上 **ボタン数・接続・遷移先の定義を変えていない**（親に Theme が付くため、実行時の見た目は Theme 継承で変わりうる）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。
 
@@ -57,14 +58,17 @@
 ◎ 契約・人事サマリー・ロスター構成カード（Phase4SummaryCard）
 ◎ 契約・人事サマリー・注意カード（Phase4WarningCard）
 ◎ ロスター閲覧・ヘッダー（Phase4HeaderCard + 文字色）
-□ 契約・人事サマリー・人事リスク / 主要契約選手の動的行（.gd + 色または variation）
-□ ロスター表本体（Scroll / RowList・.gd）
-□ ホーム Theme 化
+◎ ロスター表・OnDark（動的 Label → Phase4OnDarkTableHead / Phase4OnDarkTableCell・暗背景のまま）
+◎ ホーム・Header のみ（HeaderCard に Theme 限定・Scroll 以下は従来 StyleBox）
+□ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
+□ ホーム・Metrics / Summary 等のカード（Scroll 以下）
+□ ホーム全体への Theme 拡大（ルート一括など）
 □ 左サイドナビ
+□ ホーム「データ更新」表示 / ボタン判断
 □ Theme 全面適用（10 画面一括など）
 ```
 
-関連コミット（Theme 周辺・必要最小限）: `26fa722`（preview 追加）→ `b319af3`（契約人事ヘッダー適用）→ `2995a22`（契約概要）→ `77c5d04`（ロスター構成）→ `310ebed`（注意）→ `2bb594c`（ロスターヘッダー）。調査レポート: `827e6f8`（契約人事カード候補）、`c0e018e`（ロスター展開候補・`reports/`。追跡されない場合あり）。
+関連コミット（Theme 周辺・必要最小限の列）: `26fa722`（preview）→ `b572a7e` / `88f5f52`（白ベース検証調整）→ `8bf6788` / `4c1cb08`（文字色調整）→ `b319af3` → `2995a22` → `77c5d04` → `310ebed` → `2bb594c`（ロスターヘッダー）→ `d33edb6`（ロスター表 OnDark）→ `afb482d`（ホーム Header のみ）。調査: `827e6f8`、`c0e018e`、`03494b8`、`2cb49ed`（`reports/` は追跡されない場合あり）。到達点の文書化: `c41a6f5` など。
 
 ### 財務サマリー（第7画面）のファイル構成（参照）
 
@@ -173,10 +177,12 @@
   ◎ 共通Theme preview・白ベース検証版（`phase4_readonly_core.tres` / `theme_preview.tscn`）
   ◎ 契約・人事サマリーへのTheme限定適用（ヘッダー・契約概要・ロスター構成・注意）
   ◎ ロスター閲覧ヘッダーへのTheme限定適用
-  ★ README/docs 10画面到達点・Theme検証到達点の記録（本コミット）
+  ◎ ロスター表OnDark（動的Label・.gd）
+  ◎ ホームHeaderのみTheme限定適用（.tscn・Scroll以下は従来）
+  ★ README/docs Theme展開の到達点記録（本コミット）
 □ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
-□ ロスター表本体のTheme対応（.gd 前提）
-□ ホームTheme化・Theme全面適用（10画面一括など）
+□ ホーム・Scroll以下カードのTheme／本番ビジュアル調整
+□ Theme全面適用（10画面一括・ルート一括など）
 □ ホーム「データ更新」表示/ボタン判断
 □ 本格ナビ次段階 / 左サイドメニュー設計
 □ 第11画面を増やすかの判断（慎重）
@@ -212,7 +218,7 @@
 - **配布用に export 専用 exe を同梱し Godot から起動する**こと（未実装）
 - **`generated_at` を全 DTO に一斉追加する**こと、**Godot 側で JSON の更新時刻だけを常時表示する**こと（未実装・要別判断）
 - **契約 / 人事サマリー画面の本格ビジュアル調整**（現状は読み取りプロトタイプ優先）
-- **10 画面すべてへの共通 Theme の一括適用**、**ホーム全体の Theme 化**（**限定適用の検証段階**であり、表や動的行の Theme 化も **未完了**）
+- **10 画面すべてへの共通 Theme の一括適用**、**ホームの Scroll 以下まで含む全体 Theme 化**（**限定適用の検証段階**。ホームは **Header のみ**適用済みで、**主要指標・カードメニュー等は従来の暗色カードのまま**）
 - **Godot 本番 GUI の一本化**
 
 ## ファイル構成（抜粋）

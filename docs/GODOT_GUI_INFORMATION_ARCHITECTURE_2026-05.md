@@ -387,13 +387,14 @@
 **位置づけ**: **本番 GUI の確定デザインではない**。`godot/themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`godot/scenes/theme_preview.tscn` による **第 0 段 preview** で、variation とコントラストを確認している。**既存 10 画面へ一括適用したわけではない**。
 
 - **preview**: `theme_preview.tscn` は **本番10画面に未適用**。暗背景用に `Phase4OnDarkTitle` / `Phase4OnDarkTableHead` 等を使い分け、可読性を確認している。
-- **限定適用の方針**: まず **`.tscn` のみ**で済む **静的ヘッダー**・**静的 Panel カード**から当てる。**`Label.new()` + `add_theme_color_override` で明色を付けた動的行**は暗背景前提のため、白い `Phase4SummaryCard` 内へ載せ替えるには **`.gd` で色または `theme_type_variation` を直す**必要がある（契約・人事の人事リスク／主要契約選手、ロスター表が該当）。
+- **限定適用の方針**: まず **`.tscn` のみ**で済む **静的ヘッダー**・**静的 Panel カード**から当てる。**`Label.new()` + 暗地前提の明色 override** は、白い `Phase4SummaryCard` 内へ載せ替えるには **`.gd` で `theme_type_variation` または色を直す**必要がある。**ロスター表の動的行**は `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` で **暗背景のまま**対応済み（`d33edb6`）。**契約・人事の人事リスク／主要契約選手**は **未着手**。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルート Theme 割当。**`Phase4HeaderCard`**（ヘッダー）＋ヘッダー内 Label 濃色。**`Phase4SummaryCard`**: 契約概要・ロスター構成。**`Phase4WarningCard`**: 注意。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` のまま（動的行は `.gd` 未変更）。
-- **ロスター閲覧**（`roster_view.tscn`）: **ヘッダーのみ** `Phase4HeaderCard`。**Scroll / 表**は従来どおり（`roster_view.gd` の動的 Label は未着手）。
-- **読込・導線**: `from_python` / mock、**HeaderNavRow の構成変更なし**、**Godot から Python 自動起動なし**（§14.1 と同じ）。
-- **運用**: シーン保存後は **UID 参照エラー**が出ないか Godot で確認。**エディタ実行後**は `git status` で意図しない差分が混ざっていないか確認（`*_from_python.json` は **コミットしない**）。
+- **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**`Phase4HeaderCard`**（ヘッダー）。**表**は `roster_view.gd` で動的 `Label` に **`theme_type_variation`**（OnDark 系）を付与（**白カード化なし**）。
+- **ホーム**（`home_dashboard.tscn`）: **ルートに Theme なし**。**`HeaderCard` のみ**に `phase4_readonly_core.tres` を割当し **`Phase4HeaderCard`**。従来の `StyleBoxFlat_header` は削除。**`Scroll` 以下**（NavColumns・主要指標・各カード等）は **従来 SubResource の StyleBox のまま**。**`home_dashboard.gd` は不変**（JSON 経路・`DataSourceLabel` 文言は従来どおり）。
+- **読込・導線**: `from_python` / mock、**HeaderNavRow のボタン数・接続・遷移先のシーン定義は変更していない**（`afb482d` は HeaderCard とラベル色・SubResource 整理のみ）、**Godot から Python 自動起動なし**（§14.1 と同じ）。
+- **運用**: シーン保存後は **UID 参照エラー**が出ないか Godot で確認。**エディタ実行後**は `git status` で意図しない差分が混ざっていないか確認（`*_from_python.json` は **コミットしない**）。**UID の再シリアライズ**で他画面参照が壊れないか、差分レビュー時に注意。
 
-**関連コミット（Theme 周辺・必要最小限）**: `26fa722`（preview 追加）→ `b319af3`（契約人事ヘッダー）→ `2995a22`（契約概要）→ `77c5d04`（ロスター構成）→ `310ebed`（注意）→ `2bb594c`（ロスターヘッダー）。調査: `827e6f8`（契約人事カード候補）、`c0e018e`（ロスター展開候補・`reports/` は `.gitignore` で追跡されない場合あり）。文言・OnDark 調整: `b572a7e` / `8bf6788` / `4c1cb08` など（本節では列挙のみ）。
+**関連コミット（Theme 周辺・本節で列挙する必要最小限）**: `26fa722` → `b572a7e` → `8bf6788` → `4c1cb08` → `2995a22` → `77c5d04` → `310ebed` → `2bb594c` → `d33edb6` → `afb482d`（契約人事ヘッダー適用は `b319af3`）。他の調査・文言コミットは `godot/README.md` や履歴を参照。
 
 ---
 
