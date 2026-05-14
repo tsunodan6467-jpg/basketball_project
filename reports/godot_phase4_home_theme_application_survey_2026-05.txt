@@ -1,0 +1,290 @@
+================================================================================
+Godot Phase 4 — ホーム画面への Theme 最小限定適用 調査レポート
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11（リポジトリ閲読のみ。実装・シーン・Theme・Python・docs 変更なし）
+
+参照コミット（ユーザー提示・git log 照合）:
+  d33edb6  Godotロスター表の動的LabelをOnDark Themeに寄せる
+  2bb594c  Godotロスター画面のヘッダーにThemeを限定適用
+  c41a6f5  Godot白ベースTheme検証の到達点を記録
+
+読取ファイル:
+  godot/scenes/home_dashboard.tscn（全文）
+  godot/scripts/home_dashboard.gd（全文）
+  godot/themes/phase4_readonly_core.tres（冒頭〜 variation 定義）
+  godot/README.md（Theme / ホーム関連の grep 抜粋）
+
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 共通 Theme `phase4_readonly_core.tres`（uid://c9phase4rocore01）: Phase4HeaderCard /
+  Phase4SummaryCard / Phase4WarningCard / Phase4ChipPanel / Phase4DataSource /
+  Phase4Title / Phase4Muted / OnDark 系など。
+- 契約・人事サマリー: ルート Theme + ヘッダー・概要・ロスター構成・注意に限定適用済み（README 記載）。
+- ロスター: ルート Theme + ヘッダー Phase4HeaderCard。表は `roster_view.gd` で
+  Phase4OnDarkTableHead / Phase4OnDarkTableCell（d33edb6）。
+- ホーム `home_dashboard.tscn`: **ルートに Theme リソースは未割当**。SubResource の
+  StyleBoxFlat_header / _card / _warn / _chip のみで見た目を完結させている。
+- `home_dashboard.gd`: JSON 読込・既存 Label への文字列代入・`change_scene_to_file` のみ。
+  **動的 Label.new はなし**。Theme 導入の必須条件として .gd 変更は **原則不要**。
+
+
+観点キー（候補ごとの §5〜10 末尾で 1〜14 を短文整理）
+  1 商品価値  2 Steam品質  3 90年代GM風への近さ  4 導線破壊リスク
+  5 HeaderNavRow 影響  6 NavColumns/経営3ボタン  7 変更ファイルの少なさ
+  8 .tscn のみ  9 .gd 要否  10 from_python/mock/DataSourceLabel
+  11 手動確認負荷  12 UID リスク  13 1コミット戻し  14 今やるべきか
+
+
+3. home_dashboard.tscn の構造
+--------------------------------------------------------------------------------
+【ルート】`HomeDashboard`（Control）: script のみ。Theme なし。
+
+【背景】`Background` ColorRect（暗色 0.06,0.07,0.09）。
+
+【ヘッダーブロック】`Margin/RootCol/HeaderCard`（PanelContainer）
+  - `theme_override_styles/panel = SubResource("StyleBoxFlat_header")` … 暗めヘッダー帯。
+  - `HeaderInner` VBox（separation 8）
+    - `HeaderTopRow` HBox: `HeaderBadge`（chip）+ `PlaceholderStrip`（chip）… いずれも StyleBoxFlat_chip。
+      子 Label: BadgeLabel / PlaceholderLabel（明系 font_color）。
+    - `HeaderNavRow` HBox: **5 ボタン**（ロスター・クラブ史・順位表・日程・施設）。
+      各 Button はシーン個別の theme_override なし（デフォルト Engine ボタン見た目）。
+    - `ClubNameLabel`（24px 明色）, `SeasonLabel`（15px）, `DataSourceLabel`（12px 灰青）。
+
+【ステータス】`StatusLabel`（RootCol 直下・エラー時表示）。
+
+【スクロール本体】`Scroll` → `Inner` VBox（separation 12）
+  - `CardNavMenu` PanelContainer … **StyleBoxFlat_card**（Metrics 等と同一 SubResource）。
+    - `VBoxNav`: NavTitle, NavHelp, `NavColumns` HBox（separation 14）
+      - `ColTeam` / `ColLeague` / `ColClub` / `ColMgmt` … 各カテゴリ Label + 2〜3 Button。
+      - **経営列 ColMgmt**: 財務サマリー・オーナーミッション・契約・人事サマリー（3 ボタン）。
+  - `SecMetricsTitle` Label（「主要指標」）
+  - `MetricsRow` HBox: `CardDivision` / `CardRank` / `CardMoney` … いずれも **StyleBoxFlat_card**。
+  - `CardTeamExtras` … StyleBoxFlat_card。内部 Row の visibility は .gd。
+  - `CardWarnings` … **StyleBoxFlat_warn**（他と別 SubResource）。
+  - `CardNext` / `CardSummary` / `CardTasks` / `CardNews` … いずれも StyleBoxFlat_card。
+
+【フッター】`FooterNote` Label（RootCol 最下・手動 JSON / 非自動起動の説明）。
+
+【StyleBoxFlat の共有】
+  - **StyleBoxFlat_card**: CardNavMenu + Metrics 3枚 + Extras + Next + Summary + Tasks + News（広く共有）。
+  - **StyleBoxFlat_header**: HeaderCard のみ。
+  - **StyleBoxFlat_warn**: CardWarnings のみ。
+  - **StyleBoxFlat_chip**: Header 内 2 チップのみ。
+
+【接続】HeaderNavRow の 5 ボタン + CardNavMenu 内 10 ボタン → `home_dashboard.gd` の各 `_on_*`。
+
+
+4. home_dashboard.gd の構造
+--------------------------------------------------------------------------------
+- `_home_json_candidate_paths`: from_python → mock の順で FileAccess。
+- `_load_home_snapshot` / `_data_source_caption`: URI に応じた **DataSourceLabel** 用キャプション。
+- `_apply_snapshot`: 各 `@onready` Label へ `.text` 設定、`_set_optional_row` で Row の visible。
+- **Label.new / add_child / add_theme_* なし**。Theme 適用は **シーン側のみで完結可能**。
+- シーン遷移: `change_scene_to_file` のみ。パス定数は既存のまま。
+- Theme 導入で .gd を触る必要があるのは、**将来** Footer の動的化やボタン生成をした場合など（現状不要）。
+
+
+5. 候補A：ホーム Header だけ Theme 適用
+--------------------------------------------------------------------------------
+内容: `HeaderCard` を `Phase4HeaderCard` に寄せ、ロスター／契約人事ヘッダー同様に
+  クラブ名・シーズン・DataSource を **白パネル上の濃色**へ揃える。チップは `Phase4ChipPanel` 可。
+
+利点:
+  - **「顔」となる帯だけ**先に本番 Theme と整合。商品価値 / Steam 第一印象に直結。
+  - Metrics / Nav / Footer は現状の暗色カードのまま → **二層 UI（上白・下暗）**はロスター画面と同型で説明しやすい。
+  - HeaderNavRow は **兄弟のまま**残せる。ボタン数・接続・シグナルは変更不要（見た目のみ変化の可能性）。
+
+欠点:
+  - ヘッダー内 Label の **per-node theme_override_colors を大量に差し替え**（契約人事と同程度の作業）。
+  - `StyleBoxFlat_header` を外すと、チップ以外の「暗ヘッダー一体感」は失われる（意図的な移行）。
+
+触りそうなファイル:
+  **主に** `godot/scenes/home_dashboard.tscn`。**任意**で `phase4_readonly_core.tres`（新 variation は今回禁止方針なら触らない）。
+
+**推奨パターン（調査メモ）**: ルートではなく **`HeaderCard` ノードにのみ `theme = phase4_readonly_core` を割り当て**、
+  当該 Panel に `theme_type_variation = Phase4HeaderCard` を指定すると、**Scroll 以下には Theme が伝播しない**
+  （子孫のみ適用）ため、Metrics / CardNavMenu の SubResource スタイルと **衝突しにくい**。
+
+.tscn だけで済むか: **はい**（現行 .gd との独立性が高い）。
+
+リスク:
+  - HeaderNavRow の Button が **Theme 既定の明色ボタン**になり、従来のフラット暗色と質感が変わる（好み・コントラスト要確認）。
+  - UID はノード追加なし・プロパティ変更中心なら中程度。
+
+観点 1〜14: 高 / 高 / 中（帯はモダン寄り。90年代風は下層カードの方が効きやすい） / 低 / 中（見た目のみ） / 無 / 1 ファイルに集約可 / Yes / 不要 / 無（.gd 不変） / 中 / 中 / 高 / **最有力の第一歩**
+
+
+6. 候補B：Metrics / Summary 系カード 1 枚だけ Theme 適用
+--------------------------------------------------------------------------------
+例: `MetricsRow` 内の **`CardDivision` のみ** `theme_type_variation = Phase4SummaryCard`、
+  内部 `HDiv` / `DivisionLabel` を Phase4TableHead / Phase4Title 系または濃色 override に。
+
+利点:
+  - **主要指標**が目立ち、デモで「数字が載っている」印象を強化しやすい。
+
+欠点:
+  - 同一 `MetricsRow` 内で **1 枚だけ白カード**になると、CardRank / CardMoney と **質感の不整合**（意図的デザインにできるが要調整）。
+  - 白カード化に伴い、現行の明色大文字（DivisionLabel 17px）を **濃色へ変更必須**（読みやすさ）。
+
+触りそうなファイル: `home_dashboard.tscn` のみ（対象 Panel + 子 Label 数個）。
+
+.tscn のみ: **はい**。
+
+リスク: MetricsRow の **横幅バランス**（3 等分）が視覚的に崩れて見える可能性（実寸は不変でも「だけ浮く」）。
+
+観点 1〜14: 中〜高 / 中〜高 / 低〜中 / 低 / 無 / 無 / 小 / Yes / 不要 / 無 / 中 / 中 / 高 / A の次点
+
+
+7. 候補C：経営カテゴリカードだけ Theme 適用
+--------------------------------------------------------------------------------
+構造上の注意: **経営 3 ボタンは `CardNavMenu` 単一 Panel の子**（ColMgmt VBox）。経営列だけ
+  背景を変えるには、(1) CardNavMenu を分割する大改修、(2) 3 ボタンにだけ別 Panel を被せる、
+  (3) ボタンに `theme_type_variation` のみ足して **背景は共通カードのまま**、のいずれかになる。
+
+利点:
+  - 経営導線の視認性向上の可能性。
+
+欠点:
+  - **「カードだけ」物理分割がない**ため、候補名どおりの適用は **構造変更なしでは不完全**になりやすい。
+  - NavColumns 全体のバランスを崩しやすい。
+
+触りそうなファイル: `.tscn` 最小なら **ボタン 3 つのみ**（見た目限定）。カード「だけ」は難。
+
+.tscn のみ: ボタン調整なら Yes。真の「経営カード分離」は **いいえ**（VBox 再編）。
+
+観点 1〜14: 中 / 中 / 低 / 低〜中 / 無〜小 / **あり**（列の見え方） / 中 / 部分的 / 不要 / 無 / 中 / 中 / 中 / **初回最小としては A・B より劣る**
+
+
+8. 候補D：HeaderNavRow のボタンだけ Theme 適用
+--------------------------------------------------------------------------------
+内容: 5 ボタンに `theme_type_variation` や個別 StyleBox を当てる。ルート全体 Theme は付けない等。
+
+利点:
+  - ナビの統一感。
+
+欠点:
+  - ヘッダー帯が暗のままだと、Theme の **明ボタン**が浮く／逆に暗ボタンを自作すると Theme 本体と二重管理。
+  - **導線そのものは不変でも**、クリック領域・コントラスト・フォーカス枠の変化で「触れた感」が変わる（ユーザー認知）。
+
+触りそうなファイル: `home_dashboard.tscn`（Button 5 個 + 必要なら Theme）。
+
+.tscn のみ: **はい**。
+
+リスク: HeaderCard 全体のスタイルと **ボタンスタイルの整合**が取れないと安っぽく見える。
+
+観点 1〜14: 中 / 中 / 低 / 低〜中 / **高**（見た目の主対象） / 無 / 小 / Yes / 不要 / 無 / 低〜中 / 低 / 中 / **A とセットで検討が安全。単独初回は非推奨**
+
+
+9. 候補E：ホームはまだ触らず、契約人事の動的 Label へ
+--------------------------------------------------------------------------------
+利点:
+  - ホームの **二重導線・StyleBox 共有**に触れない。回帰リスク最小。
+  - 契約人事画面の **一枚完結**に投資できる。
+
+欠点:
+  - **商品の顔（ホーム）**の改善が遅れる。.gd 必須（別タスク）。
+
+観点 1〜14: 中（画面単体） / 中 / 低 / 最低 / 無 / 無 / 中（別ファイル） / .gd 中心 / **要** / 無 / 中 / 中 / 中 / リスク最小優先なら
+
+
+10. 候補F：ホーム全面 Theme 化
+--------------------------------------------------------------------------------
+利点: 一気に統一感。Steam 向け完成度高い。
+
+欠点:
+  - StyleBoxFlat_card を共有している **8+ ノード**が一斉に変わる。Scroll 内の縦流れ・警告色の独立性も要再設計。
+  - **初回スライスとしては不適**（調査結論）。
+
+観点 1〜14: 最高（完成時） / 高 / 中〜高（作り込み次第） / 中〜高 / 高 / 高 / 低 / 主に .tscn 大量 / 原則不要 / 無 / **高** / **高** / 低 / **今はやらない**
+
+
+11. StyleBoxFlat 衝突・削除リスク
+--------------------------------------------------------------------------------
+- **HeaderCard**: `StyleBoxFlat_header` をやめて `Phase4HeaderCard` に置換する場合、
+  **ヘッダー内の全 Label 色を白パネル前提に再設定**しないと可読性が崩れる（ロスター／契約人事と同パターン）。
+- **StyleBoxFlat_card**: 1 枚だけ Phase4SummaryCard に差し替え**可能**だが、**他ノードは同じ SubResource のまま**
+  残るため、「SubResource を削除」すると **複数カードが同時に壊れる**。削除は **共用が解けるまで不可**。
+- **StyleBoxFlat_warn**: Phase4WarningCard と意味が近いが、現行 warn は **赤茶系ダーク**。Theme の Warning は **黄系ライト**。
+  置換時は **文言色（HWarn / WarningsLabel）**の再調整が必要。
+- **StyleBoxFlat_chip**: Phase4ChipPanel で置換可能。ヘッダー帯とセットで整えるとよい。
+
+結論: **SubResource は「参照ゼロになったら」削除**。部分適用では **残す**のが安全。
+
+
+12. HeaderNavRow / NavColumns への影響
+--------------------------------------------------------------------------------
+- HeaderNavRow は **HeaderCard 直下**。HeaderCard に局所 Theme を付けると **ボタンもその Theme 配下**になる。
+- NavColumns は **Scroll 内 CardNavMenu** にあり、HeaderCard 局所 Theme の外に置ける → **A で Nav は無変更可能**。
+- ルートへ `theme` を付けると **全画面要素に Button/Label 既定が波及** → 非推奨（F に近い）。
+
+
+13. from_python / mock / DataSourceLabel への影響
+--------------------------------------------------------------------------------
+- 表示文字列はすべて `_data_source_caption` と各 `_txt` / `_join_lines`。**Theme は文字列を変えない**。
+- DataSourceLabel はシーン上の Label。**色・フォントを Theme variation に寄せるだけ**なら .gd 不要。
+- pytest（home_dashboard export）は **JSON 構造・パス**を見るため、**シーン見た目のみの変更で赤化する可能性は低い**（実装時も確認推奨）。
+
+
+14. 商品価値比較（定性）
+--------------------------------------------------------------------------------
+  F > A > B > D > C > E（E はホーム以外への投資）
+
+
+15. 安全性比較
+--------------------------------------------------------------------------------
+  最も安全: E（ホーム不触） > A（HeaderCard 局所 Theme + Label 調整） ≥ B（1 Panel）
+  中: D（ボタンのみ）
+  低: C（構造の誤解あり） / F
+
+
+16. Cursor としてのおすすめ順（実装スプリントの提案。本調査では実施しない）
+--------------------------------------------------------------------------------
+  1位: **A**（HeaderCard のみに `theme` + `Phase4HeaderCard` + Label/chip 調整。Scroll 外は現状維持）
+  2位: **B**（Metrics の 1 枚、例 CardDivision のみ Summary 化＋子 Label 濃色化）
+  3位: **E**（ホームを触りたくないスプリントなら契約人事 .gd へ）
+  4位: **D**（A 完了後、Header 内ボタンを Theme に揃える第2コミット）
+  5位: **C**（CardNavMenu 再設計が伴うなら別イテレーション）
+  6位: **F**（専用ブランチ・設計凍結後）
+
+
+17. 今すぐ実装してよい最小案（方針のみ）
+--------------------------------------------------------------------------------
+- **ステップ A0**: `HomeDashboard` ルートには Theme を付けない。
+- **ステップ A1**: `HeaderCard` に `theme = phase4_readonly_core.tres` を割当（ext_resource 追加）。
+- **ステップ A2**: `HeaderCard` の Panel に `theme_type_variation = Phase4HeaderCard`。
+  `theme_override_styles/panel`（StyleBoxFlat_header）を外す。
+- **ステップ A3**: ClubNameLabel / SeasonLabel / DataSourceLabel / Badge / Placeholder を
+  ロスター・契約人事ヘッダーと同様 **濃色・Phase4DataSource 等**に整理（必要なら `theme_type_variation`）。
+- **ステップ A4**: Godot 4.6.2 で HeaderNavRow 5 ボタンの視認性・フォーカス・ホバーを確認。
+
+- **ステップ B 最小**: `CardDivision` のみ `theme_type_variation = Phase4SummaryCard`、
+  `HDiv` → Phase4Muted 相当、`DivisionLabel` → Phase4Title 相当の濃色（白上可読）。
+
+
+18. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- ルートに Theme を載せて **ホーム一括**で Button 既定を変えること（Metrics/Nav/警告まで一斉波及）。
+- StyleBoxFlat_card を削除して **参照中の全カードを一度に壊す**こと。
+- HeaderNavRow の **ボタン数・接続・シーン遷移先**を変えること（ドキュメント上の制約・回帰リスク）。
+
+
+19. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- ホームの第一歩を **A（ヘッダー帯）**にするか、**B（指標の目玉 1 枚）**にするか。
+- HeaderCard 局所 Theme 時、**HeaderNavRow のボタン**を Phase4 既定のまま使うか、暗色帯用に
+  別 variation を将来 Theme に足すか（今回 Theme ファイル変更禁止の調査範囲外）。
+- README の「ロスター表未着手」記述と実装（d33edb6）の **ドキュメント追従タイミング**（本レポートでは未編集）。
+
+
+20. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査では **コード・シーン・Theme・docs・README・Python・JSON・project.godot を一切変更していない**。
+新規作成のみ: `reports/godot_phase4_home_theme_application_survey_2026-05.txt`。
+
+================================================================================
+EOF
+================================================================================
