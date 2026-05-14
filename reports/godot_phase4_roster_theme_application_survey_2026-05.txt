@@ -1,0 +1,206 @@
+================================================================================
+Godot ロスター画面: 白ベース Theme 展開候補調査
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-12（調査実施時点のリポジトリ HEAD）
+対象コミット: 310ebedb670127328a7a445267d728c53f9cb9d5
+
+参照ファイル（読取のみ・本調査では未変更）:
+  - godot/scenes/roster_view.tscn
+  - godot/scripts/roster_view.gd
+  - godot/themes/phase4_readonly_core.tres（冒頭〜 Phase4WarningCard まで確認）
+
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+契約・人事サマリー（contract_personnel_summary_view）では以下が確立済み。
+- ルートに phase4_readonly_core.tres を割当
+- HeaderCard: Phase4HeaderCard（scene の header 用 StyleBoxFlat は撤去済み）
+- ヘッダー内静的 Label の濃色化（白アイボリー上で可読）
+- 契約概要 / ロスター構成: Phase4SummaryCard + タイトル・本文の濃色
+- 注意: Phase4WarningCard + 茶〜琥珀系の濃色
+- from_python / mock・ホーム往復・UID 問題なし
+
+ロスター画面（roster_view）は現状、共通 Theme を **ext_resource していない**。
+Header は **StyleBoxFlat_header**（紺系）の SubResource override。
+スクロール部は **静的カードなし**。表見出し・選手行は **100% GDScript 生成**。
+
+
+3. roster_view.tscn の構造
+--------------------------------------------------------------------------------
+- RosterView (Control) … **theme 未設定**。script = roster_view.gd のみ ext_resource。
+- Background: 暗色 ColorRect（0.06, 0.07, 0.09）
+- Margin / RootCol (VBox, separation 12)
+  - HeaderCard (PanelContainer)
+    - theme_override_styles/panel = SubResource("StyleBoxFlat_header") … ローカル紺パネル
+    - HeaderInner / HeaderTopRow
+      - ReadonlyBadge / ModeStrip: SubResource("StyleBoxFlat_chip")（暗チップ）
+      - ReadonlyBadgeLabel / ModeStripLabel: 明色 font_color
+    - **HeaderNavRow**（契約人事と異なり、ホームボタンがトップ行ではなく独立行）
+      - HomeNavButton
+    - TitleLabel, TeamNameLabel, SummaryMetaLabel, DataSourceLabel, FooterNoteLabel
+      … いずれも **暗ヘッダー向けの明色** font_color override
+  - StatusLabel（RootCol 直下・エラー時表示・赤系）
+  - Scroll (VBox RowList へ)
+    - RowList (%RowList): separation 8 のみ。**子ノードはシーンに無し**（実行時に .gd が追加）
+
+SubResource:
+  - StyleBoxFlat_header … HeaderCard のみ
+  - StyleBoxFlat_chip … バッジ2つのみ
+
+契約人事と異なり **StyleBoxFlat_summary は存在しない**（スクロール内に Panel カード無し）。
+
+scene uid: uid://cr9rosterproto01
+
+
+4. roster_view.gd の動的表示処理
+--------------------------------------------------------------------------------
+- _apply_snapshot: JSON 成否で StatusLabel / ヘッダー各 Label テキストを更新。
+- _clear_rows: %RowList の子をすべて queue_free。
+- _add_table_header_row:
+  - HBoxContainer.new() + 各列 Label.new()
+  - **add_theme_color_override("font_color", Color(0.82, 0.88, 0.96))** … 暗背景用の明色
+  - font_size 12、列幅 _col_width
+  - 続けて HSeparator を RowList に追加
+- _add_player_row:
+  - 同様に HBoxContainer + 9 セルの Label.new()
+  - **add_theme_color_override("font_color", Color(0.92, 0.94, 0.98))** … データ行も明色
+  - 選手名列・状態列に tooltip / mouse_filter の特例あり
+
+コメントより「背景・テーマ追加はしない」と明示されているが、現状は暗 Background 直置きの表なので明色が妥当。
+
+
+5. Theme 適用しやすい箇所
+--------------------------------------------------------------------------------
+**A. ヘッダー限定（最も契約人事と同型）**
+- ext_resource で phase4_readonly_core.tres を追加し、RosterView に theme を設定。
+- HeaderCard: theme_type_variation = Phase4HeaderCard、**StyleBoxFlat_header の panel override を削除**。
+- チップは暗背景のまま → ReadonlyBadge / ModeStrip の chip override とラベル明色は **維持で可**。
+- TitleLabel / TeamNameLabel / SummaryMetaLabel / DataSourceLabel / FooterNoteLabel を
+  契約人事ヘッダーと同系の **濃色 override** に差し替え（白アイボリー上で可読に）。
+- HomeNavButton は Theme の Button スタイルが自動適用される。
+
+**B. ルート Theme のみ先に入れる**
+- ヘッダー panel はまだローカル override のままにしてもよいが、二重管理になるため非推奨。
+
+**C. スクロール周りを「カード化」する**
+- RowList を **PanelContainer + Phase4SummaryCard** で包む案は、**ノード階層が1段増える**（構造変更）。
+- 白カード内に表を載せるなら、**現状の明色セルは不可読** → 必ず **.gd で色または variation 変更**が必要。
+
+
+6. Theme 適用が危険な箇所
+--------------------------------------------------------------------------------
+- **表ヘッダー・データ行を白カード上に載せる**のに .gd の明色 override を残すこと
+  → コントラスト崩壊。
+- Header を Phase4HeaderCard にしただけで **TitleLabel 等の明色 override を残す**こと
+  → 契約人事で起きていたのと同様に薄く見える。
+- StatusLabel は暗背景上のエラー表示のため、**現状の赤系のまま**が無難（ヘッダー外）。
+
+
+7. ヘッダー限定適用案
+--------------------------------------------------------------------------------
+- 変更は主に roster_view.tscn + load_steps 増（Theme ext_resource）。
+- StyleBoxFlat_header を参照しなくなれば **未参照 SubResource 削除可能**だが、削除は
+  Godot 再保存で差分が広がることがあるため、**別コミットで削除**するか、残しても害は小さい。
+- 契約人事の 4c1cb08 系の色（タイトル 0.08,0.11,0.18、メタ 0.2,0.25,0.36、DataSource 0.18,0.28,0.55 等）
+  を **FooterNoteLabel** にも流用すれば一貫する。
+
+
+8. カード限定適用案
+--------------------------------------------------------------------------------
+- 現状シーンに **静的 Summary / Warning カードは無い**。
+- 「カード」を足すには PanelContainer を新設する必要があり、**純粋に .tscn のみ**でも
+  RowList の親を差し替える **階層変更**になる。
+- カード内に表を入れるなら **.gd 必須**（セル色・または theme_type_variation 付与）。
+
+
+9. 表 / 選手行への適用案
+--------------------------------------------------------------------------------
+- **現状のまま暗背景上**なら、Theme の **Phase4OnDarkTableHead / Phase4OnDarkTableCell** を
+  .gd で variation 付与するか、Color を OnDark 系に寄せるのが筋が良い。
+- **白 Summary カード内の表**にする場合:
+  - Phase4TableHead / Phase4TableCell（濃色）を variation で付与
+  - または _add_* 内の Color を Phase4TableCell に合わせた濃色へ変更
+- 列幅・HSeparator・tooltip ロジックはそのまま活かせる。
+
+
+10. .tscn だけで済む最小案
+--------------------------------------------------------------------------------
+1. ext_resource: res://themes/phase4_readonly_core.tres（uid 既存 Theme と整合）
+2. RosterView に theme = ExtResource(...)
+3. HeaderCard: **Phase4HeaderCard**（契約人事と同じ。SummaryCard ではない）
+4. HeaderCard から theme_override_styles/panel（StyleBoxFlat_header）削除
+5. TitleLabel / TeamNameLabel / SummaryMetaLabel / DataSourceLabel / FooterNoteLabel の
+   font_color を濃色へ（契約人事ヘッダーと揃えるのが最短）
+6. StyleBoxFlat_chip とチップ内ラベルは維持
+7. **RowList / Scroll / .gd は触らない** → 表は暗背景のまま明色セルで現状維持
+
+→ **契約人事の「ヘッダー限定適用」手順のほぼコピー**で済む。
+
+
+11. .gd 変更が必要な案
+--------------------------------------------------------------------------------
+- 表を **Phase4SummaryCard** の白パネル内に移す（親 Panel 追加）＋セル可読化。
+- 表ヘッダー・データの色を **Theme variation** に統一し override をやめる。
+- 暗背景のまま OnDark variation に切り替えて Theme 一本化する（見た目微調整は要確認）。
+
+いずれも _add_table_header_row / _add_player_row の修正が中心。
+
+
+12. UID / 差分リスク
+--------------------------------------------------------------------------------
+- roster_view.tscn の uid://cr9rosterproto01 は維持すべき。
+- ext_resource 追加で **load_steps** が増える（4→5 など）。意図しないノード順の再ソートに注意。
+- SubResource 削除時は **差分が広がりやすい** → ヘッダー適用と SubResource 削除を分けるとレビューしやすい。
+
+
+13. 契約・人事サマリー手順から流用できること
+--------------------------------------------------------------------------------
+- phase4_readonly_core.tres をルート theme に載せるパターン。
+- HeaderCard の **theme_type_variation + ローカル panel StyleBox 削除**。
+- ヘッダー直下 Label の **明色 override →濃色**（チップ上ラベルは暗チップ向けに残す）。
+- HomeNavButton は追加の scene スタイル無しで Theme の Button が効く。
+- **チップは StyleBoxFlat_chip のまま**（契約人事と同じ考え方）。
+
+流用しにくい点:
+- 契約人事は Scroll 内に **静的 Panel カード**があったが、ロスターには **無い**。
+- 表は **全動的**のため、「カードだけ .tscn」で済むパターンが無い。
+
+
+14. Cursor としてのおすすめ順
+--------------------------------------------------------------------------------
+1. **ヘッダー限定**（.tscn のみ・契約人事と同型）… リスク最小・手順検証に最適
+2. 表を暗背景のまま **OnDark系 variation + .gd** で Theme に寄せる（見た目は微差）
+3. Scroll 内に **Summary カードを1枚追加**し表を包む（.tscn 階層 + .gd 色）
+4. 列ごとのリッチ表現（ zebra 等）は **最後**
+
+
+15. 今すぐ実装してよい最小案
+--------------------------------------------------------------------------------
+上記「10. .tscn だけで済む最小案」を **1 コミット**で実施する。
+pytest はホーム export / smoke が通ればよい（ロスター専用の scene テストが無ければ
+手動で Godot 確認を推奨）。
+
+
+16. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- ヘッダーを白化した直後に **表だけ** Phase4SummaryCard へ移す（セル色未対応のまま）。
+- Theme ファイルのトーンをロスター専用にいじる（本調査スコープ外）。
+- RowList の unique_name や % 参照パスを壊す階層変更。
+
+
+17. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査では以下を **読取のみ**とし、**編集していない**:
+  - godot/scenes/roster_view.tscn
+  - godot/scripts/roster_view.gd
+  - godot/themes/phase4_readonly_core.tres
+  - basketball_sim/ / docs/ / README / project.godot / 生成 JSON / handoff md
+
+本ファイル reports/godot_phase4_roster_theme_application_survey_2026-05.txt のみ新規作成。
+
+================================================================================
+END
+================================================================================
