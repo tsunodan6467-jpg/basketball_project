@@ -112,6 +112,19 @@ func _clear_rows() -> void:
 		c.queue_free()
 
 
+## 表ヘッダー用。暗背景向け `Phase4OnDarkTableHead`（`roster_view.tscn` ルートの Theme 継承）。
+## Theme 既定フォントは 11px のため、従来表示との互換で 12px を維持する。
+func _style_ondark_table_header_label(lab: Label) -> void:
+	lab.theme_type_variation = &"Phase4OnDarkTableHead"
+	lab.add_theme_font_size_override("font_size", 12)
+
+
+## 表セル用。暗背景向け `Phase4OnDarkTableCell`（同上）。
+func _style_ondark_table_cell_label(lab: Label) -> void:
+	lab.theme_type_variation = &"Phase4OnDarkTableCell"
+	lab.add_theme_font_size_override("font_size", 12)
+
+
 func _add_table_header_row() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -122,9 +135,7 @@ func _add_table_header_row() -> void:
 		var h: String = headers[i]
 		var lab := Label.new()
 		lab.text = h
-		# データ行と同じサイズで、色だけ少し明るくして区別（背景・テーマ追加はしない）
-		lab.add_theme_color_override("font_color", Color(0.82, 0.88, 0.96, 1))
-		lab.add_theme_font_size_override("font_size", 12)
+		_style_ondark_table_header_label(lab)
 		lab.custom_minimum_size.x = _col_width(i)
 		lab.clip_text = true
 		row.add_child(lab)
@@ -163,8 +174,7 @@ func _add_player_row(p: Dictionary) -> void:
 		var s: String = cells[i]
 		var lab := Label.new()
 		lab.text = s
-		lab.add_theme_color_override("font_color", Color(0.92, 0.94, 0.98, 1))
-		lab.add_theme_font_size_override("font_size", 12)
+		_style_ondark_table_cell_label(lab)
 		lab.custom_minimum_size.x = _col_width(i)
 		lab.clip_text = true
 		if i == 5:
