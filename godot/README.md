@@ -47,7 +47,10 @@
 - **左レール**はカテゴリナビ風に調整済み。**現在地「ホーム」**を強調表示。
 - 左の大分類は **ホーム / チーム / リーグ / 経営 / クラブ**（見た目のみ。クリック・遷移なし）。
 - **ClubBand** に **SG / LOGO** の仮クラブロゴ枠を追加済み（実画像・外部ロゴ素材なし）。
+- **左レール現在地**（`StyleBoxFlat_nav_active`）のアクセント枠色を、ClubBand の仮ロゴ枠（琥珀系）に**馴染む暖色**へ**最小調整**済み（Theme 非変更・シーン内 SubResource のみ）。
 - **中央 2 カラムの低〜中密度カード**と **BottomStrip** は従来どおり維持。
+- **ユーザー環境 Godot 4.6.2** で sandbox を **F6 表示確認**済み（ナビ・ClubBand・中央・**アクセント調整後**）。**UID 参照エラーなし**、**実行後の不要な追跡差分なし**（手元運用の目安）。
+- 色・質感の追加試験前に、候補整理は **`reports/godot_phase4_home_wire_color_texture_survey_2026-05.txt`**（調査レポート）で実施済み。**Theme 全面改色は未着手**。
 
 **本線との役割分担**:
 
@@ -88,9 +91,11 @@
 ◎ README/docs へ sandbox 位置づけ記録
 ◎ sandbox 左レールをカテゴリナビ風に調整（現在地ホーム強調）
 ◎ sandbox ClubBand に仮クラブロゴ枠（SG/LOGO）を追加
+◎ sandbox 左レール現在地アクセント調整（ロゴ枠琥珀系に馴染む最小変更・SubResource のみ）
+◎ sandbox 色・質感候補調査（`reports/godot_phase4_home_wire_color_texture_survey_2026-05.txt`）
 ★ README/docs sandbox 最新到達点記録（本コミット）
 □ sandbox 中央カード密度の追加調整
-□ sandbox 色・質感バリエーション
+□ sandbox 色・質感バリエーション追加試験
 □ sandbox 右サマリー列あり版の比較
 □ 本線 `home_dashboard` への段階移植判断
 □ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
@@ -218,9 +223,11 @@
   ◎ README/docsへsandbox位置づけ記録
   ◎ sandbox左レールをカテゴリナビ風に調整（現在地ホーム強調）
   ◎ sandbox ClubBandに仮クラブロゴ枠（SG/LOGO）を追加
+  ◎ sandbox左レール現在地アクセント調整（ロゴ枠琥珀系に馴染む最小変更）
+  ◎ sandbox色・質感候補調査（レポート）
   ★ README/docs sandbox最新到達点記録（本コミット）
 □ sandbox中央カード密度の追加調整
-□ sandbox色・質感バリエーション
+□ sandbox色・質感バリエーション追加試験
 □ sandbox右サマリー列あり版の比較
 □ 本線home_dashboardへの段階移植判断
 □ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
