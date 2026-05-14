@@ -1,6 +1,7 @@
 [gd_scene load_steps=5 format=3 uid="uid://bkgmhomeproto01"]
 
 [ext_resource type="Script" path="res://scripts/home_dashboard.gd" id="1_script"]
+[ext_resource type="Theme" uid="uid://c9phase4rocore01" path="res://themes/phase4_readonly_core.tres" id="2_theme"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
 content_margin_left = 14.0
@@ -17,22 +18,6 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header"]
-content_margin_left = 16.0
-content_margin_top = 14.0
-content_margin_right = 16.0
-content_margin_bottom = 14.0
-bg_color = Color(0.09, 0.1, 0.13, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.26, 0.32, 0.4, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_warn"]
 content_margin_left = 14.0
@@ -104,7 +89,8 @@ theme_override_constants/separation = 12
 [node name="HeaderCard" type="PanelContainer" parent="Margin/RootCol"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_header")
+theme = ExtResource("2_theme")
+theme_type_variation = &"Phase4HeaderCard"
 
 [node name="HeaderInner" type="VBoxContainer" parent="Margin/RootCol/HeaderCard"]
 layout_mode = 2
@@ -169,21 +155,21 @@ tooltip_text = "施設サマリー画面へ表示切替します。読み取り�
 [node name="ClubNameLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 24
 text = "（クラブ名）"
 
 [node name="SeasonLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.76, 0.84, 1)
+theme_override_colors/font_color = Color(0.2, 0.25, 0.36, 1)
 theme_override_font_sizes/font_size = 15
 text = "（シーズン）"
 
 [node name="DataSourceLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.52, 0.58, 0.66, 1)
+theme_override_colors/font_color = Color(0.18, 0.28, 0.55, 1)
 theme_override_font_sizes/font_size = 12
 text = ""
 
