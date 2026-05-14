@@ -1,0 +1,342 @@
+================================================================================
+Godot Phase 4 白ベース Theme 展開 — 次工程候補 比較調査レポート
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11（ローカルリポジトリ閲読・コマンド実行に基づく。実装変更なし）
+
+参照した直近コミット（ユーザー提示・git log 照合）:
+  c41a6f5  Godot白ベースTheme検証の到達点を記録
+  2bb594c  Godotロスター画面のヘッダーにThemeを限定適用
+  310ebed  Godot契約人事サマリーの注意カードにThemeを限定適用
+  77c5d04  Godot契約人事サマリーのロスター構成カードにThemeを限定適用
+  2995a22  Godot契約人事サマリーの契約概要カードにThemeを限定適用
+  4c1cb08  Godot契約人事サマリーのTheme用文字色を調整
+  8bf6788  Godot白ベースTheme検証の文字色を調整
+  b572a7e  Godot共通ThemeStyleを白ベース検証版に調整
+  26fa722  Godot共通ThemeStyleプレビューを追加
+
+調査で読んだ主なファイル（読取のみ）:
+  godot/scripts/roster_view.gd
+  godot/scripts/contract_personnel_summary_view.gd
+  godot/scripts/home_dashboard.gd
+  godot/scenes/roster_view.tscn（冒頭〜RowList）
+  godot/scenes/contract_personnel_summary_view.tscn（冒頭〜PlayersCard 付近）
+  godot/scenes/home_dashboard.tscn（冒頭〜接続定義末尾）
+  godot/themes/phase4_readonly_core.tres（Phase4* variation 行の grep）
+
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 共通 Theme: phase4_readonly_core.tres（UID uid://c9phase4rocore01）。variation に
+  Phase4HeaderCard / Phase4SummaryCard / Phase4WarningCard のほか、
+  Phase4OnDarkTitle / Phase4OnDarkTableHead / Phase4OnDarkTableCell 等の OnDark 系がある。
+- theme_preview.tscn でプレビュー。本番10画面への一括適用はしていない（README/docs 記録どおり）。
+- 契約・人事サマリー: ヘッダー・契約概要・ロスター構成・注意は Theme 型 variation 適用済み。
+  RiskCard / PlayersCard は SubResource StyleBoxFlat_summary（暗背景）のまま。
+- ロスター: ルートに Theme 割当済み。HeaderCard のみ Phase4HeaderCard。Scroll 内 RowList は
+  コード生成の明色ラベルが暗い画面背景上に乗る構成。
+- from_python / mock 優先、Godot から Python 自動起動なし、DTO/JSON 構造は本調査範囲で変更なし。
+- README/docs には Theme 到達点・限定適用・UID/実行後 git 確認が記録済み（本レポートでは再編集しない）。
+
+
+観点キー（各候補の末尾で 1〜12 を短文評価）
+  1 商品価値  2 Steam品質寄与  3 既存10画面破壊リスク  4 変更ファイルの少なさ
+  5 .tscn のみで済むか  6 .gd 要否  7 Python/JSON/save 影響  8 Godot 手動確認負荷
+  9 UID/再シリアライズ  10 1コミット戻しやすさ  11 今やるべきか  12 後回し理由
+
+
+3. 候補A：ロスター表本体の Theme 対応
+--------------------------------------------------------------------------------
+現状のコード根拠:
+  - roster_view.gd: _clear_rows → _add_table_header_row / _add_player_row。
+  - 表ヘッダー: HBoxContainer + Label.new() ×9。font_color (0.82,0.88,0.96)、font_size 12、
+    _col_width で列幅固定。直後に HSeparator。
+  - 選手行: 同様に Label.new() ×9。font_color (0.92,0.94,0.98)。年俸列は右寄せ、
+    名前・状態は tooltip。
+  - roster_view.tscn: 全体 Background は暗色 ColorRect。Scroll は RowList の子に動的行が追加。
+    ルート theme = phase4_readonly_core（ヘッダーは Phase4HeaderCard 済）。
+
+利点:
+  - ロスターは中核画面。表が読みやすいとデモ・プレイ感の向上が大きい。
+  - 契約人事と同様「限定適用」の延長で説明しやすい。
+
+欠点:
+  - 表は動的生成のため .tscn だけでは完結しない。色はコード override 固定。
+  - 白カード（Phase4SummaryCard）内に表を載せると、現行の明色文字はコントラスト不足になりやすい。
+  - 行数が多いと Scroll 内の再レイアウト・視認性の手動確認が重い。
+
+触りそうなファイル:
+  godot/scripts/roster_view.gd（必須）
+  godot/scenes/roster_view.tscn（Scroll 周りの Panel 追加、背景、variation 付与など任意）
+  godot/themes/phase4_readonly_core.tres（新 variation 追加する場合）
+
+.tscn だけで済むか:
+  いいえ。現状の表はすべて GDScript で Label を生成しているため、配色・variation の切替は .gd が主戦場。
+
+.gd 変更範囲:
+  小: 動的 Label に theme_type_variation を付与し、override 色をやめる／Theme に寄せる。
+  中: 行コンテナに Panel や Separator 方針を変え、ゼブラ行・hover 等。
+  大: ItemList / RichTextLabel 化や列ソートなどは別タスク。
+
+リスク:
+  - 白パネル化した瞬間に「ヘッダーは白・表エリアは暗」の二層が崩れ、中間グレー帯になりがち。
+  - 列幅・clip・tooltip 挙動の回帰。
+  - .tscn を広く触ると UID 差分が出やすい（運用で吸収は可能だが負荷あり）。
+
+OnDark に寄せるだけで足りるか:
+  - 画面背景が暗いままなら、Theme の Phase4OnDarkTableHead / Phase4OnDarkTableCell に
+    variation を寄せるだけで、現行の明色 override と整合しやすい（preview で検証済み系統）。
+  - 「白ベースで表エリアもカード化」するなら、文字色を Phase4TableCell 系へ寄せる .gd 変更が必要。
+
+Scroll / RowList の Theme 化の必要性:
+  - ScrollContainer 自体はスクロールバー見た目程度で、表の主因は子 Label。
+  - RowList の separation は既に tscn で override。必須ではないが、
+    「表をカードで囲む」なら Scroll の親に PanelContainer を足す .tscn 変更が現実的。
+
+今やるべきか:
+  - Theme 一貫性を「データ画面」から進めるなら最有力。ただし .gd 必須でコミット単位は分けたい。
+
+観点 1〜12: 高 / 中 / 低 / 中 / 否 / 要 / 無 / 中〜高 / 中 / 中（.gd中心なら可） / 条件付きでYes / ホーム先行やナビ大改修と同時だと負荷大
+
+
+4. 候補B：契約・人事サマリーの動的 Label 対応
+--------------------------------------------------------------------------------
+現状のコード根拠:
+  - _fill_risk_rows: 空時は Label.new + _style_body_label(12, 暗め灰)。
+    データ時は複数行テキストの Label.new + _style_body_label(12, 明色 0.86,0.9,0.95)。
+  - _fill_player_rows: 同様。最大 8 行。複数行 1 Label。
+  - _style_body_label: autowrap、SIZE_EXPAND_FILL、font_size / font_color override のみ。
+  - contract_personnel_summary_view.tscn: RiskCard / PlayersCard は StyleBoxFlat_summary（暗）。
+    タイトル RiskTitle / PlayersTitle は既に明色 font override（暗パネル向け）。
+
+利点:
+  - 同一画面内で「白カード部分」と「暗パネル＋動的行」の二重構造が解消し、画面単位の説明がしやすい。
+  - 変更ファイル数は原則 contract_personnel_summary_view.gd + .tscn + 必要なら theme のみで収まりやすい。
+
+欠点:
+  - 商品インパクトはロスター表やホームより限定的。
+  - 画面内仕上げに寄り、プロダクト全体の「顔」には直結しにくい。
+
+触りそうなファイル:
+  godot/scripts/contract_personnel_summary_view.gd
+  godot/scenes/contract_personnel_summary_view.tscn（RiskCard/PlayersCard を Phase4SummaryCard に、
+    タイトル Label の override を Theme 側に寄せる等）
+  godot/themes/phase4_readonly_core.tres（必要なら）
+
+.tscn だけで済むか:
+  カード枠を白系にする部分は .tscn で可能。ただし動的行の文字色は .gd の override が上書きするため、
+  白化するなら .gd 側の Color か variation 付与のどちらかが必要。
+
+.gd 変更範囲:
+  - 小〜中: _style_body_label を「パネル種別に応じた色／variation」に分岐、
+    または override をやめて theme_type_variation のみにする。
+  - Risk / Player の行構造を HBox 化するのは別途（スコープ増）。
+
+リスク:
+  - RiskTitle 等の静的 Label と動的行の色の再バランス。
+  - 長文 autowrap 時のカード高さ・Scroll 内の見切れ。
+
+今やるべきか:
+  - 「契約人事画面を一枚で統一感」優先なら良い。全体ロードマップでは A または C と並走判断。
+
+観点 1〜12: 中 / 中 / 低 / 高い（範囲狭い） / 部分的 / 要（実質） / 無 / 中 / 中 / 高 / 条件付きYes / ロスター・ホーム優先なら後回し可
+
+
+5. 候補C：ホーム本番 GUI 化試験
+--------------------------------------------------------------------------------
+現状のシーン構造（home_dashboard.tscn 要約）:
+  - ルートに Theme リソースは未割当（SubResource StyleBoxFlat_* でカード・ヘッダーを自己完結）。
+  - HeaderCard: StyleBoxFlat_header。HeaderTopRow に chip + placeholder。
+  - HeaderNavRow: 5 ボタン（ロスター・クラブ史・順位表・日程・施設）のみ。
+  - Scroll/Inner: CardNavMenu（NavColumns: チーム / リーグ / クラブ / 経営3ボタン）、
+    主要指標 MetricsRow（所属D・順位・資金）、CardTeamExtras、CardWarnings、
+    CardNext、CardSummary、CardTasks、CardNews。
+  - FooterNote: 手動 JSON と「自動起動は未実装」の文言。
+  - home_dashboard.gd: JSON 読込と各 Label への文字列反映、visibility 制御、
+    change_scene_to_file のみ。動的ノード生成なし。
+
+1画面試験として安全な切り方:
+  - まず「見た目のみ」: HeaderCard または 1 枚のカード（例: CardDivision のみ）に
+    phase4_readonly_core の variation を当て、他は現状の StyleBox のまま残す。
+  - HeaderNavRow のボタン数・シグナル接続は触らない（ドキュメント上の制約とも整合）。
+  - NavColumns の列追加・経営ボタン再配置は「本番 GUI 化」とセットになりやすく、
+    小さく切るなら「色・フォント・パネル角」のみに留めるのが安全。
+
+利点:
+  - 商品価値・Steam 向け第一印象へのインパクト最大。
+  - 90年代 GM ホームの方向性をここで試せる。
+
+欠点:
+  - 触るノード数が多く、部分適用でも差分が読みにくい。
+  - カードメニューと上部ナビの二重導線の見た目バランスを崩しやすい。
+
+触りそうなファイル:
+  godot/scenes/home_dashboard.tscn（主）
+  godot/themes/phase4_readonly_core.tres（Button/Label の追加 variation）
+  godot/scripts/home_dashboard.gd（原則不要だが、将来の動的要素で要る可能性）
+
+.tscn だけで済むか:
+  スタイルの置換なら主に .tscn + .tres で可能。.gd は現状ほぼ不要。
+
+.gd 変更:
+  試験段階では不要が、データ更新 UI 等を足すと別論（候補E と合流）。
+
+リスク:
+  - 10 画面入口・経営3ボタン・主要指標が同一 Scroll 内にあるため、
+    縦スクロール量・最小高さの再調整で他カードが見えなくなる回帰。
+  - 大きな .tscn 編集は UID や子順序の差分が出やすい。
+
+観点 1〜12: 最高 / 高 / 中（見た目のみならロジック破壊は低いが見落とし面は広い） / 低〜中 /
+  主にYes / 原則不要 / 無 / 高 / 中〜高 / 低〜中 / ブランド優先ならYes / Theme縦割り未完了との並走は混乱しやすい
+
+
+6. 候補D：左サイドメニュー / 本格ナビ設計へ進む（Theme 一旦停止）
+--------------------------------------------------------------------------------
+利点:
+  - 10 画面超への拡張・Steam 実売後の保守で効く骨格が先に決まる。
+  - Theme は後から一括で当て直す前提にできる。
+
+欠点:
+  - シーン構造・シグナル・ドキュメントの更新範囲が広く、Phase4 の「仮ナビ」からの跳躍が大きい。
+  - 現状の HeaderNavRow + カードメニューの二重導線をどう整理するか設計未確定だと手戻り多発。
+
+触りそうなファイル:
+  複数 scenes、project.godot の main 確認、docs 大量、home_dashboard と各閲覧画面の戻り導線。
+
+.tscn のみ: いいえ（設計・複数画面）。
+
+.gd: 各画面の遷移先一元化なら中〜大。
+
+Python/JSON: 原則なし（ナビのみなら）。
+
+観点 1〜12: 中〜高（長期） / 高（完成時） / 高（導線変更） / 低 / 否 / 要 / 無 / 高 / 高 / 低 / 全体設計合意後 / Theme 垂直スライスと並走すると差分地獄
+
+
+7. 候補E：ホーム「データ更新」表示 / ボタン判断へ戻る
+--------------------------------------------------------------------------------
+背景: 過去コミット 1f94455（調査）・a5c37a0 等で Python 自動起動論点が既にある。
+
+利点:
+  - 実運用（JSON の鮮度・手動 export のストレス軽減）に直結。
+  - 見た目より「誤解しない UI 文言」とボタン有無の整理で済む場合がある。
+
+欠点:
+  - 本番ビジュアルとは別軸。Theme ロードマップと混ぜると優先度が曖昧になりやすい。
+  - ボタン実装が「Python 起動」に寄ると設計論争・スコープ膨張（ユーザー禁止事項: 自動起動を前提に書かない）。
+
+触りそうなファイル:
+  home_dashboard.tscn / .gd、README/docs（方針文）。※本タスクでは実装・docs 変更なし。
+
+.tscn のみ: 文言ラベルの追加なら可能。起動ロジックは .gd。
+
+観点 1〜12: 中（開発体験） / 中（誤解防止） / 低〜中 / 高い場合あり / 部分的 / 任意 / 無〜小 / 低〜中 / 低 / 高 / 論点整理が先ならYes / 本番GUI試作と同一スプリントだと散焦
+
+
+8. 候補F：第11画面追加へ戻る
+--------------------------------------------------------------------------------
+利点:
+  - 機能横断の DTO/export/pytest パターンが確立済みなら追加画面は手順化しやすい。
+
+欠点:
+  - 本番 GUI・Theme 統一が遅れる。画面数増は手動確認・export 対象も増える。
+
+触りそうなファイル:
+  basketball_sim（export/DTO）、godot data mock、新 scene/script、home 導線、一括 bundle。
+
+観点 1〜12: 機能による / 中 / 中 / 低 / 否 / 要 / 有（export・テスト追加） / 中 / 中 / 中 / 画面追加が最優先なら / Theme・ホームが未整理のままだと負債増
+
+
+9. 商品価値比較（定性）
+--------------------------------------------------------------------------------
+  最上位: C（ホームが「ゲームの顔」）
+  次点: A（ロスター中核）、F（新機能が刺さる場合のみ同格に）
+  中段: B（単体画面の完成度）、D（長期の土台）
+  下位になりがち: E（開発者向け・誤解防止は重要だが販売デモの第一印象は C/A に劣る）
+
+
+10. 安全性比較（既存10画面・ビルド・データ経路）
+--------------------------------------------------------------------------------
+  最も安全: E（文言のみ）＞ B ≈ A（.gd 中心・データ経路は不変にしやすい）
+  中: C（見た目のみ・差分は広い）
+  低: D（導線）、F（export 連鎖）
+
+
+11. 手動確認負荷比較（Godot 4.6.2 目安）
+--------------------------------------------------------------------------------
+  高: C、D、F
+  中: A（多行・スクロール）、B
+  低: E（範囲を絞れば）
+
+
+12. 1コミットで戻しやすい候補
+--------------------------------------------------------------------------------
+  高: B または A の「色・variation のみ」スライス、E の文言のみ
+  中: C の単一カード試験
+  低: D、F
+
+
+13. Steam 販売品質への寄与
+--------------------------------------------------------------------------------
+  直接デモ映え: C ＞＞ A ＞ B
+  信頼感・誤解防止: E（適切な文言・ボタン方針）
+  長期品質: D
+
+
+14. 90年代〜PS1 / セガサターン風 GM 画面との関係
+--------------------------------------------------------------------------------
+  最も接点が大きいのは C（ホーム全体のパネル分割・色面・情報密度）。
+  A は「データテーブルの質感」（ドット感・境界線は Theme + フォント選定次第）。
+  B は補助画面。D はフレーム（ウィンドウ分割）そのものに近いが設計フェーズ。
+  参考: 現状ホームはモダンなフラット暗色カード UI。セガサターン風へ寄せるには
+  色数制限・枠線・タイポの方針を C で試すのが自然。
+
+
+15. Cursor としてのおすすめ順（実装順の提案。本調査では実施しない）
+--------------------------------------------------------------------------------
+  1位: A または B のどちらか **1 本だけ** を「動的 Label + Theme variation」練習として完走
+        （チーム方針で「中核画面優先」なら A、「画面一枚の完結」なら B）。
+  2位: C の **スモール試験**（ホームの 1 カードまたはヘッダーのみ白ベース寄せ、導線は不変）。
+  3位: E の **文書・ワイヤーだけ先に合意**（ボタンを付けるか否か、自動起動はしない前提を固定）。
+  4位: D（Theme と並走させない。専用スプリントがよい）。
+  5位: F（第11画面がロードマップ上クリティカルでない限り後ろ）。
+
+
+16. 今すぐ実装してよい最小案（方針レベル。本タスクではコードを書かない）
+--------------------------------------------------------------------------------
+  - ロスター A: **表エリアは暗背景のまま**、動的 Label に `theme_type_variation` で
+    Phase4OnDarkTableHead / Phase4OnDarkTableCell を指定し、**ハードコード Color を削る**。
+    Scroll の背景をわずかに区切る程度の .tscn は任意。白カード化は次段。
+  - 契約人事 B: RiskCard/PlayersCard を Phase4SummaryCard にし、**タイトル Label を Phase4Title 系**に。
+    `_style_body_label` を Phase4TableCell 相当の濃色へ。**1 PR = 契約人事のみ**。
+  - ホーム C: **MetricsRow の 1 枚だけ** Theme 試験（他は旧 StyleBox のまま）。
+
+
+17. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+  - ホーム全面 Theme 化 + HeaderNavRow ボタン増設 + 左サイド導入を **同一コミット群**で実施すること。
+  - Python 自動起動を「データ更新」ボタンから暗黙に入れること（設計合意とセキュリティ・配布形態が先）。
+  - Theme 未整理のまま第11画面を量産すること。
+
+
+18. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+  - Theme 縦割り（A vs B）の優先順位。
+  - ホーム C を「デモ用に先に厚化」するか、「データ画面の統一 A/B から」積み上げるか。
+  - 左サイド D をいつ専用イテレーションにするか（Theme スプリントと分離するか）。
+  - 「データ更新」E をプロダクト必須にするタイミングと、**手動 export の正式運用**のまま行く期間。
+
+
+19. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査およびレポート作成において **変更していないもの**:
+  godot/scenes/*  godot/scripts/*  godot/themes/*  basketball_sim/*  docs/*  godot/README.md
+  project.godot  生成 JSON  handoff md
+
+実施したのは **reports/godot_phase4_theme_next_step_survey_2026-05.txt の新規追加のみ**
+（ユーザー指定パス）。
+
+================================================================================
+EOF
+================================================================================
