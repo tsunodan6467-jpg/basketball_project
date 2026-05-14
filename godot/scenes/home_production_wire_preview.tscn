@@ -492,12 +492,8 @@ text = "サブ画面ショートカット"
 [node name="ShortcutRow1" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardShortcuts/CardShortcutsInner"]
 layout_mode = 2
 theme_type_variation = &"Phase4DataSource"
-text = "ロスター / 契約・人事 / 戦術"
-
-[node name="ShortcutRow2" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardShortcuts/CardShortcutsInner"]
-layout_mode = 2
-theme_type_variation = &"Phase4DataSource"
-text = "財務 / 日程"
+autowrap_mode = 2
+text = "詳細画面: チーム / リーグ / 経営 / クラブ"
 
 [node name="BottomStrip" type="PanelContainer" parent="RootMargin/MainRow/RightStack"]
 layout_mode = 2
