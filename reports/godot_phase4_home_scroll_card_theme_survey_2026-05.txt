@@ -1,0 +1,249 @@
+================================================================================
+Godot Phase 4 — ホーム Scroll 以下「1 カード」Theme 試験候補 調査レポート
+================================================================================
+
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+調査日時: 2026-05-11（リポジトリ閲読のみ。シーン・スクリプト・Theme・Python・docs 変更なし）
+
+参照コミット（ユーザー提示・現行ツリー前提）:
+  fd795f7  Godot Theme展開の到達点を記録
+  afb482d  Godotホーム画面のHeaderにThemeを限定適用
+  d33edb6  Godotロスター表の動的LabelをOnDark Themeに寄せる
+
+読取ファイル:
+  godot/scenes/home_dashboard.tscn（Scroll 以下のノード・SubResource 参照）
+  godot/scripts/home_dashboard.gd（全文相当）
+  godot/themes/phase4_readonly_core.tres（Phase4* variation の grep 前提知識）
+
+
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- `phase4_readonly_core.tres` は `home_dashboard.tscn` の **ext_resource** として既に存在。
+- **HeaderCard のみ**に `theme = ExtResource("2_theme")` + `Phase4HeaderCard`。ルート `HomeDashboard` には Theme なし。
+- Scroll 以下は **従来どおり** `SubResource("StyleBoxFlat_card")` または `StyleBoxFlat_warn`。
+- `home_dashboard.gd` は **既存 Label の `.text` のみ**更新。`Label.new` / `add_theme_*` なし。
+
+
+観点キー（候補ごとに §5〜11 で 1〜12 を短文で触れる）
+  1 商品価値  2 Theme 差の目視分かりやすさ  3 .tscn のみ  4 .gd 要否
+  5 from_python/mock/DataSourceLabel  6 NavColumns  7 HeaderNavRow
+  8 StyleBoxFlat 共有リスク  9 文字色調整範囲  10 1コミット戻し  11 Godot 手動確認  12 今やるべきか
+
+
+3. home_dashboard.tscn の Scroll 以下構造
+--------------------------------------------------------------------------------
+【階層】`Margin/RootCol/Scroll` → `Inner`（VBox・separation 12）
+
+【1】`CardNavMenu`（PanelContainer）
+  - `theme_override_styles/panel = SubResource("StyleBoxFlat_card")`
+  - 子: `VBoxNav` → `NavTitle`, `NavHelp`, **`NavColumns`**（HBox）
+    - `ColTeam` / `ColLeague` / `ColClub` / `ColMgmt` … 各カテゴリ Label + 2〜3 **Button**（MenuCard*）
+    - **経営 3 ボタン**は `ColMgmt` 内
+
+【2】`SecMetricsTitle`（Label・「主要指標」）— カード外タイトル
+
+【3】`MetricsRow`（HBox）
+  - **`CardDivision`** / **`CardRank`** / **`CardMoney`** … いずれも Panel + **同一** `StyleBoxFlat_card`
+  - 各カード内: 見出し Label（HDiv 等）+ 値 Label（`DivisionLabel` 等・`unique_name_in_owner`）
+
+【4】`CardTeamExtras`（Panel + `StyleBoxFlat_card`）— visibility は .gd
+
+【5】`CardWarnings`（Panel + **`StyleBoxFlat_warn`**）— 警告系配色。他カードと SubResource が異なる
+
+【6】`CardNext` / `CardSummary` / `CardTasks` / `CardNews` … いずれも **`StyleBoxFlat_card`**
+
+【共有の実態】
+  - **`StyleBoxFlat_card`**: 上記 **9 箇所**の PanelContainer が **同一 SubResource ID** を参照。
+  - **1 枚だけ** `theme_override_styles/panel` を外し、`theme_type_variation = Phase4SummaryCard` 等に差し替えても、**他 8 箇所が参照を残す限り SubResource を削除してはならない**。
+  - **`StyleBoxFlat_warn`**: `CardWarnings` のみ。
+
+
+4. home_dashboard.gd の Scroll 以下更新処理
+--------------------------------------------------------------------------------
+- `_apply_snapshot`: `%DivisionLabel` / `%RankRecordLabel` / `%MoneyLabel` / `%NextGameLabel` /
+  `%ClubSummaryLabel` / `%TasksLabel` / `%NewsLabel` などに **文字列のみ**代入。
+- `_join_lines` で tasks / news / club_summary は **複数行テキスト**（先頭に「・」）。
+- `_set_optional_row` で `CardTeamExtras` 内の Row visible と値 Label。
+- **動的ノード生成なし**。**`add_theme_color_override` 等のコード上書きなし**。
+- **結論**: Scroll 以下の Theme 試験は **原則 `.tscn` のみで完結可能**（白カード化時は **子 Label の濃色化**をシーンで足す）。
+
+
+5. 候補A：Metrics 系カード 1 枚（例 CardDivision）
+--------------------------------------------------------------------------------
+利点:
+  - **主要指標**はデモで目立つ。商品価値が高い。
+  - 同一 `MetricsRow` 内の **1 枚だけ**変えると、Before/After が並んで比較しやすい。
+
+欠点:
+  - 隣の `CardRank` / `CardMoney` が暗のままだと **質感の段差**が出る（意図的なら可）。
+  - 値ラベルは現状 **明色大文字**（17px 付近）→ 白パネルでは **必ず濃色へ**（調整行数は少ないが必須）。
+
+触りそうなファイル: `godot/scenes/home_dashboard.tscn` のみ（+ 既存 ext_resource Theme は流用）。
+
+.tscn のみ: **はい**（推奨パターン: **対象 Panel のみ** `theme = ExtResource("2_theme")` + `theme_type_variation = Phase4SummaryCard`、
+  `theme_override_styles/panel` を当該ノードから削除。子 Label に Phase4Title / Phase4Muted 等または `theme_override_colors`）。
+
+StyleBoxFlat 共有リスク: **低**（当該 Panel だけ参照を外す。**SubResource は削除しない**）。
+
+文字色リスク: **中**（見出し 2 + 値 1 程度の最小セット）。
+
+観点 1〜12: 高 / 高 / Yes / 不要 / 無 / 無 / 無 / 低 / 小 / 高 / 高 / **第一候補**
+
+
+6. 候補B：NextGame 系（`CardNext`）
+--------------------------------------------------------------------------------
+- **「RecentGame」専用カードは無い**。次戦は `CardNext`。直近成績は **`CardTeamExtras` 内の Row**（別カード）。
+
+利点:
+  - 「次に何があるか」が伝わる。ホームの役割と一致。
+
+欠点:
+  - 1 枚だけ白化すると **Summary / Tasks / News** との上下リズムがやや不揃い。
+
+.tscn のみ: **はい**。共有リスクは A と同様 **低**。
+
+観点 1〜12: 中〜高 / 中 / Yes / 不要 / 無 / 無 / 無 / 低 / 小 / 高 / 高 / **A の次点**
+
+
+7. 候補C：Tasks / News（`CardTasks` / `CardNews`）
+--------------------------------------------------------------------------------
+利点:
+  - テキスト量が多く **Theme 差が分かりやすい**（折返し・行間の確認に向く）。
+
+欠点:
+  - **複数行・長文**で、白パネル＋濃色の組合せミスが **読みづらさ**に直結。
+  - mock で極端に長い文字列を入れたときの **縦スクロール量**が変わって見える可能性（実寸はレイアウト次第）。
+
+.tscn のみ: **はい**。共有リスク **低**。
+
+観点 1〜12: 中 / 高 / Yes / 不要 / 無 / 無 / 無 / 低 / **中〜大** / 高 / 中 / **A の後**向き
+
+
+8. 候補D：CardNavMenu / NavColumns 全体
+--------------------------------------------------------------------------------
+利点:
+  - 導線の塊として一気に統一感。
+
+欠点:
+  - **10 ボタン + 複数 Label**。**経営・チーム列**と同時に触るため、候補 E より遥かに重い。
+  - **二重導線の顔**になり、README/docs の「限定適用」説明と齟齬が出やすい。
+
+.tscn のみ: 主に .tscn だが **差分が大きい**。
+
+共有リスク: CardNavMenu 1 ノードだけなら SubResource は他で使われ続ける → **削除不要**。ただし **見た目の検証負荷が最大**。
+
+観点 1〜12: 中〜高 / 高 / 主にYes / 不要 / 無 / **高** / 無 / 中 / 大 / 低 / 低 / **初回 1 カード試験としては非推奨**
+
+
+9. 候補E：経営列（`ColMgmt`）だけ
+--------------------------------------------------------------------------------
+構造: `ColMgmt` は **VBoxContainer**（Panel ではない）。子は Label + 3 Button。
+
+利点:
+  - 経営 3 導線の強調。
+
+欠点:
+  - **VBox に `theme` を付ける**と子 Button は Theme 継承するが、**兄弟列（Team/League/Club）とのバランス**が崩れやすい。
+  - **単独「カード」ではない**（親 `CardNavMenu` のパネルは暗のまま）。
+
+.tscn のみ: **可能**だがデザイン判断が難しい。
+
+観点 1〜12: 中 / 中 / Yes / 不要 / 無 / **高** / 無 / 低（SubResource は触らない） / 中 / 中 / 中 / **D より小さいが、列だけ浮くリスク**
+
+
+10. 候補F：Scroll 以下はまだ触らない
+--------------------------------------------------------------------------------
+利点:
+  - **回帰ゼロ**。契約人事の動的 Label や他画面の Theme 縦割りにリソースを回せる。
+
+欠点:
+  - ホームの **Scroll 以下の見た目改善**は遅れる。
+
+観点 1〜12: 低（ホーム下層） / なし / — / — / 無 / 無 / 無 / 無 / なし / 最高 / 最高 / **リスク最小優先なら**
+
+
+11. 候補G：Scroll 以下一括 Theme 化
+--------------------------------------------------------------------------------
+利点:
+  - 統一感は最大。
+
+欠点:
+  - **9+ パネル・多数 Label・警告カードの意味色**を一斉に再設計。**初回試験としては不適**（README も「全面適用でない」と明記）。
+
+共有リスク: `StyleBoxFlat_card` を消すと **多参照が一斉破壊**。**禁止に近い操作**。
+
+観点 1〜12: 完成時は高 / 高 / — / 場合により / 無 / 高 / 無 / **最高リスク** / 最大 / 低 / 低 / **今はやらない**
+
+
+12. StyleBoxFlat 衝突・削除リスク
+--------------------------------------------------------------------------------
+- **削除してはならないタイミング**: いずれかのノードがまだ `SubResource("StyleBoxFlat_card")` を参照している間。
+- **1 カード試験の安全手順**: 対象 Panel だけ **参照を外す** → 必要なら **その Panel にだけ** `theme = ExtResource("2_theme")` を重ねる（ファイル先頭の ext_resource は **既に存在**）。
+- **CardWarnings**: `Phase4WarningCard` と意味は近いが **色相が異なる**（warn SubResource は赤茶ダーク）。置換時は **HWarn / WarningsLabel** の再調整が必要 → **2 枚目以降の候補**向き。
+
+
+13. .gd 変更が必要になりそうな箇所
+--------------------------------------------------------------------------------
+- **現状の Scroll 以下 Theme 試験では不要**。
+- 将来、**JSON 由来の文字列長に応じて font_size を変える**等を入れる場合のみ .gd が絡む。
+
+
+14. HeaderNavRow / NavColumns / 導線への影響
+--------------------------------------------------------------------------------
+- **HeaderNavRow** は Scroll の外（HeaderCard 内）。Scroll 以下の編集では **接続・ノード数に触れなければ無影響**。
+- **NavColumns** は `CardNavMenu` 内。D/E を避ければ **ボタン接続はそのまま**。
+- **`change_scene_to_file` の connection** は Scroll 内 Button から HomeDashboard 根。パス文字列が変わらなければ **維持**。
+
+
+15. 商品価値比較（定性）
+--------------------------------------------------------------------------------
+  A（Metrics 1 枚） ≥ B（Next） > C（Tasks/News） > E（経営列） > D（Nav 全体） > F（据え置き） … G は別枠（試験対象外）
+
+
+16. 安全性比較
+--------------------------------------------------------------------------------
+  最も安全: F > A ≈ B ≈ C（単一 Panel・接続不変） > E > D >> G
+
+
+17. Cursor としてのおすすめ順（実装スプリントの提案。本調査では実施しない）
+--------------------------------------------------------------------------------
+  1位: **A**（`CardDivision` または `CardMoney` の **1 枚のみ**。MetricsRow で並び比較しやすい）
+  2位: **B**（`CardNext`）
+  3位: **C**（長文確認が必要なら `CardTasks` 単独）
+  4位: **F**（他タスク優先時）
+  5位: **E**（列だけ浮かせないデザイン案が付くまで保留）
+  6位: **D**（1 カード試験の次段）
+  7位: **G**（専用ブランチ・設計後）
+
+
+18. 今すぐ実装してよい最小案（方針のみ）
+--------------------------------------------------------------------------------
+- **`CardDivision` のみ**: `theme = ExtResource("2_theme")`、`theme_type_variation = &"Phase4SummaryCard"`、
+  当ノードの `theme_override_styles/panel` を削除。`HDiv` を `Phase4Muted` 系または濃灰 override、`DivisionLabel` を `Phase4Title` 系相当の濃色に。
+- **SubResource `StyleBoxFlat_card` は残す**（他 8 参照のため）。
+- **コミット 1 本・差分レビューで丸ごと revert 可能**。
+
+
+19. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- `StyleBoxFlat_card` を **参照ゼロになるまで消す**こと。
+- `Inner` や `Scroll` に **ルート相当の Theme** を付けて **一括波及**させること。
+- **CardNavMenu 全体**を最初の 1 歩にすること。
+
+
+20. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- 最初の 1 枚を **Division / Rank / Money のどれにするか**（並びの「左端」なら Division が比較写真に向く）。
+- 白化後も **`SecMetricsTitle` は暗背景側のまま**にするか、あわせて弱いトーンに寄せるか。
+- **CardTeamExtras**（複数 Row）を「2 枚目の試験」に回すか。
+
+
+21. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+本調査では **シーン・スクリプト・Theme・docs・README・Python・JSON・project.godot を一切変更していない**。
+新規作成のみ: `reports/godot_phase4_home_scroll_card_theme_survey_2026-05.txt`。
+
+================================================================================
+EOF
+================================================================================
