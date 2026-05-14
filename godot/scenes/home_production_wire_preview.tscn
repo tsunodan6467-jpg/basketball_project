@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://c9homeprodwire01"]
+[gd_scene load_steps=5 format=3 uid="uid://c9homeprodwire01"]
 
 [ext_resource type="Theme" uid="uid://c9phase4rocore01" path="res://themes/phase4_readonly_core.tres" id="1_theme"]
 
@@ -10,6 +10,38 @@ content_margin_bottom = 14.0
 bg_color = Color(0.07, 0.09, 0.14, 1)
 border_width_right = 1
 border_color = Color(0.22, 0.26, 0.36, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nav_item"]
+content_margin_left = 10.0
+content_margin_top = 8.0
+content_margin_right = 10.0
+content_margin_bottom = 8.0
+bg_color = Color(0.1, 0.12, 0.17, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.28, 0.32, 0.42, 1)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nav_active"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 10.0
+content_margin_bottom = 8.0
+bg_color = Color(0.15, 0.18, 0.27, 1)
+border_width_left = 4
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.55, 0.62, 0.88, 1)
+corner_radius_top_left = 9
+corner_radius_top_right = 9
+corner_radius_bottom_right = 9
+corner_radius_bottom_left = 9
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom"]
 content_margin_left = 14.0
@@ -65,7 +97,7 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_rail")
 
 [node name="RailVBox" type="VBoxContainer" parent="RootMargin/MainRow/LeftRail"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="WireTitle" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
 layout_mode = 2
@@ -82,38 +114,113 @@ autowrap_mode = 2
 text = "既存home_dashboardには未接続の検証sceneです。"
 
 [node name="NavSpacer" type="Control" parent="RootMargin/MainRow/LeftRail/RailVBox"]
-custom_minimum_size = Vector2(0, 6)
+custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 
-[node name="NavCurrent" type="PanelContainer" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+[node name="NavItemsVBox" type="VBoxContainer" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="NavHome" type="PanelContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox"]
+custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
 mouse_filter = 2
-theme_type_variation = &"Phase4ChipPanel"
+theme_override_styles/panel = SubResource("StyleBoxFlat_nav_active")
 
-[node name="NavCurrentLabel" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavCurrent"]
+[node name="NavHomeInner" type="MarginContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavHome"]
 layout_mode = 2
-theme_type_variation = &"Phase4TableHead"
-text = "ホーム（現在地）"
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 4
 
-[node name="NavTeam" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+[node name="NavHomeCol" type="VBoxContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavHome/NavHomeInner"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="NavHomeBadge" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavHome/NavHomeInner/NavHomeCol"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkTableHead"
+theme_override_font_sizes/font_size = 10
+text = "現在地"
+
+[node name="NavHomeTitle" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavHome/NavHomeInner/NavHomeCol"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkSubtitle"
+theme_override_font_sizes/font_size = 15
+text = "ホーム"
+
+[node name="NavTeam" type="PanelContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_nav_item")
+
+[node name="NavTeamInner" type="MarginContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavTeam"]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="NavTeamLabel" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavTeam/NavTeamInner"]
 layout_mode = 2
 theme_type_variation = &"Phase4OnDarkMuted"
 theme_override_font_sizes/font_size = 14
 text = "チーム"
 
-[node name="NavLeague" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+[node name="NavLeague" type="PanelContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_nav_item")
+
+[node name="NavLeagueInner" type="MarginContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavLeague"]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="NavLeagueLabel" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavLeague/NavLeagueInner"]
 layout_mode = 2
 theme_type_variation = &"Phase4OnDarkMuted"
 theme_override_font_sizes/font_size = 14
 text = "リーグ"
 
-[node name="NavMgmt" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+[node name="NavMgmt" type="PanelContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_nav_item")
+
+[node name="NavMgmtInner" type="MarginContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavMgmt"]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="NavMgmtLabel" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavMgmt/NavMgmtInner"]
 layout_mode = 2
 theme_type_variation = &"Phase4OnDarkMuted"
 theme_override_font_sizes/font_size = 14
 text = "経営"
 
-[node name="NavClub" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+[node name="NavClub" type="PanelContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_nav_item")
+
+[node name="NavClubInner" type="MarginContainer" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavClub"]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 6
+
+[node name="NavClubLabel" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavItemsVBox/NavClub/NavClubInner"]
 layout_mode = 2
 theme_type_variation = &"Phase4OnDarkMuted"
 theme_override_font_sizes/font_size = 14
