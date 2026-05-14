@@ -42,11 +42,24 @@
 
 **位置づけ**: 本番 GUI のレイアウト・情報密度・左レール＋上部クラブ帯の**研究用**シーン。`scenes/home_dashboard.tscn`（**10 画面導線・`from_python` / mock の正本**）とは別ファイルで、**本線を壊さず**に目視確認する。
 
-- **確認方法**: Godot エディタで当該シーンを開き、**「現在のシーンを実行」（F6）** で単体起動する。**`project.godot` の `run/main_scene` は変更しない**（既定のまま本線ホーム）。
-- **中身**: **script なし**、**固定文言のみ**。JSON 読込・Python 自動起動・`change_scene_to_file` による本線への遷移は**未実装**。
-- **試す場の例**: 左サイドナビ（大分類のみ）、上部クラブ帯、中央カードの低密度〜中密度、色味（シーン内 `StyleBoxFlat` と既存 `phase4_readonly_core.tres` の variation の組み合わせ）。
-- **UID / `load_steps`**: エディタで保存したあと **`git diff -- scenes/home_production_wire_preview.tscn`** を確認する。意図しない**先頭行付近だけ**の差分なら、必要に応じて `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻し、意図するレイアウト変更だけを再適用する（詳細方針は `reports/godot_phase4_home_wire_sandbox_policy_2026-05.txt`）。
-- **本線へ反映**: 1280×720 での破綻なし・目視合意・左の大分類確定・表示と DTO の整理・UID 運用の安定・**小さなコミット単位**で切れる、を満たしてから **別タスク・別コミット**で `home_dashboard` 側へ移植する。
+**最新状態（2026-05 sandbox 到達点）**:
+
+- **左レール**はカテゴリナビ風に調整済み。**現在地「ホーム」**を強調表示。
+- 左の大分類は **ホーム / チーム / リーグ / 経営 / クラブ**（見た目のみ。クリック・遷移なし）。
+- **ClubBand** に **SG / LOGO** の仮クラブロゴ枠を追加済み（実画像・外部ロゴ素材なし）。
+- **中央 2 カラムの低〜中密度カード**と **BottomStrip** は従来どおり維持。
+
+**本線との役割分担**:
+
+- **本線 `home_dashboard.tscn`** は **10 画面導線**・**from_python 優先 + mock フォールバック**・pytest の**正本**として維持。
+- **sandbox** は **script なし**・**固定文言のみ**・**F6 単体**での確認用。
+- **`project.godot` の `run/main_scene` は変更しない**（既定のまま本線ホーム）。
+- **実データ接続**、**Python 自動起動**、**本線への `change_scene_to_file`** は**未実装**。
+
+- **確認方法**: Godot エディタで当該シーンを開き、**「現在のシーンを実行」（F6）** で単体起動する。
+- **試す場の例**（上記に加え）: 色味（シーン内 `StyleBoxFlat` と既存 `phase4_readonly_core.tres` の variation の組み合わせ）。
+- **UID / `load_steps`（再シリアライズ運用）**: エディタで保存したあと **`git diff -- scenes/home_production_wire_preview.tscn`** を確認する。意図しない**先頭行付近だけ**（`uid://` / `load_steps` のみ等）の差分なら、必要に応じて `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻し、**意図するレイアウト差分だけ**を再適用する（詳細方針は `reports/godot_phase4_home_wire_sandbox_policy_2026-05.txt`）。**実行後も `git diff` で意図外の差分が混ざっていないか**確認する。
+- **本線へ反映**: 1280×720 での破綻なし・目視合意・左の大分類確定・ホーム表示情報の整理・必要 DTO の整理・UID 運用の安定・**小さなコミット単位**で切れる、を満たしてから **別タスク・別コミット**で `home_dashboard` 側へ移植する。
 
 ## 共通 Theme / 白ベース検証（Phase 4・限定適用）
 
@@ -72,9 +85,13 @@
 ◎ ホーム・Header のみ（HeaderCard に Theme 限定・Scroll 以下は従来 StyleBox）
 ◎ 本番ホームワイヤー sandbox（`home_production_wire_preview.tscn`・F6 単体・script なし）
 ◎ sandbox 方針整理（`reports/godot_phase4_home_wire_sandbox_policy_2026-05.txt`）
-★ README/docs へ sandbox 位置づけ記録（本コミット）
-□ sandbox 左レール幅調整
-□ ClubBand 寸法調整
+◎ README/docs へ sandbox 位置づけ記録
+◎ sandbox 左レールをカテゴリナビ風に調整（現在地ホーム強調）
+◎ sandbox ClubBand に仮クラブロゴ枠（SG/LOGO）を追加
+★ README/docs sandbox 最新到達点記録（本コミット）
+□ sandbox 中央カード密度の追加調整
+□ sandbox 色・質感バリエーション
+□ sandbox 右サマリー列あり版の比較
 □ 本線 `home_dashboard` への段階移植判断
 □ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
 □ ホーム・Metrics / Summary 等のカード（Scroll 以下）
@@ -198,9 +215,13 @@
   ◎ README/docs Theme展開の到達点記録（過去コミット）
   ◎ 本番ホームワイヤーsandbox（`home_production_wire_preview.tscn`・F6単体）
   ◎ sandbox方針整理（レポート）
-  ★ README/docsへsandbox位置づけ記録（本コミット）
-□ sandbox左レール幅調整
-□ ClubBand寸法調整
+  ◎ README/docsへsandbox位置づけ記録
+  ◎ sandbox左レールをカテゴリナビ風に調整（現在地ホーム強調）
+  ◎ sandbox ClubBandに仮クラブロゴ枠（SG/LOGO）を追加
+  ★ README/docs sandbox最新到達点記録（本コミット）
+□ sandbox中央カード密度の追加調整
+□ sandbox色・質感バリエーション
+□ sandbox右サマリー列あり版の比較
 □ 本線home_dashboardへの段階移植判断
 □ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
 □ ホーム・Scroll以下カードのTheme／本番ビジュアル調整
