@@ -1,0 +1,353 @@
+[gd_scene load_steps=3 format=3 uid="uid://c9homeprodwire01"]
+
+[ext_resource type="Theme" uid="uid://c9phase4rocore01" path="res://themes/phase4_readonly_core.tres" id="1_theme"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rail"]
+content_margin_left = 12.0
+content_margin_top = 14.0
+content_margin_right = 12.0
+content_margin_bottom = 14.0
+bg_color = Color(0.07, 0.09, 0.14, 1)
+border_width_right = 1
+border_color = Color(0.22, 0.26, 0.36, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bottom"]
+content_margin_left = 14.0
+content_margin_top = 8.0
+content_margin_right = 14.0
+content_margin_bottom = 8.0
+bg_color = Color(0.14, 0.12, 0.11, 1)
+border_width_top = 1
+border_color = Color(0.35, 0.3, 0.26, 1)
+
+[node name="HomeProductionWirePreview" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(1280, 720)
+theme = ExtResource("1_theme")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.06, 0.08, 1)
+
+[node name="RootMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 12
+
+[node name="MainRow" type="HBoxContainer" parent="RootMargin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="LeftRail" type="PanelContainer" parent="RootMargin/MainRow"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_rail")
+
+[node name="RailVBox" type="VBoxContainer" parent="RootMargin/MainRow/LeftRail"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="WireTitle" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkTitle"
+theme_override_font_sizes/font_size = 15
+autowrap_mode = 2
+text = "本番ホームワイヤー preview"
+
+[node name="WireHint" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkMuted"
+theme_override_font_sizes/font_size = 11
+autowrap_mode = 2
+text = "既存home_dashboardには未接続の検証sceneです。"
+
+[node name="NavSpacer" type="Control" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+
+[node name="NavCurrent" type="PanelContainer" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4ChipPanel"
+
+[node name="NavCurrentLabel" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox/NavCurrent"]
+layout_mode = 2
+theme_type_variation = &"Phase4TableHead"
+text = "ホーム（現在地）"
+
+[node name="NavTeam" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkMuted"
+theme_override_font_sizes/font_size = 14
+text = "チーム"
+
+[node name="NavLeague" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkMuted"
+theme_override_font_sizes/font_size = 14
+text = "リーグ"
+
+[node name="NavMgmt" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkMuted"
+theme_override_font_sizes/font_size = 14
+text = "経営"
+
+[node name="NavClub" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkMuted"
+theme_override_font_sizes/font_size = 14
+text = "クラブ"
+
+[node name="NavFootnote" type="Label" parent="RootMargin/MainRow/LeftRail/RailVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_type_variation = &"Phase4OnDarkMuted"
+theme_override_font_sizes/font_size = 10
+autowrap_mode = 2
+text = "サブ画面は中央のカードから選ぶ想定（本previewでは遷移しません）。"
+
+[node name="RightStack" type="VBoxContainer" parent="RootMargin/MainRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="ClubBand" type="PanelContainer" parent="RootMargin/MainRow/RightStack"]
+custom_minimum_size = Vector2(0, 88)
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4HeaderCard"
+
+[node name="BandInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/ClubBand"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ClubName" type="Label" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Title"
+theme_override_font_sizes/font_size = 22
+text = "横浜シーガルズ"
+
+[node name="BandRow1" type="HBoxContainer" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="SeasonLine" type="Label" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner/BandRow1"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+theme_override_font_sizes/font_size = 14
+text = "シーズン 1年目 / 第12節"
+
+[node name="BandRow2" type="HBoxContainer" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="DivLine" type="Label" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner/BandRow2"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "EAST DIVISION"
+
+[node name="RecordLine" type="Label" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner/BandRow2"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "12勝12敗 / 地区4位"
+
+[node name="BandRow3" type="HBoxContainer" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="MoneyLine" type="Label" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner/BandRow3"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "資金 3億6850万円"
+
+[node name="TrustLine" type="Label" parent="RootMargin/MainRow/RightStack/ClubBand/BandInner/BandRow3"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "オーナー信頼 72%"
+
+[node name="MidScroll" type="ScrollContainer" parent="RootMargin/MainRow/RightStack"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+
+[node name="MidInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="DashCaption" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkSubtitle"
+theme_override_font_sizes/font_size = 15
+text = "ダッシュボード（ワイヤー・低密度）"
+
+[node name="CardsRow" type="HBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ColLeft" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="CardNext" type="PanelContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4SummaryCard"
+
+[node name="CardNextInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardNext"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CardNextTitle" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardNext/CardNextInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "次戦"
+
+[node name="CardNextBody" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardNext/CardNextInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+autowrap_mode = 2
+text = "第13節 vs 新潟アルビレックスBB\n1/27（土）15:00 TIP OFF"
+
+[node name="CardStandings" type="PanelContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4SummaryCard"
+
+[node name="CardStandingsInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardStandings"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CardStandingsTitle" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardStandings/CardStandingsInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "順位・成績"
+
+[node name="CardStandingsBody" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardStandings/CardStandingsInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+text = "地区4位 / 12勝12敗"
+
+[node name="CardClubState" type="PanelContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4SummaryCard"
+
+[node name="CardClubInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardClubState"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CardClubTitle" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardClubState/CardClubInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "クラブ状態"
+
+[node name="CardClubBody" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardClubState/CardClubInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+autowrap_mode = 2
+text = "サラリー余力 +1億5150万円\nチーム士気 良好"
+
+[node name="ColRight" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="CardTasks" type="PanelContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4WarningCard"
+
+[node name="CardTasksInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardTasks"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CardTasksTitle" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardTasks/CardTasksInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "タスク"
+
+[node name="CardTasksBody" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardTasks/CardTasksInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4NoteText"
+autowrap_mode = 2
+text = "・契約満了候補の確認\n・スカウトレポート確認\n・練習メニュー調整"
+
+[node name="CardNews" type="PanelContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4SummaryCard"
+
+[node name="CardNewsInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardNews"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="CardNewsTitle" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardNews/CardNewsInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "ニュース"
+
+[node name="CardNewsBody" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardNews/CardNewsInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Muted"
+autowrap_mode = 2
+text = "・ホームで快勝\n・新外国籍選手の獲得に動きか"
+
+[node name="CardShortcuts" type="PanelContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Phase4SummaryCard"
+
+[node name="CardShortcutsInner" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardShortcuts"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="CardShortcutsTitle" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardShortcuts/CardShortcutsInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4Subtitle"
+text = "サブ画面ショートカット"
+
+[node name="ShortcutRow1" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardShortcuts/CardShortcutsInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4DataSource"
+text = "ロスター / 契約・人事 / 戦術"
+
+[node name="ShortcutRow2" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColRight/CardShortcuts/CardShortcutsInner"]
+layout_mode = 2
+theme_type_variation = &"Phase4DataSource"
+text = "財務 / 日程"
+
+[node name="BottomStrip" type="PanelContainer" parent="RootMargin/MainRow/RightStack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bottom")
+
+[node name="BottomLabel" type="Label" parent="RootMargin/MainRow/RightStack/BottomStrip"]
+layout_mode = 2
+theme_type_variation = &"Phase4OnDarkMuted"
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 2
+text = "次の試合に向けて、ロスターと戦術を確認しましょう。（preview 注記・操作なし）"
