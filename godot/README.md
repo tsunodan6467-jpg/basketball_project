@@ -75,10 +75,24 @@
 - **`project.godot` の `run/main_scene` は変更しない**（既定のまま本線ホーム）。
 - **実データ接続**、**Python 自動起動**、**本線への `change_scene_to_file`** は**未実装**。
 
+### 本線ホーム Header の ClubBand 風寄せ（`scenes/home_dashboard.tscn`）
+
+- **段階移植の第一歩**（`83d7fc0`「Godot本線ホームHeaderにクラブ帯要素を追加」）: **HeaderCard 内だけ**を sandbox **ClubBand** 風へ**最小寄せ**。**大レイアウト移植ではない**。
+- **追加**: `HeaderClubBandRow`（HBox）・`HomeLogoSlot`（`custom_minimum_size = Vector2(72, 58)`・`StyleBoxFlat_home_logo_slot`・暗地背景・**琥珀系枠**・**角丸 9**）・`LogoSlotCenter` / `LogoSlotCol` / **`LogoMark`（`SG`）** / **`LogoHint`（`LOGO`）**・`HeaderBandTextCol`。**`load_steps` は 5→6**。
+- **既存ラベル**: **`ClubNameLabel` / `SeasonLabel` / `DataSourceLabel`** は **ノード名と `unique_name_in_owner = true`** を維持したまま **`HeaderBandTextCol` 配下へ親移動**（`home_dashboard.gd` の `%` 参照は変更不要）。
+- **`DataSourceLabel`**: **`autowrap_mode = 2`** を追加し、**長い読込元パス**にやや強くした。**from_python / mock の読込元表示として維持**（削除なし）。
+- **`HeaderTopRow`**（Badge / Placeholder）、**`HeaderNavRow` と 5 ボタン**は**維持**。**文言・tooltip・`[connection]`・遷移先は変更なし**。
+- **`home_dashboard.gd` は未変更**。**from_python / mock の候補パス・読込経路は未変更**。**`Scroll` 以下は未変更**。
+- **左レール**は**本線未実装**。**右サマリー比較scene**（`home_production_wire_preview_right_summary.tscn`）は**本線未接続**（上記「右サマリー列あり版」節）。
+- **ユーザー環境 Godot 4.6.2**: 通常起動 / F6 で **仮ロゴ枠・ClubName / Season / DataSourceLabel・HeaderNavRow** が問題なく表示。**UID エラーなし**。**実行後の不要差分なし**（手元運用の目安）。
+- **今後**: **中央カード密度の段階移植**・**home DTO / JSON の追加整理**・**左サイドナビ本線導入**は **別タスク・別コミット**で判断する。
+
+**sandbox（`home_production_wire_preview.tscn`）の確認運用:**
+
 - **確認方法**: Godot エディタで当該シーンを開き、**「現在のシーンを実行」（F6）** で単体起動する。
 - **試す場の例**（上記に加え）: 色味（シーン内 `StyleBoxFlat` と既存 `phase4_readonly_core.tres` の variation の組み合わせ）。
 - **UID / `load_steps`（再シリアライズ運用）**: エディタで保存したあと **`git diff -- scenes/home_production_wire_preview.tscn`** を確認する。意図しない**先頭行付近だけ**（`uid://` / `load_steps` のみ等）の差分なら、必要に応じて `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻し、**意図するレイアウト差分だけ**を再適用する（詳細方針は `reports/godot_phase4_home_wire_sandbox_policy_2026-05.txt`）。**実行後も `git diff` で意図外の差分が混ざっていないか**確認する。
-- **本線へ反映**: 1280×720 での破綻なし・目視合意・左の大分類確定・ホーム表示情報の整理・必要 DTO の整理・UID 運用の安定・**小さなコミット単位**で切れる、を満たしてから **別タスク・別コミット**で `home_dashboard` 側へ移植する。
+- **本線へ反映**: 1280×720 での破綻なし・目視合意・左の大分類確定・ホーム表示情報の整理・必要 DTO の整理・UID 運用の安定・**小さなコミット単位**で切れる、を満たしてから **別タスク・別コミット**で `home_dashboard` 側へ移植する（**Header の ClubBand 風寄せ第 1 段**は `83d7fc0` で実施済み。**Scroll 以下・DTO 等は未着手**）。
 
 ## 共通 Theme / 白ベース検証（Phase 4・限定適用）
 
@@ -87,7 +101,7 @@
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **暗地前提のまま**で、**白カード化・Theme 統一は未着手**（別タスクで `.gd` 調整が必要）。
 - **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**ヘッダー**は `Phase4HeaderCard` + ヘッダー Label 濃色。**表**（`Scroll` / `RowList` 内の動的 `Label`）は **暗背景のまま**、`roster_view.gd` で `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` の **`theme_type_variation` に寄せた最小対応**（白カード化はしていない）。
-- **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard`（PanelContainer）のみ**に `phase4_readonly_core.tres` を割当し、`Phase4HeaderCard` を適用。クラブ名・シーズン・DataSource 等は白ヘッダ上の濃色に調整。**`Scroll` 以下**（カードメニュー・主要指標・各カード等）は **従来の `StyleBoxFlat_card` 等のまま**。**HeaderNavRow** はシーン上 **ボタン数・接続・遷移先の定義を変えていない**（親に Theme が付くため、実行時の見た目は Theme 継承で変わりうる）。
+- **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard`（PanelContainer）のみ**に `phase4_readonly_core.tres` を割当し、`Phase4HeaderCard` を適用。クラブ名・シーズン・DataSource 等は白ヘッダ上の濃色に調整。**`83d7fc0` で HeaderCard 内に sandbox ClubBand 風の `HeaderClubBandRow`・`HomeLogoSlot`（`SG` / `LOGO`）・`HeaderBandTextCol` を追加**し、既存 3 ラベルをクラブ帯内に配置（**`home_dashboard.gd` 不変**）。**`Scroll` 以下**（カードメニュー・主要指標・各カード等）は **従来の `StyleBoxFlat_card` 等のまま**。**HeaderNavRow** はシーン上 **ボタン数・接続・遷移先の定義を変えていない**（親に Theme が付くため、実行時の見た目は Theme 継承で変わりうる）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
 
@@ -121,10 +135,16 @@
 ◎ 右サマリー比較sceneのUID問題を調査（`a8b4a1d`）
 ◎ 右サマリー比較sceneのUIDを安定化（`cf8012c`）
 ◎ 右サマリー比較sceneのF6表示確認（ユーザー環境 Godot 4.6.2）
-★ README/docs に右サマリー比較の確認結果を記録（本コミット・本命は現行2カラム版寄り）
+◎ README/docs に右サマリー比較の確認結果を記録（本命は現行2カラム版寄り）
+◎ 本線 `home_dashboard` への段階移植方針を調査（`a2feb4e`）
+◎ 本線 `home_dashboard` HeaderCard にクラブ帯要素を最小追加（`83d7fc0`）
+◎ Header 仮ロゴ枠 / ClubName / Season / DataSourceLabel / HeaderNavRow 表示確認 OK（ユーザー環境 Godot 4.6.2）
+★ README/docs に本線 Header クラブ帯要素の到達点を記録（本コミット）
 □ sandbox 中央カード密度の追加調整
 □ sandbox 色・質感バリエーション追加試験
-□ 本線 `home_dashboard` への段階移植判断
+□ 本線 `home_dashboard` 中央カード密度の段階移植判断
+□ home DTO / JSON の追加整理
+□ 左サイドナビ本線導入判断
 □ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
 □ ホーム・Metrics / Summary 等のカード（Scroll 以下）
 □ ホーム全体への Theme 拡大（ルート一括など）
@@ -264,10 +284,16 @@
   ◎ 右サマリー比較sceneのUID問題を調査（`a8b4a1d`）
   ◎ 右サマリー比較sceneのUIDを安定化（`cf8012c`）
   ◎ 右サマリー比較sceneのF6表示確認（ユーザー環境 Godot 4.6.2）
-  ★ README/docs に右サマリー比較の確認結果を記録（本コミット・本命は現行2カラム版寄り）
+  ◎ README/docs に右サマリー比較の確認結果を記録（本命は現行2カラム版寄り）
+  ◎ 本線home_dashboardへの段階移植方針を調査（`a2feb4e`）
+  ◎ 本線home_dashboard HeaderCardにクラブ帯要素を最小追加（`83d7fc0`）
+  ◎ Header仮ロゴ枠 / ClubName / Season / DataSourceLabel / HeaderNavRow 表示確認OK（ユーザー環境 Godot 4.6.2）
+  ★ README/docs に本線Headerクラブ帯要素の到達点を記録（本コミット）
 □ sandbox中央カード密度の追加調整
 □ sandbox色・質感バリエーション追加試験
-□ 本線home_dashboardへの段階移植判断
+□ 本線home_dashboard中央カード密度の段階移植判断
+□ home DTO / JSON の追加整理
+□ 左サイドナビ本線導入判断
 □ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
 □ ホーム・Scroll以下カードのTheme／本番ビジュアル調整
 □ Theme全面適用（10画面一括・ルート一括など）
