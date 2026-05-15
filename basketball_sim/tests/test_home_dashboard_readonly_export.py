@@ -106,6 +106,68 @@ def test_season_label_no_meta_unchanged_fallback() -> None:
     assert d["season_label"] == "シーズン未接続"
 
 
+def test_home_dashboard_club_summary_is_situation_note_not_metrics_recap() -> None:
+    team = SimpleNamespace(
+        name="テストFC",
+        league_level=2,
+        regular_wins=10,
+        regular_losses=5,
+        money=1_000_000_000,
+        owner_trust=72.5,
+        players=[],
+        facility_upgrade_points=0,
+        fa_shortlist=[],
+        owner_mission=None,
+    )
+    season = SimpleNamespace(
+        season_finished=False,
+        season_no=1,
+        current_round=5,
+        total_rounds=30,
+        leagues={2: [team]},
+    )
+    d = build_home_dashboard_readonly_dict(season, team, max_tasks=3, max_news=3)
+    summary = d["club_summary"]
+    assert isinstance(summary, list)
+    assert 1 <= len(summary) <= 3
+    joined = "\n".join(str(x) for x in summary)
+    assert "順位・戦績:" not in joined
+    assert "ディビジョン:" not in joined
+    assert d["rank_record"] not in summary
+    assert d["division"] not in joined
+    assert d["money"] not in joined
+    cap = d["salary_cap"]
+    assert isinstance(cap, str) and cap
+    assert cap not in summary
+    assert any("シーズン状態:" in str(line) for line in summary)
+    assert d["division"] == "D2"
+    assert d["rank_record"]
+    assert d["money"]
+    assert d["owner_trust"]
+    assert d["recent_form"]
+
+
+def test_home_dashboard_club_summary_when_season_missing() -> None:
+    team = SimpleNamespace(
+        name="テストFC",
+        league_level=1,
+        regular_wins=0,
+        regular_losses=0,
+        money=0,
+        owner_trust=None,
+        players=[],
+        facility_upgrade_points=0,
+        fa_shortlist=[],
+        owner_mission=None,
+    )
+    d = build_home_dashboard_readonly_dict(None, team)
+    summary = d["club_summary"]
+    assert isinstance(summary, list)
+    assert 1 <= len(summary) <= 3
+    assert any("シーズン未同梱" in str(line) for line in summary)
+    assert "順位・戦績:" not in "\n".join(str(x) for x in summary)
+
+
 def test_build_home_dashboard_returns_dict_with_required_keys() -> None:
     team = SimpleNamespace(
         name="テストFC",

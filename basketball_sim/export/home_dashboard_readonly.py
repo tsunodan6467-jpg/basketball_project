@@ -274,25 +274,26 @@ def _next_game_one_line(season: Any, team: Any) -> str:
     return "次戦情報：未接続"
 
 
-def _club_summary_lines(season: Any, team: Any, rank_record: str, money: str, division: str) -> List[str]:
-    lines: List[str] = [
-        f"順位・戦績: {rank_record}",
-        f"ディビジョン: {division} / 資金: {money}",
-    ]
+def _club_summary_lines(season: Any) -> List[str]:
+    """
+    ホーム CardSummary 向けの短い状況メモ（list[str]）。
+
+    順位・資金・キャップ等は MetricsRow / CardTeamExtras / トップレベルキーで表示するため、
+    ここではシーズン文脈のみを返す（最大3行）。
+    """
     if season is not None:
         fin = bool(_safe_get(season, "season_finished", False))
-        lines.append("シーズン状態: 終了" if fin else "シーズン状態: 進行中")
+        if fin:
+            status = "シーズン状態: 終了"
+        else:
+            status = "シーズン状態: 進行中"
     else:
-        lines.append("シーズン状態: セーブにシーズン未同梱（年度メニュー直後など）")
-    try:
-        cap_line = _salary_cap_summary(team)
-        if cap_line != "給与キャップ：未接続":
-            lines.append(cap_line)
-    except Exception:
-        pass
-    if len(lines) < 4:
-        lines.append("※ 本ブロックは読み取り専用スナップショットです（本番ロジック非変更）。")
-    return lines[:6]
+        status = "シーズン状態: セーブにシーズン未同梱（年度メニュー直後など）"
+    lines: List[str] = [
+        status,
+        "主要指標は上段カードで確認（読み取り専用）",
+    ]
+    return lines[:3]
 
 
 def _task_lines(team: Any, season: Any, *, max_tasks: int) -> List[str]:
@@ -368,7 +369,7 @@ def build_home_dashboard_readonly_dict(
     recent_form = _recent_form_text(team)
     warnings = _injury_warning_note(team)
     next_game = _next_game_one_line(season, team)
-    club_summary = _club_summary_lines(season, team, rank_record, money, division)
+    club_summary = _club_summary_lines(season)
     tasks = _task_lines(team, season, max_tasks=max_tasks)
     news = _news_lines(team, season, max_news=max_news)
     return {
