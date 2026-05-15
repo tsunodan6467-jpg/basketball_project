@@ -1,0 +1,330 @@
+================================================================================
+Godot 本線 home_dashboard — Scroll 以下「次の 1 カード」Theme 限定適用候補の調査
+================================================================================
+
+本ファイルは調査・整理のみ。実装・シーン・スクリプト・Theme・docs/README・Python・
+既存 reports の編集は行っていない。
+
+
+--------------------------------------------------------------------------------
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+- 調査日時: 2026-05-11（`home_dashboard.tscn` / `home_dashboard.gd` / `phase4_readonly_core.tres`
+  の読取・grep に基づく）
+- 調査時点のリポジトリ HEAD: 44b4957（「Godot本線ホームCardNews限定Theme適用の到達点を記録」直後）
+- 参照した主なパス:
+  - godot/scenes/home_dashboard.tscn
+  - godot/scripts/home_dashboard.gd
+  - godot/themes/phase4_readonly_core.tres（variation 定義の確認）
+  - godot/scenes/home_production_wire_preview.tscn（先頭〜 CardsRow 周辺の grep・方針確認）
+  - reports/godot_phase4_home_dashboard_center_density_migration_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_migration_survey_2026-05.txt（冒頭）
+  - godot/README.md / docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md /
+    docs/GODOT_NAVIGATION_PHASE4_2026-05.md（方針の整合・本レポートでは未編集）
+
+
+--------------------------------------------------------------------------------
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 本線 `home_dashboard.tscn`: **HeaderCard** に `Phase4HeaderCard`（`83d7fc0`）。**Scroll 以下**
+  の **`CardNews` のみ** `ExtResource("2_theme")` + **`Phase4SummaryCard`**（`ed106c8`）。
+  **`CardNews` から `StyleBoxFlat_card` の panel override のみ除去**（**SubResource 定義は残存**）。
+- **`CardDivision`**（MetricsRow 内）は既に **`Phase4SummaryCard`**。**`CardRank` / `CardMoney`**
+  は **`StyleBoxFlat_card`** のまま。
+- **`CardWarnings`** は **`StyleBoxFlat_warn`**（**`StyleBoxFlat_card` ではない**）。
+- **`home_dashboard.gd`**: キー代入・`_join_lines`・**`CardTeamExtras` / `CardWarnings` の
+  `visible`** のみ（パネル Theme とは独立）。
+
+
+--------------------------------------------------------------------------------
+3. CardNews 限定 Theme 適用の結果（前提の整理）
+--------------------------------------------------------------------------------
+- **手順の型**: 対象 `PanelContainer` に `theme` + `theme_type_variation`、**当該ノードのみ**
+  `theme_override_styles/panel` を外す。**子 Label の `theme_override_colors/font_color` を
+  白カード向け濃色へ**（CardDivision / CardNews と同系）。
+- **共有 `StyleBoxFlat_card`**: **削除していない**。**他ノードが参照し続けている**。
+- **`.gd` / JSON / Python / DTO / Theme `.tres`**: 変更なしで成立した。
+- **次カードも同型**に収めれば、**1 コミット＝1 カード（または MetricsRow の対称ペア）**
+  にしやすい。
+
+
+--------------------------------------------------------------------------------
+4. 本線 home_dashboard Scroll 以下の候補一覧（Inner 内・上から順）
+--------------------------------------------------------------------------------
+| ノード | 現状 panel | 主なデータ / 備考 |
+| CardNavMenu | StyleBoxFlat_card | 9 ボタン・導線。触ると差分が大きくなりやすい |
+| MetricsRow / CardDivision | Phase4SummaryCard 済 | 参照済み |
+| MetricsRow / CardRank | StyleBoxFlat_card | rank_record 1 行＋見出し |
+| MetricsRow / CardMoney | StyleBoxFlat_card | money 1 行＋見出し |
+| CardTeamExtras | StyleBoxFlat_card | owner_trust / salary_cap / recent_form の行。
+  **`.gd` で `_extras_card.visible` が連動** |
+| CardWarnings | **StyleBoxFlat_warn** | warnings。**`_warnings_card.visible` 連動**。
+  **WarningsRow は tscn 上 `visible = false`、実行時に .gd が更新** |
+| CardNext | StyleBoxFlat_card | next_game。本文は 1 ラベル・比較的短文 |
+| CardSummary | StyleBoxFlat_card | club_summary。**`_join_lines` で複数行になりうる** |
+| CardTasks | StyleBoxFlat_card | tasks 最大 3 行 |
+| CardNews | Phase4SummaryCard 済 | 参照済み |
+
+
+--------------------------------------------------------------------------------
+5. CardTasks の候補評価
+--------------------------------------------------------------------------------
+- **役割**: 「今やること」ToDo。**sandbox では `Phase4WarningCard`** で右列主役。
+- **本線**: 暗地 `StyleBoxFlat_card` + 明色ラベル。**`Phase4WarningCard` に寄せると sandbox
+  と意味付けが一致**しやすい。
+- **リスク**: **`CardWarnings` も警告系**。両方を `Phase4WarningCard` にすると、**注意喚起
+  カードが縦に 2 枚**（間に CardNext / CardSummary が挟まるが）**視覚的に「全部危険」感**
+  が強まる可能性。**`Phase4SummaryCard` にすると** sandbox とはズレるが、**ニュース白
+  カードとのコントラスト**では「ToDo＝白カード」の方が主張しすぎる可能性。
+- **結論**: **Theme だけで実装は可能**だが、**WarningCard か SummaryCard かは設計判断が必要**。
+  **CardWarnings との役割分担**を先に決めないと、**被り**が出やすい。
+
+
+--------------------------------------------------------------------------------
+6. CardNext の候補評価
+--------------------------------------------------------------------------------
+- **役割**: **次戦 / 次イベント**。ホームで**重要度が高い**。
+- **データ**: `next_game` は **1 文字列**。**複数行になりにくい**（`CardNews` と同型にしやすい）。
+- **`.gd`**: **Card 自体の visible は触っていない**（常に表示）。
+- **Theme**: **`Phase4SummaryCard` が自然**（情報カード）。**CardNews と同じ手順**
+  （panel override 除去 + 子 Label 濃色化）で済む見込みが高い。
+- **リスク**: **低**。Header ClubBand と「試合の近さ」は文脈で近いが、**本線は帯に次戦全文は
+  出していない**ため、**重複は限定的**。
+- **結論**: **次の 1 枚として最もバランスが良い候補**。
+
+
+--------------------------------------------------------------------------------
+7. CardSummary の候補評価
+--------------------------------------------------------------------------------
+- **役割**: `club_summary`。**export 由来の説明複数行**になりうる（`_join_lines` 全行）。
+- **Theme**: **`Phase4SummaryCard` は型として合う**。
+- **リスク**: **白背景 + 長文**で**縦に伸び**、**Scroll 内で密度が目立つ**。**可読性は
+  autowrap と行数次第**で悪化しうる。
+- **結論**: **`.tscn` のみでは技術的に可能**だが、**UX リスクが CardNext より高い**。
+  **「次」より後ろ**が無難。
+
+
+--------------------------------------------------------------------------------
+8. CardWarnings の候補評価
+--------------------------------------------------------------------------------
+- **現状**: **`StyleBoxFlat_warn`** 専用。**シーン内で `StyleBoxFlat_warn` を参照しているのは
+  CardWarnings のみ**（**他カードは参照しない**）。**SubResource を削除しない運用**は
+  CardNews と同型。
+- **Theme**: **`Phase4WarningCard`** が**意味的に最一致**（`phase4_readonly_core.tres` に
+  定義あり）。**パネルは Theme に寄せ、ラベルは `Phase4NoteText` 系に寄せるか、現状の
+  暖色 override を維持するか**は目視判断。
+- **visible**: **空 warnings で非表示**の挙動は **`.gd` 既存のまま**。
+- **リスク**: **見た目が強くなりすぎないか**は Theme の `SubResource("4")` と現行
+  `StyleBoxFlat_warn` の**比較目視**が必要。**中程度**。
+- **結論**: **`Phase4WarningCard` 候補の第 1 位（意味）**。**ただし「次の 1 枚」としての
+  安全性**は **CardNext よりやや議論が増える**（色の強さ）。
+
+
+--------------------------------------------------------------------------------
+9. CardTeamExtras の候補評価
+--------------------------------------------------------------------------------
+- **役割**: owner_trust / salary_cap / recent_form の**任意行**。
+- **`.gd`**: **`_extras_card.visible`** が子行の可視と連動。**Theme を付けてもロジック変更不要**。
+- **子ノード**: **複数行・複数ラベル**（Key + Value）。**CardNews より調整点が多い**。
+- **リスク**: **中**。**Metrics（money）** や **club_summary** と**情報が隣接**し、**白カード化で
+  「数字が並ぶ」**印象が強まる可能性。
+- **結論**: **可能だが「次の 1 枚」としては優先度は CardNext より下**。
+
+
+--------------------------------------------------------------------------------
+10. CardRank / CardMoney の候補評価
+--------------------------------------------------------------------------------
+- **現状**: **CardDivision のみ** Theme 済みで、**同一 HBox 内に暗地 2 枚が残る**。
+- **Theme**: いずれも **`Phase4SummaryCard` が自然**（指標サマリー）。**CardDivision と同じ
+  ラベル色パターン**（HDiv 系 / 本文系）へ寄せられる。
+- **リスク**: **CardRank だけ**、または **CardMoney だけ**を白くすると **MetricsRow 内で
+  チグハグ**。**「1 コミットで Rank+Money の 2 枚」**なら整合は取りやすいが、**「1 カード
+  限定」というユーザ方針からは 2 ノード扱い**になる。
+- **Header ClubBand**: **将来**帯に資金・成績を寄せる設計がある場合、**Metrics と帯の
+  重複**が論点（README/docs の sandbox 調査と整合）。
+- **結論**: **単独 1 枚より「MetricsRow 残り 2 枚セット」で計画する方が安全**。
+  **いま単独で 1 枚だけ触るのは非推奨寄り**。
+
+
+--------------------------------------------------------------------------------
+11. 触らない案の評価
+--------------------------------------------------------------------------------
+- **CardNavMenu**: ボタン多数・**connection との見え方連動**。**1 カード限定の「安全」とは
+  言いにくい**。
+- **現状維持**: **リスクゼロ**。DTO / News 1 行化へ進む時間を確保できる。
+
+
+--------------------------------------------------------------------------------
+12〜18. 案 A〜G（マトリクス要約）
+--------------------------------------------------------------------------------
+観点はユーザー指定（安全性・.tscn のみ …）を各案に割当てて整理。
+
+【案 A: CardTasks を次に Theme 限定適用】
+- 安全性: 中（WarningCard 化で CardWarnings と**警告帯の二重化**の懸念）
+- .tscn のみ: 可
+- .gd / Python / DTO / .tres: 不要
+- StyleBoxFlat_card: **CardTasks からだけ外せばよい**（SubResource 残す）
+- visible: 影響なし
+- pytest: 影響なし
+- 今すぐ: **中**（variation 選定が必要）
+
+【案 B: CardNext を次に Theme 限定適用】
+- 安全性: **高**
+- .tscn のみ: **可**（CardNews と同型）
+- 共有 SubResource: **問題なし**
+- pytest: なし
+- 今すぐ: **高（推奨）**
+
+【案 C: CardSummary】
+- 安全性: **中〜低**（長文化）
+- .tscn のみ: 可
+- 今すぐ: **低〜中**
+
+【案 D: CardWarnings】
+- 安全性: **中〜高**（意味は最適、**色の強さ**は要目視）
+- .tscn のみ: 可（**`StyleBoxFlat_warn` は CardWarnings のみ参照** → override 除去のみで
+  SubResource はファイルに残せる）
+- 今すぐ: **中〜高**（**CardNext の次**が無難な並びもあり）
+
+【案 E: CardTeamExtras】
+- 安全性: 中
+- .tscn のみ: 可（ラベル数多）
+- 今すぐ: 中
+
+【案 F: CardRank または CardMoney の単独】
+- 安全性: **低〜中**（**チグハグ**）
+- **2 枚セットなら中〜高**
+- 今すぐ単独: **非推奨**
+
+【案 G: 次カード Theme を止め、News 1 行化 / DTO 調査へ】
+- 安全性: 最高
+- 進捗: Theme の見た目連鎖は止まるが、**データ契約の整理にリソースを回せる**
+- 今すぐ: **戦略的にはあり**（ただし「次の 1 カード Theme」の問いには「止める」回答）
+
+
+--------------------------------------------------------------------------------
+19. Phase4SummaryCard に合う候補
+--------------------------------------------------------------------------------
+- **最適**: **CardNext**、**CardRank + CardMoney（セット）**、（やや注意しつつ）**CardSummary**。
+- **不適（優先度低）**: **CardTasks**（sandbox は WarningCard 主役のため、SummaryCard は意味がズレる）。
+
+
+--------------------------------------------------------------------------------
+20. Phase4WarningCard に合う候補
+--------------------------------------------------------------------------------
+- **最適**: **CardWarnings**（現状も warn StyleBox）。**CardTasks**（sandbox と整合。
+  **CardWarnings との見た目分担**に注意）。
+
+
+--------------------------------------------------------------------------------
+21. 共有 StyleBoxFlat_card を壊さないための注意
+--------------------------------------------------------------------------------
+- **`StyleBoxFlat_card` の SubResource をシーンから削除しない**。**参照元**:
+  CardNavMenu、CardRank、CardMoney、CardTeamExtras、CardNext、CardSummary、CardTasks 等
+  （**CardNews は既に panel override なし**）。
+- **1 カード作業の型**: **そのカードだけ** `theme_override_styles/panel` 行を外す。
+- **`StyleBoxFlat_warn`**: **CardWarnings のみ**が参照。**Theme 化時も削除しない**。
+
+
+--------------------------------------------------------------------------------
+22. from_python / mock 維持の注意
+--------------------------------------------------------------------------------
+- **表示内容・キー・読込順は `.gd` 不変なら影響なし**。
+- **Theme は見た目のみ**。**DataSourceLabel** や **JSON パス表示**とは独立。
+
+
+--------------------------------------------------------------------------------
+23. 最初の安全な次カード候補
+--------------------------------------------------------------------------------
+**第 1 推奨: `CardNext` に `Phase4SummaryCard` を限定適用**（**CardNews と同じ手順**で
+**子ラベル濃色化**まで一括）。
+
+**第 2 推奨（意味重視）: `CardWarnings` に `Phase4WarningCard`**（**warn StyleBox からの
+ 移行**。ラベル色は **Theme の `Phase4NoteText` との兼ね合い**を F6 で確認）。
+
+**第 3 推奨（まとめ打ち）: `CardRank` + `CardMoney` を同一コミット**で SummaryCard 化
+（**「1 カード」ではなく「1 行 Metrics の残り」**として扱う）。
+
+
+--------------------------------------------------------------------------------
+24. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- **CardRank または CardMoney のどちらか片方だけ**の Theme 化（**チグハグ**）。
+- **CardNavMenu** を Theme 実験の次ターゲットにすること（**範囲が大きい**）。
+- **CardSummary を、長文対策の設計なしに**いきなり白カード化すること。
+
+
+--------------------------------------------------------------------------------
+25. pytest / 手動確認観点
+--------------------------------------------------------------------------------
+- pytest: **キー・export 不変なら現状のまま通過**（`test_home_dashboard_readonly_export.py`）。
+- 手動: **1280×720**、**mock / from_python**、**CardWarnings 非表示セーブ**と**表示セーブ**、
+  **MetricsRow の並び**、**UID**、**実行後 `git diff` の範囲が当該カードのみか**。
+
+
+--------------------------------------------------------------------------------
+26. Cursor としてのおすすめ順（実装フェーズ用・本レポートは実施しない）
+--------------------------------------------------------------------------------
+1. **CardNext** … SummaryCard + 濃色ラベル（**最も安全な「次の 1 枚」**）
+2. **CardRank + CardMoney** … **同一コミット**で SummaryCard 揃え（**Metrics 行の完成度**）
+3. **CardWarnings** … WarningCard（**意味最適**、色は目視）
+4. **CardTasks** … WarningCard か SummaryCard を**設計判断のうえ**で
+5. **CardTeamExtras** … 余力があれば
+6. **CardSummary** … 長文対策の検討後
+7. **案 G** … News 1 行化 / DTO と**交互**に入れるとよい
+
+
+--------------------------------------------------------------------------------
+27. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- **次の 1 コミットを「CardNext のみ」にするか**、**「Rank+Money の 2 枚」にまとめるか**。
+- **CardTasks を WarningCard にするか**（**sandbox 一致**）**／ SummaryCard にするか**
+  （**警告感を抑える**）。
+- **CardWarnings を先に WarningCard 化するか**（**意味優先**）**／ CardNext を先に白カード化するか**
+  （**安全優先**）。
+
+
+--------------------------------------------------------------------------------
+28. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+- 本調査で **編集したのは本ファイル（新規）のみ**。
+- godot/scenes/*、godot/scripts/*、godot/themes/*、docs/*、godot/README.md、既存 reports、
+  Python、生成 JSON、handoff md は **未変更**。
+
+
+================================================================================
+【結論】Cursor としての推奨（曖昧にしない）
+================================================================================
+
+■ 次に Theme 限定適用するならどのカードが最も安全か
+  → **`CardNext`**（**`Phase4SummaryCard` + 子 Label 濃色化**。**データは 1 文字列**で
+    **CardNews と同型**）。
+
+■ Phase4SummaryCard にするならどれがよいか
+  → **第 1: `CardNext`**。**第 2: `CardRank` と `CardMoney` をセット**（単独片方は非推奨）。
+    **CardSummary は長文リスクのため後回し**。
+
+■ Phase4WarningCard にするならどれがよいか
+  → **`CardWarnings` が最自然**。**`CardTasks` は sandbox 整合で WarningCard も妥当**だが
+    **`CardWarnings` と役割が近い**ため、**見た目設計をセットで決める**こと。
+
+■ CardTasks と CardWarnings のどちらを先に触るべきか
+  → **見た目の「安全・中立」優先なら先に `CardWarnings` は必須ではない**。
+    **意味の一貫性優先なら `CardWarnings` を WarningCard 化**。
+    **いずれにせよ、ToDo の `CardTasks` より先に決めるべきは「警告 vs ToDo の色の役割」**。
+    **本レポートの実装順のデフォルト**: **先に `CardNext`** → その後 **`CardWarnings`**
+    → その後 **`CardTasks`**（**Tasks を WarningCard にする場合**）。
+
+■ CardRank / CardMoney は単独で触るべきか、MetricsRow 全体方針後にすべきか
+  → **単独 1 枚は非推奨**。**方針として「Division と揃えて残り 2 枚を同じコミット」**がよい。
+
+■ まだ触らない方がよいカードはどれか
+  → **`CardRank` または `CardMoney` の片方だけ**。**`CardNavMenu`**。**根拠のない順序だけの
+    大入替**。
+
+■ いったん CardNews 1 行化 / DTO 整理へ進むべきか
+  → **Theme 連鎖だけ続ける必要はない**。**案 G は合理的**。ただし **低リスクで効果が大きい
+    `CardNext` の 1 コミット**を挟むと、**ホームの縦リズムが一気に揃い**、**その後 DTO に
+   集中しやすい**。
+
+（以上）
