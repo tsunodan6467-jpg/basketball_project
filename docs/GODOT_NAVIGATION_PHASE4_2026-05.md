@@ -35,7 +35,7 @@
 - **共通 Theme**（`godot/themes/phase4_readonly_core.tres`）と **preview**（`godot/scenes/theme_preview.tscn`）で **見た目を検証中**。**10 画面への一括適用**や **ホームの Scroll 以下の全面 Theme 化**は **していない**（**限定適用の段階**）。
 - **契約 / 人事サマリー**: ヘッダー・契約概要・ロスター構成・注意に **部分的に** Theme を当てた。**人事リスク**・**主要契約選手**（`Label.new()` 等の動的行）は **未着手**（暗パネル＋`.gd` のまま）。
 - **ロスター閲覧**: **ヘッダー**に Theme。**表**は暗背景のまま **`roster_view.gd`** で OnDark 系 **`theme_type_variation`** に寄せた最小対応（**白カード化なし**）。
-- **ホーム**: **`HeaderCard` のみ**に Theme を割当（**ルート `HomeDashboard` には付けない**）。**MetricsRow** は **`CardDivision` / `CardRank` / `CardMoney`** に `phase4_readonly_core.tres` + **`Phase4SummaryCard`** を付与済み（**3 枚とも白カード系で統一**）。**`Scroll` 以下**は **`CardNews`（`ed106c8`）・`CardNext`（`8676095`）・`CardTasks`（`d18bf1f`）**に **`Phase4SummaryCard`**、**`CardWarnings`（`762f5bc`）**に **`Phase4WarningCard`** を付与済み（**`CardWarnings`＝警告、`CardTasks`＝行動・ToDo** の分界）。**それ以外**（`NavColumns`・Summary 等）は **従来の StyleBox のまま**。**HeaderNavRow** は **ボタン数・接続・遷移先のシーン定義を変更していない**（親 `HeaderCard` に Theme が付くため、**見た目**は Theme 継承で変わりうる）。
+- **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 **`Phase4SummaryCard`**。**`Scroll` 以下**: **`CardNews` / `CardNext` / `CardTasks`** SummaryCard、**`CardWarnings`** WarningCard、**`CardTeamExtras` / `CardSummary`** SummaryCard（**`dc0182a`・`1d070ba`**）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内で暗色のまま残るのは `CardNavMenu`（画面メニュー・`NavColumns`）のみ** — **単純 Theme 化は未着手**（下記 §2.3）。**HeaderNavRow** は **ボタン数・接続・遷移先不変**（親 `HeaderCard` の Theme 継承で見た目は変わりうる）。
 - **左サイドナビ**・**本格ナビの全面実装**は **未着手**（§10）。**第 11 画面を急いで増やすより**、いまは **本番 GUI 化の足場**（Theme 限定適用・読み取り導線の安定）を優先する段階、という整理でよい（優先度の最終判断はチーム）。
 - 詳細・ロードマップ・運用は **`godot/README.md` の「共通 Theme / 白ベース検証」** と **`docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md` §15.1 / §15.2** を参照。
 
@@ -56,6 +56,21 @@
 - **本線 `home_dashboard.tscn` の Scroll 以下**では、**HeaderCard の ClubBand 風寄せ**（`83d7fc0`）に続き、**`CardNews`（`ed106c8`）・`CardNext`（`8676095`）・`CardWarnings`（`762f5bc`）・`CardTasks`（`d18bf1f`）**の限定 Theme 適用に加え、**MetricsRow の `CardRank` / `CardMoney`（`2471b67`）**にも **`Phase4SummaryCard`** を限定適用済み。**`CardDivision` / `CardRank` / `CardMoney` の MetricsRow 3 枚が白カード系で統一**された。**ナビ構造の変更ではない**。**`rank_record` / `money` の表示ロジック**・**`tasks` の本文・最大 3 行表示**（**`_join_lines(d, "tasks", 3)`**）・**`news` / `next_game` / `warnings` の表示ロジック**・**from_python / mock 経路は不変**（**`home_dashboard.gd` 不変**）。**HeaderNavRow は本線で維持**。**左サイドナビは本線未実装**。**右サマリー比較scene は本線未接続の参考案**。**`CardWarnings`＝警告・リスク、`CardTasks`＝行動・ToDo** の分界を維持。**sandbox の `CardNewsBody` 級の 1 行ヘッドライン本格導入**は **`.gd` または `news_headline` 等の DTO** を**別タスク**で検討。**本線移行は今後も小さなコミット単位**で行う。
 - **`godot/scenes/home_production_wire_preview_right_summary.tscn`**: **右サマリー列あり版**の**比較scene**として追加済み。**Godot 4.6.2** で UID 問題解消後の **F6 表示確認済み**。ただし 1280×720 では**中央が詰まりやすく**、**現時点では本命ではない**。**本命候補は左レール＋ClubBand＋中央 2 カラムの現行 sandbox**（`home_production_wire_preview.tscn`）。右サマリー列あり版は**将来の情報密度比較・参考画像寄せ**のための**参考案**として残す。**本線移行は別タスク・別コミット**。
 - **本線への取り込み**は **別タスク・別コミット**（本書 §10「左サイドメニューの全面実装」はいま着手しない方針と整合）。
+
+### 2.3 本線 `CardNavMenu`（暗色カード・判断保留）
+
+- **現状（2026-05）**: 本線 `home_dashboard.tscn` の Scroll 内で、**`StyleBoxFlat_card` の暗色 panel が残るのは `CardNavMenu` のみ**（**`CardTeamExtras` / `CardSummary` は `dc0182a`・`1d070ba` で `Phase4SummaryCard` 化済み**）。
+- **役割**: **8 画面**へのカード型メニュー（§3 の **HeaderNavRow 5 ボタンと一部重複**）。**第7〜10画面**は主にこちらから遷移。
+- **今回触っていない理由（意図的な判断保留）**:
+  - **HeaderNavRow** との**二重導線**（ロスター・順位表・日程等が上部と Scroll 内の両方にある）。
+  - **将来の左レール導入**（sandbox `home_production_wire_preview.tscn`）と**役割が近い** — 先に Theme だけ白化すると**再設計時に二度手間**になりうる。
+  - **10 画面導線**の整理（文言短縮・カテゴリ再配置・ヘッダーとカードの統合）と**同時に決めた方がよい**。
+- **次の判断候補**（いずれも未確定・**「必ず次は Theme」ではない**）:
+  - **`CardNavMenu` を暗色のまま残す**（ナビ IA が固まるまで）。
+  - **見た目だけ `Phase4SummaryCard` 化**（導線は現状維持）。
+  - **HeaderNavRow へ統合・カード縮小**（二重導線の解消）。
+  - **左レール本線化時に `CardNavMenu` を置換・再設計**。
+- **関連コミット**: **`91cfaed`**（`club_summary` 状況メモ化・export のみ）、**`dc0182a`**（`CardTeamExtras` Theme・`.tscn` のみ）、**`1d070ba`**（`CardSummary` Theme・`.tscn` のみ）。いずれも **CardNavMenu は未変更**。
 
 ## 3. 現行ナビ構造
 

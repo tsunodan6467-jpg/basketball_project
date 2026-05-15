@@ -85,7 +85,7 @@
 - **`home_dashboard.gd` は未変更**（**`83d7fc0` / `ed106c8` / `8676095` / `762f5bc` / `d18bf1f` / `2471b67` いずれでも変更なし**）。**from_python / mock の候補パス・読込経路は未変更**。**`83d7fc0` は HeaderCard のみ**で **`Scroll` 以下は未着手だった**が、その後 **`ed106c8` で `CardNews`、`8676095` で `CardNext`、`762f5bc` で `CardWarnings`、`d18bf1f` で `CardTasks`、`2471b67` で MetricsRow の `CardRank` / `CardMoney`** Theme 限定適用（下記「Scroll 以下 `CardNews`」〜「MetricsRow」節）。
 - **左レール**は**本線未実装**。**右サマリー比較scene**（`home_production_wire_preview_right_summary.tscn`）は**本線未接続**（上記「右サマリー列あり版」節）。
 - **ユーザー環境 Godot 4.6.2**: 通常起動 / F6 で **仮ロゴ枠・ClubName / Season / DataSourceLabel・HeaderNavRow** が問題なく表示。**UID エラーなし**。**実行後の不要差分なし**（手元運用の目安）。
-- **今後**: **`CardTasks` は `d18bf1f` で `Phase4SummaryCard` を限定適用済み**（**`CardWarnings`＝警告 / `CardTasks`＝行動・ToDo** の分界。調査レポート `reports/godot_phase4_home_dashboard_warning_task_theme_survey_2026-05.txt` と整合）。**MetricsRow**（`CardRank` / `CardMoney`）は **`2471b67` で同一コミット SummaryCard 化済み**（調査レポート `reports/godot_phase4_home_dashboard_metricsrow_theme_survey_2026-05.txt` と整合）。**News の本当の 1 行化**（`.gd` または `news_headline` 等）・**`CardSummary` / `club_summary` を触る場合**は**現 DTO の複数行説明との整合を先に確認**する。**Header へ資金・成績行の本格移植**は **MetricsRow との情報重複を別途整理**する。**中央カード密度の大移植**・**home DTO / JSON の追加整理**・**左サイドナビ本線導入**は **別タスク・別コミット**。
+- **今後（Header 節・`83d7fc0` 時点の補足）**: Scroll 以下 Theme・**`club_summary` 状況メモ化**（`91cfaed`）・**`CardTeamExtras` / `CardSummary` Theme**（`dc0182a`・`1d070ba`）は**別節**。**残る暗色は `CardNavMenu` のみ**（ナビ設計と合わせて判断）。**News 1 行化**・**Header 資金・成績本格移植**・**左レール本線化**は **別タスク**。
 
 ### 本線ホーム Scroll 以下 `CardNews` の Theme 限定適用（`ed106c8`）
 
@@ -131,8 +131,26 @@
 - **`rank_record` / `money` の表示内容は未変更**。**`_rank_record.text = _txt(d, "rank_record")` / `_money.text = _txt(d, "money")` は従来どおり**。**`home_dashboard.gd` は未変更**。**JSON / Python / DTO は未変更**。**Theme `.tres` は未変更**。**from_python / mock の読込経路は未変更**。**HeaderNavRow は未変更**。
 - **`CardDivision` は未変更**（既存 SummaryCard 済み）。**`SecMetricsTitle` は未変更**。**MetricsRow の構造・幅・`separation` は未変更**。**`CardRank` / `CardMoney` 以外の Scroll 下カードは未変更**。**`CardNews` / `CardNext` / `CardTasks` は既存の SummaryCard 状態を維持**。**`CardWarnings` は既存の WarningCard 状態を維持**。**HeaderCard のクラブ帯要素は維持**。**左レール**は**本線未実装**。**右サマリー比較scene**は**本線未接続の参考案**。
 - **ユーザー環境 Godot 4.6.2**: **MetricsRow 3 枚の白カード統一・`CardRank` / `CardMoney` 見出し・本文の可読性・`rank_record` / `money` 内容維持**を確認。**UID エラーなし**。**実行後不要差分なし**（手元運用の目安）。
-- **現時点の本線ホーム**: **HeaderCard クラブ帯要素**＋**MetricsRow 3 枚（`CardDivision` / `CardRank` / `CardMoney`）の SummaryCard**＋**`CardNews` / `CardNext` / `CardTasks` の SummaryCard**＋**`CardWarnings` の WarningCard**まで進んだ状態。
-- **今後**: **`CardSummary` / `club_summary` を触る場合**は**現 DTO の複数行説明との整合**を先に確認する。**`CardNews` を本当に 1 行化する場合**は **`.gd` 表示制御**または **`news_headline` 等の DTO / export 整理**を**別タスク**で判断。**Header へ資金・成績行を本格移植する場合**は **MetricsRow との情報重複を別途整理**する。
+- **現時点の本線ホーム**（`2471b67` 時点）: **HeaderCard クラブ帯要素**＋**MetricsRow 3 枚**＋**Scroll 以下の Summary / Warning 系**まで（**`CardTeamExtras` / `CardSummary` の Theme・`club_summary` 状況メモ化は下記 3 コミット**）。
+
+### 本線ホーム `club_summary` 状況メモ化（`91cfaed`）
+
+- **DTO / export のみ**（`home_dashboard_readonly.py`・`test_home_dashboard_readonly_export.py`・`home_dashboard_mock.json`）。**`.tscn` / `.gd` / Theme は未変更**。
+- **`club_summary` の役割**: **順位・資金・salary_cap の再掲サマリー**から **シーズン状態などの短い状況メモ**（原則 1〜2 行、最大 3 行）へ変更。
+- **削った再掲**: `rank_record` / `division` / `money` / `salary_cap` 全文（**MetricsRow**・**CardTeamExtras**・トップレベルキーで表示）。
+- **トップレベル** `division` / `rank_record` / `money` / `salary_cap` / `owner_trust` / `recent_form` は**維持**。
+
+### 本線ホーム `CardTeamExtras` の Theme 限定適用（`dc0182a`）
+
+- **`home_dashboard.tscn` のみ**。`theme` + **`Phase4SummaryCard`**、**`StyleBoxFlat_card` の panel override のみ除去**（SubResource は **CardNavMenu** 用に残存）。
+- **表示**: `owner_trust` / `salary_cap` / `recent_form`（**`_extras_card.visible` 等の .gd ロジックは不変**）。
+
+### 本線ホーム `CardSummary` の Theme 限定適用（`1d070ba`）
+
+- **`home_dashboard.tscn` のみ**（**`91cfaed` の状況メモ化の後**）。`CardTeamExtras` と同型の **SummaryCard** 化。
+- **Scroll 内の暗色カード**: **`CardNavMenu` のみ**残存（**単純 Theme 化は未着手** — **HeaderNavRow / 左レール / 10 画面導線**と合わせて判断）。
+
+- **今後**: **`CardNavMenu`** は **HeaderNavRow との二重導線**・**将来左レール**・**10 画面導線整理**と絡むため、**見た目だけの Theme 化は急がない**（設計判断を挟む）。**`CardNews` の 1 行化**は **`.gd` または `news_headline` 等**を**別タスク**。**Header へ資金・成績行の本格移植**は **MetricsRow との重複整理**を**別途**。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -148,7 +166,7 @@
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **暗地前提のまま**で、**白カード化・Theme 統一は未着手**（別タスクで `.gd` 調整が必要）。
 - **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**ヘッダー**は `Phase4HeaderCard` + ヘッダー Label 濃色。**表**（`Scroll` / `RowList` 内の動的 `Label`）は **暗背景のまま**、`roster_view.gd` で `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` の **`theme_type_variation` に寄せた最小対応**（白カード化はしていない）。
-- **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard`（PanelContainer）のみ**に `phase4_readonly_core.tres` を割当し、`Phase4HeaderCard` を適用。クラブ名・シーズン・DataSource 等は白ヘッダ上の濃色に調整。**`83d7fc0` で HeaderCard 内に sandbox ClubBand 風の `HeaderClubBandRow`・`HomeLogoSlot`（`SG` / `LOGO`）・`HeaderBandTextCol` を追加**し、既存 3 ラベルをクラブ帯内に配置（**`home_dashboard.gd` 不変**）。**MetricsRow** は **`CardDivision`（`f66bcd2` 先行）・`CardRank` / `CardMoney`（`2471b67`）**に `theme` + **`Phase4SummaryCard`**（**各カードから `StyleBoxFlat_card` の panel override のみ除去**。共有 SubResource は残存）。**`Scroll` 以下**は **`CardNews`（`ed106c8`）・`CardNext`（`8676095`）・`CardTasks`（`d18bf1f`）**に `theme` + **`Phase4SummaryCard`**、**`CardWarnings`（`762f5bc`）**に `theme` + **`Phase4WarningCard`**（**`StyleBoxFlat_warn` の panel override のみ除去**。`StyleBoxFlat_warn` SubResource は残存）。**それ以外**（カードメニュー・Summary 等）は **従来の `StyleBoxFlat_card` 等のまま**。**HeaderNavRow** はシーン上 **ボタン数・接続・遷移先の定義を変えていない**（親に Theme が付くため、実行時の見た目は Theme 継承で変わりうる）。
+- **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**MetricsRow** 3 枚 **`Phase4SummaryCard`**（`f66bcd2`・`2471b67`）。**Scroll 以下**: **`CardNews` / `CardNext` / `CardTasks`** SummaryCard、**`CardWarnings`** WarningCard、**`CardTeamExtras` / `CardSummary`** SummaryCard（**`dc0182a`・`1d070ba`**）。**暗色 `StyleBoxFlat_card` は `CardNavMenu` のみ**（**`91cfaed` で `club_summary` は状況メモ化済み・export/mock のみ**）。**`home_dashboard.gd`・Theme `.tres` は上記 Theme 段階で不変**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
 
@@ -166,6 +184,9 @@
 ◎ ホーム・MetricsRow `CardDivision` / `CardRank` / `CardMoney` のみ `Phase4SummaryCard` 限定適用（`f66bcd2`・`2471b67`）
 ◎ ホーム・Scroll 以下 `CardNews` / `CardNext` / `CardTasks` のみ `Phase4SummaryCard` 限定適用（`ed106c8`・`8676095`・`d18bf1f`）
 ◎ ホーム・Scroll 以下 `CardWarnings` のみ `Phase4WarningCard` 限定適用（`762f5bc`）
+◎ 本線ホーム `club_summary` 状況メモ化（`91cfaed`・export/tests/mock のみ）
+◎ 本線ホーム `CardTeamExtras` のみ `Phase4SummaryCard` 限定適用（`dc0182a`）
+◎ 本線ホーム `CardSummary` のみ `Phase4SummaryCard` 限定適用（`1d070ba`）
 ◎ 本番ホームワイヤー sandbox（`home_production_wire_preview.tscn`・F6 単体・script なし）
 ◎ sandbox 方針整理（`reports/godot_phase4_home_wire_sandbox_policy_2026-05.txt`）
 ◎ README/docs へ sandbox 位置づけ記録
@@ -209,8 +230,13 @@
 ◎ 本線 `home_dashboard` MetricsRow の Theme 統一方針を調査（`ffb14f8`）
 ◎ 本線 `home_dashboard` の `CardRank` / `CardMoney` に Theme を限定適用（`2471b67`）
 ◎ MetricsRow 3 枚白カード統一・`rank_record` / `money` 表示維持を確認（ユーザー環境 Godot 4.6.2）
-★ README/docs に本線 MetricsRow 限定 Theme 適用の到達点を記録（本コミット）
-□ CardSummary / `club_summary` の表示整理判断
+◎ README/docs に本線 MetricsRow 限定 Theme 適用の到達点を記録（`43136f9`）
+◎ 残る暗色カード・`club_summary` 整理方針を調査（`307a7cc`・`e45321c`）
+◎ 本線ホーム `club_summary` 状況メモ化（`91cfaed`）
+◎ 本線ホーム `CardTeamExtras` Theme 限定適用（`dc0182a`）
+◎ 本線ホーム `CardSummary` Theme 限定適用（`1d070ba`）
+★ README/docs に状況メモ化とカード Theme 到達点を記録（本コミット）
+□ CardNavMenu の扱い（HeaderNavRow / 左レール / 10 画面導線と合わせて判断）
 □ CardNews 1 行化の表示制御 / DTO 整理判断
 □ Header 資金・成績行の本格移植判断
 □ home DTO / JSON の追加整理
@@ -219,7 +245,7 @@
 □ 本線 `home_dashboard` 中央カード密度の大移植判断
 □ 左サイドナビ本線導入判断
 □ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
-□ ホーム・Metrics / Summary 等のカード（Scroll 以下）
+□ ホーム・CardNavMenu（Scroll 内唯一の暗色カード・ナビ設計と合わせて判断）
 □ ホーム全体への Theme 拡大（ルート一括など）
 □ 左サイドナビ（本線未実装・sandbox でレイアウト研究可）
 □ ホーム「データ更新」表示 / ボタン判断
@@ -384,8 +410,13 @@
   ◎ 本線home_dashboard MetricsRowのTheme統一方針を調査（`ffb14f8`）
   ◎ 本線home_dashboard CardRank/CardMoneyにThemeを限定適用（`2471b67`）
   ◎ MetricsRow 3枚白カード統一・rank_record/money表示維持を確認（ユーザー環境 Godot 4.6.2）
-  ★ README/docsに本線MetricsRow限定Theme適用の到達点を記録（本コミット）
-□ CardSummary / club_summaryの表示整理判断
+  ◎ README/docsに本線MetricsRow限定Theme適用の到達点を記録（`43136f9`）
+  ◎ 残る暗色カード・club_summary整理方針を調査（`307a7cc`・`e45321c`）
+  ◎ 本線ホームclub_summary状況メモ化（`91cfaed`）
+  ◎ 本線ホームCardTeamExtras Theme限定適用（`dc0182a`）
+  ◎ 本線ホームCardSummary Theme限定適用（`1d070ba`）
+  ★ README/docsに状況メモ化とカードTheme到達点を記録（本コミット）
+□ CardNavMenuの扱い（HeaderNavRow/左レール/10画面導線）
 □ CardNews1行化の表示制御 / DTO整理判断
 □ Header資金・成績行の本格移植判断
 □ home DTO / JSON の追加整理
@@ -432,7 +463,7 @@
 - **配布用に export 専用 exe を同梱し Godot から起動する**こと（未実装）
 - **`generated_at` を全 DTO に一斉追加する**こと、**Godot 側で JSON の更新時刻だけを常時表示する**こと（未実装・要別判断）
 - **契約 / 人事サマリー画面の本格ビジュアル調整**（現状は読み取りプロトタイプ優先）
-- **10 画面すべてへの共通 Theme の一括適用**、**ホームの Scroll 以下まで含む全体 Theme 化**（**限定適用の検証段階**。ホームは **`HeaderCard`・MetricsRow の `CardDivision` / `CardRank` / `CardMoney`（`Phase4SummaryCard`）**および Scroll 以下の **`CardNews` / `CardNext` / `CardTasks`（`Phase4SummaryCard`）・`CardWarnings`（`Phase4WarningCard`）**まで Theme 限定適用済み。**カードメニュー・Summary 等のその他 Scroll 以下**は従来の暗色 `StyleBoxFlat_card` のまま）
+- **10 画面すべてへの共通 Theme の一括適用**、**ホームの Scroll 以下まで含む全体 Theme 化**（**限定適用の検証段階**。ホーム Scroll 以下は **Summary / Warning 系カードがほぼ白カード化済み**。**暗色 `StyleBoxFlat_card` は `CardNavMenu` のみ** — **ナビ設計判断を挟むまで Theme 化しない方針**）
 - **本番ホームワイヤー sandbox**（`scenes/home_production_wire_preview.tscn`）および **右サマリー比較scene**（`scenes/home_production_wire_preview_right_summary.tscn`）を **本線ホームに自動接続**すること（**script なし・JSON なし・本線遷移なし**。研究・比較用。詳細は「本番ホームワイヤー sandbox」「右サマリー列あり版」節）
 - **Godot 本番 GUI の一本化**
 
