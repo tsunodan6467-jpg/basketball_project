@@ -468,7 +468,8 @@ text = "（資金）"
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme = ExtResource("2_theme")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="VBoxExtras" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardTeamExtras"]
 layout_mode = 2
@@ -476,7 +477,7 @@ theme_override_constants/separation = 10
 
 [node name="HExtras" type="Label" parent="Margin/RootCol/Scroll/Inner/CardTeamExtras/VBoxExtras"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 12
 text = "オーナー信頼・給与キャップ・直近成績"
 
@@ -489,7 +490,7 @@ theme_override_constants/separation = 8
 [node name="OwnerKey" type="Label" parent="Margin/RootCol/Scroll/Inner/CardTeamExtras/VBoxExtras/OwnerTrustRow"]
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.74, 0.82, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 13
 text = "オーナー信頼"
 
@@ -497,7 +498,7 @@ text = "オーナー信頼"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.92, 0.94, 0.98, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 15
 autowrap_mode = 2
 text = ""
@@ -511,7 +512,7 @@ theme_override_constants/separation = 8
 [node name="CapKey" type="Label" parent="Margin/RootCol/Scroll/Inner/CardTeamExtras/VBoxExtras/SalaryCapRow"]
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.74, 0.82, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 13
 text = "給与キャップ"
 
@@ -519,7 +520,7 @@ text = "給与キャップ"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.92, 0.94, 0.98, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 15
 autowrap_mode = 2
 text = ""
@@ -533,7 +534,7 @@ theme_override_constants/separation = 8
 [node name="RecentKey" type="Label" parent="Margin/RootCol/Scroll/Inner/CardTeamExtras/VBoxExtras/RecentFormRow"]
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.74, 0.82, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 13
 text = "直近成績"
 
@@ -541,7 +542,7 @@ text = "直近成績"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.92, 0.94, 0.98, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 15
 autowrap_mode = 2
 text = ""
