@@ -59,6 +59,15 @@
 - **ユーザー環境 Godot 4.6.2** で sandbox を **F6 表示確認**済み（ナビ・ClubBand・中央・**アクセント調整後**）。**UID 参照エラーなし**、**実行後の不要な追跡差分なし**（手元運用の目安）。
 - 色・質感の追加試験前に、候補整理は **`reports/godot_phase4_home_wire_color_texture_survey_2026-05.txt`**（調査レポート）で実施済み。**Theme 全面改色は未着手**。
 
+### 右サマリー列あり版の比較scene（`scenes/home_production_wire_preview_right_summary.tscn`）
+
+- **位置づけ**: 現行 2 カラム sandbox（`home_production_wire_preview.tscn`）を壊さず、**右に第 3 列（状態サマリー）**を足したレイアウトを **比較する**ための **別シーン**（script なし・固定文言・**F6 単体**）。**本線 `home_dashboard.tscn` には未接続**。
+- **UID**: `cf8012c`（`Godot右サマリー比較sceneのUIDを安定化`）で先頭行を Godot 側の正式 UID 表記へ合わせ済み。調査: `a8b4a1d`（`Godot右サマリー比較sceneのUID問題を調査`）。scene 追加: `a7858c3`。
+- **ユーザー環境 Godot 4.6.2**: **F6 表示確認 OK**。**UID エラーなし**。**実行後の不要な追跡差分なし**（手元運用の目安）。
+- **右サマリー列「状態サマリー」**: **キャップ余力**・**士気**・**ロスター**・**契約警告**・**疲労リスク**の短い行（固定文言）。**ClubBand の資金・オーナー信頼**、**中央「順位・成績」カードの立ち位置文**、**タスク ToDo の箇条書き**を**右列で繰り返さない**比較用の情報分担サンプル。
+- **目視評価（2026-05）**: 1280×720 では中央カードの**横幅がやや詰まり**、**現行 2 カラム版より見やすいとは言いにくい**。**右サマリー列あり版は比較候補・参考案として残す**。**現時点の本命候補は、余白と可読性に優れる現行 2 カラム版**（`home_production_wire_preview.tscn`）寄り。
+- **本線への移植**: **未実施**。**別タスク・別コミット**で、可読性・余白・情報密度・本線 DTO との整合を見て判断する。
+
 **本線との役割分担**:
 
 - **本線 `home_dashboard.tscn`** は **10 画面導線**・**from_python 優先 + mock フォールバック**・pytest の**正本**として維持。
@@ -106,10 +115,15 @@
 ◎ sandbox CardNews 本文（`CardNewsBody`）を1行ヘッドラインへ短縮（`ホーム快勝、次戦へ弾み`）
 ◎ sandbox CardClubBody（`CardClubState`）を1行要約へ短縮（`サラリー余力あり / 士気良好`）
 ◎ sandbox 色・質感候補調査（`reports/godot_phase4_home_wire_color_texture_survey_2026-05.txt`）
-★ README/docs へ sandbox のクラブ状態短縮到達点を記録（本コミット）
+◎ README/docs へ sandbox のクラブ状態短縮到達点を記録
+◎ 右サマリー列あり版の調査
+◎ 右サマリー比較scene追加（`home_production_wire_preview_right_summary.tscn`）
+◎ 右サマリー比較sceneのUID問題を調査（`a8b4a1d`）
+◎ 右サマリー比較sceneのUIDを安定化（`cf8012c`）
+◎ 右サマリー比較sceneのF6表示確認（ユーザー環境 Godot 4.6.2）
+★ README/docs に右サマリー比較の確認結果を記録（本コミット・本命は現行2カラム版寄り）
 □ sandbox 中央カード密度の追加調整
 □ sandbox 色・質感バリエーション追加試験
-□ sandbox 右サマリー列あり版の比較
 □ 本線 `home_dashboard` への段階移植判断
 □ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
 □ ホーム・Metrics / Summary 等のカード（Scroll 以下）
@@ -244,10 +258,15 @@
   ◎ sandbox CardNewsを1行ヘッドラインへ短縮
   ◎ sandbox CardClubStateを1行要約へ短縮
   ◎ sandbox色・質感候補調査（レポート）
-  ★ README/docs へ sandbox のクラブ状態短縮到達点を記録（本コミット）
+  ◎ README/docs へ sandbox のクラブ状態短縮到達点を記録
+  ◎ 右サマリー列あり版の調査
+  ◎ 右サマリー比較scene追加（`home_production_wire_preview_right_summary.tscn`）
+  ◎ 右サマリー比較sceneのUID問題を調査（`a8b4a1d`）
+  ◎ 右サマリー比較sceneのUIDを安定化（`cf8012c`）
+  ◎ 右サマリー比較sceneのF6表示確認（ユーザー環境 Godot 4.6.2）
+  ★ README/docs に右サマリー比較の確認結果を記録（本コミット・本命は現行2カラム版寄り）
 □ sandbox中央カード密度の追加調整
 □ sandbox色・質感バリエーション追加試験
-□ sandbox右サマリー列あり版の比較
 □ 本線home_dashboardへの段階移植判断
 □ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
 □ ホーム・Scroll以下カードのTheme／本番ビジュアル調整
@@ -288,7 +307,7 @@
 - **`generated_at` を全 DTO に一斉追加する**こと、**Godot 側で JSON の更新時刻だけを常時表示する**こと（未実装・要別判断）
 - **契約 / 人事サマリー画面の本格ビジュアル調整**（現状は読み取りプロトタイプ優先）
 - **10 画面すべてへの共通 Theme の一括適用**、**ホームの Scroll 以下まで含む全体 Theme 化**（**限定適用の検証段階**。ホームは **Header のみ**適用済みで、**主要指標・カードメニュー等は従来の暗色カードのまま**）
-- **本番ホームワイヤー sandbox**（`scenes/home_production_wire_preview.tscn`）を **本線ホームに自動接続**すること（**script なし・JSON なし・本線遷移なし**。研究用。詳細は「本番ホームワイヤー sandbox」節）
+- **本番ホームワイヤー sandbox**（`scenes/home_production_wire_preview.tscn`）および **右サマリー比較scene**（`scenes/home_production_wire_preview_right_summary.tscn`）を **本線ホームに自動接続**すること（**script なし・JSON なし・本線遷移なし**。研究・比較用。詳細は「本番ホームワイヤー sandbox」「右サマリー列あり版」節）
 - **Godot 本番 GUI の一本化**
 
 ## ファイル構成（抜粋）
@@ -298,6 +317,7 @@
 | `project.godot` | Godot 4.x プロジェクト設定。メインシーンは `scenes/home_dashboard.tscn` |
 | `scenes/home_dashboard.tscn` / `scripts/home_dashboard.gd` | ホームレイアウト・JSON 表示 |
 | `scenes/home_production_wire_preview.tscn` | **本番ホームワイヤー sandbox**（script なし・固定文言・F6 単体。本線とは別） |
+| `scenes/home_production_wire_preview_right_summary.tscn` | **右サマリー列あり版の比較scene**（script なし・固定文言・F6 単体・本線未接続。レイアウト判断は README「右サマリー列あり版」節） |
 | `scenes/roster_view.tscn` / `scripts/roster_view.gd` | ロスター閲覧・JSON 表示 |
 | `scenes/club_history_view.tscn` / `scripts/club_history_view.gd` | クラブ史閲覧・JSON 表示 |
 | `scenes/standings_view.tscn` / `scripts/standings_view.gd` | 順位表（リーグ状況）閲覧・JSON 表示 |
