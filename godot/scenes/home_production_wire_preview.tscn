@@ -408,7 +408,7 @@ text = "順位・成績"
 [node name="CardStandingsBody" type="Label" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft/CardStandings/CardStandingsInner"]
 layout_mode = 2
 theme_type_variation = &"Phase4Muted"
-text = "地区4位 / 12勝12敗"
+text = "PO圏まで 2.0差 / 直近5試合 3勝2敗"
 
 [node name="CardClubState" type="PanelContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow/ColLeft"]
 layout_mode = 2
