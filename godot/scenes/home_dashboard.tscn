@@ -548,7 +548,8 @@ text = ""
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_warn")
+theme = ExtResource("2_theme")
+theme_type_variation = &"Phase4WarningCard"
 
 [node name="VBoxWarn" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardWarnings"]
 layout_mode = 2
@@ -556,7 +557,7 @@ theme_override_constants/separation = 8
 
 [node name="HWarn" type="Label" parent="Margin/RootCol/Scroll/Inner/CardWarnings/VBoxWarn"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.92, 0.78, 0.62, 1)
+theme_override_colors/font_color = Color(0.32, 0.2, 0.08, 1)
 theme_override_font_sizes/font_size = 12
 text = "注意 / 警告"
 
@@ -569,7 +570,7 @@ layout_mode = 2
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.98, 0.86, 0.72, 1)
+theme_override_colors/font_color = Color(0.3, 0.22, 0.12, 1)
 theme_override_font_sizes/font_size = 14
 autowrap_mode = 2
 text = ""
