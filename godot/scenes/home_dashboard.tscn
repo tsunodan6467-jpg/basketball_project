@@ -625,7 +625,8 @@ text = "（サマリー）"
 [node name="CardTasks" type="PanelContainer" parent="Margin/RootCol/Scroll/Inner"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme = ExtResource("2_theme")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="VBoxTasks" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/CardTasks"]
 layout_mode = 2
@@ -633,14 +634,14 @@ theme_override_constants/separation = 8
 
 [node name="HTasks" type="Label" parent="Margin/RootCol/Scroll/Inner/CardTasks/VBoxTasks"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 12
 text = "今やること（最大3件）"
 
 [node name="TasksLabel" type="Label" parent="Margin/RootCol/Scroll/Inner/CardTasks/VBoxTasks"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.9, 0.94, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 14
 autowrap_mode = 2
 text = "（タスク）"
