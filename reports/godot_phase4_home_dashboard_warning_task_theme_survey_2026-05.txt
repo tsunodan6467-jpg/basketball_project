@@ -1,0 +1,353 @@
+================================================================================
+Godot 本線 home_dashboard — CardWarnings / CardTasks の WarningCard 適用判断調査
+================================================================================
+
+本ファイルは調査・整理のみ。実装・シーン・スクリプト・Theme・docs/README・Python・
+既存 reports の編集は行っていない（本ファイルの新規作成のみ）。
+
+
+--------------------------------------------------------------------------------
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+- 調査日時: 2026-05-15（`home_dashboard.tscn` / `home_dashboard.gd` /
+  `phase4_readonly_core.tres` / `home_production_wire_preview.tscn` /
+  既存 reports / README・docs の読取・grep に基づく）
+- 調査時点のリポジトリ HEAD: 75fc9cc（「Godot本線ホームCardNext限定Theme適用の到達点を記録」）
+- 参照した主なパス:
+  - godot/scenes/home_dashboard.tscn
+  - godot/scripts/home_dashboard.gd
+  - godot/themes/phase4_readonly_core.tres
+  - godot/scenes/home_production_wire_preview.tscn（CardTasks の variation 確認）
+  - reports/godot_phase4_home_dashboard_next_card_theme_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_center_density_migration_survey_2026-05.txt（冒頭 grep）
+  - reports/godot_phase4_home_dashboard_migration_survey_2026-05.txt（冒頭 grep）
+  - godot/README.md / docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md /
+    docs/GODOT_NAVIGATION_PHASE4_2026-05.md（方針の整合確認・本調査では未編集）
+
+
+--------------------------------------------------------------------------------
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 本線 `home_dashboard.tscn`: **HeaderCard** に `phase4_readonly_core.tres` +
+  **`Phase4HeaderCard`**（`83d7fc0` 系）。
+- **Scroll / Inner 直下の並び**（VBox 上から）:
+  CardNavMenu → SecMetricsTitle → MetricsRow（CardDivision / CardRank / CardMoney）→
+  CardTeamExtras → **CardWarnings** → **CardNext** → **CardSummary** → **CardTasks** →
+  **CardNews**（最下）。
+- **Theme 限定適用済み**: **CardDivision**（SummaryCard）、**CardNext**、**CardNews**。
+- **未適用（暗地 StyleBoxFlat_card 等）**: CardNavMenu、CardRank、CardMoney、CardTeamExtras、
+  **CardSummary**、**CardTasks** など。
+- **CardWarnings のみ** 専用の **`StyleBoxFlat_warn`**（暗茶＋琥珀系 border）を panel に使用。
+
+
+--------------------------------------------------------------------------------
+3. CardNews / CardNext 限定 Theme 適用の結果（前提）
+--------------------------------------------------------------------------------
+- **手順の型**: 対象 `PanelContainer` に `theme = ExtResource("2_theme")` +
+  `theme_type_variation = Phase4SummaryCard`、**当該ノードのみ**
+  `theme_override_styles/panel`（`StyleBoxFlat_card`）を外す。**子 Label の font_color を
+  白カード向け濃色**へ（`ed106c8` / `8676095`）。
+- **共有 SubResource `StyleBoxFlat_card`**: **ファイル内に残し**、他ノードが参照継続。
+- **`.gd` / JSON / Python / DTO / Theme `.tres`**: 変更なしで成立。
+- **Scroll 以下は「1 カードずつ」安全に積み上げ可能**という実績がある。
+
+
+--------------------------------------------------------------------------------
+4. CardWarnings の現状（本線 .tscn）
+--------------------------------------------------------------------------------
+- **ノード**: `CardWarnings`（`PanelContainer`）、`unique_name_in_owner = true`（`%CardWarnings`）。
+- **panel**: `theme_override_styles/panel = SubResource("StyleBoxFlat_warn")` のみ。
+  **ルート Theme は付いていない**（HeaderCard や CardNews とは異なる）。
+- **StyleBoxFlat_warn**（SubResource）: **暗い茶系 bg**（約 0.16, 0.12, 0.1）、**border** は
+  やや暖色（約 0.45, 0.32, 0.22）。角丸 8。**契約人事画面の「注意」とは別物**（本線ホーム専用の
+  暗パネル警告帯）。
+- **子ラベル**:
+  - `HWarn`: 「注意 / 警告」、font_color 明るめ暖色（約 0.92, 0.78, 0.62）。
+  - `WarningsRow` / `WarningsLabel`: **tscn 上 `WarningsRow` は `visible = false`**。
+    `WarningsLabel` は暖色がかった明色（約 0.98, 0.86, 0.72）、14px、autowrap。
+- **grep 結果**: **`StyleBoxFlat_warn` を参照しているのは CardWarnings のみ**。
+  CardWarnings から panel override を外しても **SubResource 定義をファイルに残す**ことは
+  可能（CardNews 時の `StyleBoxFlat_card` と同型の運用）。
+
+
+--------------------------------------------------------------------------------
+5. CardTasks の現状（本線 .tscn）
+--------------------------------------------------------------------------------
+- **ノード**: `CardTasks`（`PanelContainer`）、**`unique_name_in_owner` はルートに無し**
+  （子の `TasksLabel` のみ unique）。
+- **panel**: **`StyleBoxFlat_card`**（暗地カード）。Header の Theme 継承は受けない
+  （CardTasks 自体に `theme` なし）。
+- **子ラベル**:
+  - `HTasks`: 「今やること（最大3件）」、中間の明るい灰青（約 0.62, 0.68, 0.76）。
+  - `TasksLabel`: 明るい本文色（約 0.88, 0.9, 0.94）、14px、autowrap、プレースホルダ
+    「（タスク）」。
+- **常時表示**: **カード全体の `visible` を .gd で切り替えていない**（空タスクでも枠は残る。
+  中身は空文字になりうる）。
+
+
+--------------------------------------------------------------------------------
+6. home_dashboard.gd での warnings / tasks 処理
+--------------------------------------------------------------------------------
+- **読込**: `_home_json_candidate_paths`（`from_python` 優先 → mock）。変更なし前提の調査。
+- **tasks**: `_tasks.text = _join_lines(d, "tasks", 3)` — **最大 3 行**、先頭に「・」連結。
+  **空配列なら空文字**。
+- **warnings**: `_set_optional_row(_warnings_row, _warnings, _txt(d, "warnings"))`
+  - `_txt`: キー欠如・null は **空文字**。
+  - `_set_optional_row`: **text が空なら `row.visible = false`**、非空なら `visible = true`
+    かつ `value_label.text = text`。
+- **カード表示**:
+  - `_warnings_card.visible = _warnings_row.visible` — **警告文が空のときカードごと非表示**。
+  - `_clear_body` でも **`_warnings_card.visible = false`**。
+- **CardTasks**: **visible 制御なし**（常に表示カードとして存在）。
+- **Theme 変更との独立性**: **visible はスクリプトが `PanelContainer` / `HBoxContainer` に
+  対して設定**。Theme の panel Style の差し替えと **競合しない**（Godot の通常動作）。
+
+
+--------------------------------------------------------------------------------
+7. sandbox（home_production_wire_preview.tscn）でのタスク・警告の扱い
+--------------------------------------------------------------------------------
+- **CardTasks**（右列）: `theme_type_variation = &"Phase4WarningCard"` を付与済み（grep）。
+  タイトル「タスク」＋本文は **右列の主役**として強調する方針（README / ARCHITECTURE の
+  記述と整合）。
+- **他カード**: 複数が `Phase4SummaryCard`。ニュース本文は 1 行ヘッドライン化済み等。
+- **本線との差**: sandbox は **script なし・固定文言**。**本線は JSON 駆動**で
+  **CardWarnings と CardTasks が別ノード**かつ **CardWarnings は空なら非表示**。
+  sandbox の「タスク＝WarningCard」を **本線にそのままコピーすると、本線の CardWarnings
+  （真の注意文）と視覚クラスタが近接**しうる（Inner 内では CardWarnings が CardTasks より
+  上にある）。
+
+
+--------------------------------------------------------------------------------
+8. CardWarnings と CardTasks の役割分界（情報設計）
+--------------------------------------------------------------------------------
+- **CardWarnings**: **単一文字列 `warnings`（任意表示）**。UI ラベル「注意 / 警告」。
+  **リスク・コンプライアンス・緊急度が高いメッセージ**向けの枠として自然。
+- **CardTasks**: **配列 `tasks` 最大 3 件**。「今やること」＝ **行動キュー / ToDo**。
+  **プレイヤーが次に着手する操作の候補**に近い。
+- **Tk 由来の整理**（情報設計メモ）: ホームは「次に何をするか」が主題。タスクは **行動**、
+  警告は **状態の異常・注意**。同一トーンにすると **ユーザーが「どちらを先に読むべきか」
+  を判別しづらく**なる。
+- **推奨する分界**:
+  - **視覚**: **注意＝Warning 系（Phase4WarningCard または現行の暗 warn 帯のどちらか一系統）**、
+    **ToDo＝中立〜前向き（SummaryCard または現行の暗 card のまま）**に寄せるのが読みやすい。
+  - **両方を Phase4WarningCard にするのは非推奨**（意味は違っても「全部注意色」に見える）。
+
+
+--------------------------------------------------------------------------------
+9. 案A — CardWarnings を次に WarningCard 化する案
+--------------------------------------------------------------------------------
+- **内容**: CardWarnings に `theme` + `Phase4WarningCard`、panel の `StyleBoxFlat_warn`
+  override を外す。**HWarn / WarningsLabel を白〜クリーム地に合う濃色／Phase4NoteText 系に
+  寄せる**（CardNews と同様に **子ラベルの override が必須**）。
+- **評価（調査観点 1〜18 の要約）**:
+  1. 安全性: **高**（1 カード・他カードの `StyleBoxFlat_warn` 参照なし）。
+  2. .tscn のみ: **可能**（ラベル色も .tscn で完結）。
+  3. .gd 変更: **不要**。
+  4. Python/export/DTO: **不要**。
+  5. Theme .tres 変更: **不要**（既存 variation のみ）。
+  6. StyleBoxFlat_warn: **CardWarnings から外すだけで SubResource は残せる**。
+  7. visible: **影響なし**（`_warnings_card.visible` は従来どおり）。
+  8. from_python/mock: **不要**。
+  9. HeaderNavRow / 10 画面: **影響なし**。
+  10. 1280×720: **要 Godot 目視**（暗 warn → ライト WarningCard でコントラストが変化）。
+  11. CardNews/CardNext: **白系カードが縦に増える**が、**「注意」ブロックが明確になる**利点。
+  12. sandbox: **「注意」カードを強調する方向とは一致しやすい**（sandbox に本線同型の
+      CardWarnings が無い点は差分）。
+  13. 意味の分かりやすさ: **向上しやすい**（契約人事の「注意」と同 variation で統一）。
+  14. 戻しやすさ: **高**（1 コミット・panel override 戻しで復旧可）。
+  15. pytest: **影響なし**（export は JSON のみ検証する前提）。
+  16. 手動確認: **必須**（warnings 非空 mock での表示・空での非表示）。
+  17. Steam 品質: **一貫した読み取り UI**としてプラス。
+  18. 今すぐ実装: **候補として妥当**（下記「結論」参照）。
+
+
+--------------------------------------------------------------------------------
+10. 案B — CardTasks を次に WarningCard 化する案
+--------------------------------------------------------------------------------
+- **内容**: CardTasks を `Phase4WarningCard` に。**sandbox と見た目方針は一致**。
+- **評価**:
+  - **意味の混同リスクが高い**（ToDo が「警告カード」と同じトーン）。CardWarnings が
+    表示されているケースでは **Warning 色のカードが縦に 2 枚**（CardWarnings と CardTasks
+    の間に Next/Summary があるが **トーンは近い**）。
+  - .tscn のみは可能だが、**HTasks / TasksLabel の色を全面調整必須**。
+  - **CardWarnings 未処理のまま B だけ入れると**、**「警告」見出しのカードが暗地、
+    「今やること」がライト警告色**という **逆転**も起こりうる（優先度のメッセージとして不自然）。
+- **結論**: **単独での「次の 1 コミット」としては非推奨**。
+
+
+--------------------------------------------------------------------------------
+11. 案C — CardTasks を SummaryCard 化する案
+--------------------------------------------------------------------------------
+- **内容**: CardNews/CardNext と同型で **Phase4SummaryCard** + 濃色ラベル。
+- **評価**:
+  - **意味**: **行動リスト＝中立の白カード**で分かりやすい。**CardWarnings（注意）との
+    視覚差**が付きやすい。
+  - **リスク**: **白カードが縦に連続**（Next / Summary / Tasks / News）し、**スクロールが
+    長く「カードだらけ」**に見えやすい。**タスクの主役感は sandbox より弱まる**。
+  - 技術的には **案A と同様に .tscn のみで可能**。
+- **結論**: **CardWarnings を Phase4WarningCard にした後**の **第 2 候補**として妥当。
+  **CardWarnings より先に C だけ**は、**「注意」が暗地のまま残り「ToDo だけ白」**になり
+  優先度表現が逆転しうるので **非推奨**。
+
+
+--------------------------------------------------------------------------------
+12. 案D — 役割分界だけ決めて実装しない案
+--------------------------------------------------------------------------------
+- **評価**: **最も安全**だが、**見た目改善の進捗は止まる**。既に README に「分界を確認」
+  とあるため、**本レポートで分界を文書化すれば D の価値は一部満たす**。
+- **結論**: **並行して「次の 1 コミットは案A」でもよい**（実装は別コミット）。
+
+
+--------------------------------------------------------------------------------
+13. 案E — 先に CardWarnings のみ調査・実装候補にする案
+--------------------------------------------------------------------------------
+- **評価**: **意味・技術・被りのすべての観点で最も筋が良い**（本レポートの推奨と一致）。
+
+
+--------------------------------------------------------------------------------
+14. 案F — 先に CardTasks のみ調査・実装候補にする案
+--------------------------------------------------------------------------------
+- **評価**: **B/C のジレンマ**（WarningCard は意味が被る、SummaryCard は注意より先に白化）
+  を抱えやすい。**非推奨**。
+
+
+--------------------------------------------------------------------------------
+15. 案G — Warnings/Tasks は触らず MetricsRow（CardRank/CardMoney）へ進む案
+--------------------------------------------------------------------------------
+- **評価**: **CardRank/Money は対称の 2 枚**で README でも「セット方針」とされている。
+  **1 コミットの粒度が太くなりやすい**。**warnings 空時の Card 非表示**のような **意味論の
+  整理は不要**で進められるメリットはある。
+- **欠点**: **「注意 vs ToDo」の整理を後回し**にすると、あとから CardTasks の色を変えた
+  ときに **Metrics とのバランス再調整**が必要になりうる。
+- **結論**: **Warnings/Tasks の方針が未確定のまま G に進むのは「並行検討」まで**。
+  **主線の次コミット候補としては E（CardWarnings 先）を優先**するのがよい。
+
+
+--------------------------------------------------------------------------------
+16. Phase4WarningCard に合う候補（本線）
+--------------------------------------------------------------------------------
+- **第一候補: CardWarnings** — キー名・ラベル文言・非空時のみ表示、すべて **「注意」
+  意味**と整合。
+- **任意（要別判断）**: 将来 **「コンプライアンス専用のサブカード」**を分離する場合は
+  WarningCard の再利用先になりうる。
+- **非推奨: CardTasks** — 上記 §8 / §10。
+
+
+--------------------------------------------------------------------------------
+17. Phase4SummaryCard に合う候補（本線）
+--------------------------------------------------------------------------------
+- **既適用**: CardDivision、CardNext、CardNews。
+- **次点候補**: **CardTasks**（ToDo を中立白カードに載せる）、**CardSummary**（長文
+  club_summary）、**順次 CardRank/Money**（Metrics セット方針とセット）。
+
+
+--------------------------------------------------------------------------------
+18. StyleBoxFlat_warn を壊さないための注意
+--------------------------------------------------------------------------------
+- **現状 CardWarnings のみが参照**。**panel override を外すだけなら SubResource はファイル内に
+  残せる**（未参照でも害は小さい。将来の差分比較・ロールバックに便利）。
+- **削除する場合**は **参照ゼロを確認**のうえ **load_steps** に注意（Godot が再保存する
+  可能性）。**推奨: まずは残す（CardNews 時の StyleBoxFlat_card と同じ運用）**。
+
+
+--------------------------------------------------------------------------------
+19. visible 制御を壊さないための注意
+--------------------------------------------------------------------------------
+- **Theme は Control.visible を変更しない**。.gd の `_warnings_card.visible = ...` は
+  **そのまま有効**。
+- **注意点は「見た目」**: `visible = false` のとき **カードは非表示のまま**なので
+  Theme 変更の目視は **`warnings` 非空の JSON**（mock 編集 or from_python）で確認する
+  運用が安全。
+
+
+--------------------------------------------------------------------------------
+20. from_python / mock 維持の注意
+--------------------------------------------------------------------------------
+- **キー名 `warnings` / `tasks` / 配列構造は変更不要**。.tscn のみ変更なら **export 契約に
+  影響しない**。
+- **pytest**: `home_dashboard` export テストは **JSON 内容とスキーマ**が中心で、**Theme 色は
+  対象外**の前提。
+
+
+--------------------------------------------------------------------------------
+21. 最初の安全な「次の 1 コミット」候補
+--------------------------------------------------------------------------------
+- **推奨: 案A — CardWarnings のみ**に `theme` + `Phase4WarningCard`、**panel override 除去**、
+  **HWarn / WarningsLabel の font_color（必要なら font_size）を白カード系に調整**。
+- **同時に CardTasks を触らない**（**両方同時は避ける**）。
+
+
+--------------------------------------------------------------------------------
+22. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- **CardTasks を Phase4WarningCard にする**（案B）— **CardWarnings との意味・色の被り**。
+- **CardWarnings を未処理のまま CardTasks だけ SummaryCard 化**（案C 単独）— **注意が暗地、
+  ToDo が白で優先度が逆転しうる**。
+- **Theme `.tres` のみ変更して本線ラベルを直さない** — **Phase4WarningCard はライト地**のため、
+  **現行の明色ラベルのままでは可読性が崩れる**。
+- **CardRank と CardMoney の片方だけ** Theme 適用（README の「セット方針」違反になりうる）。
+
+
+--------------------------------------------------------------------------------
+23. pytest / 手動確認観点
+--------------------------------------------------------------------------------
+- **pytest**: `test_home_dashboard_readonly_export.py` / roster export / phase0 smoke は
+  **従来どおり通る見込み**（.tscn のみの変更でも、**シーンの再保存で UID 等が揺れないか**
+  は別途注意）。
+- **手動（Godot 4.6.x 目安）**:
+  - `warnings` **空**: CardWarnings **非表示**、レイアウト崩れなし。
+  - `warnings` **非空**: **ライト WarningCard 上で HWarn / WarningsLabel が読めるか**。
+  - **CardTasks は従来どおり**（タスク有無・最大 3 行）。
+  - **HeaderNavRow・10 画面遷移**の回帰スモーク。
+
+
+--------------------------------------------------------------------------------
+24. Cursor としてのおすすめ順
+--------------------------------------------------------------------------------
+1. **本レポートで分界を固定**（注意＝CardWarnings、ToDo＝CardTasks）。
+2. **実装コミット 1**: **案A（CardWarnings のみ Phase4WarningCard）**。
+3. **目視後**: **案C（CardTasks を SummaryCard）**または **現状維持**を選択。
+4. **その後**: **案G（MetricsRow セット）**を README のロードマップに従い検討。
+5. **案B（Tasks＝WarningCard）は採用しない**（sandbox 専用の演出として留めるのが無難）。
+
+
+--------------------------------------------------------------------------------
+25. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- **CardWarnings をライト WarningCard に寄せたとき**、**現行の暗茶 warn 帯より「注意が弱く
+  見える」許容**があるか（**情報の緊急度**に対するブランド判断）。
+- **CardTasks を SummaryCard にするタイミング**（CardWarnings 後か、Metrics 後か）。
+- **白カードの縦連続**（Next / Summary / Tasks / News）の **許容密度**。
+
+
+--------------------------------------------------------------------------------
+26. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+- **本調査で変更していないもの**:
+  godot/scenes/**、godot/scripts/**、godot/themes/**、godot/project.godot、godot/README.md、
+  docs/**、basketball_sim/**、生成 JSON、既存 reports/**、handoff md。
+- **新規作成のみ**: 本ファイル `reports/godot_phase4_home_dashboard_warning_task_theme_survey_2026-05.txt`。
+
+
+================================================================================
+【結論】曖昧にせず推奨（Cursor）
+================================================================================
+
+| 論点 | 推奨 |
+|------|------|
+| CardWarnings と CardTasks のどちらを先に触るべきか | **CardWarnings を先**（CardTasks は後）。 |
+| CardWarnings は Phase4WarningCard が自然か | **自然**（キー名・UI 文言・契約人事画面の
+  「注意」と variation 整合）。**ただし暗地→ライトへ変わるため目視必須**。 |
+| CardTasks は WarningCard / SummaryCard / まだ触らないか | **Phase4WarningCard にするべきではない**。
+  **SummaryCard は CardWarnings 処理後の次善案**。**今すぐ必須ではない**（触らない選択も可）。 |
+| 両方同時に触るべきか | **避けるべき**（回帰範囲と意味の被りを最小化）。 |
+| StyleBoxFlat_warn は残すべきか | **残すべき（推奨）** — panel override を外すだけで
+  **SubResource はファイルに残す**運用が安全。 |
+| visible 制御にリスクはあるか | **実質なし**（Theme は visible を変えない）。**目視用に
+  warnings 非空データが必要**。 |
+| 次に実装するなら最も安全な 1 コミット | **CardWarnings のみ Phase4WarningCard 化**（.tscn のみ、
+  子ラベル色調整、StyleBoxFlat_warn は残置）。 |
+| まだ実装しない方がよいこと | **CardTasks の WarningCard 化**、**CardWarnings 未処理で
+  CardTasks だけ SummaryCard 化**、**CardRank/Money の片方だけ変更**、**Theme .tres のみ変更**。 |
+
+以上。
