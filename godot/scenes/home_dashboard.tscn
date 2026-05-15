@@ -418,7 +418,8 @@ text = "（D2）"
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme = ExtResource("2_theme")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="VBoxRank" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/MetricsRow/CardRank"]
 layout_mode = 2
@@ -426,14 +427,14 @@ theme_override_constants/separation = 8
 
 [node name="HRank" type="Label" parent="Margin/RootCol/Scroll/Inner/MetricsRow/CardRank/VBoxRank"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 12
 text = "順位 / 戦績"
 
 [node name="RankRecordLabel" type="Label" parent="Margin/RootCol/Scroll/Inner/MetricsRow/CardRank/VBoxRank"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.93, 0.95, 0.98, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 17
 autowrap_mode = 2
 text = "（順位）"
@@ -442,7 +443,8 @@ text = "（順位）"
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+theme = ExtResource("2_theme")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="VBoxMoney" type="VBoxContainer" parent="Margin/RootCol/Scroll/Inner/MetricsRow/CardMoney"]
 layout_mode = 2
@@ -450,14 +452,14 @@ theme_override_constants/separation = 8
 
 [node name="HMoney" type="Label" parent="Margin/RootCol/Scroll/Inner/MetricsRow/CardMoney/VBoxMoney"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 12
 text = "資金"
 
 [node name="MoneyLabel" type="Label" parent="Margin/RootCol/Scroll/Inner/MetricsRow/CardMoney/VBoxMoney"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.93, 0.95, 0.98, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 17
 autowrap_mode = 2
 text = "（資金）"
