@@ -1,0 +1,557 @@
+================================================================================
+Godot 本線 home_dashboard — 残る暗色カードと CardSummary 整理方針調査
+================================================================================
+
+本ファイルは調査・整理のみ。実装・シーン・スクリプト・Theme・docs/README・
+Python・既存 reports の編集は行っていない（本ファイルの新規作成のみ）。
+
+
+--------------------------------------------------------------------------------
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+- 調査日時: 2026-05-15（`home_dashboard.tscn` / `home_dashboard.gd` /
+  `phase4_readonly_core.tres` / `home_production_wire_preview.tscn` /
+  既存 reports / README・docs の読取・grep に基づく）
+- 調査時点のリポジトリ HEAD: `43136f9`
+  （「Godot本線ホームMetricsRow限定Theme適用の到達点を記録」）
+- 直近の本線 Theme 関連コミット（参考）:
+  - `2471b67` MetricsRow CardRank / CardMoney → Phase4SummaryCard
+  - `43136f9` 上記の README/docs 記録
+  - `d18bf1f` CardTasks、以前 CardNews / CardNext / CardWarnings / CardDivision
+- 参照した主なパス:
+  - godot/scenes/home_dashboard.tscn
+  - godot/scripts/home_dashboard.gd
+  - godot/themes/phase4_readonly_core.tres
+  - godot/scenes/home_production_wire_preview.tscn
+  - godot/data/home_dashboard_mock.json
+  - basketball_sim/export/home_dashboard_readonly.py
+  - reports/godot_phase4_home_dashboard_metricsrow_theme_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_tasks_summarycard_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_center_density_migration_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_migration_survey_2026-05.txt
+  - reports/godot_phase4_home_wire_clubband_card_overlap_survey_2026-05.txt
+  - reports/godot_phase4_home_wire_club_state_survey_2026-05.txt
+  - godot/README.md / docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md /
+    docs/GODOT_NAVIGATION_PHASE4_2026-05.md（方針確認・本調査では未編集）
+
+
+--------------------------------------------------------------------------------
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 本線 `home_dashboard.tscn` は **ルート Theme なし**、**カード単位の Theme 限定適用**が進行済み。
+- **HeaderCard**: `Phase4HeaderCard` + ClubBand 風（`HeaderClubBandRow` / `HomeLogoSlot` /
+  `ClubNameLabel` / `SeasonLabel` / `DataSourceLabel`）。**HeaderNavRow 5 ボタン維持**。
+- **Scroll / Inner 上から（実ノード順）**:
+  1. **CardNavMenu**（暗 `StyleBoxFlat_card`）
+  2. SecMetricsTitle（カード外ラベル・暗背景上の明色）
+  3. **MetricsRow**: CardDivision / CardRank / CardMoney（いずれも **Phase4SummaryCard**）
+  4. **CardTeamExtras**（暗）
+  5. CardWarnings（**Phase4WarningCard**）
+  6. CardNext（**Phase4SummaryCard**）
+  7. **CardSummary**（暗）
+  8. CardTasks（**Phase4SummaryCard**）
+  9. CardNews（**Phase4SummaryCard**）
+- **1280×720**: Scroll `custom_minimum_size.y = 128`、縦スクロール前提。
+  **暗カード 3 枚が Scroll 内に残り**、白カード群の中に **暗→白→暗** のリズムが混在する。
+
+
+--------------------------------------------------------------------------------
+3. SummaryCard / WarningCard 適用済みカード一覧
+--------------------------------------------------------------------------------
+| ノード | variation | 備考 |
+|--------|-----------|------|
+| HeaderCard | Phase4HeaderCard | ClubBand 風子要素あり |
+| CardDivision | Phase4SummaryCard | MetricsRow |
+| CardRank | Phase4SummaryCard | MetricsRow（`2471b67`） |
+| CardMoney | Phase4SummaryCard | MetricsRow（`2471b67`） |
+| CardWarnings | Phase4WarningCard | `%CardWarnings`、行 visible 制御あり |
+| CardNext | Phase4SummaryCard | `%NextGameLabel` |
+| CardTasks | Phase4SummaryCard | `%TasksLabel`、`_join_lines(..., 3)` |
+| CardNews | Phase4SummaryCard | `%NewsLabel` |
+
+**未適用（暗色 panel override のまま）**: CardNavMenu、CardTeamExtras、CardSummary。
+
+
+--------------------------------------------------------------------------------
+4. 残っている暗色カード一覧
+--------------------------------------------------------------------------------
+| ノード | panel | theme / variation | 主な内容 |
+|--------|-------|---------------------|----------|
+| CardNavMenu | StyleBoxFlat_card | なし | 8 画面への MenuCard* ボタン（4 カテゴリ列） |
+| CardTeamExtras | StyleBoxFlat_card | なし | owner_trust / salary_cap / recent_form（任意行） |
+| CardSummary | StyleBoxFlat_card | なし | club_summary 複数行（`ClubSummaryLabel`） |
+
+**SecMetricsTitle** はカードではないが、**暗 Scroll 背景上の明色ラベル**のまま（Theme 対象外）。
+
+
+--------------------------------------------------------------------------------
+5. StyleBoxFlat_card の参照状況
+--------------------------------------------------------------------------------
+**SubResource 定義**: `home_dashboard.tscn` 先頭 `StyleBoxFlat_card`（暗パネル、角丸 8、
+margin 14/12、bg 約 (0.118, 0.133, 0.169)）。
+
+**現時点の `theme_override_styles/panel = SubResource("StyleBoxFlat_card")` 参照先**（3 件のみ）:
+  1. CardNavMenu
+  2. CardTeamExtras
+  3. CardSummary
+
+**その他 StyleBox（混同注意）**:
+  - `StyleBoxFlat_chip` … HeaderBadge / HeaderStatusChip
+  - `StyleBoxFlat_home_logo_slot` … HomeLogoSlot
+  - `StyleBoxFlat_warn` … **定義のみ残存、参照 0 件**（CardWarnings は Theme の WarningCard を使用）
+
+**SubResource 削除可否**:
+  - **StyleBoxFlat_card**: 上記 3 カードすべてから panel override を外し終えるまで **削除しない**。
+  - **StyleBoxFlat_warn**: 参照なしのため **技術的には削除可能**だが、**今回の暗色カード調査の範囲では触らない**
+    （Godot が未使用 SubResource をどう扱うか・将来のフォールバック用に残す判断は別コミット）。
+
+
+--------------------------------------------------------------------------------
+6. CardNavMenu の現状と扱い
+--------------------------------------------------------------------------------
+**Style / Theme**:
+  - `theme` なし、`theme_type_variation` なし。
+  - panel = `StyleBoxFlat_card` のみ。
+  - 子 Label（NavTitle / NavHelp / Cat*）は **暗地向け明色**（例: NavTitle 0.78,0.82,0.9）。
+
+**役割**:
+  - 読み取り専用 **10 画面のうち 8 画面**へ（HeaderNavRow は 5 画面のみ）。
+  - MenuCard ボタン 8 個 → 各 `_on_*_view_button_pressed`（`change_scene_to_file` のみ）。
+
+**HeaderNavRow との重複**:
+  | 画面 | HeaderNavRow（5） | CardNavMenu（8） |
+  |------|-------------------|------------------|
+  | ロスター | RosterNavButton | MenuCardRosterButton |
+  | クラブ史 | ClubHistoryNavButton | MenuCardClubHistoryButton |
+  | 順位表 | StandingsNavButton | MenuCardStandingsButton |
+  | 日程 | ScheduleNavButton | MenuCardScheduleButton |
+  | 施設 | FacilityNavButton | MenuCardFacilityButton |
+  | 戦術サマリー | なし | MenuCardTacticsSummaryButton |
+  | 財務サマリー | なし | MenuCardFinanceSummaryButton |
+  | オーナーミッション | なし | MenuCardOwnerMissionButton |
+  | 契約・人事サマリー | なし | MenuCardContractPersonnelSummaryButton |
+
+→ **5 画面は二重導線**、**4 画面は Scroll 内メニューのみ**。HeaderNavRow 削除は **未着手・別判断**。
+
+**将来左レール**:
+  - sandbox `home_production_wire_preview.tscn` は **左レール + 中央カード**。
+  - 本線 CardNavMenu は **「仮の画面メニューカード」**に近く、左レール本線化時は **役割ごと置換・縮小**されうる。
+  - **見た目だけ SummaryCard 化**しても導線は維持できるが、**ナビ再設計と同時に白カード化した方が無駄が少ない**。
+
+**Cursor 判断（CardNavMenu）**:
+  - **今すぐ Theme 化は推奨しない**（ナビ整理・左レール方針が固まるまで **暗色のまま残す**）。
+  - どうしても見た目だけ揃えるなら **.tscn のみで可能**だが、**後でレール化したときに二度手間**になりやすい。
+
+
+--------------------------------------------------------------------------------
+7. CardTeamExtras の現状と扱い
+--------------------------------------------------------------------------------
+**Style / Theme**:
+  - panel = `StyleBoxFlat_card` のみ。`unique_name_in_owner = true`（`%CardTeamExtras`）。
+  - 見出し HExtras + 3 行（OwnerTrustRow / SalaryCapRow / RecentFormRow）。
+  - 各行・カードは **初期 `visible = false`**（.tscn）。子 Label は暗地向け色。
+
+**表示内容（JSON キー）**:
+  - `owner_trust` → OwnerTrustRow
+  - `salary_cap` → SalaryCapRow
+  - `recent_form` → RecentFormRow
+
+**home_dashboard.gd**:
+  - `_set_optional_row` で行ごとに visible。
+  - `_extras_card.visible = _owner_row.visible or _salary_row.visible or _recent_row.visible`
+  - **カード全体の表示/非表示のみ**（Theme 化してもロジック変更不要）。
+
+**情報重複**:
+  - **salary_cap**: export の `_club_summary_lines` が **4 行目候補として同じ `_salary_cap_summary(team)` を
+    club_summary にも入れうる** → **CardSummary と行レベルで重複しうる**。
+  - **owner_trust**: 将来 Header ClubBand に Trust 行を載せる案（sandbox）と **隣接重複**。
+  - **recent_form**: MetricsRow の rank_record とは **別指標**（直近 N 試合）。news とも別。
+
+**CardSummary への統合**:
+  - 技術的には club_summary に行を足すこともできるが、**optional 行 UI が失われる**。
+  - sandbox の CardClubState は **サラリー余力・士気**で、本線は **分割（Extras + Summary + Metrics）**。
+  - **統合は DTO/IA 判断後**が安全。
+
+**Cursor 判断（CardTeamExtras）**:
+  - **Theme 化の技術的難易度は低い**（CardTasks と同型: .tscn + ラベル色 + panel override 除去）。
+  - **内容整理は後回しでもよい**が、**salary_cap の二重表示**は Theme 後も残る点を認識すること。
+
+
+--------------------------------------------------------------------------------
+8. CardSummary / club_summary の現状
+--------------------------------------------------------------------------------
+**Style / Theme**:
+  - panel = `StyleBoxFlat_card` のみ。
+  - HSum「クラブ状況サマリー」+ `%ClubSummaryLabel`（14px、autowrap、暗地向け 0.88,0.9,0.94）。
+
+**表示処理（home_dashboard.gd）**:
+  - `_club_summary.text = _join_lines(d, "club_summary")`（max_lines 制限なし → **配列全行**）。
+  - `_join_lines`: 各行先頭に `・` を付けて `\n` 連結。
+
+**export（`home_dashboard_readonly.py` `_club_summary_lines`）** — from_python 時の典型:
+  1. `順位・戦績: {rank_record}`  … **MetricsRow CardRank と実質同一文字列**
+  2. `ディビジョン: {division} / 資金: {money}` … **CardDivision + CardMoney と同一ファクト**
+  3. `シーズン状態: 終了|進行中|未同梱` … **Header SeasonLabel と隣接・独自価値あり**
+  4. `_salary_cap_summary(team)`（未接続でなければ）… **CardTeamExtras SalaryCapRow と重複しうる**
+  5. 行数 < 4 ならプレースホルダ注記行
+  - 最大 6 行に truncate。
+
+**mock JSON（`home_dashboard_mock.json`）**:
+  - club_summary は **export 構造と異なるダミー文言**（勝率・雰囲気等）。
+  - **from_python 優先**のため実運用では export 形が主だが、**mock だけ見ると重複度が過小評価されうる**。
+
+**MetricsRow との重複度（from_python 時）**:
+  - **強い重複（ほぼ全文再掲）**: 行1・行2 ↔ division / rank_record / money ラベル。
+  - **中程度**: 行4 salary_cap ↔ CardTeamExtras（あれば）。
+  - **弱い/独自**: 行3 シーズン状態、行5 注記。
+
+**Header ClubBand 風との将来重複**:
+  - sandbox ClubBand は **RecordLine + MoneyLine + TrustLine** を帯に集約。
+  - 本線 Header は **現状 club_name + season + data_source のみ**（成績・資金行は MetricsRow）。
+  - **将来帯に成績・資金を載せると CardSummary 行1–2 はさらに冗長化**。
+
+**Theme だけ先にしてよいか**:
+  - **見た目だけなら .tscn で可能**（pytest 非影響）。
+  - **UX 上は「白カードに同じ文字を再度読ませる」**ため、**Steam 品質・情報密度の観点では非推奨**。
+  - README/docs も **「club_summary 整合を先に確認」**と明記済み。
+
+
+--------------------------------------------------------------------------------
+9. home_dashboard.gd での CardSummary / CardTeamExtras 処理
+--------------------------------------------------------------------------------
+| 処理 | CardSummary | CardTeamExtras |
+|------|-------------|----------------|
+| @onready | `%ClubSummaryLabel` | `%CardTeamExtras` |
+| スナップショット適用 | `_join_lines(d, "club_summary")` | 3 キーを `_set_optional_row` |
+| クリア | `_club_summary.text = ""` | 行 false + `_extras_card.visible = false` |
+| visible | 常時表示（空文字でもカード枠は残る） | いずれか行があればカード表示 |
+| nav | なし | なし |
+| Theme 化の影響 | **なし**（テキスト・キー不変） | **なし**（visible ロジック不変） |
+
+**nav menu 関連**: CardNavMenu 専用の .gd 参照は **なし**（connection は .tscn のみ）。
+
+**from_python / mock**: 読込パス・キー名・`_join_lines` 形式は **Theme 段階で不変**の実績あり。
+
+
+--------------------------------------------------------------------------------
+10. MetricsRow / Header / CardSummary の情報重複
+--------------------------------------------------------------------------------
+```
+[Header ClubBand風]  club_name, season_label, data_source
+                     （成績・資金・信頼行は未実装）
+
+[MetricsRow]         division | rank_record | money   ← 個別キー・単値
+
+[CardTeamExtras]     owner_trust?, salary_cap?, recent_form?  ← 任意
+
+[CardSummary]        club_summary[]  ← export では rank/motion/division を再掲
+
+[CardNews]           news[]  ← rank/wins/losses をヘッドラインに含む（別形式の再掲）
+```
+
+**重複マトリクス（from_python 基準）**:
+
+| 情報 | MetricsRow | CardTeamExtras | CardSummary | CardNews |
+|------|------------|----------------|-------------|----------|
+| division | DivisionLabel | — | 行2 に含む | — |
+| rank_record | RankRecordLabel | — | 行1 | ヘッドラインに順位 |
+| money | MoneyLabel | — | 行2 に含む | — |
+| salary_cap | — | SalaryCapRow | 行4 候補 | — |
+| owner_trust | — | OwnerTrustRow | — | — |
+| season 状態 | — | — | 行3 | 終了時1行 |
+| recent_form | — | RecentFormRow | — | — |
+
+**結論**: CardSummary は **「サマリー」というより MetricsRow の段落再掲 + α**。
+IA 上は **sandbox CardClubState（状態）や CardStandings（判断）とは役割がずれている**。
+
+
+--------------------------------------------------------------------------------
+11. sandbox との関係
+--------------------------------------------------------------------------------
+- **本命候補（README/docs）**: 現行 **2 カラム縦 Scroll** 本線 + Header 最小 ClubBand 寄せ。
+  **左レール・中央 2 カラム密度・右サマリー列は参考**。
+- **CardNavMenu** ≒ sandbox **CardShortcuts**（画面誘導）だが、本線は **8 ボタン・4 列**でより重い。
+- **CardTeamExtras** ≒ sandbox **CardClubState** の一部（サラリー・信頼）+ **CardStandings の直近**に
+  **recent_form** が近い。本線は **1 枚にまとめず分割**。
+- **CardSummary** ≒ sandbox には **同名カードなし**。Python 本番 UI の `club_summary_panel` 系の
+  **Godot 移植残骸**に近い。**sandbox CardClubState の置き場ではない**。
+
+**一致度**:
+  - CardTeamExtras Theme 化のみ → sandbox との **構造一致は中**（見た目は Summary 系で近づく）。
+  - CardSummary を現 DTO のまま白化 → sandbox **非一致・情報重複悪化**。
+  - club_summary DTO 整理後 → **CardClubState / 帯方針と再設計**の余地。
+
+
+--------------------------------------------------------------------------------
+12. 案 A：CardSummary を次に SummaryCard 化する案
+--------------------------------------------------------------------------------
+| 観点 | 評価 |
+|------|------|
+| (1) 安全性 | 中（.tscn のみなら技術的に安全。UX は低） |
+| (2) .tscn のみ | 可 |
+| (3) .gd 変更 | 不要 |
+| (4) Python/DTO | 不要 |
+| (5) Theme .tres | 不要 |
+| (6) StyleBoxFlat_card | CardSummary 分のみ参照減（残り2） |
+| (7) visible | 影響なし |
+| (8) from_python/mock | 影響なし |
+| (9) HeaderNavRow / 10画面 | 影響なし |
+| (10) 左レール | 影響なし |
+| (11) ClubBand 重複 | 将来帯拡張時に悪化 |
+| (12) MetricsRow 重複 | **悪化（白カードでより目立つ）** |
+| (13) sandbox 一致 | 低 |
+| (14) 1280×720 | 中（縦長・スクロール増） |
+| (15) 戻しやすさ | 高 |
+| (16) pytest | 影響なし |
+| (17) 手動確認 | 必須（重複の見え方） |
+| (18) Steam 品質 | **低〜中（見た目は揃うが情報設計は悪い）** |
+| (19) 今すぐ実装 | **非推奨** |
+
+**Cursor 結論**: **Theme だけ先はしない**。DTO または文言削減と **セット**が望ましい。
+
+
+--------------------------------------------------------------------------------
+13. 案 B：CardTeamExtras を次に SummaryCard 化する案
+--------------------------------------------------------------------------------
+| 観点 | 評価 |
+|------|------|
+| (1) 安全性 | **高**（CardTasks / CardWarnings と同手順） |
+| (2) .tscn のみ | 可 |
+| (3) .gd 変更 | 不要 |
+| (4) Python/DTO | 不要 |
+| (5) Theme .tres | 不要 |
+| (6) StyleBoxFlat_card | 参照 3→2 |
+| (7) visible | **要確認**（空カード非表示ロジックは維持） |
+| (8) from_python/mock | 影響なし |
+| (9) 導線 | 影響なし |
+| (10) 左レール | 低影響 |
+| (11) ClubBand | 将来 Trust 行と隣接重複は残る |
+| (12) MetricsRow | 直接重複なし |
+| (13) sandbox | 中（Summary 白カード化は sandbox CardClubState に近づく） |
+| (14) 1280×720 | 高 |
+| (15) 戻しやすさ | 高 |
+| (16) pytest | 影響なし |
+| (17) 手動確認 | 必須（3 行の濃色・空時非表示） |
+| (18) Steam | 中（見た目改善・内容重複は残る） |
+| (19) 今すぐ実装 | **推奨（Theme 継続する場合の第一候補）** |
+
+
+--------------------------------------------------------------------------------
+14. 案 C：CardNavMenu を SummaryCard 化する案
+--------------------------------------------------------------------------------
+| 観点 | 評価 |
+|------|------|
+| (1) 安全性 | 中（見た目のみなら可。ナビ IA リスク） |
+| (2) .tscn のみ | 可（ボタン Theme はデフォルトのまま可） |
+| (3)~(5) | .gd / Python / .tres 不要 |
+| (6) StyleBoxFlat_card | 参照 3→2 |
+| (9) 導線 | **変更なしだが「メニューカードが白い情報カードに見える」** |
+| (10) 左レール | **高リスク（後で捨てる UI に投資）** |
+| (18) Steam | 中（統一感は上がるが二重導線は残る） |
+| (19) 今すぐ実装 | **非推奨** |
+
+**Cursor 結論**: **ナビ再設計まで触らない**。
+
+
+--------------------------------------------------------------------------------
+15. 案 D：CardSummary / club_summary の DTO 整理を先にする案
+--------------------------------------------------------------------------------
+| 観点 | 評価 |
+|------|------|
+| (1) 安全性 | 中（export 変更は pytest・JSON 形状に触れる） |
+| (2) .tscn のみ | **不可** |
+| (4) Python/export | **必須**（`_club_summary_lines`） |
+| (12) MetricsRow 重複 | **ここで解消すべき本丸** |
+| (15) 戻しやすさ | 中 |
+| (16) pytest | **要実行**（キーは維持・内容は変わりうる） |
+| (18) Steam | **高** |
+| (19) 今すぐ実装 | **IA 判断後に推奨**（単独コミットで club_summary 行削減） |
+
+**整理案の例（実装は別タスク）**:
+  - 行1–2 を削除し、**シーズン状態 + 給与キャップ + 独自注記**のみにする。
+  - または CardSummary 廃止し、**CardTeamExtras + MetricsRow + Header 帯**へ再分配。
+  - mock JSON を export 形に **揃える**（開発時の驚き防止）。
+
+
+--------------------------------------------------------------------------------
+16. 案 E：CardNews 1 行化 / DTO 整理へ進む案
+--------------------------------------------------------------------------------
+- CardNews は **既に Phase4SummaryCard**。**次は内容密度**（`_join_lines` 制限 or `news_headline`）。
+- .gd または export 変更が必要 → **暗色カードより重い別レーン**。
+- MetricsRow / club_summary とは **独立**だが、**news も rank を再掲**している。
+- **今すぐ**: 非推奨（暗色 3 枚の整理と並行すると判断が散る）。
+
+
+--------------------------------------------------------------------------------
+17. 案 F：暗色カードは一旦残し、全体レビューへ進む案
+--------------------------------------------------------------------------------
+- **最安全（差分ゼロ）**。
+- Scroll 内 **暗・白・暗** のまま残る。
+- **club_summary / ナビ / sandbox 本命とのギャップ**をレポート・レビューで固めてから実装再開に向く。
+- **Theme 一区切り**として合理的。
+
+
+--------------------------------------------------------------------------------
+18. 案 G：CardSummary / CardTeamExtras / CardNavMenu を一括で扱う案
+--------------------------------------------------------------------------------
+- **原則非推奨**（差分大・原因特定困難・CardSummary だけ DTO 要否が異なる）。
+- 過去 MetricsRow は **Rank+Money 2 枚同時**が例外（横並び・同一 variation・無 visible 制御）。
+
+
+--------------------------------------------------------------------------------
+19. CardSummary を触る場合の注意
+--------------------------------------------------------------------------------
+- **先に from_python の `_club_summary_lines` 出力を読む**（mock だけ見ない）。
+- Theme 化する場合も **HSum / ClubSummaryLabel の font_color を Summary 系濃色に**。
+- **`_join_lines` の `・` プレフィックス**は Tasks と同じ（複数行のまま）。
+- **MetricsRow 直下に再掲**している以上、**白化は「整理後」が理想**。
+- export 変更時は **REQUIRED_KEYS の `club_summary` list 型は維持**（中身の行数・文言は変更可）。
+
+
+--------------------------------------------------------------------------------
+20. CardTeamExtras を触る場合の注意
+--------------------------------------------------------------------------------
+- **`%CardTeamExtras` の unique_name と `_extras_card.visible` ロジックを維持**。
+- 各行は **初期 visible=false のまま**（.gd が上書き）。
+- OwnerKey / CapKey / RecentKey 等の **120px 幅・HBox 構造**は維持推奨。
+- SummaryCard 化時は **HExtras + 値 Label の色**を CardTasks 同様に変更。
+- **空データ時はカード非表示**の挙動を Godot で必ず確認。
+
+
+--------------------------------------------------------------------------------
+21. CardNavMenu を触る場合の注意
+--------------------------------------------------------------------------------
+- **8 connection + Header 5 connection を壊さない**。
+- MenuCard* / Header*NavButton は **別ノード・同一 handler** — 片方だけ消さない。
+- ボタンは **Theme 未適用のままでも可**（パネルだけ白化するとコントラスト確認）。
+- **左レール導入タスク**とコンフリクトしうる — **README の「別コミット」方針を守る**。
+
+
+--------------------------------------------------------------------------------
+22. StyleBoxFlat_card を壊さないための注意
+--------------------------------------------------------------------------------
+- **1 カードずつ** panel override を外す（MetricsRow / CardTasks 実績）。
+- **SubResource 定義行は最後の 1 参照が消えるまで残す**。
+- `StyleBoxFlat_warn` は **別リソース** — CardWarnings とは無関係（削除は別判断）。
+
+
+--------------------------------------------------------------------------------
+23. from_python / mock 維持の注意
+--------------------------------------------------------------------------------
+- 候補パス: `home_dashboard_from_python.json` 優先 → `home_dashboard_mock.json`。
+- **club_summary の形**: list[str] 固定（pytest）。
+- mock と export の **文言不一致**は既知 — DTO 整理時に **mock を追随**推奨。
+
+
+--------------------------------------------------------------------------------
+24. 最初の安全な次コミット候補
+--------------------------------------------------------------------------------
+**推奨（Theme をもう 1 段進める場合）**:
+  - **コミット1**: `home_dashboard.tscn` のみ — **CardTeamExtras** に
+    `theme` + `Phase4SummaryCard`、panel override 除去、子 Label 濃色化。
+  - メッセージ例: `Godot本線ホームのTeamExtrasカードにThemeを限定適用`
+
+**推奨（Theme を一区切りする場合）**:
+  - **コミットなし** — 本レポート + **club_summary 行削減の設計判断**（案 D）を ChatGPT/ユーザーで確定後、
+    export 1 コミット → CardSummary Theme 1 コミット の順。
+
+**非推奨の次コミット**:
+  - CardSummary の Theme のみ
+  - CardNavMenu の Theme のみ
+  - 暗色 3 枚一括（案 G）
+
+
+--------------------------------------------------------------------------------
+25. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- **CardSummary の Theme のみ**（重複を白カードで強調するだけ）
+- **CardNavMenu の Theme**（ナビ・左レール方針未確定）
+- **StyleBoxFlat_card / StyleBoxFlat_warn SubResource の削除**（参照残存）
+- **HeaderNavRow の削減**（10 画面導線・ユーザー習慣）
+- **club_summary の MetricsRow 再掲を増やす export 変更**
+- **CardSummary / CardTeamExtras / CardNavMenu 一括**（案 G）
+- **左レール本線移植**（別タスク）
+
+
+--------------------------------------------------------------------------------
+26. pytest / 手動確認観点
+--------------------------------------------------------------------------------
+- **pytest**: Theme/.tscn のみなら **既存 3 コマンドは通過見込み高**（調査時点で実行済み）。
+  DTO 変更時は `test_home_dashboard_readonly_export.py` 必須。
+- **手動（Godot 4.6.2）**:
+  - from_python JSON 配置時の club_summary 4–6 行と MetricsRow の並読
+  - mock のみ時の club_summary 差異
+  - CardTeamExtras: owner/salary/recent が空のとき **カード非表示**
+  - CardNavMenu: 8 ボタン + Header 5 ボタンの scene change
+  - 実行後 `.tscn` に UID 差分が出ないこと
+
+
+--------------------------------------------------------------------------------
+27. Cursor としてのおすすめ順
+--------------------------------------------------------------------------------
+1. **情報設計の一区切り（案 F または D の設計のみ）** — club_summary 行定義・CardSummary の要否
+2. **案 D（export）** — 行1–2 削除など MetricsRow 再掲の解消（Python 1 コミット）
+3. **案 B（CardTeamExtras Theme）** — .tscn 1 コミット（整理と独立で安全）
+4. **CardSummary Theme** — DTO 整理後
+5. **案 E（CardNews 1 行化）** — 別レーン
+6. **案 C（CardNavMenu）** — 左レール or ナビ IA 確定後
+7. **StyleBoxFlat_card 削除** — 暗色 0 になってから
+
+
+--------------------------------------------------------------------------------
+28. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+1. **club_summary を残すか、MetricsRow へ統合して CardSummary を薄くするか**
+2. **CardTeamExtras と CardSummary を将来 1 枚（sandbox CardClubState 相当）にまとめるか**
+3. **Header ClubBand に money / rank / trust を載せるタイミング**（載せるなら club_summary 行1–2 は確実に削除）
+4. **CardNavMenu を左レール化するまで暗色のまま許容するか**
+5. **次スプリントを「Theme もう 1 枚」か「DTO 整理」か「全体レビュー」か**
+
+
+--------------------------------------------------------------------------------
+29. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+- **変更したファイル**: 本レポート `reports/godot_phase4_home_dashboard_remaining_dark_cards_survey_2026-05.txt` のみ（新規）。
+- **変更していない**: godot/scenes/*, godot/scripts/*, godot/themes/*, godot/project.godot,
+  godot/README.md, docs/*, basketball_sim/*, 既存 reports/*, 生成 JSON, handoff md。
+- **git add . は使用しない**（コミット時は本ファイルのみ `-f` 指定）。
+
+
+================================================================================
+必須結論（Cursor 推奨・曖昧にしない）
+================================================================================
+
+■ 次に Theme 適用を続けるべきか、一旦整理に入るべきか
+  → **CardSummary については一旦「整理（IA/DTO）」に入るべき。**
+     Theme だけの継続は **CardTeamExtras に限れば可**だが、**プロジェクトとしては Theme 一区切り（案 F）+
+     club_summary 設計確定を優先**するのがよい。
+
+■ CardSummary は Theme 化だけ先にしてよいか
+  → **いいえ（非推奨）。** 重複が目立つだけになる。
+
+■ CardSummary / club_summary は DTO 整理が先か
+  → **はい（先に整理すべき）。** export の `_club_summary_lines` から MetricsRow 再掲を外すか、
+     CardSummary の役割を「シーズン状態・キャップ・独自注記」に絞る判断が先。
+
+■ CardTeamExtras は Theme 化候補か、整理が先か
+  → **Theme 化候補（技術的には次に安全な 1 カード）。**
+     **内容整理（salary_cap 二重表示）は後回しでよい**が、DTO 整理時に Extras と役割分担を見直す。
+
+■ CardNavMenu は Theme 化すべきか、ナビ整理まで触らないべきか
+  → **ナビ整理（左レール／二重導線の整理）まで触らないべき。暗色のまま残す。**
+
+■ StyleBoxFlat_card はまだ残すべきか
+  → **はい。** 参照が CardNavMenu / CardTeamExtras / CardSummary の 3 件残っているため、
+     **SubResource 定義も削除しない。**
+
+■ 次に実装するなら最も安全な 1 コミットは何か
+  → **(A) Theme 継続なら**: `home_dashboard.tscn` の **CardTeamExtras のみ** SummaryCard 化。
+  → **(B) より正攻法なら**: **DTO 整理なしの調査コミットの次は、club_summary 行削減（export のみ）**。
+
+■ まだ実装しない方がよいこと
+  → **CardSummary Theme のみ**、**CardNavMenu Theme**、**暗色 3 枚一括**、
+     **StyleBoxFlat_* SubResource 削除**、**HeaderNavRow 削減**（上記 §25 参照）。
+
+================================================================================
+（以上）
+================================================================================
