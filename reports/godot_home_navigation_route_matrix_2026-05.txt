@@ -1,0 +1,283 @@
+# Godot本線 home_dashboard 導線重複表・到達経路調査（2026-05）
+
+本ファイルは調査・レポート作成のみ。実装・シーン・スクリプト・Theme・docs/README・
+Python・既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `a88f7c7`（Godot本線ホームCardNavMenuの扱いを調査）
+- **前回 report 結論**（`reports/godot_card_navmenu_policy_survey_2026-05.txt`）:
+  - Scroll 内暗色は **CardNavMenu のみ**
+  - **5 画面二重導線**、**4 画面は CardNavMenu のみ**
+  - **推奨 D**: 左レール導入時まで判断保留（暫定導線として現状維持）
+- **今回の目的**: HeaderNavRow / CardNavMenu / **Phase 4 読み取り専用 10 画面**の
+  **到達経路を正本として一覧化**し、ナビ IA 判断の材料を残す
+- **実装変更**: **なし**（ソース・scene 一覧・docs・前回 report の読取のみ）
+- **Godot 目視確認**: **未実施**
+
+
+================================================================================
+## 2. 対象画面一覧（Phase 4 読み取り専用・10 画面）
+================================================================================
+
+docs / `home_dashboard.gd` の定数・`godot/scenes/` の現物確認に基づく。
+
+| # | docs 上の呼称（目安） | scene ファイル | script | 存在 |
+|---|----------------------|----------------|--------|:----:|
+| 1 | ホーム | `home_dashboard.tscn` | `home_dashboard.gd` | ○ |
+| 2 | ロスター閲覧 | `roster_view.tscn` | `roster_view.gd` | ○ |
+| 3 | クラブ史閲覧 | `club_history_view.tscn` | `club_history_view.gd` | ○ |
+| 4 | 順位表閲覧 | `standings_view.tscn` | `standings_view.gd` | ○ |
+| 5 | 日程閲覧 | `schedule_view.tscn` | `schedule_view.gd` | ○ |
+| 6 | 施設サマリー閲覧 | `facility_summary_view.tscn` | `facility_summary_view.gd` | ○ |
+| 7 | 財務サマリー閲覧 | `finance_summary_view.tscn` | `finance_summary_view.gd` | ○ |
+| 8 | オーナーミッション閲覧 | `owner_mission_view.tscn` | `owner_mission_view.gd` | ○ |
+| 9 | 戦術サマリー閲覧 | `tactics_summary_view.tscn` | `tactics_summary_view.gd` | ○ |
+| 10 | 契約・人事サマリー閲覧 | `contract_personnel_summary_view.tscn` | `contract_personnel_summary_view.gd` | ○ |
+
+**注意（ファイル名）**:
+- **`facility_view.tscn` / `tactics_view.tscn` は存在しない**（正は `*_summary_view.tscn`）。
+- sandbox 用 `home_production_wire_preview*.tscn` は **本線 10 画面には含めない**（script なし・遷移なし）。
+
+**ホームからの遷移定義**: `home_dashboard.gd` に **10 個の `_…_VIEW_SCENE_PATH` 定数**と **9 個の `_on_*_view_button_pressed` handler**（ホーム自身を除く）。
+
+
+================================================================================
+## 3. HeaderNavRow の導線
+================================================================================
+
+**位置**: `HeaderCard` / `HeaderInner` 内（ClubBand 風要素の下）。**常時表示**（Scroll 外）。
+
+| 表示名 | ノード名 | handler | 遷移先 scene | 到達画面 # | 備考 |
+|--------|----------|---------|--------------|------------|------|
+| ロスター | RosterNavButton | `_on_roster_view_button_pressed` | roster_view.tscn | 2 | tooltip あり |
+| クラブ史 | ClubHistoryNavButton | `_on_club_history_view_button_pressed` | club_history_view.tscn | 3 | |
+| 順位表 | StandingsNavButton | `_on_standings_view_button_pressed` | standings_view.tscn | 4 | |
+| 日程 | ScheduleNavButton | `_on_schedule_view_button_pressed` | schedule_view.tscn | 5 | |
+| 施設 | FacilityNavButton | `_on_facility_summary_view_button_pressed` | facility_summary_view.tscn | 6 | 文言は「施設」 |
+
+**件数**: **5 ボタン** → **5 画面**（#2,3,4,5,6）。
+
+**載せていない画面**（docs 方針どおり）: #7 財務、#8 OM、#9 戦術、#10 契約人事。
+
+
+================================================================================
+## 4. CardNavMenu の導線
+================================================================================
+
+**位置**: `Scroll/Inner` **最上段**（暗色 `StyleBoxFlat_card`）。**4 カテゴリ列 × 計 8 ボタン**。
+
+| 表示名 | ノード名 | カテゴリ | handler | 遷移先 scene | 到達 # | 備考 |
+|--------|----------|----------|---------|--------------|--------|------|
+| ロスター | MenuCardRosterButton | チーム | `_on_roster_view_button_pressed` | roster_view.tscn | 2 | Header と同一 handler |
+| 戦術サマリー | MenuCardTacticsSummaryButton | チーム | `_on_tactics_summary_view_button_pressed` | tactics_summary_view.tscn | 9 | **Header に無し** |
+| 順位表 | MenuCardStandingsButton | リーグ | `_on_standings_view_button_pressed` | standings_view.tscn | 4 | |
+| 日程 | MenuCardScheduleButton | リーグ | `_on_schedule_view_button_pressed` | schedule_view.tscn | 5 | |
+| クラブ史 | MenuCardClubHistoryButton | クラブ | `_on_club_history_view_button_pressed` | club_history_view.tscn | 3 | |
+| 施設 | MenuCardFacilityButton | クラブ | `_on_facility_summary_view_button_pressed` | facility_summary_view.tscn | 6 | |
+| 財務サマリー | MenuCardFinanceSummaryButton | 経営 | `_on_finance_summary_view_button_pressed` | finance_summary_view.tscn | 7 | **Header に無し** |
+| オーナーミッション | MenuCardOwnerMissionButton | 経営 | `_on_owner_mission_view_button_pressed` | owner_mission_view.tscn | 8 | **Header に無し** |
+| 契約・人事サマリー | MenuCardContractPersonnelSummaryButton | 経営 | `_on_contract_personnel_summary_view_button_pressed` | contract_personnel_summary_view.tscn | 10 | **Header に無し** |
+
+**件数**: **8 ボタン** → **ホーム以外 9 画面すべて**へ到達可能（#2〜10）。
+
+
+================================================================================
+## 5. 導線重複表（10 画面 × 到達経路）
+================================================================================
+
+| # | 画面 | scene | HeaderNavRow | CardNavMenu | 重複区分 | 備考 |
+|---|------|-------|:------------:|:-----------:|----------|------|
+| 1 | ホーム | home_dashboard.tscn | — | — | ホーム自身 | 遷移元。メニュー対象外 |
+| 2 | ロスター | roster_view.tscn | ○ | ○ | **両方** | 同一 handler |
+| 3 | クラブ史 | club_history_view.tscn | ○ | ○ | **両方** | 同一 handler |
+| 4 | 順位表 | standings_view.tscn | ○ | ○ | **両方** | 同一 handler |
+| 5 | 日程 | schedule_view.tscn | ○ | ○ | **両方** | 同一 handler |
+| 6 | 施設サマリー | facility_summary_view.tscn | ○ | ○ | **両方** | 同一 handler；Header 表示名「施設」 |
+| 7 | 財務サマリー | finance_summary_view.tscn | — | ○ | **CardNavMenu のみ** | |
+| 8 | オーナーミッション | owner_mission_view.tscn | — | ○ | **CardNavMenu のみ** | |
+| 9 | 戦術サマリー | tactics_summary_view.tscn | — | ○ | **CardNavMenu のみ** | チーム列 |
+| 10 | 契約・人事サマリー | contract_personnel_summary_view.tscn | — | ○ | **CardNavMenu のみ** | 経営列 |
+
+**集計**:
+- **両方**: 5 画面（#2〜6）
+- **Header のみ**: **0 画面**
+- **CardNavMenu のみ**: 4 画面（#7〜10）
+- **ホームから未接続**: **0 画面**（#1 を除き全画面へ path あり）
+
+
+================================================================================
+## 6. 現時点の到達経路まとめ
+================================================================================
+
+### 6.1 ホームから各画面へ（前進）
+
+| 経路種別 | 画面 |
+|----------|------|
+| **HeaderNavRow と CardNavMenu の両方** | ロスター、クラブ史、順位表、日程、施設サマリー |
+| **HeaderNavRow のみ** | **なし** |
+| **CardNavMenu のみ** | 財務サマリー、オーナーミッション、戦術サマリー、契約・人事サマリー |
+| **どちらからも行けない** | **なし**（#2〜10 はすべて CardNavMenu から到達可） |
+
+### 6.2 handler 共有（重複の実体）
+
+| handler | Header ボタン | CardNavMenu ボタン |
+|---------|---------------|-------------------|
+| `_on_roster_view_button_pressed` | RosterNavButton | MenuCardRosterButton |
+| `_on_club_history_view_button_pressed` | ClubHistoryNavButton | MenuCardClubHistoryButton |
+| `_on_standings_view_button_pressed` | StandingsNavButton | MenuCardStandingsButton |
+| `_on_schedule_view_button_pressed` | ScheduleNavButton | MenuCardScheduleButton |
+| `_on_facility_summary_view_button_pressed` | FacilityNavButton | MenuCardFacilityButton |
+
+→ **script 上は完全に同一関数**。差し替え・分岐なし。
+
+### 6.3 ホームへの戻り（後退）
+
+**調査範囲**: 各 `*_view.gd` と `*_view.tscn` の grep。
+
+| 画面 | 戻り UI | 実装 |
+|------|---------|------|
+| #2〜10 すべて | ボタン文言「ホームへ戻る（表示のみ）」 | 各 view の `_HOME_DASHBOARD_SCENE_PATH` → `change_scene_to_file(home_dashboard.tscn)` |
+
+- **HeaderNavRow / CardNavMenu からの「戻る」はない**（詳細画面側のみ）。
+- **共通ナビ部品・autoload なし**（`GODOT_NAVIGATION_PHASE4` §3 と整合）。
+
+### 6.4 遷移方式の全体像
+
+```
+[ホーム home_dashboard]
+    ├─ HeaderNavRow (5) ──────┐
+    └─ CardNavMenu (8) ─────────┼─→ change_scene_to_file → 9 詳細画面
+                               │     （同一 handler ペアあり）
+    各詳細画面 ─「ホームへ戻る」─→ home_dashboard
+```
+
+
+================================================================================
+## 7. ナビ IA 上の論点
+================================================================================
+
+1. **HeaderNavRow** = **常設の上部ショートカット**（5 画面）。スクロール不要。**横幅制約**により #7〜10 は載せていない（docs 明記）。
+
+2. **CardNavMenu** = **Scroll 内の暫定・カテゴリ別メニュー**（8 ボタン）。**第7〜10 画面の主入口**かつ **#2〜6 の二重入口**。
+
+3. **二重導線 5 件**は UX 上「同じ行き先が2箇所」— 誤りではなく **設計上の重複**。
+
+4. **CardNavMenu のみ 4 件**を安易に削除すると、**Header からは到達不能**（代替経路なし）。
+
+5. **Header へ 4 画面を追加**する統合案（C）は、**1280×720 で横 9 ボタン相当**になり、docs が懸念する **文言・密度・優先順位**問題が顕在化。
+
+6. **sandbox LeftRail**（ホーム/チーム/リーグ/経営/クラブ）は **大分類のみ**（画面単位ボタンなし・クリックなし）。本線 CardNavMenu は **大分類 + 画面ボタン**。**左レール本線化時は CardNavMenu 全体または役割のかなりの部分が置換候補**（確定ではない）。
+
+7. **CardNavMenu を今消す** = **#7〜10 のホーム発進路が消える** → **危険**。
+
+8. **CardNavMenu を今 Theme 化** = 導線は不変だが、**左レール化でレイアウトごと捨てる可能性**あり（見た目投資の捨て戻し）。
+
+
+================================================================================
+## 8. 選択肢への影響（導線面・前回 A〜D との整合）
+================================================================================
+
+### A. しばらく現状維持
+
+- **メリット**: 全 9 詳細画面へ到達可能。**#7〜10 の入口を維持**。差分ゼロ。
+- **デメリット**: 5 画面の二重導線が残る。Scroll 先頭が暗色のまま。
+
+### B. 見た目だけ Phase4SummaryCard 化
+
+- **メリット**: 導線表は **変化なし**（`.tscn` panel/色のみ）。到達性は維持。
+- **デメリット**: 二重導線・#7〜10 の IA 問題は **未解決**。左レール化時に **カードごと破棄**されうる。
+- **捨て戻し**: 導線ではなく **見た目・ノード構造**の投資が無駄になりうる。
+
+### C. HeaderNavRow へ統合
+
+- **メリット**: 二重 5 件を解消できる。**常時見える単一ナビ**に寄せられる。
+- **デメリット**: Header に **+4 ボタン**必須。ないと #7〜10 が **行けなくなる**。**2 行 Header** 等のレイアウト検討が必要。`.tscn` 大変更。
+- **課題**: **10 画面の優先順位**（誰を Header に載せるか）の設計が **先決条件**。
+
+### D. 左レール導入時まで判断保留
+
+- **メリット**: 導線表どおり **現状の到達性を保持**。**#7〜10 を失わない**。**左レール可否とセットで CardNavMenu 最終形を決められる**。
+- **デメリット**: 二重 5 件・暗色 1 枚は **既知の負債**として残る。
+- **次の設計判断**: 左レールで **画面ボタンを載せるか** / Header を **短く保つか** / CardNavMenu を **縮小か廃止か**。
+
+
+================================================================================
+## 9. 推奨方針
+================================================================================
+
+**推奨: D. 左レール導入時まで判断保留し、CardNavMenu は暫定導線として現状維持**
+
+（前回 `godot_card_navmenu_policy_survey_2026-05.txt` と同一。本導線表で **反証なし**。）
+
+**推奨理由（導線表に基づく追記）**:
+
+1. **CardNavMenu のみ 4 画面**（財務・OM・戦術・契約人事）があり、**現状削除・非表示は到達不能**になる。
+2. **Header のみ 0 画面** — Header だけ残して CardNavMenu を消す案は **成立しない**。
+3. **両方 5 画面**は統合しない限り残る；統合は **C** であり **優先順位表が先**。
+4. Theme 化（B）は **導線重複表を1行も改善しない**。
+5. 左レールは **CardNavMenu + 一部 Header 機能**の代替候補だが **未確定**。
+
+**強く推奨しない（現時点）**:
+- CardNavMenu 削除・無効化のみのコミット
+- Header への 4 ボタン追加のみのコミット（IA 表なし）
+
+
+================================================================================
+## 10. 次にやるべきこと（実装なし・1件）
+================================================================================
+
+**推奨**:
+
+> **HeaderNavRow / CardNavMenu / sandbox 左レールの「役割分担案」を 3 案比較する調査レポート**
+>（例: 現状維持延長案 / Header 拡張案 / 左レール置換案 — 各案の到達経路表・1280×720 密度・捨て戻しリスクのみ。実装なし）
+
+**理由**: 本レポートで **現状の到達経路正本**は揃った。次は **将来形の比較**が IA 判断に直結する。単独 Theme 化や左レール可否単体より、**3 案比較**の方が意思決定コストが低い。
+
+
+================================================================================
+## 11. sandbox 左レールとの対応メモ（参考・未確定）
+================================================================================
+
+| sandbox LeftRail 大分類 | 本線 CardNavMenu 列 | 含まれる画面ボタン（本線） |
+|-------------------------|---------------------|---------------------------|
+| ホーム | （メニュー外） | — |
+| チーム | ColTeam | ロスター、戦術サマリー |
+| リーグ | ColLeague | 順位表、日程 |
+| 経営 | ColMgmt | 財務、OM、契約人事 |
+| クラブ | ColClub | クラブ史、施設 |
+
+| sandbox | 本線 HeaderNavRow |
+|---------|-------------------|
+| （画面ボタンなし） | ロスター、クラブ史、順位表、日程、施設 |
+
+**左レール導入時の置換候補（推測・確定ではない）**:
+- **CardNavMenu 全体** または **画面ボタン部分** → LeftRail 下位または中央へ
+- **HeaderNavRow 5 件** → LeftRail 選択時のコンテキスト表示、または LeftRail に吸収、または現状維持
+
+**CardShortcuts**（sandbox）: 「詳細画面: チーム / リーグ / 経営 / クラブ」1 行 — 本線 CardNavMenu の **圧縮版**に相当しうる。
+
+
+================================================================================
+## 12. 変更していないファイル
+================================================================================
+
+- godot/scenes/home_dashboard.tscn
+- godot/scripts/home_dashboard.gd
+- godot/themes/phase4_readonly_core.tres
+- godot/project.godot
+- godot/README.md
+- docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md
+- docs/GODOT_NAVIGATION_PHASE4_2026-05.md
+- reports/godot_card_navmenu_policy_survey_2026-05.txt
+- basketball_sim/export/home_dashboard_readonly.py
+- basketball_sim/tests/test_home_dashboard_readonly_export.py
+- godot/data/home_dashboard_mock.json
+
+================================================================================
+（以上）
+================================================================================
