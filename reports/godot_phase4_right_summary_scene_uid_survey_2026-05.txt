@@ -1,0 +1,319 @@
+Godot 右サマリー比較 scene の UID / load_steps 安定化に関する調査メモ
+================================================================
+
+1. 調査日時・対象コミット
+------------------------
+- 調査日: 2026-05-11（Cursor 上でのファイル読取・コマンド実行に基づく）
+- 参照コミット: a7858c314d316744b2b5855f533b5fd1868b4d8b
+  （コミットメッセージ: Godot本番ホームワイヤーsandboxに右サマリー比較sceneを追加）
+- 対象エディタ: ユーザー報告ベース Godot 4.6.2（本メモはエディタ本体の再現実行は行っていない）
+
+
+2. 発生した UID / load_steps 問題の概要
+----------------------------------------
+ユーザー報告によると、新規 scene `home_production_wire_preview_right_summary.tscn` を
+Godot 4.6.2 で開き F6（現在のシーン実行）したあと、当該ファイルの先頭行だけが自動で
+書き換わった。
+
+- 変更前（リポジトリ上の意図した内容）:
+  [gd_scene load_steps=6 format=3 uid="uid://c9homeprodwirers01"]
+
+- 変更後（エディタ再シリアライズ後）:
+  [gd_scene format=3 uid="uid://36856deeyhng"]
+
+つまり (a) 先頭の `load_steps=6` が消え、(b) `uid` が手書き値から別の値へ差し替えられた。
+同時に Godot 出力に次が出たとのこと:
+  ERROR: Unrecognized UID: "uid://36856deeyhng"
+
+本調査時点でワークツリーは `git checkout HEAD -- ...` により復旧済みであり、
+当該 .tscn は再びコミット時点の先頭行に戻っている。
+
+
+3. 現在の復旧状態
+-----------------
+- `git status --short` では、未追跡の `docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md` のみ
+  （調査実行時点）。`home_production_wire_preview_right_summary.tscn` に意図しない差分はない。
+- `git diff`（対象: right_summary / home_production_wire_preview / project.godot /
+  phase4_readonly_core.tres）は空。
+- リポジトリ全体を `uid://36856deeyhng` で grep してもヒットなし（再生成 UID はコミットに残っていない）。
+
+
+4. 新規 right_summary scene の先頭行（調査時点・復旧後）
+--------------------------------------------------------
+ファイル: godot/scenes/home_production_wire_preview_right_summary.tscn
+
+  1行目:
+  [gd_scene load_steps=6 format=3 uid="uid://c9homeprodwirers01"]
+
+続く構成は ext_resource 1 本 + sub_resource 5 本（計 6 load_steps）で、数値は一貫している。
+
+
+5. 既存 home_production_wire_preview scene との比較
+---------------------------------------------------
+ファイル: godot/scenes/home_production_wire_preview.tscn
+
+  1行目:
+  [gd_scene load_steps=6 format=3 uid="uid://c9homeprodwire01"]
+
+- 両者とも `format=3`・`load_steps=6`・Theme の ext_resource（uid://c9phase4rocore01）が同型。
+- ノードツリーは right_summary 側が ContentRow / MainCardsArea / RightSummaryRail 等で分岐するが、
+  ext_resource / sub_resource の数と種類（StyleBoxFlat 系）は同一パターン。
+- 差分の本質は「中身のレイアウト」と「scene ファイル先頭の uid 文字列」であり、
+  load_steps の計算ロジック上の差は見当たらない。
+
+※ 既存 wire preview の uid はエディタで一度以上保存・登録された経路があり、
+   プロジェクトローカルの UID キャッシュ（通常は .godot 配下、git 管理外）と整合している
+   可能性が高い。一方、right_summary は外部ツールで一括生成された新規パスに対し、
+   手書き uid を初めてエディタが「自分の管理下の UID」として扱おうとしたタイミングで
+   再割当が起きた、という説明が筋が通る。
+
+
+6. theme_preview や他 scene との比較
+--------------------------------------
+`godot/scenes/*.tscn` の 1 行目一覧（調査時点）:
+
+- club_history_view.tscn:
+  [gd_scene format=3 uid="uid://dh7f7x3wncuam"]  … load_steps なし
+- contract_personnel_summary_view.tscn:
+  [gd_scene load_steps=4 format=3 uid="uid://c8contractpsview1"]
+- facility_summary_view.tscn:
+  [gd_scene load_steps=4 format=3 uid="uid://bgfmfacilitysum01"]
+- finance_summary_view.tscn:
+  [gd_scene load_steps=4 format=3 uid="uid://bgfmfinancesum01"]
+- home_dashboard.tscn:
+  [gd_scene load_steps=5 format=3 uid="uid://bkgmhomeproto01"]
+- home_production_wire_preview.tscn:
+  [gd_scene load_steps=6 format=3 uid="uid://c9homeprodwire01"]
+- home_production_wire_preview_right_summary.tscn:
+  [gd_scene load_steps=6 format=3 uid="uid://c9homeprodwirers01"]
+- owner_mission_view.tscn:
+  [gd_scene load_steps=4 format=3 uid="uid://c6ownermisview01"]
+- roster_view.tscn:
+  [gd_scene load_steps=3 format=3 uid="uid://cr9rosterproto01"]
+- schedule_view.tscn:
+  [gd_scene load_steps=5 format=3 uid="uid://bxlkpyelec12x"]
+- standings_view.tscn:
+  [gd_scene load_steps=4 format=3 uid="uid://st9standingsv01"]
+- tactics_summary_view.tscn:
+  [gd_scene load_steps=4 format=3 uid="uid://c6tacticssumv01"]
+- theme_preview.tscn:
+  [gd_scene load_steps=2 format=3 uid="uid://c9themepreview01"]
+
+示唆:
+- 同一プロジェクト内でも「load_steps を省略した先頭行」と「明示した先頭行」が混在している。
+  → load_steps の有無だけでは「正誤」は分かず、エディタの保存バージョン・再シリアライズ方針に依存。
+- uid の見た目も、人間可読な短い接頭辞型（c9…）と、よりランダムに近い型（dh7f…, bxlk…）が混在。
+- したがって「right_summary だけおかしい」の直接原因は先頭行の文字列形式そのものより、
+  「そのファイルがエディタの UID データベース上どう登録されたか」の方が支配的と考えるのが妥当。
+
+
+7. uid://c9homeprodwirers01 の扱い
+---------------------------------
+- リポジトリ内 grep では、`c9homeprodwirers01` は当該 .tscn の 1 行目のみに出現。
+  project.godot や他 scene からの参照は見つからない（本線未接続の sandbox のため）。
+- Godot 4.x は各リソースに UID を付け、エディタは通常 `.godot` 配下にパス↔UID の対応を保持する。
+  テキストエディタや生成ツールで「未登録の uid 文字列」を .tscn に書いても、
+  初回オープン時に「既存キャッシュと矛盾」「未登録」と判断され、新規 UID への差し替えが走ることがある。
+- `c9homeprodwirers01` は人間が読みやすい固定文字列として意図的に付与されたが、
+  その時点でエディタの UID キャッシュに「この res:// パス = この uid」のエントリが無かった、
+  または別ルールで上書きされた、と推測できる。
+
+
+8. uid://36856deeyhng が出た状況の整理
+--------------------------------------
+- これは典型的に Godot が内部生成する UID 形式に近い（英数字のランダム列）。
+- ユーザー観測では「ファイル先頭がこの uid に置換された」直後に
+  Unrecognized UID が出ている。
+- 想定される分岐:
+  (1) ファイル上の uid は更新されたが、同一セッション内の UID キャッシュ更新・ディスク書き込みの
+      順序がずれ、一瞬だけローダが新 uid を解決できなかった（タイミング問題）。
+  (2) 4.6 系で報告されている UID 関連の不具合・再インポート順序の問題に該当し、
+      新規生成 uid が一時的に孤立参照になった（GitHub godotengine の Unrecognized UID 系 issue と類似）。
+  (3) 別の場所（メモリ上のシーンキャッシュ等）が古い uid を参照したままになり、
+      ログ上は新 uid 名が出ているが実際の原因はキャッシュ不整合。
+
+いずれにせよ、「エディタが right_summary 用に新 UID を書き込んだ」こと自体は、
+手書き uid がエディタ管理の UID と一致しなかった結果として説明しやすい。
+
+
+9. load_steps=6 が消えた理由候補
+-------------------------------
+- 候補A（エディタの正規化）: Godot 4.x のシリアライザは、内部で算出可能な load_steps を
+  省略する保存形式を取る場合がある。本リポジトリの `club_history_view.tscn` が
+  load_steps 無しの先頭行であることは、少なくとも「省略保存」が通常運用の一部である証左。
+- 候補B（4.6 の保存差分）: 4.5→4.6 以降、scene のエクスポート・保存の決定性に関する issue が
+  報告されている（例: 再保存で表記が変わる）。load_steps の省略はその一環の可能性。
+- 候補C（UID 差し替えとの独立性）: load_steps の省略は「UID エラー」とは独立に起きうる。
+  同一の「再保存」操作の副作用として両方変わった、という理解でよい。
+
+結論寄り: 「load_steps が消えた = ファイルが壊れた」とは限らず、
+エディタが冗長フィールドを落とした可能性が高い。ただしチーム方針として
+「先頭行の load_steps を常に明示したい」場合は、再保存後に git diff で監視する必要がある。
+
+
+10. Godot 4.6.2 で想定される再シリアライズ挙動
+---------------------------------------------
+- プロジェクトを開くと、未インポート・未登録のリソースに対して UID の割当・更新が走ることがある。
+- scene を初めてエディタで保存すると、ノード順・プロパティ表記・先頭行（uid / load_steps）が
+  エディタの好む形に正規化されることが多い。
+- 「Unrecognized UID」は、project 設定や他リソースが UID 参照しているのに
+  キャッシュに無い、といった状況でも報告されている（公式 issue 参照の一般論）。
+
+本件では right_summary が本線から参照されていないため影響範囲は限定的だが、
+sandbox でも「F6 後に意図せず dirty になる」ことは運用上のノイズになる。
+
+
+11. 案A: Godot が生成した UID を正式採用する
+-------------------------------------------
+内容:
+- エディタで scene を開き、意図した見た目のまま「保存」を一度行い、
+  先頭行に付いた uid（例: uid://36856deeyhng または別の新規値）をそのままコミットする。
+- 同一マシンで再度開いて F6 し、先頭行が安定するか・エラーが消えるか確認。
+
+利点:
+- エディタの UID キャッシュとファイルが一致しやすい。
+- 手書き uid とエディタの期待のズレを解消できる。
+
+リスク:
+- 初回保存直後に再度 Unrecognized が出る場合は、4.6 側の既知問題の可能性があり、
+  プロジェクト再読み込みや .godot 削除（慎重に）まで議論が及ぶことがある。
+- チームが「接頭辞 uid で grep しやすい」方針なら、可読 uid は失われる。
+
+
+12. 案B: scene の uid を削除する
+--------------------------------
+内容:
+- 先頭行から `uid="..."` を削る（手編集）。次回エディタ保存で付与されるのを待つ。
+
+利点:
+- 一度「空白」にしてエディタに任せることで、人間の固定 uid と衝突しない。
+
+リスク:
+- Godot のバージョン・設定によっては、保存前に警告や再付与挙動が異なる可能性。
+- 結局「エディタが付けた uid をコミットする」（案Aと合流）ことが多い。
+
+
+13. 案C: 手書き UID をやめ、エディタ生成の UID を使う
+---------------------------------------------------
+内容:
+- 新規 scene は「Duplicate」や「New Scene」から作り、uid は一切手で書かない。
+
+利点:
+- 最もエディタと整合しやすい。本件の再発を防ぎやすい。
+
+リスク:
+- 既にコミット済みの right_summary を作り直す手間は残る（案Dと組み合わせ）。
+
+
+14. 案D: 新規 scene を作り直す
+------------------------------
+内容:
+- 既存 wire preview をエディタで複製し、右サマリー列だけ手で調整して保存。
+  または空 scene から組み立て直す。
+
+利点:
+- 全ノードパス・内部 id がエディタ生成になり、再シリアライズ差分が最小化されやすい。
+
+リスク:
+- レイアウトの再現コスト。git diff が大きくなりうる。
+
+
+15. 案E: 右サマリー比較 scene を一旦保留する
+------------------------------------------
+内容:
+- 本件の UID ノイズを避け、2 カラム成功形のみ運用する。
+
+利点:
+- 本線・CI・ドキュメントに触れずに済む。判断コストが最小。
+
+リスク:
+- 右列レイアウトの比較が後ろ倒しになる。
+
+
+16. 案F: 現行 2 カラム版を本命にして進む
+---------------------------------------
+内容:
+- `home_production_wire_preview.tscn` を正とし、右サマリーは設計判断のみ文書で扱う。
+
+利点:
+- 既に安定している asset に集中できる。
+
+リスク:
+- 1280×720 での第 3 列の体感検証は別途必要。
+
+
+17. 安全性比較（案A〜F）
+-----------------------
+- 本線 `home_dashboard` への影響: いずれも現状「未接続」ならゼロに近い。
+  将来接続する段階では、PackedScene 参照が path か uid かで振る舞いが変わるため、
+  案A/C/D で「エディタ公式の uid」を採用しておく方が安全。
+- git の見通し: 手書き uid のまま再保存されると毎回先頭行が dirty になりうる → 運用リスク大。
+- チーム認知負荷: 案E/F が最軽量。右列比較が必要なら案A か C+D。
+
+
+18. 本線 home_dashboard への影響
+-------------------------------
+- 調査時点で `home_production_wire_preview_right_summary.tscn` を参照する記述は
+  project.godot / 他 tscn に見当たらない。
+- よって UID の揺れは本線の実行パスに直接は波及しない。
+- 将来 `preload` / `PackedScene` で uid 参照に切り替える場合は、
+  その時点の uid がキャッシュと一致していることが重要。
+
+
+19. 今すぐ実装してよい最小修正案（※今回は実装しない前提の「方針メモ」）
+--------------------------------------------------------------------
+- 最小は「エディタで一度開いて保存し、出力された先頭行（uid および load_steps の有無）を
+  そのままコミットする」こと（案A）。scene 本体のノードは触らなくてよい場合が多い。
+- 併せて、同一セッションで F6 → 即 git diff を確認し、Unrecognized が再発するか記録する。
+- 再発する場合は Godot issue の有無・.godot 削除可否を別タスクで扱うのが安全。
+
+
+20. まだ実装しない方がよいこと
+-----------------------------
+- 手書き uid を別の手書き uid に「推測で」書き換えること（再び未登録になる恐れ）。
+- project.godot の main_scene や uid 参照をいじって症状を隠すこと（本件のスコープ外かつ高リスク）。
+- 問題の切り分け前に `.godot` を無計画に削除すること（他メンバーのキャッシュと議論が必要）。
+
+
+21. Cursor としてのおすすめ順
+----------------------------
+1. 案A（エディタ保存で付いた uid を正式採用）を最優先で試す。コスト最小・本筋。
+2. それでも Unrecognized が続くなら、Godot 4.6 の UID 関連 issue と照合し、
+   プロジェクト再インポートやバージョンピン留めを検討。
+3. 並行して案C（今後は手書き uid 禁止）をルール化。
+4. 右列比較の優先度が下がるなら案E（保留）または案F（2 カラム本命）。
+
+
+22. 次に ChatGPT / ユーザーが判断すべきこと
+-------------------------------------------
+- 「右サマリー比較 scene を資産として残す」価値と、「F6 のたびに先頭行が dirty になるリスク」の
+  トレードオフをどう取るか。
+- 案A を試した結果、先頭行が安定したか、それとも再現性のあるバグかを記録するか。
+- チーム標準を「load_steps 明示」に統一するか、エディタ任せにするか（club_history 方式との整合）。
+
+
+23. 変更していないファイル・安全確認
+-----------------------------------
+本調査メモの作成以外に、以下は変更していない（意図的に未編集）:
+
+- godot/scenes/home_production_wire_preview_right_summary.tscn
+- godot/scenes/home_production_wire_preview.tscn
+- godot/scenes/home_dashboard.tscn
+- godot/scripts/ 以下
+- godot/themes/ 以下（phase4_readonly_core.tres 含む）
+- godot/project.godot
+- godot/README.md
+- docs/ 以下（handoff md 含む）
+- basketball_sim/ 以下
+- 既存の reports/ 内の他ファイル
+
+補足コマンド結果:
+- `git ls-files godot/scenes/*.tscn ...` では .tscn / .tres / project.godot のみ追跡。
+  `godot` 配下を再帰検索した `.uid` は、調査環境では該当パスが空出力だった（
+  プロジェクト方針で .uid が無い、または別場所のみ、のいずれか）。
+
+参考リンク（一般論・4.6 周辺の文脈）:
+- https://github.com/godotengine/godot/issues/117362 （Unrecognized UID 系）
+- https://github.com/godotengine/godot/issues/115971 （4.6 での保存・エクスポートの決定性）
+
+--- 調査メモ終わり ---
