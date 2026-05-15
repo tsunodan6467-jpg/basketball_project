@@ -48,6 +48,9 @@
 - 左の大分類は **ホーム / チーム / リーグ / 経営 / クラブ**（見た目のみ。クリック・遷移なし）。
 - **ClubBand** に **SG / LOGO** の仮クラブロゴ枠を追加済み（実画像・外部ロゴ素材なし）。
 - **左レール現在地**（`StyleBoxFlat_nav_active`）のアクセント枠色を、ClubBand の仮ロゴ枠（琥珀系）に**馴染む暖色**へ**最小調整**済み（Theme 非変更・シーン内 SubResource のみ）。
+- **CardShortcuts** は **2 行から 1 行**へ圧縮済み。`詳細画面: チーム / リーグ / 経営 / クラブ` の**補助案内**はそのまま残し、左レール大分類との**役割重複感を軽減**。
+- **ClubBand**（`EAST DIVISION`・`12勝12敗 / 地区4位` など）と**中央カード**の地区／勝敗／順位の**情報重複**は調査済み（レポート `reports/godot_phase4_home_wire_clubband_card_overlap_survey_2026-05.txt`。**本コミットでは reports は変更しない**）。
+- **CardStandings** のタイトル「順位・成績」は維持し、本文ラベル（`CardStandingsBody`）のみ **立ち位置判断文**へ変更済み: **`PO圏まで 2.0差 / 直近5試合 3勝2敗`**（ClubBand の現在値の**単純な繰り返し**から脱却）。
 - **中央 2 カラムの低〜中密度カード**と **BottomStrip** は従来どおり維持。
 - **ユーザー環境 Godot 4.6.2** で sandbox を **F6 表示確認**済み（ナビ・ClubBand・中央・**アクセント調整後**）。**UID 参照エラーなし**、**実行後の不要な追跡差分なし**（手元運用の目安）。
 - 色・質感の追加試験前に、候補整理は **`reports/godot_phase4_home_wire_color_texture_survey_2026-05.txt`**（調査レポート）で実施済み。**Theme 全面改色は未着手**。
@@ -92,8 +95,12 @@
 ◎ sandbox 左レールをカテゴリナビ風に調整（現在地ホーム強調）
 ◎ sandbox ClubBand に仮クラブロゴ枠（SG/LOGO）を追加
 ◎ sandbox 左レール現在地アクセント調整（ロゴ枠琥珀系に馴染む最小変更・SubResource のみ）
+◎ sandbox CardShortcuts を 2 行から 1 行へ圧縮（補助案内ラベルは維持）
+◎ ClubBand と中央カードの情報重複を調査（重複調査レポート）
+◎ sandbox 順位カード本文（`CardStandingsBody`）を立ち位置判断文へ変更（`PO圏まで 2.0差 / 直近5試合 3勝2敗`）
 ◎ sandbox 色・質感候補調査（`reports/godot_phase4_home_wire_color_texture_survey_2026-05.txt`）
-★ README/docs sandbox 最新到達点記録（本コミット）
+★ README/docs へ sandbox の情報設計到達点を記録（本コミット）
+□ タスク / ニュース / クラブ状態の追加整理（sandbox）
 □ sandbox 中央カード密度の追加調整
 □ sandbox 色・質感バリエーション追加試験
 □ sandbox 右サマリー列あり版の比較
@@ -224,8 +231,12 @@
   ◎ sandbox左レールをカテゴリナビ風に調整（現在地ホーム強調）
   ◎ sandbox ClubBandに仮クラブロゴ枠（SG/LOGO）を追加
   ◎ sandbox左レール現在地アクセント調整（ロゴ枠琥珀系に馴染む最小変更）
+  ◎ sandbox CardShortcuts を1行へ圧縮
+  ◎ ClubBandと中央カードの情報重複を調査
+  ◎ sandbox順位カード本文を立ち位置判断文へ変更
   ◎ sandbox色・質感候補調査（レポート）
-  ★ README/docs sandbox最新到達点記録（本コミット）
+  ★ README/docs へ sandbox の情報設計到達点を記録（本コミット）
+□ タスク/ニュース/クラブ状態の追加整理（sandbox）
 □ sandbox中央カード密度の追加調整
 □ sandbox色・質感バリエーション追加試験
 □ sandbox右サマリー列あり版の比較
