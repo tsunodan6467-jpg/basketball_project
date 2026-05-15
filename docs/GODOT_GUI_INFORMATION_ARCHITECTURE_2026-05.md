@@ -405,6 +405,8 @@
   - **左レール現在地**の枠線アクセントは、仮ロゴ枠の**琥珀系**に**馴染む暖色**へ**最小調整**済み（`StyleBoxFlat_nav_active` の `border_color` のみ・Theme 非変更）。
   - **CardShortcuts** は **2 行から 1 行**へ圧縮し、左レール大分類との**役割重複感を軽減**（`詳細画面: …` の補助案内は維持）。
   - **ClubBand と中央カード**の地区／勝敗／順位の**情報重複**は調査済み。中央の**「順位・成績」カード**は、ClubBand と同じ数字の**繰り返し**ではなく**立ち位置判断**へ寄せ、本文（`CardStandingsBody`）を **`PO圏まで 2.0差 / 直近5試合 3勝2敗`** に変更済み（タイトル「順位・成績」は維持）。
+  - **CardTasks / CardNews / CardClubState** の役割は調査済み（`reports/godot_phase4_home_wire_task_news_state_survey_2026-05.txt` を参照。追跡されない場合あり）。
+  - **CardNewsBody** は **`ホーム快勝、次戦へ弾み`** の **1 行ヘッドライン**へ短縮済み（ニュースは**雰囲気づくり**として軽く残し、右列では **CardTasks を主役**に見せる方向）。
   - **中央カード**は**低〜中密度のまま**維持。
   - **ユーザー環境 Godot 4.6.2** での sandbox 表示確認・**UID 問題なし**・**実行後の不要差分なし**は手元運用の目安として README に同期。
 - **本線 `home_dashboard.tscn` との違い（役割分担）**: **本線**＝**実導線**・**`from_python` / mock`**・**pytest の正本**（`home_dashboard.gd`、§15 冒頭の到達点と同じ）。**sandbox**＝**見た目・情報密度・左ナビ・クラブ帯・情報の役割分担**の研究。sandbox は **JSON / Python / scene 遷移を持たない**（script なし・固定文言のみ）。**本線への反映は別タスク・別コミット**。
