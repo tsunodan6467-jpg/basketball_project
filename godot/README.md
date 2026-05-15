@@ -51,8 +51,9 @@
 - **CardShortcuts** は **2 行から 1 行**へ圧縮済み。`詳細画面: チーム / リーグ / 経営 / クラブ` の**補助案内**はそのまま残し、左レール大分類との**役割重複感を軽減**。
 - **ClubBand**（`EAST DIVISION`・`12勝12敗 / 地区4位` など）と**中央カード**の地区／勝敗／順位の**情報重複**は調査済み（レポート `reports/godot_phase4_home_wire_clubband_card_overlap_survey_2026-05.txt`。**本コミットでは reports は変更しない**）。
 - **CardStandings** のタイトル「順位・成績」は維持し、本文ラベル（`CardStandingsBody`）のみ **立ち位置判断文**へ変更済み: **`PO圏まで 2.0差 / 直近5試合 3勝2敗`**（ClubBand の現在値の**単純な繰り返し**から脱却）。
-- **CardTasks / CardNews / CardClubState** の役割は調査済み（レポート `reports/godot_phase4_home_wire_task_news_state_survey_2026-05.txt`。**本コミットでは reports は変更しない**）。
+- **CardTasks / CardNews / CardClubState** の役割は調査済み（レポート `reports/godot_phase4_home_wire_task_news_state_survey_2026-05.txt`、および CardClubState 重点の `reports/godot_phase4_home_wire_club_state_survey_2026-05.txt`。**本コミットでは reports は変更しない**）。
 - **CardNewsBody** は 2 行ニュースから **`ホーム快勝、次戦へ弾み`** の **1 行ヘッドライン**へ短縮済み（`CardNews` カードとタイトル「ニュース」は維持）。右列の**情報密度を下げ**、**CardTasks**（`Phase4WarningCard`）が**主役**として見えやすい整理。
+- **CardClubBody** は 2 行から **`サラリー余力あり / 士気良好`** の **1 行要約**へ短縮済み（`CardClubState` カードとタイトル「クラブ状態」は維持）。ClubBand の**資金・オーナー信頼**と「クラブの健康」情報が**重く被りすぎない**よう、**詳細ではなく状態要約**に整理。**中央左列**の密度も一段軽くし、**CardTasks** の主役感を維持しやすくした。
 - 右列の読み: **タスク＝次にやること（ToDo）**、**ニュース＝雰囲気・世界の動き**、**ショートカット＝補助案内**。
 - **中央 2 カラムの低〜中密度カード**と **BottomStrip** は従来どおり維持。
 - **ユーザー環境 Godot 4.6.2** で sandbox を **F6 表示確認**済み（ナビ・ClubBand・中央・**アクセント調整後**）。**UID 参照エラーなし**、**実行後の不要な追跡差分なし**（手元運用の目安）。
@@ -103,9 +104,9 @@
 ◎ sandbox 順位カード本文（`CardStandingsBody`）を立ち位置判断文へ変更（`PO圏まで 2.0差 / 直近5試合 3勝2敗`）
 ◎ sandbox 中央カード（タスク／ニュース／クラブ状態）の役割調査
 ◎ sandbox CardNews 本文（`CardNewsBody`）を1行ヘッドラインへ短縮（`ホーム快勝、次戦へ弾み`）
+◎ sandbox CardClubBody（`CardClubState`）を1行要約へ短縮（`サラリー余力あり / 士気良好`）
 ◎ sandbox 色・質感候補調査（`reports/godot_phase4_home_wire_color_texture_survey_2026-05.txt`）
-★ README/docs へ sandbox のニュース短縮到達点を記録（本コミット）
-□ CardClubState の役割整理（sandbox）
+★ README/docs へ sandbox のクラブ状態短縮到達点を記録（本コミット）
 □ sandbox 中央カード密度の追加調整
 □ sandbox 色・質感バリエーション追加試験
 □ sandbox 右サマリー列あり版の比較
@@ -241,9 +242,9 @@
   ◎ sandbox順位カード本文を立ち位置判断文へ変更
   ◎ sandbox中央カード（タスク／ニュース／クラブ状態）の役割調査
   ◎ sandbox CardNewsを1行ヘッドラインへ短縮
+  ◎ sandbox CardClubStateを1行要約へ短縮
   ◎ sandbox色・質感候補調査（レポート）
-  ★ README/docs へ sandbox のニュース短縮到達点を記録（本コミット）
-□ CardClubStateの役割整理（sandbox）
+  ★ README/docs へ sandbox のクラブ状態短縮到達点を記録（本コミット）
 □ sandbox中央カード密度の追加調整
 □ sandbox色・質感バリエーション追加試験
 □ sandbox右サマリー列あり版の比較
