@@ -428,7 +428,7 @@ text = "クラブ状態"
 layout_mode = 2
 theme_type_variation = &"Phase4Muted"
 autowrap_mode = 2
-text = "サラリー余力 +1億5150万円\nチーム士気 良好"
+text = "サラリー余力あり / 士気良好"
 
 [node name="ColRight" type="VBoxContainer" parent="RootMargin/MainRow/RightStack/MidScroll/MidInner/CardsRow"]
 layout_mode = 2
