@@ -1,0 +1,289 @@
+Godot 本番ホームワイヤー sandbox から本線 home_dashboard への段階移植方針 — 調査メモ（実装なし）
+================================================================================
+
+1. 調査日時・対象コミット
+------------------------
+- 調査日: 2026-05-11（リポジトリ上のファイル読取・grep・export/pytest に基づく）
+- 基準コミット: 182712e42bccd7e380575a7f7dc24c635e93e1e4（README/docs に右サマリー比較結果記録済みの時点）
+- 参照した主なパス:
+  - godot/scenes/home_dashboard.tscn
+  - godot/scripts/home_dashboard.gd
+  - godot/scenes/home_production_wire_preview.tscn
+  - godot/scenes/home_production_wire_preview_right_summary.tscn（位置づけのみ）
+  - godot/themes/phase4_readonly_core.tres（先頭のみ・方針確認）
+  - godot/data/home_dashboard_mock.json
+  - basketball_sim/export/home_dashboard_readonly.py
+  - basketball_sim/tests/test_home_dashboard_readonly_export.py
+- ユーザー指定の reports/*.txt（center_density 等）は、本ワークスペースでは未追跡または未取得のため未読。**既存 reports の編集は行っていない**。
+
+
+2. 現在の到達点（要約）
+------------------------
+- sandbox 現行 2 カラム版 `home_production_wire_preview.tscn` が**本命候補寄り**（README/docs 判断と整合）。
+- 右サマリー列あり版 `home_production_wire_preview_right_summary.tscn` は**比較資産**として維持。本線未接続。
+- 本線 `home_dashboard.tscn` は **10 画面導線**・**from_python 優先 + mock フォールバック**・**pytest 正本**として稼働中。
+- 左サイドナビは**本線未実装**。`HeaderNavRow` は**本線で維持**方針（NAVIGATION doc）。
+
+
+3. 本線 home_dashboard.tscn の現状構造
+--------------------------------------
+ルート: **HomeDashboard**（Control）→ **Background** → **Margin** → **RootCol**（VBox）
+
+- **HeaderCard**（PanelContainer・Theme 限定適用済みの想定）
+  - **HeaderInner**（VBox）
+    - **HeaderTopRow**: **HeaderBadge**（仮バッジ） / **PlaceholderStrip**（仮ストリップ）
+    - **HeaderNavRow**（HBox）: **5 ボタン**（ロスター・クラブ史・順位表・日程・施設）
+    - **ClubNameLabel**, **SeasonLabel**
+    - **DataSourceLabel**（読込元表示）
+- **StatusLabel**（読込失敗時など・RootCol 直下）
+- **Scroll** → **Inner**（VBox）
+  - **CardNavMenu**: カテゴリ別ボタン列（チーム / リーグ / クラブ / 経営）
+  - **SecMetricsTitle** + **MetricsRow**: **CardDivision**（division） / **CardRank**（rank_record） / **CardMoney**（money）
+  - **CardTeamExtras**: owner_trust / salary_cap / recent_form（任意行表示）
+  - **CardWarnings**: warnings
+  - **CardNext**: next_game
+  - **CardSummary**: club_summary（複数行を1ラベルに結合表示）
+  - **CardTasks**: tasks（最大 3 行・`_join_lines(..., 3)`）
+  - **CardNews**: news（**行数上限なし**で `_join_lines` — 配列全要素を「・」で連結）
+- **FooterNote**（補足文言）
+
+sandbox との対応イメージ: 本線は **Header 内に Nav + クラブ名 + シーズン**、指標は **Scroll 内 Metrics 3 カード**に分割。sandbox は **ClubBand に指標を集約**した帯＋**中央 2 カラム**。
+
+
+4. 本線 home_dashboard.gd の現状機能
+------------------------------------
+- **`_home_json_candidate_paths`**: `home_dashboard_from_python.json` → `home_dashboard_mock.json` の順で探索。
+- **`_load_home_snapshot`**: ファイル存在・parse・型チェック。失敗時 `{"_error": ...}`。
+- **`_apply_snapshot`**: 失敗時は Status 表示・本文クリア。成功時はキーごとに Label へ代入:
+  - スカラー: `club_name`, `season_label`, `division`, `rank_record`, `money`, `next_game`
+  - **`_join_lines`**: `club_summary`（全行）、`tasks`（**max 3**）、`news`（**max 0 = 制限なし**で全行）
+  - 任意行: `owner_trust`, `salary_cap`, `recent_form`, `warnings` → 空なら行非表示。CardTeamExtras / CardWarnings の visible 連動。
+- **`change_scene_to_file`**: 10 画面それぞれ定数パスへ。コメントで閲覧専用であることを明示。
+- **`_data_source_caption`**: from_python と mock で文言切替。
+
+**守るべき契約**: `REQUIRED_KEYS`（pytest）と **Godot mock のキー集合**が export の **`build_home_dashboard_readonly_dict` の戻り値**と一致していること。
+
+
+5. sandbox 現行 2 カラム版の構造（要約）
+--------------------------------------
+- **MainRow**: **LeftRail**（カテゴリ見た目のみ） + **RightStack**
+- **RightStack**: **ClubBand**（ロゴ枠 SG/LOGO + クラブ名 + シーズン + 地区/戦績 + 資金/信頼）→ **MidScroll** → **BottomStrip**
+- **MidScroll / MidInner**: DashCaption + **CardsRow**（**ColLeft**: 次戦・順位・クラブ状態 / **ColRight**: タスク・ニュース・ショートカット）
+
+情報設計上の特徴: **タスク主役**・ニュース 1 行・クラブ状態 1 行・順位カードは**立ち位置判断文**・ショートカット 1 行補助。
+
+
+6. 右サマリー比較版の位置づけ
+----------------------------
+- 第 3 列で状態サマリーを試す比較用。**本線移植の前提レイアウトではない**（1280×720 で中央が詰まりやすいという判断）。
+
+
+7. 本線へ移す候補要素（優先度の高い順・論理単位）
+-----------------------------------------------
+1. **視覚・情報密度（Theme / variation / フォント・余白）** — キー不変で `.tscn` のみまたは軽微なラベルプロパティ。
+2. **CardTasks 主役化** — `Phase4WarningCard` 等の視覚階層は `.tscn` で可能。文言内容は **tasks 配列**に依存。
+3. **Metrics 3 カード（Division / Rank / Money）** と sandbox **ClubBand** の**情報役割の整理**（重複削減は設計・DTO 両面）。
+4. **PlaceholderStrip → ロゴ枠風パネル**（sandbox の SG/LOGO 相当）— **SubResource** 追加は可能だが UID/差分運用に注意。
+5. **BottomStrip 相当** — 本線は **FooterNote** あり。役割を統合するか検討。
+6. **左レール** — **導線・ドキュメント・HeaderNavRow との関係**が大きいため後段。
+
+
+8. 本線へまだ移さない方がよい要素
+-------------------------------
+- **左レールをそのまま本線に足すこと**（案 C）— HeaderNavRow + CardNavMenu と**三系統ナビ**になりやすい。
+- **HeaderNavRow をいきなり削除**すること — 10 画面への**最短導線**が失われ、各サブ画面の「ホームへ戻る」との**認知モデル**も変わる。
+- **ClubBand を一塊で本線に載せ替え**て Metrics を廃する等の**大レイアウト変更**（案 D）— 回帰範囲が広い。
+- **JSON キー追加を伴わないまま**、sandbox 固定文言だけを本線に焼き付けること — **from_python と乖離**し、Steam 品質の観点でも不採用。
+
+
+9. 案 A: Header だけ本番寄せ
+----------------------------
+- **安全性**: 高（範囲が HeaderCard 内に閉じやすい）。
+- **実装範囲**: `.tscn` 中心。ロゴ枠・行レイアウト調整。
+- **10 画面導線**: **HeaderNavRow を触らなければ影響小**。
+- **from_python/mock**: キー不変なら **影響なし**。
+- **home_dashboard.gd**: **原則不要**（DataSourceLabel 位置は `.tscn` で調整可）。
+- **DTO/Python**: 不要（見た目のみの場合）。
+- **Theme**: 既存 variation の利用で **Theme ファイル変更なし**も可能。
+- **HeaderNavRow**: **維持**前提が最も整合。
+- **左ナビ**: 未導入のまま。
+- **1280×720**: Header が縦に伸びすぎないよう注意。
+- **本命一致度**: 中（ClubBand 全体再現ではない）。
+- **戻しやすさ**: 高。
+- **pytest**: キー・export 不変なら **影響なし**。
+- **今すぐ実装**: **最有力の第一歩**。
+
+
+10. 案 B: 中央カード密度だけ移植
+--------------------------------
+- **安全性**: 中（Scroll 内のみだが、**表示内容は JSON 駆動**）。
+- **文言の sandbox 寄せ**:
+  - **rank_record を「PO圏まで…」型にする**: 現行 export は **`{rank} / {wins}勝{losses}敗`**。**プレーオフ差分**は **別ロジック or 新キー**が必要。**現行 DTO のみでは出せない**。
+  - **news 1 行**: `_join_lines(d, "news")` は **全行連結**。**1 行だけ**にするには (1) `home_dashboard.gd` で先頭のみ表示 (2) export の `max_news=1` (3) 新キー `news_headline` — (2)(3) は **Python + pytest 更新**。
+  - **club_summary 1 行要約**: 現行は **複数行の配列**。**短い1行**は export の `_club_summary_lines` 変更 or 新キー or gd で結合短縮。**現状の mock 構造のままでは sandbox 固定文と一致しない**。
+- **tasks 主役化**: 並び順・件数は `_task_lines` が支配。**カードの視覚強調**は `.tscn` のみで可能。
+- **pytest**: Python 変更時は **必ず再実行**。
+
+
+11. 案 C: 左レールだけ別段階で入れる
+------------------------------------
+- **安全性**: 低〜中（ナビの**情報設計が三層化**）。
+- **HeaderNavRow**: **残すのがデフォルト推奨**。消す場合は **全サブ画面の戻り導線・初回ユーザーの迷子**を再設計してから。
+- **今すぐ本線で消してよいか**: **いいえ**。
+- **矛盾**: 左レールが「ホーム/チーム/…」見た目のみで、実際の遷移は HeaderNavRow + カード — **説明コストと誤タップ**が増える。
+
+
+12. 案 D: sandbox レイアウトを本線へ大移植
+-----------------------------------------
+- **安全性**: 低。`home_dashboard.gd` の % 参照・Scroll 構造が大きく変わる。
+- **pytest / 10 画面**: 退行リスク大。
+- **結論**: **現時点では非推奨**。
+
+
+13. 案 E: 新規本線候補 scene
+---------------------------
+- **安全性**: 中（本線ファイルは触らない）が、**二重メンテ**・**main_scene 切替の議論**が発生。
+- **結論**: **小規模チームでは早すぎる**が、将来「本線を凍結したまま大実験」するなら選択肢。
+
+
+14. 案 F: DTO/JSON 整理を先にする
+---------------------------------
+- **安全性**: 高（見た目より契約を先に固める）。
+- **範囲**: `home_dashboard_readonly.py`・`REQUIRED_KEYS`・mock・**Godot gd** の表示ロジックが連動。
+- **pytest**: **必須更新**。
+- **結論**: **「sandbox の文章を本当にデータで表現する」段階では先に F が妥当**。逆に **見た目だけの Theme 調整**なら F は後でも可。
+
+
+15. 案 G: まだ本線移植せず sandbox を続ける
+------------------------------------------
+- **安全性**: 最高。
+- **リスク**: 検証の長期化。**ただし現時点では「大移植しない」方針と両立しやすい**。
+
+
+16. HeaderNavRow の扱い（結論寄り）
+----------------------------------
+- **本線に左レールを入れる場合**: 原則 **HeaderNavRow は残す**。左レールは**装飾＋将来のカテゴリ表示**に留めるか、**クリック可能にするなら**遷移先を HeaderNavRow / CardNavMenu と**重複させない**設計が必要。
+- **HeaderNavRow を消す判断**: **今はしない**。ドキュメント・ユーザー教育・サブ画面ヘッダー文言の一括見直しが前提。
+
+
+17. from_python/mock 維持の注意
+-------------------------------
+- **キー集合を変える場合**は必ず **export・mock・REQUIRED_KEYS・`_apply_snapshot`** を同じコミット系列で更新。
+- **`news` の全行連結**は、行数が増えると **CardNews が縦に伸び Scroll が圧迫** — 1 行化は **gd か export のどちらか**で明示的に制限する。
+
+
+18. DataSourceLabel の置き場所
+------------------------------
+- 現状: **HeaderCard / HeaderInner 内**、シーズンラベル付近。**読込元の可視化**として妥当。
+- sandbox ClubBand 化でヘッダが縦長になる場合: **Header 最下段**に固定するか、**Scroll 外の薄い一行バー**に分離する案もある（実装時判断）。**Steam 品質**: 「モックか本物か」が一目で分かることが重要。
+
+
+19. CardStandings / CardNews / CardClubState の DTO 課題（本線との対応）
+--------------------------------------------------------------------
+※ 本線には **CardStandings 専用ノードはない**。相当は **MetricsRow の CardRank（rank_record）** と **club_summary**。
+
+- **sandbox の「PO圏まで 2.0差 / 直近5試合 3勝2敗」**:
+  - **rank_record** 1 本で表現するには **export 側でプレーオフ差・直近成績を計算して文字列化**する必要がある。**現行 `build_home_dashboard_readonly_dict` では未提供**（`recent_form` は別キーで存在）。
+- **CardNews 1 行ヘッドライン**:
+  - `news` は配列。**先頭 1 要素だけを見出しに**するのが最も変更が小さい（gd 1 行 or export で 1 要素配列）。
+- **「サラリー余力あり / 士気良好」**:
+  - **salary_cap** に近い文言は export 可能。**士気**は現行キーに**専用フィールドがない**。**morale_short 等の新キー**か、**club_summary の先頭行に統合**か、**owner_trust 以外の派生**かを決める必要あり。
+
+
+20. 左レール本線導入のリスク
+---------------------------
+- **三重導線**（左レール見た目 + HeaderNavRow + CardNavMenu）。
+- **1280×720** で中央が狭くなる（右サマリー比較版で既に顕在化したリスクと同型）。
+- **サブ画面の「ホームへ戻る」**とのストーリー一貫性。
+- **結論**: **後段**。まず本線の**情報密度と DTO**を sandbox 判断に寄せてからでも遅くない。
+
+
+21. 最初の安全な本線移植コミット候補
+-----------------------------------
+**推奨（単一コミットの粒度）**:
+1. **HeaderCard 内の視覚調整のみ**（案 A）— **PlaceholderStrip を sandbox 風ロゴ枠に近づける**、行間・フォント。**gd・Python・キー不変**を維持しやすい。
+
+**次点**:
+2. **CardNews の表示行数制限** — `_join_lines(d, "news", 1)` のように **gd 1 行変更**なら pytest **不要**だが、**「1 行に何を出すか」**のポリシーは product 判断。export で `max_news=1` にする方が **データ制御として明確**だが **pytest 対象のスナップショット文言が変わる**。
+
+**分割の例（失敗時に戻しやすい）**:
+- コミット 1: Header のみ `.tscn`
+- コミット 2: Metrics カードの Theme variation のみ
+- コミット 3 以降: Python/export（キー追加・行数制御）
+
+
+22. 段階移植の推奨順（Cursor）
+------------------------------
+1. **案 A**（Header のみ・本線キー維持）
+2. **案 F のうち「表示ポリシーだけ」**（news 行数・headline 方針）を **小さく**（必要なら gd のみ）
+3. **案 F**（rank の立ち位置文・morale 等）— **export + pytest**
+4. **案 B** の残り（club_summary 短縮方針）
+5. **左レール（案 C）** — 本線のナビ設計が固まってから
+6. **案 D** — 回避継続
+7. **案 E** — 必要になったら
+
+
+23. まだ実装しない方がよいこと
+-----------------------------
+- **HeaderNavRow 削除**と**左レール実遷移の同時導入**。
+- **MetricsRow を廃して ClubBand に一本化**する大変更（データの置き場所が変わる）。
+- **project.godot main_scene の差し替え**や**本線の二重化**（明確な合意なし）。
+
+
+24. 本線 home_dashboard への影響（案別サマリー）
+-----------------------------------------------
+| 案 | 本線 .tscn | 本線 .gd | Python | pytest | 10 画面 |
+| A  | 小        | 無      | 無     | 無     | 維持   |
+| B  | 中        | 小〜中  | 任意   | 任意   | 維持   |
+| C  | 大        | 中〜大  | 無〜中 | 要検討 | 要検討 |
+| D  | 特大      | 大      | 大     | 大     | 高リスク |
+| E  | 新規      | 複製    | 同上   | 同上   | 分岐   |
+| F  | 小        | 小      | 中     | 必須   | 維持   |
+| G  | 無        | 無      | 無     | 無     | 維持   |
+
+
+25. pytest / 手動確認観点
+-------------------------
+- **必須**: `py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q`
+- **Python を触ったら**: REQUIRED_KEYS・スナップショット期待値の更新確認。
+- **手動 Godot**: from_python 配置時・mock のみ時の **HeaderNavRow 5 ボタン + カードメニュー全遷移**、**DataSourceLabel**、**CardNews 行数**。
+
+
+26. Cursor としてのおすすめ順（実装フェーズ用・本調査では実行しない）
+--------------------------------------------------------------------
+1. 案 G と両立しつつ **案 A** を第一コミット候補にする。
+2. 文言の sandbox 一致を目指すなら **案 F を小分け**（news → rank 文 → morale）。
+3. 左レールは **ナビ全面実装の設計合意後**。
+
+
+27. 次に ChatGPT / ユーザーが判断すべきこと
+------------------------------------------
+- **news**: 「先頭 1 件のみ表示」でよいか、**複数ヘッドライン**を残すか。
+- **rank の立ち位置文**: **どのシミュレーション値**を約束するか（プレーオフ差の定義）。
+- **士気**: 新キーか、既存のどこに寄せるか。
+- **BottomStrip**: 本線 FooterNote と**統合文案**にするか。
+
+
+28. 変更していないファイル・安全確認
+-----------------------------------
+本調査では **新規レポート本ファイルの追加のみ**を行う。以下は**読取のみ**で**未変更**:
+- godot/scenes/*.tscn, godot/scripts/*.gd, godot/themes/, godot/project.godot, godot/README.md, docs/, basketball_sim/, 既存 reports/, handoff md, 生成 JSON
+
+
+================================================================================
+必須結論（曖昧にしない）
+================================================================================
+
+- **今すぐ本線へ大移植してよいか** → **いいえ**（案 D は避ける）。
+
+- **左レールを本線へ入れるのは今か後か** → **後**。HeaderNavRow・CardNavMenu・サブ画面導線の設計を固めた後。
+
+- **HeaderNavRow を今消してよいか** → **いいえ**。
+
+- **最初の本線移植コミットは何がよいか** → **案 A 相当（HeaderCard 内の視覚調整・可能ならロゴ枠風 SubResource。キー・gd・Python は触らない範囲に留める）**。
+
+- **DTO 整理を先にすべきか後にすべきか** → **「sandbox と同じ文言・同じ情報役割をデータで保証したい」なら先（案 F を小分け）**。**「まず見た目の本番感だけ上げる」なら後**でもよいが、その場合 **rank/news/club の sandbox 一致はしない**。
+
+- **現時点の本命は 2 カラム版でよいか** → **よい**（右サマリー列あり版は比較資産。本線の第一レイアウト候補は現行 2 カラム sandbox 寄りで整合）。
+
+--- 調査メモ終わり ---
