@@ -1,0 +1,414 @@
+================================================================================
+Godot 本線 home_dashboard — MetricsRow（CardRank / CardMoney）Theme 統一方針調査
+================================================================================
+
+本ファイルは調査・整理のみ。実装・シーン・スクリプト・Theme・docs/README・Python・
+既存 reports の編集は行っていない（本ファイルの新規作成のみ）。
+
+
+--------------------------------------------------------------------------------
+1. 調査日時・対象コミット
+--------------------------------------------------------------------------------
+- 調査日時: 2026-05-15（`home_dashboard.tscn` / `home_dashboard.gd` /
+  `phase4_readonly_core.tres` / `home_production_wire_preview.tscn` /
+  既存 reports / README・docs の読取・grep に基づく）
+- 調査時点のリポジトリ HEAD: `07bbf12`（「Godot本線ホームCardTasks限定Theme適用の到達点を記録」）
+- 直近の本線 Theme 実装コミット（参考）:
+  - `d18bf1f` CardTasks → Phase4SummaryCard
+  - `762f5bc` CardWarnings → Phase4WarningCard
+  - `8676095` CardNext → Phase4SummaryCard
+  - `ed106c8` CardNews → Phase4SummaryCard
+  - `f66bcd2` CardDivision → Phase4SummaryCard（MetricsRow 内・先行適用）
+- 参照した主なパス:
+  - godot/scenes/home_dashboard.tscn
+  - godot/scripts/home_dashboard.gd
+  - godot/themes/phase4_readonly_core.tres
+  - godot/scenes/home_production_wire_preview.tscn
+  - godot/data/home_dashboard_mock.json
+  - basketball_sim/export/home_dashboard_readonly.py
+  - reports/godot_phase4_home_dashboard_next_card_theme_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_center_density_migration_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_tasks_summarycard_survey_2026-05.txt
+  - reports/godot_phase4_home_dashboard_warning_task_theme_survey_2026-05.txt
+  - godot/README.md / docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md /
+    docs/GODOT_NAVIGATION_PHASE4_2026-05.md（方針の整合確認・本調査では未編集）
+
+
+--------------------------------------------------------------------------------
+2. 現在の到達点
+--------------------------------------------------------------------------------
+- 本線 `home_dashboard.tscn`:
+  - **HeaderCard**: `Phase4HeaderCard` + ClubBand 風（`HeaderClubBandRow` / `HomeLogoSlot` /
+    `ClubNameLabel` / `SeasonLabel` / `DataSourceLabel`）。**HeaderNavRow 5 ボタン維持**。
+  - **Scroll / Inner 上から**: CardNavMenu（暗）→ **SecMetricsTitle** → **MetricsRow**
+    → CardTeamExtras（暗）→ CardWarnings（WarningCard）→ CardNext（Summary）→
+    CardSummary（暗）→ CardTasks（Summary）→ CardNews（Summary）。
+- **Theme 限定適用済み（Summary / Warning 系）**:
+  HeaderCard、**CardDivision**、CardNews、CardNext、CardTasks、CardWarnings。
+- **MetricsRow 内の未適用**: **CardRank**、**CardMoney**（いずれも暗 `StyleBoxFlat_card`）。
+- **`.gd` / JSON / Python / DTO / Theme `.tres` / project.godot`**: ここまでの Theme 段階では
+  **未変更で維持**の実績あり。
+
+
+--------------------------------------------------------------------------------
+3. CardNews / CardNext / CardWarnings / CardTasks 限定 Theme 適用の結果（前提）
+--------------------------------------------------------------------------------
+- **確立した手順**: 対象 `PanelContainer` に `theme = ExtResource("2_theme")` +
+  `theme_type_variation`、**当該ノードのみ** `theme_override_styles/panel` を外す。
+  **子 Label の `font_color` を白カード向け濃色**（見出し約 (0.08, 0.11, 0.18)、
+  本文約 (0.16, 0.2, 0.3)）。
+- **共有 SubResource**: `StyleBoxFlat_card` / `StyleBoxFlat_warn` は **定義を残し**、
+  他ノード参照を維持。
+- **CardTasks 適用後**、Scroll 縦カード群は Summary / Warning の二系統が揃い、
+  **MetricsRow だけが横 3 枚のうち 1 枚だけ白（CardDivision）・2 枚暗**という
+  **目立つ不揃い**が残っている。
+
+
+--------------------------------------------------------------------------------
+4. MetricsRow の現状
+--------------------------------------------------------------------------------
+- **SecMetricsTitle**（`Label`）: テキスト「主要指標」。**カード外の見出し**。
+  `font_color` 約 **(0.78, 0.82, 0.9)**、13px。**Scroll 背景（暗）上の明色ラベル**。
+  **Theme / variation なし**。
+- **MetricsRow**（`HBoxContainer`）: `separation = 12`。
+- **子 3 枚**（いずれも `size_flags_horizontal = 3` → **等幅 3 分割**）:
+  1. CardDivision（白 Summary）
+  2. CardRank（暗 card）
+  3. CardMoney（暗 card）
+- **1280×720 の見え方（推定）**:
+  - 横 3 等分は **指標チップとして読みやすい**一方、**中央 1 枚だけ白**で
+    **Rank / Money が同系の暗パネル**のため **MetricsRow 内の統一感が崩れている**。
+  - 本文 17px + `autowrap_mode = 2` のため、長い `rank_record` / `money` でも
+    **カード内折り返し**は可能（mock: `4位 / 18勝12敗`、`7.2億円` 程度は 1〜2 行）。
+- **visible 制御**: MetricsRow 全体・各カードとも **`.gd` からの非表示切替なし**（常時表示）。
+- **connection**: MetricsRow 配下に **シグナル接続なし**。
+
+
+--------------------------------------------------------------------------------
+5. CardDivision の現状
+--------------------------------------------------------------------------------
+- **Theme 適用済み**（コミット `f66bcd2`「GodotホームのDivisionカードにThemeを限定適用」）。
+- **variation**: **`Phase4SummaryCard`**（CardNews / CardNext / CardTasks と同じ）。
+- **panel**: **`theme_override_styles/panel` なし**（Theme 側パネル）。
+- **`theme = ExtResource("2_theme")`** あり。
+- **見出し `HDiv`**: `Color(0.08, 0.11, 0.18, 1)`、12px、「所属ディビジョン」。
+- **本文 `%DivisionLabel`**: `Color(0.16, 0.2, 0.3, 1)`、17px、`autowrap_mode = 2`、
+  プレースホルダ `（D2）`。
+- **`StyleBoxFlat_card`**: CardDivision からは **参照を外している**が、**SubResource 定義は
+  ファイル先頭に残存**（他ノードが参照）。
+- **CardRank / CardMoney との差**:
+  - Rank / Money は **暗 panel + 明色本文 (0.93, 0.95, 0.98)** + **薄い見出し (0.62, 0.68, 0.76)**。
+  - **同一行内で「白・暗・暗」**となり、**Division だけ浮いて見える**。
+- **再調整の要否**: **Theme variation の付け替えは不要**。**色・パネルは既に Summary 系で
+  確定**。MetricsRow を揃えるには **Rank / Money を Division に合わせる**のが主作業。
+
+
+--------------------------------------------------------------------------------
+6. CardRank の現状
+--------------------------------------------------------------------------------
+- **panel**: `theme_override_styles/panel = SubResource("StyleBoxFlat_card")` のみ。
+  **ルート `theme` なし**。
+- **見出し `HRank`**: 「順位 / 戦績」、**(0.62, 0.68, 0.76)**、12px。
+- **本文 `%RankRecordLabel`**: **(0.93, 0.95, 0.98)**、17px、`autowrap_mode = 2`、
+  プレースホルダ `（順位）`。
+- **JSON / mock**: `rank_record` 文字列（例: `"4位 / 18勝12敗"`）。
+- **export（`home_dashboard_readonly.py`）**: `rank` + `wins`/`losses` から
+  `"{rank} / {wins}勝{losses}敗"` または `順位未確定 / …` 形式。**順位・勝敗の複合文字列**
+  （sandbox の `PO圏まで 2.0差 / 直近5試合 3勝2敗` のような**立ち位置判断文ではない**）。
+- **見た目だけ触れるか**: **可能**（`.tscn` で Theme + ラベル色のみ）。**文言・DTO は変更不要**。
+- **sandbox との差**: sandbox は **CardStandings**（中央左列）で立ち位置文。
+  本線 MetricsRow の CardRank は **DTO どおりの順位/戦績表示**のままが正しい（今回の Theme 段階）。
+
+
+--------------------------------------------------------------------------------
+7. CardMoney の現状
+--------------------------------------------------------------------------------
+- **panel**: `theme_override_styles/panel = SubResource("StyleBoxFlat_card")`（CardRank と同型）。
+- **見出し `HMoney`**: 「資金」、**(0.62, 0.68, 0.76)**、12px。
+- **本文 `%MoneyLabel`**: **(0.93, 0.95, 0.98)**、17px、`autowrap_mode = 2`、
+  プレースホルダ `（資金）`。
+- **JSON / mock**: `money` 文字列（例: `"7.2億円"`）。export は `format_money_yen_ja_readable`。
+- **見た目だけ触れるか**: **可能**（CardRank と同手順）。
+- **Header ClubBand との関係（本線）**:
+  - **現行本線 Header**は **ClubName / Season / DataSourceLabel のみ**。
+    **資金行は Header には未配置**（sandbox ClubBand の `MoneyLine` は**本線未移植**）。
+  - よって **Header との直重複は現時点では小さい**。
+  - **重複の主因は `club_summary` 行**（後述 §9）と、将来 Header へ資金行を足す場合の設計。
+
+
+--------------------------------------------------------------------------------
+8. home_dashboard.gd での division / rank_record / money 処理
+--------------------------------------------------------------------------------
+- **`@onready`**: `%DivisionLabel`、`**RankRecordLabel**`（ノード名は RankRecordLabel、
+  変数 `_rank_record`）、`%MoneyLabel`。
+- **`_apply_snapshot`**:
+  - `_division.text = _txt(d, "division")`
+  - `_rank_record.text = _txt(d, "rank_record")`
+  - `_money.text = _txt(d, "money")`
+- **visible 制御**: **Metrics 3 項目に対する行/カードの visible 切替は無い**（常時表示）。
+  空文字のときはラベルが空になるだけ。
+- **`_clear_body`**: 3 キーとも `text = ""`。
+- **from_python / mock**: `_home_json_candidate_paths` の優先順は従来どおり。**Theme 化で
+  ロジック変更は不要**。
+- **export DTO キー**（`home_dashboard_readonly.py`）: `division`, `rank_record`, `money` は
+  トップレベル文字列。`club_summary` は配列で **rank_record / division / money を再掲**する行を含む。
+
+
+--------------------------------------------------------------------------------
+9. Header ClubBand との情報重複
+--------------------------------------------------------------------------------
+- **本線 Header（現状）**:
+  - 表示: クラブ名、シーズン、読込元。**地区名・戦績・資金は Header には無い**。
+- **MetricsRow**:
+  - division / rank_record / money を **横 3 カードで明示**。
+- **`club_summary`（CardSummary 本文）**:
+  - export が例として生成:
+    - `順位・戦績: {rank_record}`
+    - `ディビジョン: {division} / 資金: {money}`
+  - **MetricsRow と内容が重複**（Theme 以前からの構造）。**CardRank/Money を白化しても
+    重複は悪化しない**が、**解消は DTO / 表示整理（別タスク）**。
+- **sandbox ClubBand**:
+  - `EAST DIVISION` / `12勝12敗 / 地区4位` / `資金 3億6850万円` 等を **帯に集約**。
+  - **本線は帯を最小寄せ済み・数値行は未移植**。sandbox 本命は **CardStandings 立ち位置文**で、
+    MetricsRow 3 枚とは **レイアウト役割が異なる**。
+- **Theme 適用時の重複リスク**:
+  - **CardMoney を白 Summary にしても**、Header に資金が無い限り **「帯と Metrics の二重」には
+    ならない**。
+  - **将来 Header に資金行を足す場合**は、Metrics の「資金」カードとの**役割分担を設計**する
+    （今回の Theme コミットの範囲外）。
+
+
+--------------------------------------------------------------------------------
+10. sandbox との関係
+--------------------------------------------------------------------------------
+- sandbox **MetricsRow 相当の横 3 枚は無い**（左 2 カラム + 右列 Tasks/News 等）。
+- **順位・成績**: sandbox は **CardStandings** + 本文 `PO圏まで 2.0差 / 直近5試合 3勝2敗`
+  （固定文言・本線 DTO とは別）。
+- **資金**: sandbox **ClubBand `MoneyLine`** に集約。本線は **MetricsRow CardMoney** のみ
+  （Header 未移植）。
+- **本命 sandbox（2 カラム）との一致度**:
+  - **見た目の白カード密度**を本線に足す方向性とは **矛盾しない**（Summary 系の延長）。
+  - **文言・情報設計の一致**は **DTO / 大移植（案 D・F）** で初めて揃う。**今回の Theme は
+    見た目のみ**で sandbox 本命と **完全一致にはしない**（想定どおり）。
+
+
+--------------------------------------------------------------------------------
+11. 案A — CardRank / CardMoney を同一コミットで SummaryCard 化する案
+--------------------------------------------------------------------------------
+- **内容**: CardRank・CardMoney に `theme` + `Phase4SummaryCard`、各 `StyleBoxFlat_card`
+  panel override を外す。`HRank`/`HMoney` を (0.08, 0.11, 0.18)、`RankRecordLabel`/
+  `MoneyLabel` を (0.16, 0.2, 0.3) 付近へ（CardDivision / CardNews と同系）。
+- **観点評価（要約）**:
+  1. 安全性: **高**（確立パターンの 2 ノード適用）。
+  2. .tscn のみ: **可能**。
+  3. .gd: **不要**。
+  4. Python/DTO: **不要**。
+  5. Theme .tres: **不要**（既存 Phase4SummaryCard）。
+  6. StyleBoxFlat_card: **Rank/Money から参照除去のみ。SubResource 残置**（NavMenu /
+     CardTeamExtras / CardSummary が継続参照）。
+  7. visible: **影響なし**。
+  8. from_python/mock: **影響なし**。
+  9. HeaderNavRow / 10 画面: **影響なし**。
+  10. Header 重複: **現状ほぼ増えない**（Header に資金行なし）。
+  11. 1280×720: **3 枚とも白で統一され読みやすい**。
+  12. CardNews/Next/Tasks: **同じ Summary 言語で整合**。
+  13. CardDivision: **行内 3 枚が揃う（本調査の主目的）**。
+  14. sandbox: **見た目方向は一致、文言は別**。
+  15. 戻しやすさ: **中**（2 カード分の差分だがパターン単純）。
+  16. pytest: **影響なし想定**（export 契約不変）。
+  17. 手動確認: **Godot 目視必須**（3 枚横並び・長文折返し）。
+  18. Steam 品質: **中〜高**（主要指標帯の完成度向上）。
+  19. 今すぐ実装: **推奨**（次の Theme コミットとして最適）。
+
+
+--------------------------------------------------------------------------------
+12. 案B — CardRank だけ先に SummaryCard 化する案
+--------------------------------------------------------------------------------
+- **MetricsRow が「白・白・暗」**になり、**CardMoney だけ暗のまま**。
+- **原則非推奨**（README「片方だけでなくセット」方針と整合）。
+- 安全性は高いが、**統一目的を半分しか満たさない**。**一時的な違和感**が目視で残る。
+
+
+--------------------------------------------------------------------------------
+13. 案C — CardMoney だけ先に SummaryCard 化する案
+--------------------------------------------------------------------------------
+- **「白・暗・白」**となり、**Rank が中央だけ暗**でより不自然になりやすい。
+- **原則非推奨**（案 B 以上に避ける）。資金は将来 Header 重複の論点があるが、
+  **見た目だけの段階では Rank とセットが妥当**。
+
+
+--------------------------------------------------------------------------------
+14. 案D — MetricsRow 全体をまとめて再設計する案
+--------------------------------------------------------------------------------
+- SecMetricsTitle / 幅配分 / 見出し文言 / CardStandings 的立ち位置文の導入など。
+- **DTO・sandbox 本格移植・`.gd` に触れる可能性が高い**。
+- **今やるべきではない**（Phase 4 Theme 足場の「1 カード（またはセット）限定」方針から外れる）。
+
+
+--------------------------------------------------------------------------------
+15. 案E — MetricsRow は触らず CardSummary / club_summary 調査へ進む案
+--------------------------------------------------------------------------------
+- **club_summary は `_join_lines` 複数行 + export が Metrics と重複行を生成**。
+- **DTO 整合が重く**、Theme より先に設計判断が要る。
+- **MetricsRow の横並び不揃いは残る**。**Theme 系列の次手としては優先度低**。
+
+
+--------------------------------------------------------------------------------
+16. 案F — MetricsRow は触らず CardNews 1 行化 / DTO 整理へ進む案
+--------------------------------------------------------------------------------
+- **正攻法だが `.gd` / export / DTO が必須**。
+- **Theme 一段落（MetricsRow 横 3 枚）後でも遅くない**。
+- 現状 CardNews は既に SummaryCard 化済みで **見た目は白**。**中身 1 行化はデータ層**。
+
+
+--------------------------------------------------------------------------------
+17. 案G — MetricsRow 現状維持・全体レビューのみ
+--------------------------------------------------------------------------------
+- **最安全だが進捗停止**。
+- CardTasks / CardNews 等と **主要指標帯だけ暗いまま**で、**商品感・統一感が弱い**。
+- **推奨しない**（意図的停止以外）。
+
+
+--------------------------------------------------------------------------------
+18. CardRank / CardMoney を同時に触る場合の注意
+--------------------------------------------------------------------------------
+- **同一コミット・同一パターン**で `CardDivision` / `CardNews` と **同色・同 variation**に揃える。
+- **`RankRecordLabel` / `MoneyLabel` の `unique_name_in_owner`・`autowrap_mode`・
+  `font_size`・プレースホルダ text は変更しない**。
+- **2 カード分の差分**のため、**Godot 保存後の UID / load_steps の意図外差分**に注意
+  （過去コミットと同様に `git diff` で CardRank/CardMoney 周辺のみか確認）。
+- **SecMetricsTitle は触らない**（最初のコミットでは）。触るなら **別コミット**で
+  Scroll 暗背景上のコントラスト調整として判断。
+
+
+--------------------------------------------------------------------------------
+19. 片方だけ触らない方がよい理由
+--------------------------------------------------------------------------------
+- MetricsRow は **1 行 3 等分の UI ユニット**として認識される。**1 枚だけ色が違うと
+  バグ・途中コミットに見える**。
+- **CardDivision は既に白**。片方だけ直すと **「白・白・暗」または「白・暗・白」**で
+  **意図が伝わりにくい**。
+- README / 情報設計 docs が **CardRank と CardMoney をセット方針**と明記済み。
+- **レビュー・目視確認も 2 枚セットの方が一度で完了**する（手戻りが少ない）。
+
+
+--------------------------------------------------------------------------------
+20. StyleBoxFlat_card を壊さないための注意
+--------------------------------------------------------------------------------
+- **現状 `StyleBoxFlat_card` を参照するノード**（grep）:
+  - CardNavMenu
+  - **CardRank**（除去対象）
+  - **CardMoney**（除去対象）
+  - CardTeamExtras
+  - CardSummary
+- **Rank / Money から panel override を外した後も**、上記 4 ノード以上が SubResource を
+  参照し続けるため **SubResource 定義を削除してはならない**。
+- **CardDivision は既に override なし** — 手本としてそのまま踏襲。
+
+
+--------------------------------------------------------------------------------
+21. rank_record / money 表示を維持する注意
+--------------------------------------------------------------------------------
+- **`.gd` の `_txt(d, "rank_record")` / `_txt(d, "money")` は触らない**。
+- **export の文字列形式は維持**（`4位 / 18勝12敗`、`7.2億円` 等）。
+- **sandbox 立ち位置文への差し替えは今回の範囲外**（DTO 変更が必要）。
+- **長文時**: `autowrap_mode = 2` 維持で **カード高さが伸びる**可能性 — 目視確認。
+
+
+--------------------------------------------------------------------------------
+22. from_python / mock 維持の注意
+--------------------------------------------------------------------------------
+- JSON キー名・型は不変。**Theme は表示層のみ**。
+- **DataSourceLabel**・HeaderNavRow・connection は **変更しない**。
+- 手動配置 `home_dashboard_from_python.json` も **gitignore のまま**（コミットしない）。
+
+
+--------------------------------------------------------------------------------
+23. 最初の安全な次コミット候補
+--------------------------------------------------------------------------------
+**推奨（案 A）**:
+- コミット名イメージ: `Godot本線ホームの順位・資金カードにThemeを限定適用`
+- 対象: **`godot/scenes/home_dashboard.tscn` の CardRank と CardMoney のみ**
+- 手順:
+  1. 各 Panel に `theme = ExtResource("2_theme")` + `Phase4SummaryCard`
+  2. 各 `theme_override_styles/panel = StyleBoxFlat_card` を削除
+  3. `HRank`/`HMoney` → (0.08, 0.11, 0.18, 1)
+  4. `RankRecordLabel`/`MoneyLabel` → (0.16, 0.2, 0.3, 1)
+- **CardDivision・SecMetricsTitle・他 Scroll カードは触らない**。
+
+
+--------------------------------------------------------------------------------
+24. まだ実装しない方がよいこと
+--------------------------------------------------------------------------------
+- **案 D**: MetricsRow 構造・文言・幅の全面再設計。
+- **案 F（このタイミング）**: `news_headline` / CardNews 1 行化の DTO・`.gd` 変更。
+- **案 E（先行）**: `club_summary` 重複解消のための export / CardSummary 整理
+  （Theme より先に設計が必要）。
+- **Header ClubBand へ資金・戦績行を追加**（sandbox 本格移植の一部）。
+- **SecMetricsTitle の色変更を Rank/Money と同コミットに混ぜる**（範囲がぶれる。
+  必要なら別コミット）。
+- **Theme `.tres` に Metrics 専用 variation を新設**（既存 Phase4SummaryCard で足りる）。
+
+
+--------------------------------------------------------------------------------
+25. pytest / 手動確認観点
+--------------------------------------------------------------------------------
+- **pytest**: `test_home_dashboard_readonly_export.py` 等は **JSON スキーマ・キー**が主。
+  **.tscn のみ変更なら失敗しない想定**（過去 CardNews/Tasks と同様）。
+- **手動（Godot 4.6.2）**:
+  - MetricsRow **3 枚とも白カード**で揃っているか
+  - mock / from_python で **division / rank_record / money** が従来どおり入るか
+  - **club_summary** に同じ数値が繰り返されても **表示が壊れないか**（重複は既知）
+  - HeaderNavRow 5 ボタン遷移
+  - 1280×720 で 3 等分が崩れないか
+  - UID エラー・実行後の意図しない `git diff` なし
+
+
+--------------------------------------------------------------------------------
+26. Cursor としてのおすすめ順
+--------------------------------------------------------------------------------
+1. **案 A 実装**（CardRank + CardMoney 同一コミット・Phase4SummaryCard）
+2. **README/docs に到達点記録**（docs 方針どおり別コミット）
+3. **CardSummary / club_summary 重複の調査または整理**（DTO 系・案 E）
+4. **CardNavMenu / CardTeamExtras の Theme 判断**（Scroll 残り暗カード）
+5. **CardNews 1 行化 / sandbox 立ち位置文の本線化**（案 F・大移植寄り）
+6. **MetricsRow 再設計（案 D）** — 商品化フェーズで十分に要件が固まってから
+
+
+--------------------------------------------------------------------------------
+27. 次に ChatGPT / ユーザーが判断すべきこと
+--------------------------------------------------------------------------------
+- 案 A の **コミットメッセージ・実施タイミング**（調査コミット後すぐでよいか）。
+- **SecMetricsTitle** を白カード群に合わせて濃色にするか（別コミット推奨）。
+- **club_summary 重複**を MetricsRow Theme の前後どちらで解消するか。
+- **Header へ sandbox 型の戦績・資金行を入れる**タイミング（Theme 後・別ライン）。
+
+
+--------------------------------------------------------------------------------
+28. 変更していないファイル・安全確認
+--------------------------------------------------------------------------------
+- 本調査では **reports/godot_phase4_home_dashboard_metricsrow_theme_survey_2026-05.txt の
+  新規作成のみ**。
+- **未変更**: godot/scenes/*, godot/scripts/*, godot/themes/*, godot/project.godot,
+  godot/README.md, docs/*, basketball_sim/*, 既存 reports/*, 生成 JSON, handoff md。
+
+
+================================================================================
+【必須結論 — Cursor 推奨】
+================================================================================
+
+| 論点 | 推奨 |
+|------|------|
+| MetricsRow を次に触るべきか | **はい**（CardTasks まで終わり、MetricsRow 不揃いが最も目立つ残件） |
+| CardRank / CardMoney は同一コミットか | **はい（必須に近い）** |
+| 片方だけ先に触る案（B/C） | **避ける** |
+| CardDivision の再調整 | **不要**（既に Phase4SummaryCard・濃色ラベル済み） |
+| rank_record / money の表示内容 | **維持でよい**（見た目のみ変更） |
+| MetricsRow より CardSummary/DTO へ先に進むか | **Theme 系列では MetricsRow 先**（DTO は別ライン） |
+| 次に実装するなら最も安全な 1 コミット | **案 A: CardRank + CardMoney を同時に Phase4SummaryCard 化** |
+| まだ実装しない方がよいこと | **案 D 全面再設計、案 F の DTO 1 行化、Header 資金行本格移植、Theme .tres 新 variation** |
+
+**MetricsRow 内 3 枚を揃えるには CardRank / CardMoney の 2 枚で足りる。CardDivision は再調整不要。**
+
+================================================================================
+（以上）
