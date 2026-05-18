@@ -1,0 +1,415 @@
+# Godot Phase 4 詳細画面UI現状調査・次整備対象選定（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `b1cc957`（Godot本線ホームCardNavMenuのTheme確認を記録）
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**（Cursor 環境。ユーザー確認は別途）
+
+### 1.1 home_dashboard の到達点（一区切り完了）
+
+| 領域 | 状態 |
+|------|------|
+| **レイアウト** | HeaderCard 全幅 / StatusLabel / MainRow（LeftRail 200px + Scroll）/ FooterNote |
+| **ナビ** | HeaderNavRow 5導線 / CardNavMenu 9詳細（8ボタン・4列）/ LeftRail 表示のみ |
+| **Theme** | HeaderCard `Phase4HeaderCard` / Scroll 以下 Summary・Warning 系（CardNavMenu 含む・`d9bd713`） |
+| **DTO** | `club_summary` 状況メモ化済み（`91cfaed`） |
+| **確認** | ユーザー環境 1280×720 目視・HeaderNavRow/CardNavMenu 遷移 OK（`b1cc957` 記録） |
+| **script / Theme.tres** | `home_dashboard.gd`・`phase4_readonly_core.tres` はホーム Theme 段階で不変 |
+
+### 1.2 今回の調査目的
+
+- **9詳細画面**（ホーム除く Phase 4 読み取り専用画面）の `.tscn` / `.gd` / `godot/data` / README・docs を読取し、
+  **home_dashboard で確定した Phase4 質感をどの画面へ最初に展開するか**を選定する。
+- **LeftRail クリック化・CardNavMenu 削除・複数画面同時改修は対象外**。
+
+### 1.3 10画面とナビ上の番号（参照）
+
+| # | 画面 | scene | HeaderNavRow | CardNavMenu 主入口 |
+|---|------|-------|--------------|-------------------|
+| 1 | ホーム | `home_dashboard.tscn` | — | — |
+| 2 | ロスター | `roster_view.tscn` | ○ | ○（チーム列） |
+| 3 | クラブ史 | `club_history_view.tscn` | ○ | ○（クラブ列） |
+| 4 | 順位表 | `standings_view.tscn` | ○ | ○（リーグ列） |
+| 5 | 日程 | `schedule_view.tscn` | ○ | ○（リーグ列） |
+| 6 | 施設サマリー | `facility_summary_view.tscn` | ○ | ○（クラブ列） |
+| 7 | 財務サマリー | `finance_summary_view.tscn` | × | ○（経営列・主入口） |
+| 8 | オーナーミッション | `owner_mission_view.tscn` | × | ○（経営列・主入口） |
+| 9 | 戦術サマリー | `tactics_summary_view.tscn` | × | ○（チーム列・主入口） |
+| 10 | 契約・人事 | `contract_personnel_summary_view.tscn` | × | ○（経営列・主入口） |
+
+※ `facility_view.tscn` / `tactics_view.tscn` 等の別名 scene は **存在しない**（`godot/scenes/*.tscn` 現物確認）。
+
+### 1.4 godot/scenes の全 .tscn（参考・9詳細以外）
+
+- `home_dashboard.tscn`（本線ホーム）
+- `home_production_wire_preview.tscn` / `home_production_wire_preview_right_summary.tscn`（sandbox・本線未接続）
+- `theme_preview.tscn`（Theme 検証用）
+
+
+================================================================================
+## 2. 9詳細画面の現物一覧
+================================================================================
+
+| 画面名 | scene | 存在 | script | mock JSON | export + pytest | HomeNavButton | 備考 |
+|--------|-------|------|--------|-----------|-----------------|---------------|------|
+| ロスター閲覧 | `roster_view.tscn` | ○ | `roster_view.gd` | `roster_mock.json` | `roster_readonly.py` / `test_roster_readonly_export.py` | ○ HeaderNavRow | ルート Theme 済み・表は暗色+`.gd` |
+| クラブ史閲覧 | `club_history_view.tscn` | ○ | `club_history_view.gd` | `club_history_mock.json` | 同型 | ○ HeaderNavRow | 暗色 StyleBox 主体 |
+| 順位表閲覧 | `standings_view.tscn` | ○ | `standings_view.gd` | `standings_mock.json` | 同型 | ○ HeaderNavRow | facility と同型レイアウト |
+| 日程閲覧 | `schedule_view.tscn` | ○ | `schedule_view.gd` | `schedule_mock.json` | 同型 | ○ HeaderNavRow | Summary+NextGame+Scroll |
+| 施設サマリー | `facility_summary_view.tscn` | ○ | `facility_summary_view.gd` | `facility_summary_mock.json` | 同型 | ○ HeaderNavRow | 第6画面・暗色未 Theme |
+| 財務サマリー | `finance_summary_view.tscn` | ○ | `finance_summary_view.gd` | `finance_summary_mock.json` | 同型 | ○ HeaderTopRow | Scroll 内静的カード5枚 |
+| オーナーミッション | `owner_mission_view.tscn` | ○ | `owner_mission_view.gd` | `owner_mission_mock.json` | 同型 | ○ HeaderTopRow | 経営・#8・動的行多め |
+| 戦術サマリー | `tactics_summary_view.tscn` | ○ | `tactics_summary_view.gd` | `tactics_summary_mock.json` | 同型 | ○ HeaderTopRow | チーム・#9 |
+| 契約・人事サマリー | `contract_personnel_summary_view.tscn` | ○ | `contract_personnel_summary_view.gd` | `contract_personnel_summary_mock.json` | 同型 | ○ HeaderTopRow | **部分 Theme 済み** |
+
+**共通データ経路**: 各 `.gd` が `*_from_python.json` 優先 → `*_mock.json` フォールバック（`FileAccess` + `JSON.parse_string`）。
+**DataSourceLabel**: 9画面すべて `%DataSourceLabel`（unique_name）あり。
+**戻り**: 9画面すべて `HomeNavButton` → `_on_home_nav_button_pressed` → `change_scene_to_file("res://scenes/home_dashboard.tscn")`。
+
+
+================================================================================
+## 3. 画面別UI現状
+================================================================================
+
+### 3.1 ロスター閲覧（`roster_view`）
+
+- **scene構造**: `Control` + 暗 `Background` → `Margin/RootCol` → `HeaderCard` → `StatusLabel` → `Scroll/RowList`（動的行のみ）。
+- **Theme**: ルート `phase4_readonly_core.tres`。**`HeaderCard` = `Phase4HeaderCard`**。ヘッダー Label は白帯向け濃色 override 済み。
+- **Scroll**: **静的 Panel なし**。`roster_view.gd` が `Label.new()` で表行生成。**`Phase4OnDarkTableHead` / `Phase4OnDarkTableCell`** を `.gd` で付与（暗背景のまま）。
+- **データ**: export/pytest 実績あり。DTO 安定。
+- **戻り導線**: HeaderNavRow `HomeNavButton` ○。
+- **見た目課題**: ヘッダーのみ Phase4 寄り。**表本体はホーム白カード群と質感が不一致**。
+- **`.tscn` のみ**: ヘッダー以上の改善は **不可**（表は `.gd` 必須）。
+- **リスク**: 中〜高（ゲーム中心画面・行数・列幅）。
+- **1画面目適性**: 価値は最大だが **初手としては重い**。
+
+---
+
+### 3.2 クラブ史閲覧（`club_history_view`）
+
+- **scene構造**: facility/standings 同型 — `HeaderCard` + `SummaryCard`（RootCol 直下）+ `Scroll/ScrollContent`（動的 Label）。
+- **Theme**: **未適用**（`StyleBoxFlat_header` / `StyleBoxFlat_summary` 暗色 SubResource のみ）。
+- **データ**: export/pytest あり。
+- **戻り導線**: HeaderNavRow ○。
+- **見た目課題**: 全面暗色。Scroll 内は `.gd` の `Label.new()`（明色文字・暗地前提）。
+- **`.tscn` のみ**: **Header + SummaryCard** まで可能（第1コミット）。Scroll 本文は第2段で `.gd` または OnDark variation。
+- **リスク**: 低〜中。
+- **1画面目適性**: 中（施設・順位表と同型で横展開しやすい）。
+
+---
+
+### 3.3 順位表閲覧（`standings_view`）
+
+- **scene構造**: club_history / facility と同型。`SummaryCard` + `Scroll`（順位表・注記を動的生成）。
+- **Theme**: 未適用（暗色 StyleBox）。
+- **データ**: export/pytest あり。`standings_view.gd` は表形式に近い動的 Label 多め。
+- **戻り導線**: HeaderNavRow ○。
+- **見た目課題**: 暗色統一。リーグ状況の可読性はデータ量次第で Scroll が長くなりうる。
+- **`.tscn` のみ**: Header + SummaryCard まで同型。
+- **リスク**: 低〜中。
+- **1画面目適性**: 中。
+
+---
+
+### 3.4 日程閲覧（`schedule_view`）
+
+- **scene構造**: `HeaderCard` + `Scroll/ScrollMain` 内 **`SummaryCard` + `NextGameCard`**（`StyleBoxFlat_nextgame` 強調）+ 動的試合リスト。
+- **Theme**: 未適用。NextGame 用に別 StyleBox あり。
+- **データ**: export/pytest あり。`schedule_view.gd` は `_apply_next_game_card` 等で動的 Label。
+- **戻り導線**: HeaderNavRow ○。
+- **見た目課題**: カード2種+リストで **ホーム `CardNext` との対応関係が設計上あり**（Theme 化時に NextGame 強調の扱い要判断）。
+- **`.tscn` のみ**: Header + Summary + NextGame の3 Panel まで可能。リスト部分は `.gd`。
+- **リスク**: 中（NextGame カードの役割分担）。
+- **1画面目適性**: 中（やや特殊）。
+
+---
+
+### 3.5 施設サマリー（`facility_summary_view`）★推奨
+
+- **scene構造**: `HeaderCard` + **`SummaryCard`（RootCol 直下）** + `Scroll/ScrollContent`（施設一覧・sections を `.gd` で Label 生成）。
+- **Theme**: **未適用**（暗色 StyleBox のみ）。README「第6画面の第1弾」。
+- **データ**: `facility_summary_mock.json`（facilities 配列・summary・sections）。export/pytest あり。
+- **戻り導線**: **HeaderNavRow から到達可**（ホーム上部5導線の1つ）→ **目視・遷移確認が容易**。
+- **見た目課題**: ホーム完成後の詳細画面では **最も典型的な「暗色ヘッダ+暗色サマリー+暗Scroll」**。改善効果が一目で分かる。
+- **`.tscn` のみ**: **ルート Theme 割当 + HeaderCard `Phase4HeaderCard` + SummaryCard `Phase4SummaryCard` + ラベル濃色化**までが home と同規律で可能（**1コミット完結**）。
+- **Scroll 本文**: 当面は暗背景+明文字のまま（第2段）。ホーム CardNavMenu 整備時と同様「静的カード先行」。
+- **リスク**: **低**（導線・DTO・handler 不変、静的ノードのみ）。
+- **1画面目適性**: **高**。
+
+---
+
+### 3.6 財務サマリー（`finance_summary_view`）
+
+- **scene構造**: `HeaderCard` + `Scroll/ScrollContent` 内 **静的 Panel 5枚**（Finance / Prior / Salary / History / Caution）+ Footer Label。
+- **Theme**: 未適用（すべて `StyleBoxFlat_summary` 暗色）。
+- **データ**: export/pytest 実績厚い。CardNavMenu **#7 主入口**（HeaderNavRow 非搭載）。
+- **戻り導線**: HomeNavButton ○（HeaderTopRow）。
+- **見た目課題**: Scroll 内がすべて暗色カード。**静的ノードが多く一括白化のインパクト大**。
+- **`.tscn` のみ**: **可能**（5枚+Header を段階または一括）。1コミットだと **差分・目視範囲が施設より大きい**。
+- **リスク**: 低〜中（カード数・History 動的子 VBox）。
+- **1画面目適性**: **高（有力第2候補）** — ユーザー価値は施設より大きいが **初手の差分規模はやや大**。
+
+---
+
+### 3.7 オーナーミッション（`owner_mission_view`）
+
+- **scene構造**: finance/tactics 系 — HeaderTopRow + Scroll 内複数カード + 動的 `Label.new()` 多め。
+- **Theme**: 未適用。
+- **データ**: export/pytest あり。#8・CardNavMenu 主入口。
+- **戻り導線**: HomeNavButton ○。
+- **見た目課題**: ミッション・評価・報酬など **情報ブロックが多く**、仮表示感が残りうる（docs 上も操作 UI 未接続）。
+- **`.tscn` のみ**: 一部可能だが **動的行の比率が高い**。
+- **リスク**: 中。
+- **1画面目適性**: 中〜低（初手には重い）。
+
+---
+
+### 3.8 戦術サマリー（`tactics_summary_view`）
+
+- **scene構造**: finance/owner 同系。Scroll + 動的 Label。
+- **Theme**: 未適用。#9・CardNavMenu 主入口。
+- **データ**: export/pytest あり。
+- **見た目課題**: 戦術・ローテーションは **将来操作 UI 接続予定**があり、見た目だけ先に固めると再設計の可能性。
+- **`.tscn` のみ**: 部分的。
+- **リスク**: 中。
+- **1画面目適性**: 低〜中。
+
+---
+
+### 3.9 契約・人事サマリー（`contract_personnel_summary_view`）
+
+- **scene構造**: ルート Theme あり。Scroll 内 **ContractCard/BalanceCard/CautionCard = Phase4Summary/Warning**、**RiskCard/PlayersCard = 暗色 StyleBox 残存**。
+- **Theme**: **部分適用済み**（README §共通 Theme）。**人事リスク・主要契約選手**は `.gd` の `Label.new()` が暗色パネル前提。
+- **データ**: export/pytest あり。#10。
+- **戻り導線**: HomeNavButton ○。
+- **見た目課題**: **半端な白カード混在**（統一感が最も悪い画面の一つ）。残作業は `.gd` 必須部分が明確。
+- **`.tscn` のみ**: Risk/Players の Panel を Summary 化する第1段は可能だが、**「途中までやった画面」の続き**になり、初手のテンプレにはなりにくい。
+- **リスク**: 中（部分完了の整合）。
+- **1画面目適性**: 低（第2〜3手で「未完分を閉じる」方が自然）。
+
+
+================================================================================
+## 4. 比較表
+================================================================================
+
+| 画面 | ユーザー価値 | 実装安全性 | .tscnのみ | データ連携リスク | 見た目改善効果 | 1画面目適性 | 推奨度 |
+|------|-------------|-----------|-----------|-----------------|---------------|------------|--------|
+| ロスター | 最高 | 中 | 低（表は.gd） | 低 | 中（部分のみ） | 低 | △ |
+| クラブ史 | 中 | 高 | 中（静的部分） | 低 | 中 | 中 | ○ |
+| 順位表 | 高 | 高 | 中 | 低 | 中 | 中 | ○ |
+| 日程 | 高 | 中 | 中 | 低 | 中〜高 | 中 | ○ |
+| **施設サマリー** | **中高** | **最高** | **高** | **低** | **高（Header+Summary）** | **最高** | **◎** |
+| 財務サマリー | 高 | 高 | 高（カード5） | 低 | 最高（全面静的部分多） | 高 | ◎（第2候補） |
+| オーナーミッション | 高 | 中 | 低〜中 | 低 | 中 | 低〜中 | △ |
+| 戦術サマリー | 中高 | 中 | 低〜中 | 低 | 中 | 低〜中 | △ |
+| 契約・人事 | 高 | 中 | 中（未完の続き） | 低 | 中（統一完了時） | 低 | △（後続） |
+
+**結論（比較）**:
+- **初手◎**: `facility_summary_view` — home と同じ「Header + 1 Summary カード」規律・HeaderNavRow 到達・未着手でテンプレ化しやすい。
+- **初手の次◎**: `finance_summary_view` — 静的 Scroll カードが多く効果大だが **1コミット差分は施設より大**。
+- **避ける初手**: ロスター（表`.gd`）、契約人事（部分完了の続き）、複数画面同時。
+
+
+================================================================================
+## 5. 次に整備する推奨1画面
+================================================================================
+
+### 推奨画面名
+
+**施設サマリー閲覧**（Phase 4 第6画面）
+
+### scene / script
+
+- **scene**: `godot/scenes/facility_summary_view.tscn`
+- **script**: `godot/scripts/facility_summary_view.gd`（**今回の第1段では変更しない**）
+
+### なぜ今この画面か
+
+1. **home_dashboard の整備規律と一致** — 「ルートまたは対象 Panel に Theme を限定」「静的カードから1枚ずつ」が README/docs で確立済み。施設は **HeaderCard + SummaryCard の2枚**で第1段を閉じられる。
+2. **Phase4 Theme 未着手のまま** — 部分適用済みの契約人事・ロスターと違い、**やり直し・統一の説明コストが低い**。
+3. **`.tscn` のみで完結可能** — `unique_name_in_owner`・connection・`_on_home_nav_button_pressed`・JSON キーは不変。Scroll 内動的 Label は第2段に回せる。
+4. **データ連携が安定** — `facility_summary_readonly.py` + `test_facility_summary_readonly_export.py` + mock あり。DTO/export を触る必要なし。
+5. **検証しやすい** — **HeaderNavRow から到達**（ホーム上部「施設サマリー」）。1280×720 で Header+Summary の白化だけでも Before/After が明確。
+6. **横展開の起点** — `club_history_view` / `standings_view` と **同一レイアウト族**。成功パターンを3画面へコピーしやすい。
+7. **docs と矛盾しない** — README ロードマップ「□ 次詳細画面の Theme 方針展開（選定調査 → 1画面ずつ）」の直後タスク。`reports/godot_phase4_home_next_task_options_2026-05.txt` でも **B（CardNavMenu）完了後は E（他画面・1画面1コミット）** が自然と整理済み（B は `d9bd713`/`b1cc957` で完了）。
+
+### なぜ他画面を後回しにするか
+
+| 画面 | 後回し理由 |
+|------|------------|
+| ロスター | 表が `.gd` 動的生成。**初手に `.gd` / OnDark 整理が必要** |
+| 契約・人事 | **部分 Theme 済み**。Risk/Players は `.gd` 必須。初手テンプレに不向き |
+| 財務 | **第2候補**。Scroll 静的カード5枚で効果大だが **1コミット規模が大きい** |
+| 日程 | NextGame 強調カードがあり home `CardNext` との役割整理が要る |
+| オーナー/戦術 | CardNavMenu 専用入口・動的行多・将来操作 UI 余地 |
+| クラブ史/順位表 | 施設と同型。**施設で型を確定してから**横展開が効率的 |
+
+### 変更対象ファイルの想定（実装時）
+
+- **変更可**: `godot/scenes/facility_summary_view.tscn` **のみ**（第1段）
+- **変更不可**: `facility_summary_view.gd`、`phase4_readonly_core.tres`、`project.godot`、
+  `godot/data/*.json`、`basketball_sim/export/*`、`basketball_sim/tests/*`、
+  README/docs、sandbox、他 scene
+
+### 実装する場合の安全条件
+
+1. ルートに `phase4_readonly_core.tres` を割当（roster/contract と同様）。
+2. **`HeaderCard` のみ** `theme_type_variation = Phase4HeaderCard`。**`StyleBoxFlat_header` panel override 除去**（SubResource 定義は残置可）。
+3. **`SummaryCard` のみ** `Phase4SummaryCard`。**`StyleBoxFlat_summary` panel override 除去**。
+4. **ヘッダー・Summary 内静的 Label** を白カード向け濃色（home `CardSummary` / roster ヘッダーと同系）。
+5. **`HomeNavButton`・connection・handler 名・`%` unique 名・Scroll 構造**は不変。
+6. **Scroll 内動的 Label（`.gd`）は第1段では触らない**（暗地+明文字のまま許容）。
+
+### Godot 目視確認ポイント
+
+- 1280×720 で Header+Summary が白系カード化し、**大きな崩れなし**
+- ホーム **HeaderNavRow「施設サマリー」** → 当画面 → **HomeNavButton でホーム復帰**
+- `facility_summary_mock.json` 表示（施設4件・summary 数値）が従来どおり読める
+- Scroll 内リストは暗背景のままでも **可読性が極端に悪化していない**こと
+- 実行後 `git diff` で **当該 .tscn のみ**
+
+### pytest
+
+- **第1段（.tscn のみ）**: **必須ではない**（export/DTO 不変）
+- **念のため**: `py -m pytest basketball_sim/tests/test_facility_summary_readonly_export.py -q`（10 passed 想定）
+
+
+================================================================================
+## 6. 推奨画面の最小実装案（Cursor 依頼骨子）
+================================================================================
+
+### 目的
+
+`facility_summary_view` の **HeaderCard + SummaryCard** を、home_dashboard と同規律で
+`Phase4HeaderCard` / `Phase4SummaryCard` に限定適用し、**詳細画面 Phase4 展開の第1弾**とする。
+
+### 変更してよいファイル
+
+- `godot/scenes/facility_summary_view.tscn` **のみ**
+
+### 変更してはいけないファイル
+
+- `godot/scripts/facility_summary_view.gd`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/data/facility_summary_mock.json` および export/tests
+- README / docs（**実装コミットでは触らない**。記録は別コミット）
+- 他 scene / sandbox / 既存 reports
+
+### 実装方針
+
+- home の `CardTeamExtras` / `CardSummary` / roster ヘッダーと同型の **「Theme 割当 + panel override 除去 + ラベル濃色」**。
+- **ナビ・JSON キー・表示ロジックは変更しない**。
+- Scroll 内 `Label.new()` は **第2タスク**（`.gd` で `Phase4OnDark*` または白カード用 Panel ラップ等を検討）。
+
+### Theme 適用方針
+
+- `Phase4HeaderCard` / `Phase4SummaryCard` のみ（Warning は第1段不要）。
+- **Theme .tres は編集しない**。
+
+### ノード名・unique_name 維持
+
+- `%ScreenTitleLabel` / `%TeamNameLabel` / `%SummaryBlockLabel` / `%DataSourceLabel` 等 **すべて維持**。
+- `HomeNavButton` の connection パス不変。
+
+### 確認コマンド
+
+```text
+git diff -- godot/scenes/facility_summary_view.tscn
+git diff -- godot/scripts/facility_summary_view.gd
+git status --short
+```
+
+（任意）`py -m pytest basketball_sim/tests/test_facility_summary_readonly_export.py -q`
+
+### 目視確認ポイント
+
+- ホーム HeaderNavRow → 施設サマリー → 白ヘッダ+白サマリー
+- ホームへ戻る
+- mock データ表示維持
+
+### テスト方針
+
+- 基本は **pytest 未実施可**（.tscn のみ）
+- export を触った場合のみ `test_facility_summary_readonly_export.py`
+
+### コミット名案
+
+`Godot施設サマリーにPhase4Themeを限定適用`
+
+
+================================================================================
+## 7. 後回しにする画面と理由
+================================================================================
+
+| 画面 | 理由 |
+|------|------|
+| ロスター | 表が動的 `.gd`。OnDark 最小対応済みだが **白カード化は .gd 必須** |
+| クラブ史 | 施設と同型。**施設の第1段パターン確定後**に横展開 |
+| 順位表 | 同上 |
+| 日程 | NextGame カードの役割が home `CardNext` と絡む。**施設・財務の後** |
+| 財務 | **第2推奨**。静的カード5枚で効果大。**施設より差分大**のため初手を譲る |
+| オーナーミッション | #8・動的行多・経営ブロック複雑 |
+| 戦術サマリー | #9・将来操作 UI 余地 |
+| 契約・人事 | **部分 Theme 済み**。Risk/Players の `.gd` 整理は **専用タスク**で閉じる |
+
+
+================================================================================
+## 8. 変更していないファイル
+================================================================================
+
+本調査では以下に **一切手を入れていない**。
+
+- `godot/scenes/*.tscn`（全 scene）
+- `godot/scripts/*.gd`（全 script）
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 `reports/*.txt`（本ファイルを除く新規作成のみ）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- sandbox scene（`home_production_wire_preview*.tscn`）
+- `docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md`
+
+
+================================================================================
+## 9. home_dashboard との比較（横展開メモ）
+================================================================================
+
+| home_dashboard 確定要素 | 詳細画面への展開 |
+|-------------------------|------------------|
+| `Phase4HeaderCard`（HeaderCard のみ） | 各画面 `HeaderCard` に同型適用（ルート Theme 割当が前提） |
+| `Phase4SummaryCard` / `Phase4WarningCard` | 静的 `PanelContainer` カードへ順次適用 |
+| `DataSourceLabel` + from_python/mock | 9画面とも既存。変更不要 |
+| HomeNav / ホームへ戻る | 9画面とも実装済み。変更不要 |
+| 左レール | **ホームのみ**。詳細画面には未導入（今回対象外） |
+| 1画面1コミット・`.tscn` 限定 | 施設第1段は Header+Summary のみで遵守可能 |
+
+**共通化実装（共通親 scene 等）には今回踏み込まない** — 施設で手順を固定し、同型3画面へコピーが現実的。
+
+
+================================================================================
+## 10. 調査コマンド実施メモ
+================================================================================
+
+- `git log --oneline -28` — `b1cc957` 先頭付近を確認
+- `godot/scenes/*.tscn` 一覧 — 9詳細 + home + sandbox + theme_preview
+- 各 `*_view.tscn` の Theme/StyleBox/HomeNav パターン grep
+- 各 `*_view.gd` の JSON パス・`Label.new`・`change_scene_to_file` grep
+- `godot/data/*_mock.json` 一覧（9詳細すべて mock 存在）
+- `basketball_sim/export/*_readonly.py` および `test_*_readonly_export.py` 一覧
+- README §共通 Theme / ロードマップ / 各画面説明
+- docs §15.1 ホーム到達点・10画面位置づけ
+
+**pytest**: 本調査では **未実施**（調査レポート追加のみ）。
