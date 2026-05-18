@@ -1,0 +1,309 @@
+# Godot Phase 4 詳細画面4画面Theme後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `1e474a6`（Godot日程Theme第1段の確認を記録）
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**（ユーザー確認は README/docs に記録済み）
+
+### 1.1 home_dashboard（一区切り完了）
+
+| 領域 | 状態 |
+|------|------|
+| **レイアウト** | HeaderCard 全幅 / StatusLabel / MainRow（LeftRail 200px + Scroll）/ FooterNote |
+| **ナビ** | HeaderNavRow 5導線 / CardNavMenu 9詳細（8ボタン・4列）/ LeftRail 表示のみ |
+| **Theme** | HeaderCard + Scroll 以下 Summary/Warning（CardNavMenu 含む） |
+| **確認** | ユーザー環境 1280×720 目視・遷移 OK |
+
+### 1.2 詳細画面 Theme 横展開・第1段（4画面完了）
+
+| # | 画面 | 実装 | 記録 | 第1段の形 |
+|---|------|------|------|-----------|
+| 1 | 施設サマリー | `5987821` | `c8ec528` | RootCol: **Header + Summary** |
+| 2 | クラブ史 | `682a941` | `f7b43c7` | 同上 |
+| 3 | 順位表 | `927e918` | `a22ec1d` | 同上 |
+| 4 | 日程 | `440c3f6` | `1e474a6` | RootCol: **Header** + **Scroll内 SummaryCard**（`NextGameCard` / 試合リストは第2段） |
+
+**共通**: `.tscn` のみ・`.gd` / Theme `.tres` / export / mock 不変・ユーザー環境で遷移・戻り・差分なし OK。
+
+### 1.3 今回の調査目的
+
+4画面第1段完了後、**案A（完了4画面の第2段）** と **案B〜F（残り5画面の第1段）** を比較し、**次に実装する1タスク**を決定する。
+
+
+================================================================================
+## 2. 完了済み4画面の第2段評価
+================================================================================
+
+### 2.1 facility_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | `%ScrollContent` 内の施設一覧・sections（`facility_summary_view.gd` の `_add_scroll_*` → **`Label.new()` + 明色ハードコード**） |
+| **.gd 必要か** | **はい** — 白カード化は OnDark 最小対応か Panel ラップで **`.gd` 必須**。**`.tscn` のみでは閉じない** |
+| **メリット** | 施設画面の上下統一 |
+| **リスク** | 中 — 生成ラベル全経路の目視 |
+| **今すぐ** | **否** |
+
+### 2.2 club_history_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | 段落・**シーズン表**（`HBoxContainer` 行 + `Label.new()`） |
+| **.gd 必要か** | **はい** |
+| **リスク** | 中〜やや高（表行レイアウト） |
+| **今すぐ** | **否** |
+
+### 2.3 standings_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **8列表ヘッダ + 順位行**（動的 `HBoxContainer`） |
+| **.gd 必要か** | **はい** |
+| **リスク** | 中〜高 |
+| **今すぐ** | **否** |
+
+### 2.4 schedule_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **`NextGameCard`**（`StyleBoxFlat_nextgame`・静的 Label は `.gd` が text 更新）・**`ScrollContent`** 試合リスト（`PanelContainer` + `Label.new()`） |
+| **.gd 必要か** | **NextGame のみ `.tscn` 化も可能だが**、試合リストは **`.gd` 必須** |
+| **リスク** | 中（ホーム `CardNext` との役割整理も別論点） |
+| **今すぐ** | **否** |
+
+### 2.5 第2段の横断結論
+
+| 観点 | 結論 |
+|------|------|
+| **共通化** | 画面ごとに生成パターンが異なり **個別 `.gd` 対応** |
+| **優先度** | Phase4 横展開の足場としては **残り詳細の第1段を先** が一貫（`a5eec31` / `64abb9c` と同趣旨） |
+| **案A 総合** | 推奨度 **△（今すぐ最優先ではない）** |
+
+
+================================================================================
+## 3. 残り詳細画面の現状
+================================================================================
+
+※ **RootCol 直下 SummaryCard 型**は施設・クラブ史・順位表で完了。**日程型**（Scroll 内 Summary + 他カード）は日程で検証済み。**財務・OM・戦術**は **Scroll 内複数静的 Panel 型**（`23a8fcf` 調査どおり）。
+
+### 3.1 roster_view
+
+| 項目 | 内容 |
+|------|------|
+| **scene** | `HeaderCard`（**Phase4HeaderCard 済み**）+ `Scroll/RowList`（**動的行のみ**）。**SummaryCard なし** |
+| **Theme** | ルート Theme あり。**表は `.gd` で OnDark 系** |
+| **HomeNav** | HeaderNavRow `HomeNavButton` / `%DataSourceLabel` ○ |
+| **データ** | `roster_mock.json` / `test_roster_readonly_export.py`（10 tests） |
+| **.tscn のみ第1段** | **ヘッダー以上は不可**（表は `.gd`） |
+| **ユーザー価値** | **最高** |
+| **1コミット** | 低（初手不向き） |
+| **次候補** | △ |
+
+### 3.2 finance_summary_view ★有力
+
+| 項目 | 内容 |
+|------|------|
+| **scene** | `HeaderCard` + `Scroll/ScrollContent` 内 **静的 Panel 5枚**（Finance / Prior / Salary / History / Caution）+ `NotesFooterLabel`。**RootCol SummaryCard なし** |
+| **Theme** | **未適用**（全 `StyleBoxFlat_summary` 暗色） |
+| **HomeNav** | HeaderTopRow `HomeNavButton` / `%DataSourceLabel` ○（**HeaderNavRow 非搭載**・**CardNavMenu #7 主入口**） |
+| **script** | 本文は `%CardFinanceBody` 等 **静的 Label** へ text。**`%HistoryBody` のみ `Label.new()`** で履歴行追加 |
+| **データ** | `finance_summary_mock.json` / `test_finance_summary_readonly_export.py`（**10 tests**） |
+| **.tscn のみ第1段** | **高** — ルート Theme + Header + **5枚静的カード** + 各カード内タイトル/本文 Label 濃色化。**HistoryBody 内動的行は第2段で許容可** |
+| **ユーザー価値** | **高**（経営・#7） |
+| **1コミット** | **中** — 差分・目視箇所は日程より多いが **`.gd` 不変で閉じられる** |
+| **次候補** | **◎** |
+
+### 3.3 owner_mission_view
+
+| 項目 | 内容 |
+|------|------|
+| **scene** | finance 同系 — Header + Scroll 内 **Trust / Missions / Eval / Caution** 4枚 |
+| **Theme** | 未適用 |
+| **HomeNav** | HeaderTopRow（**CardNavMenu #8**） |
+| **script** | **`%MissionsBody` に `Label.new()`**（ミッション行） |
+| **データ** | `owner_mission_mock.json` / **12 tests** |
+| **.tscn のみ第1段** | Header + 静的部分カード可能。**Missions 動的行は第2段** |
+| **1コミット** | 中 |
+| **次候補** | **○**（財務の次・経営系テンプレ確立後） |
+
+### 3.4 tactics_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **scene** | finance/owner 同系 — Header + Scroll 内 **6枚**（Overview / Attack / Defense / Rotation / PlayerRoles / Notes） |
+| **Theme** | 未適用 |
+| **HomeNav** | HeaderTopRow（**CardNavMenu #9・チーム列**） |
+| **script** | **`%PlayerRolesBody` に `Label.new()`** |
+| **データ** | `tactics_summary_mock.json` / **14 tests** |
+| **.tscn のみ第1段** | Header + 静的部分カード可能（**6枚で差分最大級**） |
+| **1コミット** | 中〜やや低（カード数・将来操作 UI 余地） |
+| **次候補** | △ |
+
+### 3.5 contract_personnel_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **scene** | ルート Theme あり。**Contract / Balance / Caution = Phase4 済み**。**Risk / Players = 暗色 StyleBox 残** |
+| **Theme** | **部分適用済み** |
+| **HomeNav** | HeaderTopRow（**CardNavMenu #10**） |
+| **script** | **RiskRows / PlayerRows に `Label.new()`** |
+| **データ** | `contract_personnel_summary_mock.json` / pytest あり |
+| **.tscn のみ** | Risk/Players Panel の Summary 化は可能だが **「未完の続き」** |
+| **1コミット** | 低〜中（初手テンプレに不向き） |
+| **次候補** | △（後続で統一完了向き） |
+
+
+================================================================================
+## 4. 選択肢比較表
+================================================================================
+
+| 案 | 対象 | 変更範囲 | .tscnのみ可能性 | .gd変更リスク | ユーザー価値 | 見た目改善効果 | 1コミット安全性 | 推奨度 |
+|----|------|----------|----------------|--------------|-------------|---------------|----------------|--------|
+| **A** | 完了4画面の第2段 | `.gd` 主 | **低** | **高** | 中 | 中（各画面内） | 低〜中 | **△** |
+| **B** | **財務サマリー第1段** | Header + Scroll静的5カード | **高** | **低**（History行は第2段可） | **高** | **最高** | **中** | **◎** |
+| **C** | オーナーミッション第1段 | Header + 静的部分カード | 高 | 中（Missions動的） | 高 | 高 | 中 | **○** |
+| **D** | 戦術サマリー第1段 | Header + 静的6カード | 高 | 中 | 中高 | 高 | 中〜低 | **△** |
+| **E** | 契約・人事の続き | 暗色Panel残 + .gd | 中 | **高** | 高 | 中 | 低〜中 | **△** |
+| **F** | ロスター続き | 表・動的行 | 低 | **高** | 最高 | 中 | 低 | **△** |
+
+**比較結論**:
+- **案A**: 横展開停止リスク — **後回し**
+- **案B**: **CardNavMenu 経営列の本命**・静的カード一括白化でインパクト大・**日程で実証済みの「Scroll内複数Panel」型の次号** — **第1推奨**
+- **案C**: 財務成功パターンの **経営系第2号**として自然 — **財務の直後**
+
+
+================================================================================
+## 5. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**財務サマリー閲覧 — Phase4 Theme 第1段（HeaderCard + Scroll 内静的カード5枚）**
+
+### 対象
+
+| 種別 | パス |
+|------|------|
+| **scene** | `godot/scenes/finance_summary_view.tscn` |
+| **script** | `godot/scripts/finance_summary_view.gd`（**変更しない**） |
+
+### なぜ今それを選ぶのか
+
+1. **横展開継続の自然な次手** — 4画面第1段完了後、残り **5画面**のうち **未Theme が最も目立つ経営系本命**（`23a8fcf` 第2候補、`a5eec31` で日程の次は財務と整理済み）。
+2. **`.tscn` のみで第1段を閉じやすい** — ルート Theme + `HeaderCard` → `Phase4HeaderCard` + **FinanceCard / PriorCard / SalaryCard / HistoryCard / CautionCard** → `Phase4SummaryCard`（**日程の Scroll内カード型と同系**）。**`%Card*Body` / タイトル Label** は `.gd` 参照済みのまま text 更新のみ。
+3. **第2段の切り分けが明確** — **`%HistoryBody` 内の `Label.new()` 履歴行**のみ暗地のまま第2段。**他4カード + Header は静的**で今回完了可能。
+4. **ユーザー価値・データ安定** — **CardNavMenu #7** 主入口。**`finance_summary_readonly` + 10 pytest**。
+5. **見た目インパクト** — HeaderNavRow 系4画面は完了済み。**経営列の代表画面**が暗色のまま残るため、**ホームから入ったときの改善が大きい**。
+6. **テンプレ拡張** — 成功後、**オーナーミッション**（4枚・Missions 動的は第2段）へ **同型コピー**しやすい。
+
+### なぜ他案を後回しにするか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **A 第2段** | 4画面とも `.gd` 必須。横展開テンプレを **5画面目（財務）** で広げてから |
+| **C OM** | 財務で **Scroll内複数静的Panel** の手順を確定してから |
+| **D 戦術** | 静的カード **6枚**で1コミットが重い。将来 UI 変更余地 |
+| **E 契約人事** | 部分 Theme 済み。**Risk/Players は `.gd` 必須**の続き |
+| **F ロスター** | ヘッダー済み。**表は別フェーズ** |
+
+### 変更対象ファイルの想定（実装時）
+
+- **変更可**: `godot/scenes/finance_summary_view.tscn` **のみ**
+- **変更不可**: `finance_summary_view.gd`、`phase4_readonly_core.tres`、`project.godot`、他 scene、export / tests / mock、README / docs、reports
+
+### 実装する場合の安全条件
+
+1. ルート `FinanceSummaryView` に `phase4_readonly_core.tres`。
+2. `HeaderCard` → `Phase4HeaderCard`（panel override 除去・SubResource 残置）。
+3. **Scroll/ScrollContent 内**の **FinanceCard / PriorCard / SalaryCard / HistoryCard / CautionCard** のみ → `Phase4SummaryCard`（**各 VBox 内 Title + Body Label 濃色化**）。
+4. **`NotesFooterLabel`** を白カード向け muted 濃色（必要なら）。
+5. **触らない**: `HistoryBody` 子ノード構造（`.gd` が `Label.new()` する先）、connection、handler、JSON キー。
+6. Godot 保存後 **tracked 差分は当該 `.tscn` のみ**。
+
+### Godot 目視確認ポイント
+
+- ホーム → **CardNavMenu・経営列・財務サマリー**（HeaderNavRow にはない）
+- Header 白系 / **5枚カード白系** / ラベル可読性 / DataSourceLabel
+- **HistoryCard 内に履歴行が表示されること**（暗行でも可・第2段）
+- HomeNavButton でホーム復帰 / エラーなし / git 差分なし
+
+### pytest
+
+- **必要**（実装コミット時）: home_dashboard 10 / roster 10 / phase0 1 / **`test_finance_summary_readonly_export` 10**
+
+
+================================================================================
+## 6. 推奨タスクの最小実装案（Cursor 指示骨子）
+================================================================================
+
+**目的**: 詳細画面 Theme 横展開 **第5号** — 財務の **Header + Scroll 内静的カード5枚** 第1段。
+
+**変更してよいファイル**: `godot/scenes/finance_summary_view.tscn`
+
+**変更してはいけないファイル**: `finance_summary_view.gd` / Theme `.tres` / `project.godot` / 他 scene / export / tests / mock / README / docs / reports
+
+**実装方針**:
+- `5987821` / `440c3f6`（日程）と同手順。
+- **第1段**: ルート Theme + Header + **Finance / Prior / Salary / History / Caution** の 5 Panel。
+- **第2段（今回触らない）**: `%HistoryBody` 内動的履歴行。
+
+**Theme**: `Phase4HeaderCard` / `Phase4SummaryCard`。SubResource `StyleBoxFlat_*` は残置。
+
+**ノード維持**: `%DataSourceLabel` / `%CardFinanceBody` / `%CardPriorBody` / `%CardSalaryBody` / `%CardCautionBody` / `%HistoryBody` / `HomeNavButton` connection。
+
+**確認**: `git diff -- godot/scenes/finance_summary_view.tscn` のみ。
+
+**テスト**: finance export 10 + 既存3系。
+
+**コミット名案**:
+- `Godot財務サマリーにPhase4Themeを限定適用`
+- 記録: `Godot財務サマリーTheme第1段の確認を記録`
+
+
+================================================================================
+## 7. 後回しにする案と理由
+================================================================================
+
+| 案 | 理由 |
+|----|------|
+| **A 完了4画面第2段** | `.gd` 必須・横展開が止まる。財務第1段後に個別判断 |
+| **C オーナーミッション** | 財務と同型だが Missions 動的。**財務テンプレ確定後** |
+| **D 戦術** | 静的6枚で差分最大。財務・OM 後 |
+| **E 契約人事** | 部分完了の続き。**テンプレ初手に不向き** |
+| **F ロスター** | 表 `.gd` 必須。**別ライン** |
+
+
+================================================================================
+## 8. 変更していないファイル
+================================================================================
+
+- `godot/scenes/*.tscn`（本レポート新規除く）
+- `godot/scripts/*.gd`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- `reports/godot_phase4_detail_screens_ui_survey_2026-05.txt`
+- `reports/godot_phase4_after_facility_theme_next_task_2026-05.txt`
+- `reports/godot_phase4_after_three_detail_themes_next_task_2026-05.txt`
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- `godot/scenes/home_production_wire_preview*.tscn`
+- `docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md`
+
+================================================================================
+## 参照コミット・レポート
+================================================================================
+
+- 第1〜4号 Theme: `5987821` / `682a941` / `927e918` / `440c3f6` + 記録 `c8ec528` / `f7b43c7` / `a22ec1d` / `1e474a6`
+- 調査: `23a8fcf`、`64abb9c`、`a5eec31` + 各 reports
