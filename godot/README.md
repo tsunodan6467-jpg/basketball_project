@@ -170,6 +170,18 @@
 - **現在のホーム到達点（ナビ）**: **HeaderNavRow**＝上部主要5導線、**LeftRail**＝大分類・現在地の表示、**CardNavMenu**＝**実操作用**の中央画面メニュー（9詳細・#7〜10含む）。
 - **今後**: **LeftRail クリック化**は**別タスク**。**次の自然な進め方**は **他詳細画面への Theme 方針展開**（次画面選定調査 → 1画面ずつ）または **ホーム DTO/表示の別整理**（`CardNews` 1行化等）。**CardNavMenu の削除・縮小は当面しない**。
 
+### 施設サマリー閲覧 `Phase4` Theme 限定適用・第1段（`5987821`）
+
+- **9詳細画面 Theme 横展開の第1号**（選定調査 `23a8fcf` → 実装 `5987821`）。**変更ファイル**: **`facility_summary_view.tscn` のみ**。
+- **ルート** `FacilitySummaryView` に `phase4_readonly_core.tres` を割当。**`HeaderCard`** → **`Phase4HeaderCard`**。**`SummaryCard`** → **`Phase4SummaryCard`**（**panel override のみ除去**。**`StyleBoxFlat_header` / `StyleBoxFlat_summary` の SubResource 定義は残置**）。**`ReadonlyBadge` / `ModeStrip`** の `StyleBoxFlat_chip` は維持。
+- **ラベル**: ヘッダー・サマリーを白カード向け濃色（`roster_view` / 本線 `CardSummary` と同系）。**Scroll 内**の動的 `Label.new()`（施設一覧・sections）は**第2段** — **暗背景＋明文字のまま**（今回未変更）。
+- **維持**: **`HomeNavButton`**（text / tooltip / connection / `_on_home_nav_button_pressed`）、**`%DataSourceLabel`** 等 **unique 名**、**from_python / mock** 読込（**`facility_summary_view.gd` 不変**）。
+- **未変更**: **`facility_summary_view.gd`**、**Theme `.tres`**、**export / mock JSON**、**`project.godot`**、**`home_dashboard.tscn`**。
+- **pytest**（実装時）: `test_home_dashboard_readonly_export` 10 / `test_roster_readonly_export` 10 / phase0 smoke 1 / **`test_facility_summary_readonly_export` 9** — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 施設サマリー遷移 OK**（**HeaderNavRow** または **CardNavMenu・クラブ列**）。**施設サマリー表示 OK**。**HeaderCard Phase4 系・SummaryCard 白系 OK**。**ラベル可読性・DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **到達点**: **Header + Summary の白カード化第1段完了**（**画面全体の完全仕上げではない**）。
+- **今後**: **Scroll 動的部分の第2段**（`.gd` または OnDark 系）か、**同型のクラブ史・順位表**への横展開を判断。
+
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
 - **確認方法**: Godot エディタで当該シーンを開き、**「現在のシーンを実行」（F6）** で単体起動する。
@@ -184,6 +196,7 @@
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **暗地前提のまま**で、**白カード化・Theme 統一は未着手**（別タスクで `.gd` 調整が必要）。
 - **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**ヘッダー**は `Phase4HeaderCard` + ヘッダー Label 濃色。**表**（`Scroll` / `RowList` 内の動的 `Label`）は **暗背景のまま**、`roster_view.gd` で `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` の **`theme_type_variation` に寄せた最小対応**（白カード化はしていない）。
+- **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で表示用 `LeftRail`（200px・クリック不可）**。**MetricsRow** 3 枚 + **Scroll 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`home_dashboard.gd`・Theme `.tres` は不変**。**HeaderNavRow**・**CardNavMenu**＝実操作導線（**LeftRail は表示のみ** — 下記2節）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
@@ -258,7 +271,10 @@
 ◎ 表示用 LeftRail・HeaderNavRow・CardNavMenu のローカル目視確認 OK（ユーザー環境 Godot・約 1216×684）
 ◎ 本線 `home_dashboard` の `CardNavMenu` に Theme を限定適用（`d9bd713`）
 ◎ CardNavMenu 白系化・4列・8ボタン・#7〜#10・遷移確認 OK（ユーザー環境 Godot・1280×720）
-□ 次詳細画面の Theme 方針展開（次画面選定調査 → 1画面ずつ）
+◎ 9詳細画面UI現状調査（`23a8fcf`・reports）
+◎ 施設サマリー・Header+Summary Phase4 Theme 第1段（`5987821`）
+◎ 施設サマリー・遷移・表示・戻り・可読性確認 OK（ユーザー環境 Godot）
+□ 施設サマリー Scroll 動的Labelの第2段、または同型画面（クラブ史・順位表）への横展開判断
 □ CardNews 1 行化の表示制御 / DTO 整理判断
 □ Header 資金・成績行の本格移植判断
 □ home DTO / JSON の追加整理

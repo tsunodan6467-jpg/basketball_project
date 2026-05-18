@@ -35,6 +35,7 @@
 - **共通 Theme**（`godot/themes/phase4_readonly_core.tres`）と **preview**（`godot/scenes/theme_preview.tscn`）で **見た目を検証中**。**10 画面への一括適用**や **ホームの Scroll 以下の全面 Theme 化**は **していない**（**限定適用の段階**）。
 - **契約 / 人事サマリー**: ヘッダー・契約概要・ロスター構成・注意に **部分的に** Theme を当てた。**人事リスク**・**主要契約選手**（`Label.new()` 等の動的行）は **未着手**（暗パネル＋`.gd` のまま）。
 - **ロスター閲覧**: **ヘッダー**に Theme。**表**は暗背景のまま **`roster_view.gd`** で OnDark 系 **`theme_type_variation`** に寄せた最小対応（**白カード化なし**）。
+- **施設サマリー閲覧**: **Theme 第1段**（`5987821`・**`facility_summary_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 動的本文は未変更**（§2.5）。
 - **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み** — §2.3）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内の暗色カード問題は解消済み**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
 - **本線 LeftRail**: **`a5e548f` で表示用のみ追加済み**（§2.4）。**クリック・遷移は未実装**。**実操作導線**は引き続き **HeaderNavRow + CardNavMenu**。
 - **本格ナビの全面実装**（LeftRail クリック化・CardNavMenu 整理等）は **未着手**（§10）。**第 11 画面を急いで増やすより**、いまは **本番 GUI 化の足場**（Theme 限定適用・読み取り導線の安定）を優先する段階、という整理でよい（優先度の最終判断はチーム）。
@@ -80,6 +81,17 @@
 - **未変更**: **`home_dashboard.gd`**、**Theme `.tres`**、**export / mock JSON**。
 - **ユーザー環境 Godot（ローカル目視・スクショ約 1216×684）**: **大きなレイアウト崩れなし**。**HeaderCard 全幅**・**LeftRail 左表示**・**CardNavMenu 4 列**・**MetricsRow 以降**・**FooterNote** 表示 OK。
 - **今後**: **LeftRail クリック化**は**別タスク**（**大分類と複数詳細画面の対応**を先に設計）。**次にナビを触る場合**も、**CardNavMenu 削除・縮小は当面しない**。**HeaderNavRow / CardNavMenu は現時点では維持**。
+
+### 2.5 施設サマリー閲覧・Theme 第1段と導線確認（`5987821`）
+
+- **到達点**: **`facility_summary_view.tscn` のみ**（**ナビ構造の変更ではない**・**見た目第1段**）。**`facility_summary_view.gd`・Theme `.tres` 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`HeaderNavRow`** — 5 導線のうち **施設サマリー**（第6画面）。
+  - **`CardNavMenu`** — **クラブ**列の **施設** ボタン（**HeaderNavRow と二重導線**）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。
+- **施設サマリーからホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**text / tooltip / connection / handler 名は維持**。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 施設サマリー遷移 OK**。**施設画面表示 OK**。**HomeNavButton でホームへ戻る OK**。**HeaderNavRow / CardNavMenu の役割分担は維持**（Theme 適用は施設画面の静的カードのみ）。
+- **Theme 適用範囲**: **`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的リストは第2段**（今回未変更）。
 
 ## 3. 現行ナビ構造
 

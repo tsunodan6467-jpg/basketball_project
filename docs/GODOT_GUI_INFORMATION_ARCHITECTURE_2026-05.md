@@ -390,6 +390,7 @@
 - **限定適用の方針**: まず **`.tscn` のみ**で済む **静的ヘッダー**・**静的 Panel カード**から当てる。**`Label.new()` + 暗地前提の明色 override** は、白い `Phase4SummaryCard` 内へ載せ替えるには **`.gd` で `theme_type_variation` または色を直す**必要がある。**ロスター表の動的行**は `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` で **暗背景のまま**対応済み（`d33edb6`）。**契約・人事の人事リスク／主要契約選手**は **未着手**。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルート Theme 割当。**`Phase4HeaderCard`**（ヘッダー）＋ヘッダー内 Label 濃色。**`Phase4SummaryCard`**: 契約概要・ロスター構成。**`Phase4WarningCard`**: 注意。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` のまま（動的行は `.gd` 未変更）。
 - **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**`Phase4HeaderCard`**（ヘッダー）。**表**は `roster_view.gd` で動的 `Label` に **`theme_type_variation`**（OnDark 系）を付与（**白カード化なし**）。
+- **施設サマリー閲覧**（`facility_summary_view.tscn`）: **詳細画面 Theme 横展開第1号・第1段**（`5987821`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の `facility_summary_view.gd` による **`Label.new()`** は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`23a8fcf`** 調査（Header+Summary 型・`.tscn` のみ・HeaderNavRow 到達・DTO 安定・クラブ史/順位表へ横展開しやすい）。
 - **ホーム**（`home_dashboard.tscn`）: **ルートに Theme なし**。**`HeaderCard` のみ**に `phase4_readonly_core.tres` を割当し **`Phase4HeaderCard`**。**`83d7fc0` で HeaderCard 内に ClubBand 風クラブ帯**。**`a5e548f` で `MainRow` 左に表示用 `LeftRail`（200px・大分類 5・クリック不可）** — 構造は §15.2 参照。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も最小 Theme 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`91cfaed` で `club_summary` 状況メモ化**（export / mock のみ）。**`home_dashboard.gd`・JSON / Python / DTO・Theme `.tres` は不変**。**HeaderNavRow・CardNavMenu・10 画面導線は維持**（実操作導線）。**LeftRail は表示のみ**。
 - **読込・導線**: `from_python` / mock、**HeaderNavRow のボタン数・接続・遷移先のシーン定義は変更していない**（`afb482d` は HeaderCard とラベル色・SubResource 整理のみ）、**Godot から Python 自動起動なし**（§14.1 と同じ）。
 - **運用**: シーン保存後は **UID 参照エラー**が出ないか Godot で確認。**エディタ実行後**は `git status` で意図しない差分が混ざっていないか確認（`*_from_python.json` は **コミットしない**）。**UID の再シリアライズ**で他画面参照が壊れないか、差分レビュー時に注意。
@@ -422,6 +423,14 @@
   - **本線ホーム `CardSummary` の Theme 限定適用（`1d070ba`）**: **`home_dashboard.tscn` のみ**（**`91cfaed` の状況メモ化の後**）。**`CardSummary`** に **`Phase4SummaryCard`**（**`HSum` / `ClubSummaryLabel` 濃色化**）。**`_join_lines(d, "club_summary")`・JSON キーは不変**。
   - **本線ホーム `CardNavMenu` の Theme 限定適用（`d9bd713`）**: **`home_dashboard.tscn` のみ**。**`CardNavMenu`** に **`Phase4SummaryCard`**（**panel override のみ除去**。**SubResource は残置**）。**`NavTitle` / カテゴリラベルを白カード向け濃色**。**8 ボタン・4 列・14 connection・9 handler 名は不変**。**削除・縮小なし**。
   - **CardNavMenu の情報役割（現在形）**: **中央の画面メニュー** — **ホーム除く詳細画面**への**主入口**（**#7〜#10** 含む）。**HeaderNavRow** と一部重複するが、**経営・戦術系の詳細入口はこちらが主**。**最小 Theme 化済み**（導線は維持）。
+  - **施設サマリー閲覧・Phase4 Theme 第1段（`5987821`）** — **9詳細画面 UI 整備のテンプレ候補第1号**:
+    - **選定（`23a8fcf`）**: **Header + Summary カード型**・**`.tscn` のみで第1段を閉じやすい**・**HeaderNavRow から到達**（第6画面）・**`facility_summary_readonly` + pytest 安定**・**`club_history_view` / `standings_view` と同型で横展開しやすい**。
+    - **実装範囲**: **`facility_summary_view.tscn` のみ**。ルートに **`phase4_readonly_core.tres`**。**`HeaderCard`** → **`Phase4HeaderCard`**、**`SummaryCard`** → **`Phase4SummaryCard`**。**`StyleBoxFlat_header` / `StyleBoxFlat_summary` の panel override のみ除去**（SubResource 定義は残置）。**静的ラベル**を白カード向け濃色。
+    - **情報構造（不変）**: **`HeaderCard`**（タイトル・チーム・リーグ段階・DataSource・HomeNav）→ **`SummaryCard`**（施設強化ポイント等の要約）→ **`Scroll/ScrollContent`**（施設一覧・sections — **`.gd` で動的生成**）。
+    - **実装境界**: **`facility_summary_view.gd`・Theme `.tres`・export / mock JSON 未変更**。
+    - **第2段（未着手）**: **Scroll 内動的 `Label.new()`** の白カード化・行レイアウト整理（**`.gd` 調整が必要**）。**今回の第1段では Scroll は暗地＋明文字のまま許容**。
+    - **ユーザー環境 Godot**: **ホーム → 施設サマリー OK**・**表示・Header/Summary 見た目・可読性・DataSourceLabel OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+    - **今後**: **施設の Scroll 第2段**か、**クラブ史・順位表**への同型横展開を判断（**LeftRail クリック化は別工程**）。
   - **本線ホーム 表示用 LeftRail（`a5e548f`）**: **`home_dashboard.tscn` のみ**。**レイアウト構造（情報設計）**:
     - **`HeaderCard`** — 全幅（クラブ帯・**`HeaderNavRow` 5 ボタン**）。
     - **`StatusLabel`** — 全幅。
