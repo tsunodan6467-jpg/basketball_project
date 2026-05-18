@@ -112,16 +112,16 @@ func _clear_rows() -> void:
 		c.queue_free()
 
 
-## 表ヘッダー用。暗背景向け `Phase4OnDarkTableHead`（`roster_view.tscn` ルートの Theme 継承）。
+## 表ヘッダー用。白カード向け `Phase4TableHead`（`roster_view.tscn` ルートの Theme 継承）。
 ## Theme 既定フォントは 11px のため、従来表示との互換で 12px を維持する。
 func _style_ondark_table_header_label(lab: Label) -> void:
-	lab.theme_type_variation = &"Phase4OnDarkTableHead"
+	lab.theme_type_variation = &"Phase4TableHead"
 	lab.add_theme_font_size_override("font_size", 12)
 
 
-## 表セル用。暗背景向け `Phase4OnDarkTableCell`（同上）。
+## 表セル用。白カード向け `Phase4TableCell`（同上）。
 func _style_ondark_table_cell_label(lab: Label) -> void:
-	lab.theme_type_variation = &"Phase4OnDarkTableCell"
+	lab.theme_type_variation = &"Phase4TableCell"
 	lab.add_theme_font_size_override("font_size", 12)
 
 
