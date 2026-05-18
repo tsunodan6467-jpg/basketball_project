@@ -1,0 +1,303 @@
+# Godot Phase 4 詳細画面7画面Theme後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `317b143`（Godot戦術サマリーTheme第1段の確認を記録）
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**（ユーザー確認は README/docs に記録済み）
+
+### 1.1 home_dashboard（一区切り完了）
+
+| 領域 | 状態 |
+|------|------|
+| **レイアウト** | HeaderCard 全幅 / StatusLabel / MainRow（LeftRail 200px + Scroll）/ FooterNote |
+| **ナビ** | HeaderNavRow 5導線 / CardNavMenu 9詳細（8ボタン・4列）/ LeftRail 表示のみ |
+| **Theme** | HeaderCard + Scroll 以下 Summary/Warning（CardNavMenu 含む） |
+| **確認** | ユーザー環境 1280×720 目視・遷移 OK |
+
+### 1.2 詳細画面 Theme 横展開・第1段（7画面完了）
+
+| # | 画面 | Theme実装 | 記録 | 第1段の形 | 動的行色補正 |
+|---|------|-----------|------|-----------|------------|
+| 1 | 施設サマリー | `5987821` | `c8ec528` | RootCol: **Header + Summary** | — |
+| 2 | クラブ史 | `682a941` | `f7b43c7` | 同上 | — |
+| 3 | 順位表 | `927e918` | `a22ec1d` | 同上 | — |
+| 4 | 日程 | `440c3f6` | `1e474a6` | RootCol: **Header** + **Scroll内 SummaryCard** | — |
+| 5 | 財務サマリー | `4b43da5` | `35eeed5` | RootCol: **Header** + **Scroll内5静的カード** | `6c3dc43`（HistoryBody） |
+| 6 | オーナーミッション | `e6acce0` | `549f0a1` | RootCol: **Header** + **Scroll内4静的カード** | `2f808e5`（MissionsBody） |
+| 7 | 戦術サマリー | `44b0584` | `317b143` | RootCol: **Header** + **Scroll内6静的カード** | `7bbbb4e`（PlayerRolesBody） |
+
+**共通（第1段）**: 原則 **`.tscn` のみ**・`.gd` / Theme `.tres` / export / mock 不変（財務・OM・戦術の色補正は目視課題の例外）。
+
+### 1.3 補正の扱い（財務・OM・戦術）
+
+| 画面 | 第1段後の目視課題 | 対応 |
+|------|------------------|------|
+| **財務** | HistoryBody 動的履歴行が白カード上で薄い | `6c3dc43` — `font_color` のみ（**第2段本格整備ではない**） |
+| **OM** | MissionsBody 動的ミッション行が白カード上で薄い | `2f808e5` — 同上 |
+| **戦術** | PlayerRolesBody 動的選手ロール行が白カード上で薄い | `7bbbb4e` — 同上 |
+
+### 1.4 残り2画面の位置づけ
+
+| 画面 | 第1段の状態 |
+|------|-------------|
+| **契約・人事サマリー** | **部分 Theme 済み**（Header + Contract + Balance + Caution）。**RiskCard / PlayersCard のみ暗色残** |
+| **ロスター** | **Header のみ Phase4**。**Scroll は `%RowList` 表のみ**（静的 SummaryCard なし） |
+
+### 1.5 今回の調査目的
+
+7画面第1段完了後、**案A（完了7画面の第2段）** と **案B（契約人事の続き）** と **案C（ロスター）** を比較し、**次に実装する1タスク**を決定する。
+
+
+================================================================================
+## 2. 完了済み7画面の第2段評価
+================================================================================
+
+### 2.1 facility_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | `%ScrollContent` 内施設一覧（`Label.new()` + 明色） |
+| **.gd 必要か** | **はい** |
+| **今すぐ** | **否** |
+
+### 2.2 club_history_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | 段落・**シーズン表**（`HBoxContainer` + `Label.new()`） |
+| **.gd 必要か** | **はい** |
+| **今すぐ** | **否** |
+
+### 2.3 standings_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **8列表・動的行** |
+| **.gd 必要か** | **はい** |
+| **今すぐ** | **否** |
+
+### 2.4 schedule_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **`NextGameCard`**・**`ScrollContent` 試合リスト** |
+| **.gd 必要か** | **試合リストは必須** |
+| **今すぐ** | **否** |
+
+### 2.5 finance_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **HistoryBody 構造**・履歴行レイアウト（**文字色は `6c3dc43` 済**） |
+| **.gd 必要か** | **構造・レイアウトは `.gd` 絡みが濃い** |
+| **今すぐ** | **否** |
+
+### 2.6 owner_mission_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **MissionsBody 構造**・ミッション行レイアウト（**文字色は `2f808e5` 済**） |
+| **.gd 必要か** | **構造・レイアウトは `.gd` 絡みが濃い** |
+| **今すぐ** | **否** |
+
+### 2.7 tactics_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **PlayerRolesBody 構造**・選手ロール行レイアウト（**文字色は `7bbbb4e` 済**） |
+| **.gd 必要か** | **構造・レイアウトは `.gd` 絡みが濃い** |
+| **今すぐ** | **否** |
+
+### 2.8 第2段の横断結論
+
+| 観点 | 結論 |
+|------|------|
+| **共通化** | 画面ごとに生成パターンが異なり **個別 `.gd` 対応** |
+| **案A 総合** | 推奨度 **△（今すぐ最優先ではない）** — 残り2画面の横展開完了を優先 |
+
+
+================================================================================
+## 3. 残り詳細画面の現状
+================================================================================
+
+※ **10画面中、フル第1段未完了は2画面**（契約人事は部分完了、ロスターは Header のみ）。
+
+### 3.1 contract_personnel_summary_view ★有力
+
+| 項目 | 内容 |
+|------|------|
+| **scene** | ルート **`phase4_readonly_core.tres` 済み**。**Scroll/ScrollContent** 内 **5枚 Panel**: **ContractCard**（Phase4SummaryCard）→ **RiskCard**（**暗色 `StyleBoxFlat_summary` 残**）→ **PlayersCard**（**暗色残**）→ **BalanceCard**（Phase4SummaryCard）→ **CautionCard**（Phase4WarningCard）。**HeaderCard**＝Phase4HeaderCard |
+| **Theme** | **部分適用済み**（過去 `afb482d` / `b319af3` 系 + 現物で Header/3カード済み） |
+| **HomeNav** | HeaderTopRow `HomeNavButton` / `%DataSourceLabel`（**CardNavMenu #10・経営列**。**HeaderNavRow 非搭載**） |
+| **script** | **`%RiskRows` / `%PlayerRows`** に `Label.new()`（`_fill_risk_rows` / `_fill_player_rows`）。色は **`_style_body_label`** で **`Color(0.86, 0.9, 0.95)`** 等（白カード化後は **財務/OM/戦術と同型の目視リスク**） |
+| **静的ラベル（Risk/Players）** | **RiskTitle / RiskHint / PlayersTitle** は **暗色パネル向け明色**（`0.94` / `0.62` 系）— 白カード化時は **濃色へ最小調整が必要** |
+| **.tscn のみで次の一歩** | **高** — **RiskCard + PlayersCard の2枚のみ** `Phase4SummaryCard` 化 + 静的 Label 濃色化。**`%RiskRows` / `%PlayerRows` は触らない** |
+| **1コミット** | **中〜高** — 変更は **2 Panel + 静的 Label のみ**で diff は小さい。**動的行色は別コミット**（`6c3dc43` パターン） |
+| **ユーザー価値** | **最高**（経営列 #10・契約・人事の核） |
+| **次候補** | **◎** |
+
+### 3.2 roster_view
+
+| 項目 | 内容 |
+|------|------|
+| **scene** | ルート Theme あり。**`HeaderCard`**＝Phase4HeaderCard。**`Scroll/RowList` のみ**（SummaryCard 相当なし） |
+| **Theme** | **ヘッダーのみ Phase4** |
+| **HomeNav** | **HeaderNavRow** `HomeNavButton`（**CardNavMenu チーム列 #1 と二重導線**） |
+| **script** | **`%RowList`** に表ヘッダ・選手行を **`Label.new()`** 大量生成。**`Phase4OnDarkTableHead` / `Phase4OnDarkTableCell`** を `.gd` で付与（**暗背景表専用**） |
+| **.tscn のみ** | **低** — Scroll 内に **白カード化できる静的 Panel がない**。表全体の白カード化は **`.gd` + レイアウト第2段** |
+| **1コミット** | **低**（第1段横展開として閉じにくい） |
+| **ユーザー価値** | **最高**（ロスター本体） |
+| **次候補** | **△**（契約人事完了後・表は別フェーズ） |
+
+
+================================================================================
+## 4. 選択肢比較表
+================================================================================
+
+| 案 | 対象 | 変更範囲 | .tscnのみ可能性 | .gd変更リスク | ユーザー価値 | 見た目改善効果 | 1コミット安全性 | 推奨度 |
+|----|------|----------|----------------|--------------|-------------|---------------|----------------|--------|
+| **A** | 完了7画面の第2段 | `.gd` 主 | **低** | **高** | 中 | 中（各画面内） | 低〜中 | **△** |
+| **B** | **契約人事・Risk/Players 白カード化** | **RiskCard + PlayersCard**（静的2枚） | **高** | **低**（動的行は第2段/補正可） | **最高** | **高**（Scroll内暗色2枚解消） | **中〜高** | **◎** |
+| **C** | ロスター続き | 表・`%RowList` | **低** | **高** | 最高 | 中（ヘッダーのみ済） | 低 | **△** |
+
+**比較結論**:
+- **案A**: 7画面とも `.gd` 必須 — **後回し**
+- **案B**: **残り横展開で最も安全に閉じられる一歩** — 部分 Theme 済み画面の **暗色2枚のみ** — **第1推奨**
+- **案C**: 表は OnDark `.gd` 専用 — 契約人事の視覚統一後に判断
+
+
+================================================================================
+## 5. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**契約・人事サマリー閲覧 — Phase4 Theme 残り第1段（RiskCard + PlayersCard の白カード化）**
+
+### 対象
+
+| 種別 | パス |
+|------|------|
+| **scene** | `godot/scenes/contract_personnel_summary_view.tscn` |
+| **script** | `godot/scripts/contract_personnel_summary_view.gd`（**第1段では変更しない**） |
+
+### なぜ今それを選ぶのか
+
+1. **7画面フル第1段完了後の自然な次手** — 残りは **契約人事（部分）** と **ロスター（Headerのみ）** の2画面のみ。**契約人事**は Scroll 内 **暗色が Risk / Players の2枚だけ**で、diff が最小。
+2. **`.tscn` のみで1コミットを閉じやすい** — ルート Theme・Header・Contract/Balance/Caution は **既に Phase4 済み**。**`theme_override_styles/panel` → `Phase4SummaryCard`** と **RiskTitle / RiskHint / PlayersTitle の濃色化**のみ。
+3. **確立済みテンプレの横展開** — 財務・OM・戦術と同型。**`%RiskRows` / `%PlayerRows` は第2段扱いで触らない**（動的行色は目視後に `6c3dc43` 型の **別コミット**）。
+4. **ユーザー価値が高い** — **CardNavMenu #10（経営列）**。ゲームの契約・人事の核に直結。
+5. **ロスターより安全** — ロスターは **`%RowList` 表全体が `.gd`** で、`.tscn` だけでは第1段を完結できない。
+6. **データ安定** — `contract_personnel_summary_mock.json` / **`test_contract_personnel_summary_readonly_export.py`（16 tests）**。
+
+### なぜ他案を後回しにするか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **A 第2段** | 7画面とも `.gd` 必須。契約人事の残り2枚完了後に個別判断 |
+| **C ロスター** | Header 済み・表は OnDark `.gd` 専用。契約人事の視覚統一後 |
+
+### 変更対象ファイルの想定（実装時）
+
+- **変更可**: `godot/scenes/contract_personnel_summary_view.tscn` **のみ**（本タスク）
+- **変更不可**: `contract_personnel_summary_view.gd`（本タスク）、Theme `.tres`、`project.godot`、他 scene、export / tests / mock、README / docs、reports
+
+### 実装する場合の安全条件
+
+1. **触る Panel**: **`RiskCard`**・**`PlayersCard`** のみ → **`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。
+2. **触る静的 Label**: **RiskTitle**（見出し `0.08,0.11,0.18`）、**RiskHint**（muted `0.2,0.25,0.36` 等）、**PlayersTitle**（見出し濃色）。**ContractCard / BalanceCard / CautionCard / Header は変更しない**（既に Phase4）。
+3. **触らない**: **`%RiskRows`**・**`%PlayerRows`** 子構造・connection・handler・JSON キー。
+4. 目視で Risk / Players 動的行が薄い場合 → **別コミット**で `_fill_risk_rows` / `_fill_player_rows` の **`_style_body_label` 色**を `Color(0.16, 0.2, 0.3, 1)` へ（財務 `6c3dc43` / 戦術 `7bbbb4e` パターン）。
+
+### Godot 目視確認ポイント
+
+- CardNavMenu #10 → 契約・人事サマリー
+- Scroll 内5カードがすべて白系（Risk / Players が暗色残りでないこと）
+- Contract / Balance / Caution の見た目が壊れていないこと
+- DataSourceLabel / HomeNavButton 戻り
+- RiskRows / PlayerRows 動的行（薄くても本タスクでは可）
+
+### pytest
+
+- **必要**（実装時）: home_dashboard 10 + roster 10 + phase0 1 + **`test_contract_personnel_summary_readonly_export` 16**
+
+
+================================================================================
+## 6. 推奨タスクの最小実装案（Cursor 指示骨子）
+================================================================================
+
+**目的**: 契約・人事サマリーの Scroll 内 **暗色残り2枚**（Risk / Players）を Phase4 白カード化し、**10画面 Theme 横展開の視覚的な締め**に近づける。
+
+**変更してよいファイル**: `godot/scenes/contract_personnel_summary_view.tscn`
+
+**変更してはいけないファイル**: `contract_personnel_summary_view.gd`、Theme `.tres`、`project.godot`、他 scene、export / tests / mock、README / docs、reports
+
+**実装方針**:
+- `RiskCard` / `PlayersCard`: `theme_type_variation = Phase4SummaryCard`（`theme_override_styles/panel` 除去）。
+- `RiskTitle` / `PlayersTitle`: `Color(0.08, 0.11, 0.18)`。
+- `RiskHint`: `Color(0.2, 0.25, 0.36)` または BalanceCard 脚注と同系。
+- **既存 Phase4 済みカードは触らない**。
+
+**Scroll / 動的**: **`%RiskRows` / `%PlayerRows` 内は触らない**。
+
+**確認**: `git diff -- godot/scenes/contract_personnel_summary_view.tscn` のみ。
+
+**テスト**: contract export 16 + 既存3系。
+
+**コミット名案**:
+- `Godot契約人事サマリーRiskPlayersにPhase4Themeを限定適用`
+- 記録: `Godot契約人事サマリーRiskPlayersThemeの確認を記録`
+- 色補正（必要時）: `Godot契約人事サマリー動的行文字色を補正`
+
+
+================================================================================
+## 7. 後回しにする案と理由
+================================================================================
+
+| 案 | 理由 |
+|----|------|
+| **A 完了7画面第2段** | 7画面とも `.gd` 必須。契約人事2枚完了後に個別判断 |
+| **C ロスター** | 表は `%RowList` + OnDark `.gd` 専用。静的カードなし |
+| **契約人事の動的行色・構造第2段** | RiskRows / PlayerRows — 本タスク後に必要時 `6c3dc43` 型で対応 |
+| **10画面すべての第2段一括** | 画面ごとにパターンが異なり共通化不可 |
+
+
+================================================================================
+## 8. 変更していないファイル
+================================================================================
+
+- `godot/scenes/*.tscn`（本レポート新規除く）
+- `godot/scripts/*.gd`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- `reports/godot_phase4_detail_screens_ui_survey_2026-05.txt`
+- `reports/godot_phase4_after_facility_theme_next_task_2026-05.txt`
+- `reports/godot_phase4_after_three_detail_themes_next_task_2026-05.txt`
+- `reports/godot_phase4_after_four_detail_themes_next_task_2026-05.txt`
+- `reports/godot_phase4_after_five_detail_themes_next_task_2026-05.txt`
+- `reports/godot_phase4_after_six_detail_themes_next_task_2026-05.txt`
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- `godot/scenes/home_production_wire_preview*.tscn`
+- `docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md`
+
+================================================================================
+## 参照コミット・レポート
+================================================================================
+
+- 第1〜7号 Theme: `5987821` … `44b0584` + 記録 `c8ec528` … `317b143`
+- 色補正: `6c3dc43` / `2f808e5` / `7bbbb4e`
+- 調査: `6afb201` + `reports/godot_phase4_after_six_detail_themes_next_task_2026-05.txt`
+- 契約人事部分 Theme（過去）: `afb482d` / `b319af3` 系（README 参照）
