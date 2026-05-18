@@ -1,0 +1,419 @@
+# Godot Phase 4 Body系第2段 財務後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-19
+- **調査時点 HEAD**: `9f894aa`（Godot財務履歴行区切り第2段の確認を記録）
+- **直近実装**: `d57b021`（財務 HistoryBody HSeparator） / 記録 `9f894aa`
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**（ユーザー確認は `9f894aa` / README / docs に記録済み）
+
+### 1.1 主要10画面 Theme 第1段
+
+**主要10画面の Theme 第1段（＋必要最小の動的行色補正）は一通り完了。**
+
+### 1.2 日程第2段の到達点
+
+| 段階 | コミット | 内容 |
+|------|----------|------|
+| **第2段・前半** | `986c4ab` | **NextGameCard** → `Phase4SummaryCard`（`.tscn` のみ） |
+| **第2段・後半（最小）** | `7fecb99` | **`_add_upcoming_block`** — runtime Panel + 3 Label 濃色化（`.gd` のみ） |
+| **記録** | `a388da0` / `d49d177` | 前半・後半の確認記録 |
+
+**残り（日程）**: Scroll 見出し（`_add_scroll_heading`）/ advance_hint / 空メッセージ色、Scroll 全体の暗地・白地統一 — **中〜大**（`d2c08d1`・`20efa29` と同評価）。
+
+### 1.3 財務 HistoryBody 行区切りの完了状況
+
+| 項目 | 内容 |
+|------|------|
+| **実装** | `d57b021` — **`finance_summary_view.gd` の `_fill_history_rows` のみ** |
+| **内容** | 履歴行 `Label` 追加後 **`i < lim - 1` のとき `HSeparator.new()`**（`lim = mini(rows.size(), 5)`） |
+| **空表示** | 履歴なし時は空 `Label` のみ、**HSeparator なし** |
+| **維持** | `6c3dc43` の `font_color`、文言・件数・並び順・JSON key、`.tscn` / Theme / DTO |
+| **記録** | `9f894aa` — Body系第2段（最小）**第1号**として README/docs 記載済み |
+| **未完了** | HistoryBody Panel 化・履歴行カード化・余白本格調整（**財務 HistoryBody 全体の第2段ではない**） |
+
+### 1.4 残っている Body 系候補
+
+| 画面 | 動的 Body | 色補正 | 行区切り |
+|------|-----------|--------|----------|
+| オーナーミッション | `%MissionsBody` | `2f808e5` 済 | **未** |
+| 戦術サマリー | `%PlayerRolesBody` | `7bbbb4e` 済 | **未** |
+| 契約・人事 | `%RiskRows` / `%PlayerRows` | `1df4820` 済 | **未** |
+| 財務（追加） | `%HistoryBody` | 済 | **行区切りのみ済** — 構造整理は別 |
+
+### 1.5 今回の調査目的
+
+財務 HistoryBody の **HSeparator 最小第2段が成功した後**、Body 系第2段の **横展開第2号**として **OM / 戦術 / 契約 / 財務追加 / 日程・ロスター戻り** のどれを **次の1コミット**で実装するのが最も安全かを現物比較し、**1タスクに絞る**。
+
+
+================================================================================
+## 2. 財務HistoryBodyの現在地
+================================================================================
+
+### 2.1 `d57b021` の内容（現物確認）
+
+**ファイル**: `godot/scripts/finance_summary_view.gd`  
+**関数**: `_fill_history_rows`（147–177 行付近）
+
+| 処理 | 内容 |
+|------|------|
+| **空** | `rows.is_empty()` → 空 `Label`（`（履歴がありません）`）のみ `return` |
+| **ループ** | `lim = mini(rows.size(), 5)`、`for i in range(lim)` |
+| **行** | 1件1 `Label.new()`、複数行テキスト（シーズン・収支・メモ） |
+| **区切り** | `_history_body.add_child(line)` の直後 **`if i < lim - 1: HSeparator.new()`** |
+| **色** | `Color(0.16, 0.2, 0.3, 1)` — `6c3dc43` 維持 |
+
+**scene**: `finance_summary_view.tscn` — **HistoryCard**（`Phase4SummaryCard`）内 **HistoryBody**（VBox、`separation` あり）。**第1段で白カード化済み**。
+
+### 2.2 まだ残る財務の課題（案D）
+
+| 課題 | 規模 | 今すぐか |
+|------|------|----------|
+| HistoryBody **Panel 化** | 中 | **×** — 横展開テンプレとして過剰 |
+| **履歴行カード化** | 中〜大 | **×** |
+| **余白・行レイアウト本格調整** | 中 | **×** — HSeparator 直後に本格化すると **他画面未横展開のまま財務だけ先行** |
+
+### 2.3 財務を続けるべきか
+
+| 判断 | 内容 |
+|------|------|
+| **結論** | **いったん横展開を優先** — `9f894aa` / `d2c08d1` の方針どおり **「1画面1コミットで OM → 戦術 → 契約」** が自然 |
+| **財務再開タイミング** | 3画面横展開後、または **HistoryBody 全面整理をまとめて行う別コミット群** |
+
+
+================================================================================
+## 3. OM MissionsBody候補（案A）
+================================================================================
+
+### 3.1 現状（現物）
+
+**script**: `owner_mission_view.gd` — **`_fill_mission_rows`**（114–134 行）  
+**scene**: `owner_mission_view.tscn` — **MissionsCard**（`Phase4SummaryCard`）→ **MissionsBody**（VBox、`unique_name_in_owner`）
+
+| 項目 | 内容 |
+|------|------|
+| **ループ** | `for item in arr:` — **インデックスなし**（財務の `for i in range(lim)` と異なる） |
+| **件数上限** | **コード上なし**（mock は **5件**、`mission_count: 5`） |
+| **1行の形** | 1ミッション1 `Label`、**3〜4行の複数行ブロック**（`_mission_block_text`） |
+| **空表示** | `今季ミッションはありません。` の `Label` のみ → **return**（HSeparator 不要） |
+| **色** | `Color(0.16, 0.2, 0.3, 1)` — **`2f808e5` 済** |
+| **他関数** | `_clear_missions_body`、`_mission_block_text` — **今回触らない想定** |
+
+### 3.2 HSeparator 追加のしやすさ
+
+| 観点 | 評価 |
+|------|------|
+| **財務テンプレとの近さ** | **◎** — 白カード内 VBox + 動的 `Label.new()` + 色補正済み |
+| **実装パターン** | 有効ミッションを **配列に集めて `for i in range(n)`** にするか、**追加ラベル数をカウント**して最終行判定 — **数行のループ整理で足りる** |
+| **最終行以外** | 集めた件数 `n` に対し **`i < n - 1`** で財務と同型 |
+| **空表示** | 財務と同様 **早期 return で HSeparator なし** |
+| **リスク** | **低** — `continue` で辞書不正をスキップする場合、**財務と同様「実際に add した行」基準で区切る**必要あり（財務も `continue` あり） |
+
+### 3.3 変更規模・初手適性
+
+| 項目 | 評価 |
+|------|------|
+| **変更ファイル** | **`owner_mission_view.gd` のみ**（想定） |
+| **変更関数** | **`_fill_mission_rows` のみ**（想定） |
+| **UI効果** | **高** — 複数行ミッションブロックの境目が明確になる |
+| **1コミット** | **高** |
+| **初手横展開** | **◎** — README **次候補第1**、`d2c08d1` **B群第2号**想定 |
+
+
+================================================================================
+## 4. 戦術 PlayerRolesBody候補（案B）
+================================================================================
+
+### 4.1 現状（現物）
+
+**script**: `tactics_summary_view.gd` — **`_fill_player_roles`**（117–140 行）  
+**scene**: `tactics_summary_view.tscn` — **PlayerRolesCard**（`Phase4SummaryCard`）→ **PlayerRolesBody**
+
+| 項目 | 内容 |
+|------|------|
+| **ループ** | `for it in raw:` + **`shown >= 8` で break** — インデックスなし |
+| **件数上限** | **最大8件**（mock は **5件**） |
+| **1行の形** | 1選手1 `Label`、**1〜2行**（メモあり時は2行）— 財務より短い |
+| **空表示** | `選手ロール情報はありません。` → **return** |
+| **色** | `Color(0.16, 0.2, 0.3, 1)` — **`7bbbb4e` 済** |
+
+### 4.2 HSeparator 追加のしやすさ
+
+| 観点 | 評価 |
+|------|------|
+| **財務テンプレとの近さ** | **◎** |
+| **実装** | **有効行を最大8件集めて `for i in range(shown)`** など、**OM と同様のインデックス化が必要** |
+| **OMより先にやる理由** | **弱い** — 構造は同等だが、**ドキュメント上の次候補順は OM 優先** |
+| **1コミット** | **高** |
+| **初手横展開** | **○** — **第3号**として有力（OM の次） |
+
+
+================================================================================
+## 5. 契約・人事 RiskRows / PlayerRows候補（案C）
+================================================================================
+
+### 5.1 現状（現物）
+
+**script**: `contract_personnel_summary_view.gd`
+
+| Body | 関数 | ループ | 上限 | 1行の形 |
+|------|------|--------|------|---------|
+| **RiskRows** | `_fill_risk_rows` | `for it in rows:` | **なし**（mock **7件**） | **4行ブロック** `Label` |
+| **PlayerRows** | `_fill_player_rows` | `for i in range(lim)` | **8件** | **4行テキスト** `Label` |
+
+**scene**: **RiskCard** / **PlayersCard** いずれも **`Phase4SummaryCard`** 内 VBox。色は **`_style_body_label(..., Color(0.16, 0.2, 0.3, 1))`** — **`1df4820` 済**。
+
+### 5.2 2箇所同時変更の重さ
+
+| 観点 | 評価 |
+|------|------|
+| **関数が2つ** | **RiskRows と PlayerRows は別 VBox** — 横展開するなら **2関数**（同一 `.gd` でも **論理2タスク**） |
+| **1コミットで両方** | **中リスク** — 差分・目視・ロールバックが財務の2倍 |
+| **1コミット1関数** | 可能だが **「Body系1画面完了」にならない** — 契約画面は **半端状態が2コミット続く** |
+| **ブロックの高さ** | 各 `Label` が **4行固定フォーマット** — 区切りの **UI効果は高い**が、ミッション同様 **行が高い** |
+| **PlayerRows** | **`for i in range(lim)`** は財務と**最もコピーしやすい** — ただし **RiskRows もセットで欲しくなる** |
+
+### 5.3 今すぐ適するか
+
+| 判断 | 内容 |
+|------|------|
+| **結論** | **△〜○** — **技術的には可能**だが **B群の後方**（`d2c08d1`・`8fc2d91` と同趣旨） |
+| **推奨順** | **OM → 戦術 → 契約（Risk のみ → Player のみの2コミット、または1コミット2関数は慎重に）** |
+
+
+================================================================================
+## 6. 日程 / ロスターへ戻る案（案E）
+================================================================================
+
+### 6.1 日程残タスク
+
+| 項目 | 内容 |
+|------|------|
+| **関数** | `_add_scroll_heading` / `_add_scroll_paragraph` / `_fill_scroll_body`（advance_hint・空メッセージ） |
+| **背景** | **ScrollContent は暗地** — 見出しは **明色** `Color(0.94, 0.96, 0.99)` のまま |
+| **リスク** | 見出しだけ濃色化は **暗地で読めなくなる**（`d2c08d1` 記載） |
+| **規模** | **中〜大**（Scroll 全体設計） |
+| **Body系より先か** | **×** — 財務テンプレ横展開の **勢い・1コミット安全性**が劣る |
+
+### 6.2 ロスター表第2段
+
+| 項目 | 内容 |
+|------|------|
+| **現状** | `%RowList` — **HBox 9列** × `Label.new()`、**`Phase4TableHead/Cell`** 済み |
+| **第2段** | 表行 Panel 化・chip・9列レイアウト — **大・高リスク** |
+| **Body系より先か** | **×** — UI効果は最大だが **入口として不適** |
+
+### 6.3 Body系より先に戻る必要があるか
+
+**現時点ではない。** 日程は NextGame + upcoming で一区切り。ロスターは第1段完了。**Body系 HSeparator 横展開を2〜3画面進めてから** 日程 Scroll 統一・ロスター表本格化に戻る方が、**コミット単位の安全性とテンプレ蓄積**のバランスが良い。
+
+
+================================================================================
+## 7. 選択肢比較表
+================================================================================
+
+| 案 | 対象 | 主な変更範囲 | 財務テンプレとの近さ | .gd変更リスク | UI効果 | 横展開しやすさ | 1コミット安全性 | 推奨度 |
+|----|------|--------------|---------------------|--------------|--------|---------------|----------------|--------|
+| **A** | **OM MissionsBody** | `owner_mission_view.gd` **`_fill_mission_rows` のみ** | **◎** | **低** | **高**（複数行ブロック） | **◎** 第2号 | **高** | **◎** |
+| **B** | 戦術 PlayerRolesBody | `tactics_summary_view.gd` **`_fill_player_roles` のみ** | **◎** | **低** | **中〜高** | **○** 第3号 | **高** | **○** |
+| **C** | 契約 RiskRows + PlayerRows | `contract_personnel_summary_view.gd` **2関数** | **○**（Player は近い） | **中** | **高** | **△** 2箇所 | **中** | **△** |
+| **D** | 財務 HistoryBody 追加整備 | Panel 化・カード化・レイアウト | — | **中〜高** | **高** | **低**（先行しすぎ） | **低** | **×** |
+| **E** | 日程 Scroll 残り / ロスター表 | `schedule_view.gd` 複数関数 / `roster_view.gd` 表全体 | **△** | **中〜高** | **中〜最高** | **低** | **低〜中** | **△**（後回し） |
+
+**比較結論**:
+- **案A（OM MissionsBody）** が **次の1タスクとして最適** — 財務 `d57b021` と**同型**（白カード内 VBox・色補正済み・空表示1 Label・**1関数1ファイル**）。
+- **案B** は **OM の直後**が自然（最大8件・行はやや短い）。
+- **案C** は **PlayerRows 単体**なら財務に近いが、**RiskRows とのセット意識**で **コミットが重くなりやすい**。
+- **案D・E** は **Body系横展開の途中では優先しない**。
+
+
+================================================================================
+## 8. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**オーナーミッション閲覧 — Phase4 Theme 第2段（最小）— MissionsBody 動的ミッション行の行区切り（HSeparator 追加）**
+
+### 対象
+
+| 種別 | パス |
+|------|------|
+| **scene** | `godot/scenes/owner_mission_view.tscn`（**本タスクでは変更しない**） |
+| **script** | `godot/scripts/owner_mission_view.gd`（**`_fill_mission_rows` のみ**） |
+
+### なぜ今それを選ぶのか
+
+1. **財務 `d57b021` の成功パターンをそのまま横展開できる** — 白カード内動的 `Label` 行 + **`2f808e5` 色補正済み** + 空表示 early return。
+2. **`9f894aa` / README の次候補が「OM MissionsBody 行区切り」** — 記録と一致。
+3. **`d2c08d1` の予定** — 財務 Body 第1号成功後、**OM / 戦術 / 契約** の順。**OM は「財務成功後」初手**として既に評価済み。
+4. **1コミット・1関数** — 契約2 Body や日程 Scroll より **切り分けが明確**。
+5. **UI効果** — ミッション1件が **複数行ブロック**のため、**HSeparator の視認性向上が大きい**。
+
+### なぜ他案を後回しにするのか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **B 戦術** | 構造は近いが **ドキュメント上第3号**。OM 成功後に **同手順で実施**すればよい。 |
+| **C 契約** | **2関数・2 VBox** — 1コミットが太るか、**半端な1関数だけ**になりやすい。 |
+| **D 財務追加** | **横展開テンプレ未完了のうち財務だけ本格化**は過剰。 |
+| **E 日程・ロスター** | **Scroll 設計・9列表** — Body 最小パターンの **蓄積後**が安全。 |
+
+### 変更対象ファイルの想定
+
+- **変更**: `godot/scripts/owner_mission_view.gd`（**`_fill_mission_rows` のみ**）
+- **不変**: `owner_mission_view.tscn`、`phase4_readonly_core.tres`、`project.godot`、export / mock JSON、他関数（`_mission_block_text` 等）
+
+### 実装する場合の安全条件
+
+- **ミッション行の文言・件数・並び順・JSON key を変えない**
+- **`_mission_block_text` を変えない**
+- **ミッションなし時は HSeparator を追加しない**
+- **実際に `MissionsBody` へ add したミッション `Label` の間のみ**区切る（不正 dict スキップ時も財務同様に注意）
+- **HomeNavButton / DataSourceLabel / from_python・mock 表示を維持**
+- **`2f808e5` の `font_color` を維持**
+
+### Godot 目視確認ポイント（ユーザー環境）
+
+- ホーム → **CardNavMenu 経営列** → オーナーミッション遷移 OK
+- **MissionsCard** 内ミッション行の **区切り OK**
+- **最終ミッション行の後に不要な区切りなし**
+- **ミッションなし mock / 空配列**で区切りなし・空メッセージのみ
+- **HeaderCard / 4静的カード** 従来どおり
+- **HomeNavButton** でホーム復帰 OK
+- **エラーなし・実行後 git 差分なし**
+
+### pytest が必要か
+
+**推奨（実装タスク時）**:
+- `py -m pytest basketball_sim/tests/test_owner_mission_readonly_export.py -q`（10 passed 想定）
+- 回帰: `test_home_dashboard_readonly_export.py`、`test_finance_summary_readonly_export.py`、`test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+
+
+================================================================================
+## 9. 推奨タスクの最小実装案（骨子）
+================================================================================
+
+### 目的
+
+Body系第2段（最小）**第2号** — 財務 `_fill_history_rows` と同型で **MissionsBody に HSeparator のみ**追加。
+
+### 変更してよいファイル
+
+- `godot/scripts/owner_mission_view.gd`（**`_fill_mission_rows` のみ**）
+
+### 変更してはいけないファイル
+
+- `godot/scenes/owner_mission_view.tscn`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/data/*.json`
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- README / docs / 既存 reports
+
+### 実装方針
+
+1. 有効な `mission_items` 要素を走査し、**これまでどおり `_mission_block_text` で `Label` を生成**。
+2. **財務と同様**、**最後に add したミッション行以外**の直後に **`HSeparator.new()`** を `MissionsBody` へ add。
+3. 実装方法の例: 先に **表示対象 Dictionary の配列 `valid_missions` を構築** → `for i in range(valid_missions.size())` で Label 追加 → `if i < valid_missions.size() - 1: add HSeparator`（**件数上限を新設しない** — 現状どおり全件表示）。
+
+### HSeparator 追加方針
+
+- **ノード**: `HSeparator.new()`（Theme 追加なし — 財務 `d57b021` と同じ）
+- **配置**: 各ミッション `Label` の直後（次のミッション `Label` の前）
+
+### 空表示時の扱い
+
+- **現状の `今季ミッションはありません。` Label のみ** — **return 前に HSeparator を入れない**
+
+### ノード名・unique_name 維持
+
+- **`%MissionsBody`** の参照・scene 上の unique_name **不変**
+
+### 表示文言・データ
+
+- **`_mission_block_text` のフォーマット不変**
+- **JSON key・export・mock 不変**
+
+### 確認コマンド（実装後）
+
+```
+git diff -- godot/scripts/owner_mission_view.gd
+git diff -- godot/scenes/owner_mission_view.tscn
+py -m pytest basketball_sim/tests/test_owner_mission_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_finance_summary_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+```
+
+### コミット名案
+
+`Godotオーナーミッション履歴行に行区切りを追加`
+
+（docs 記録は別コミット: `Godotオーナーミッション行区切り第2段の確認を記録`）
+
+
+================================================================================
+## 10. 後回しにする案と理由
+================================================================================
+
+| 案 | 理由 |
+|----|------|
+| **B 戦術 PlayerRolesBody** | OM と同手順で **第3号**にできる。最大8件でやや単純だが **優先順は OM 後**。 |
+| **C 契約 RiskRows / PlayerRows** | **2 VBox・2関数**。PlayerRows は `range(lim)` で近いが、**Risk とのセット**でコミットが太りやすい。 |
+| **D 財務 HistoryBody 追加整備** | Panel/カード/レイアウトは **横展開完了後**または **財務専用の第2段本格コミット群**。 |
+| **E 日程 Scroll / ロスター表** | **中〜大・高リスク**。Body 最小テンプレを **あと2画面**進めてから再評価。 |
+
+
+================================================================================
+## 11. 変更していないファイル
+================================================================================
+
+本調査では以下を **一切変更していない**:
+
+- `godot/scenes/*.tscn`
+- `godot/scripts/*.gd`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 `reports/*.txt`（**本ファイルを新規作成したのみ**）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- sandbox scene
+
+### 参照したテスト候補（次実装時）
+
+| 画面 | テストファイル |
+|------|----------------|
+| 財務 | `test_finance_summary_readonly_export.py` |
+| OM | `test_owner_mission_readonly_export.py` |
+| 戦術 | `test_tactics_summary_readonly_export.py` |
+| 契約 | `test_contract_personnel_summary_readonly_export.py` |
+| ホーム | `test_home_dashboard_readonly_export.py` |
+| ロスター | `test_roster_readonly_export.py` |
+| smoke | `test_phase0_smoke.py` |
+
+### README / docs / 直近 reports の確認結果
+
+- **`9f894aa`**: Body系第2段（最小）第1号・財務 HistoryBody 行区切り **記録済み**
+- **財務 HistoryBody 全体完了と誤読しない記述** — 「別タスク」「Panel 化未着手」明記あり
+- **次候補**: README に **OM MissionsBody 行区切り** が先頭
+- **`d2c08d1`**: 財務 HSeparator を推奨済み（**実施済み `d57b021`**）— 続きは **OM → 戦術 → 契約** の示唆
+
+
+================================================================================
+## 12. pytest（本調査）
+================================================================================
+
+**未実施** — 調査レポート追加のみのため。次実装コミット時に上記テストを実行する想定。
