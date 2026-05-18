@@ -1,0 +1,400 @@
+# Godot Phase 4 契約人事Theme第1段後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `092a0b1`（Godot契約人事サマリーTheme第1段の確認を記録）
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**（ユーザー確認は README/docs `092a0b1` 以前に記録済み）
+
+### 1.1 home_dashboard（一区切り完了）
+
+| 領域 | 状態 |
+|------|------|
+| **レイアウト** | HeaderCard 全幅 / StatusLabel / MainRow（LeftRail 200px + Scroll）/ FooterNote |
+| **ナビ** | HeaderNavRow 5導線 / CardNavMenu 9詳細（8ボタン・4列）/ LeftRail 表示のみ |
+| **Theme** | HeaderCard + Scroll 以下 Summary/Warning（CardNavMenu 含む） |
+| **確認** | ユーザー環境 1280×720 目視・遷移 OK |
+
+### 1.2 詳細画面 Theme 横展開・第1段（8画面＋契約人事第8号相当 完了）
+
+| # | 画面 | Theme実装 | 記録 | 第1段の形 | 動的行色補正 |
+|---|------|-----------|------|-----------|------------|
+| 1 | 施設サマリー | `5987821` | `c8ec528` | RootCol: **Header + Summary** | — |
+| 2 | クラブ史 | `682a941` | `f7b43c7` | 同上 | — |
+| 3 | 順位表 | `927e918` | `a22ec1d` | 同上 | — |
+| 4 | 日程 | `440c3f6` | `1e474a6` | RootCol: **Header** + **Scroll内 SummaryCard** | — |
+| 5 | 財務サマリー | `4b43da5` | `35eeed5` | RootCol: **Header** + **Scroll内5静的カード** | `6c3dc43`（HistoryBody） |
+| 6 | オーナーミッション | `e6acce0` | `549f0a1` | RootCol: **Header** + **Scroll内4静的カード** | `2f808e5`（MissionsBody） |
+| 7 | 戦術サマリー | `44b0584` | `317b143` | RootCol: **Header** + **Scroll内6静的カード** | `7bbbb4e`（PlayerRolesBody） |
+| 8相当 | 契約・人事サマリー | `5d1afa2` | `092a0b1` | **部分済み**の残り: **RiskCard + PlayersCard** | `1df4820`（RiskRows / PlayerRows） |
+
+**契約・人事（`5d1afa2` / `1df4820`）の到達点**:
+- ルート Theme + Header + Contract / Balance / Caution は実装前から Phase4 系。
+- **RiskCard / PlayersCard** → `Phase4SummaryCard`（`.tscn` のみ）。
+- **RiskRows / PlayerRows** 動的行は **構造第2段未着手**。**文字色のみ** `Color(0.16, 0.2, 0.3, 1)` 最小補正（`.gd` のみ）。
+
+### 1.3 唯一の第1段未完了画面
+
+| 画面 | 第1段の状態 |
+|------|-------------|
+| **ロスター** | ルート `phase4_readonly_core.tres` + **`HeaderCard`＝Phase4HeaderCard** のみ。**`Scroll/%RowList` 表は暗背景＋OnDark 動的行**（`d33edb6`） |
+
+### 1.4 今回の調査目的
+
+契約・人事の第1段記録（`092a0b1`）完了後、**案A（ロスター）**・**案B（完了済み画面の第2段）**・**案C（総点検）** を比較し、**次に実装する1タスク**を決定する。
+
+
+================================================================================
+## 2. ロスター画面の現状
+================================================================================
+
+### 2.1 scene 構造（`roster_view.tscn`）
+
+```
+RosterView (Control, theme=phase4_readonly_core.tres)
+├── Background (ColorRect 暗色 #0.06,0.07,0.09)
+└── Margin / RootCol (VBox)
+    ├── HeaderCard (Phase4HeaderCard) — 静的
+    │   └── HeaderInner … ReadonlyBadge/ModeStrip(chip) / HeaderNavRow/HomeNavButton
+    │       TitleLabel / TeamNameLabel / SummaryMetaLabel / DataSourceLabel / FooterNoteLabel
+    ├── StatusLabel (hidden, エラー用)
+    └── Scroll (ScrollContainer)
+        └── RowList (%RowList, VBoxContainer) — 子は実行時のみ
+```
+
+- **静的 SummaryCard 相当の Panel はない**（他詳細画面の Scroll 内白カード型と異なる）。
+- **ReadonlyBadge / ModeStrip** は `StyleBoxFlat_chip`（暗 chip）の **panel override 残**（ヘッダー内の細部のみ）。
+
+### 2.2 script（`roster_view.gd`）
+
+| 項目 | 内容 |
+|------|------|
+| **JSON** | `roster_from_python.json` 優先 → `roster_mock.json` |
+| **入口** | `_ready` → `_apply_snapshot` → `_clear_rows` + 表生成 |
+| **動的生成** | **`%RowList`** に `HBoxContainer` + `Label.new()`（9列ヘッダ＋選手行）+ `HSeparator` |
+| **スタイル** | `_style_ondark_table_header_label` → **`Phase4OnDarkTableHead`** |
+| | `_style_ondark_table_cell_label` → **`Phase4OnDarkTableCell`** |
+| **列幅** | `_col_width()` 固定配列（1280 横スクロールなし前提） |
+| **HomeNav** | `_on_home_nav_button_pressed` → `home_dashboard.tscn`（**HeaderNavRow** 内） |
+| **DataSource** | `%DataSourceLabel` に読込元キャプション |
+
+### 2.3 Theme 状況
+
+| 領域 | 状態 |
+|------|------|
+| **ルート** | `phase4_readonly_core.tres` 割当済み |
+| **HeaderCard** | `Phase4HeaderCard` + タイトル系 Label 濃色（`2bb594c` 系） |
+| **表** | **暗ページ背景上の OnDark 表**（`d33edb6`）。白カード未使用 |
+| **Theme .tres 内の未使用候補** | **`Phase4TableHead` / `Phase4TableCell`**（白背景向け・既に定義あり） |
+
+### 2.4 `.tscn` のみで安全に進められる範囲
+
+| 候補 | 可否 | 備考 |
+|------|------|------|
+| **Scroll 内に `TableCard`（Phase4SummaryCard）を挿入し `%RowList` をその子にする** | **△（単独では不十分）** | 白カード化するが、**.gd が OnDark のままだと明色文字が白上で読めない**（財務/契約人事と同型の目視リスク） |
+| **ReadonlyBadge / ModeStrip の chip 色調整のみ** | **○ 可能だが効果小** | 表本体は変わらない |
+| **表の白カード化＋可読表スタイル** | **× .tscn のみ不可** | **`.gd` で OnDark → Phase4TableHead/Cell 切替が必須** |
+
+### 2.5 `.gd` 変更リスク
+
+| 観点 | 評価 |
+|------|------|
+| **変更量** | **中** — 2関数の `theme_type_variation` 差し替え＋（必要なら）関数名コメント更新。**ロジック・JSON キー・列定義は不変** |
+| **回帰** | **中** — 9列×N行の見た目・clip・tooltip（名前/状態列）の目視が必要 |
+| **DTO/export** | **影響なし** |
+
+### 2.6 データ・テスト
+
+| 項目 | 内容 |
+|------|------|
+| **mock** | `godot/data/roster_mock.json` |
+| **export** | `basketball_sim/export/roster_readonly.py` |
+| **pytest** | `test_roster_readonly_export.py`（**10 passed** 想定・他画面と同型） |
+
+### 2.7 ナビ
+
+- **CardNavMenu チーム列 #1**（主入口の一つ）+ **HeaderNavRow「ロスター」**（5導線の先頭）。
+- **HomeNavButton** は Header 内（他詳細画面と同型）。
+
+### 2.8 次候補としての評価
+
+| 観点 | 評価 |
+|------|------|
+| **ユーザー価値** | **◎ 最高**（ゲーム中心の編成表） |
+| **見た目改善** | **◎ 高**（暗表→白カード表で他9画面と統一） |
+| **1コミット安全性** | **中** — **`.tscn` + `.gd` のセットが必要**（契約人事の2コミット分割も可） |
+| **.tscn のみ** | **× 推奨しない**（OnDark 残りで可読性破綻） |
+| **総合** | **◎ 第1段横展開の最終ピース** |
+
+
+================================================================================
+## 3. 完了済み画面の第2段候補
+================================================================================
+
+### 3.1 facility_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | `%ScrollContent` 内施設一覧・セクション（`Label.new()` + 明色 override） |
+| **.gd 必要** | **はい** |
+| **差分規模** | 中（段落多数） |
+| **今すぐ** | **否** |
+
+### 3.2 club_history_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | 段落・**シーズン表**（`HBoxContainer` + `Label.new()`） |
+| **.gd 必要** | **はい** |
+| **差分規模** | 中〜大 |
+| **今すぐ** | **否** |
+
+### 3.3 standings_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **8列表・動的行**（`_add_standings_header_row` / `_add_standings_data_row`） |
+| **.gd 必要** | **はい** |
+| **差分規模** | 大（ロスターに近い表） |
+| **今すぐ** | **否** |
+
+### 3.4 schedule_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **`NextGameCard`**（`.tscn` 静的・`StyleBoxFlat_nextgame` 残）・**`ScrollContent` 試合リスト**（`.gd` で `PanelContainer.new()` + 明色 Label） |
+| **.gd 必要** | **試合リストは必須**。NextGameCard 単体は **`.tscn` のみ可能**だが第1段の「残り1枚」に相当 |
+| **差分規模** | NextGame のみ: 小 / 試合リスト込み: 大 |
+| **今すぐ** | **否**（第1段未完了のロスター優先） |
+
+### 3.5 finance_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **HistoryBody 構造**・履歴行レイアウト（**文字色は `6c3dc43` 済**） |
+| **.gd 必要** | **はい** |
+| **差分規模** | 中 |
+| **今すぐ** | **否** |
+
+### 3.6 owner_mission_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **MissionsBody 構造**・ミッション行レイアウト（**文字色は `2f808e5` 済**） |
+| **.gd 必要** | **はい** |
+| **差分規模** | 中 |
+| **今すぐ** | **否** |
+
+### 3.7 tactics_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第2段対象** | **PlayerRolesBody 構造**・選手ロール行レイアウト（**文字色は `7bbbb4e` 済**） |
+| **.gd 必要** | **はい** |
+| **差分規模** | 中 |
+| **今すぐ** | **否** |
+
+### 3.8 contract_personnel_summary_view
+
+| 項目 | 内容 |
+|------|------|
+| **第1段** | **完了**（Risk/Players + 動的行色 `1df4820`） |
+| **第2段対象** | **RiskRows / PlayerRows 構造**・多行ブロックのレイアウト・区切り |
+| **.gd 必要** | **はい** |
+| **差分規模** | 中 |
+| **ロスターより先に進む理由** | **なし** — 第1段は完了。第2段は他画面と同列で後回し可 |
+
+### 3.9 第2段の横断結論
+
+| 観点 | 結論 |
+|------|------|
+| **最小の第2段一歩** | **日程 NextGameCard の `.tscn` のみ**（1 Panel + 静的 Label 濃色）— ただし **10画面第1段の締めにはならない** |
+| **案B 総合** | **△（今すぐ最優先ではない）** — ほぼすべて `.gd` 必須・画面ごとに個別対応 |
+| **優先順** | **ロスター第1段完了後**に、必要なら **日程 NextGame** または **財務/OM/戦術/契約の Body 構造**を個別選定 |
+
+
+================================================================================
+## 4. 選択肢比較表
+================================================================================
+
+| 案 | 対象 | 変更範囲 | .tscnのみ可能性 | .gd変更リスク | ユーザー価値 | 見た目改善効果 | 1コミット安全性 | 推奨度 |
+|----|------|----------|----------------|--------------|-------------|---------------|----------------|--------|
+| **A** | **ロスター第1段**（TableCard + 表スタイル切替） | `roster_view.tscn` + `roster_view.gd` | **低**（表は .gd 必須） | **中** | **◎ 最高** | **◎ 高**（唯一の暗表解消） | **中**（2ファイル・分割可） | **◎** |
+| **B** | 完了8画面の第2段 | 各 `.gd` 主 | **低**（NextGame のみ例外） | **高** | 中 | 中（画面内） | 低〜中 | **△** |
+| **C** | 第1段完了後の総点検・小ロードマップ | reports/docs 的整理 | — | — | 低 | 低 | 高 | **△（低）** |
+
+**比較結論**:
+- **案A**: **9詳細画面 Theme 第1段の最終未着手画面**。Theme に **Phase4TableHead/Cell が既にある**ため、**OnDark→Table 切替は Theme `.tres` 変更なしで可能**。**`.tscn` 単独は不可**。
+- **案B**: 第1段が揃った今、**横展開の締めより仕上げ**。共通化薄く **1コミットで閉じにくい**。
+- **案C**: README/docs + 直近 reports チェーン（`a01de09` 等）で **足りている** — **実装を止める理由は弱い**。
+
+
+================================================================================
+## 5. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**ロスター閲覧 — Phase4 Theme 第1段（Scroll 内 TableCard 白カード化 ＋ 表を Phase4TableHead/Cell へ切替）**
+
+### 対象
+
+| 種別 | パス |
+|------|------|
+| **scene** | `godot/scenes/roster_view.tscn` |
+| **script** | `godot/scripts/roster_view.gd` |
+
+### なぜ今それを選ぶのか
+
+1. **第1段横展開の唯一の残り** — 8画面＋契約人事第8号相当まで完了（`092a0b1`）。**ロスターのみ** Header のみ Phase4。
+2. **docs / 前回調査（`a01de09`）の次候補と一致** — 契約人事完了後は **ロスター**。
+3. **ユーザー価値が最高** — CardNavMenu #1・HeaderNavRow 先頭。**編成表はゲームの中心画面**。
+4. **Theme 資産が既にある** — `phase4_readonly_core.tres` に **`Phase4TableHead` / `Phase4TableCell`** 定義済み。**新規 Theme 変更不要**。
+5. **確立済みパターンの適用** — 白カード（SummaryCard 型）＋動的 Label の variation 切替は、財務/OM/戦術/契約の **「白カード＋読める文字」** と同系（ロスターは variation 切替で色補正コミットを省略できる可能性が高い）。
+6. **`.tscn` のみでは不十分と現物で確認** — TableCard だけ追加して OnDark のままにすると **可読性が壊れる**ため、**同一タスク（または直後の第2コミット）で `.gd` 必須**。
+
+### なぜ他案を後回しにするのか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **B 第2段** | 8画面とも `.gd` 必須。第1段の横展開締め（ロスター）を先に |
+| **B 日程 NextGame のみ** | 小さいが **ロスター全体の価値に劣る** |
+| **C 総点検** | README + 8本の after_* reports でロードマップは十分 |
+| **契約人事第2段** | 第1段完了済み。RiskRows 構造整理はロスター後でよい |
+
+### 変更対象ファイルの想定（実装時）
+
+- **変更可**: `godot/scenes/roster_view.tscn`、`godot/scripts/roster_view.gd`
+- **変更不可**: `phase4_readonly_core.tres`（本タスクでは触らない想定）、`project.godot`、他 scene、export / tests / mock、README / docs、reports
+
+### 実装する場合の安全条件
+
+1. **`.tscn`**: `Scroll` 直下に **`TableCard`（PanelContainer, `Phase4SummaryCard`）** を挿入し、**`%RowList` を TableCard の子に移動**（unique_name・connection は維持）。
+2. **`.gd`**: `_style_ondark_table_header_label` / `_style_ondark_table_cell_label` の variation を **`Phase4TableHead` / `Phase4TableCell`** に変更（関数名は任意でリネーム可。ロジック・列幅・JSON は不変）。
+3. **触らない**: `_col_width`、選手行生成順、HomeNavButton handler、JSON パス、export DTO。
+4. **HeaderCard** は既に Phase4 — **壊さない**。
+5. **ReadonlyBadge/ModeStrip** の chip は **本タスクでは任意**（触らなくてよい）。
+6. 目視で表が薄い場合のみ — **font_color override の最小補正**を検討（財務 `6c3dc43` 型）。**Phase4TableHead/Cell で足りる想定**。
+
+### Godot 目視確認ポイント
+
+- CardNavMenu #1 / HeaderNavRow → ロスター遷移
+- HeaderCard 白カード・タイトル・DataSourceLabel
+- **Scroll 内表が白カード上で読めること**（ヘッダ9列・選手行・区切り線）
+- 長い選手名・状態列の tooltip / clip
+- HomeNavButton でホーム復帰
+- エラーなし・実行後 git 差分なし
+
+### pytest
+
+- **必要**（実装時）: `test_roster_readonly_export` 10 + `test_home_dashboard_readonly_export` 10 + phase0 smoke 1（他画面を触った場合は該当 export も）
+
+
+================================================================================
+## 6. 推奨タスクの最小実装案（Cursor 指示骨子）
+================================================================================
+
+**目的**: ロスター閲覧の **Scroll 内表を Phase4 白カード＋白背景向け表スタイル**にし、**10詳細画面の Theme 第1段横展開を完了**させる。
+
+**変更してよいファイル**:
+- `godot/scenes/roster_view.tscn`
+- `godot/scripts/roster_view.gd`
+
+**変更してはいけないファイル**:
+- `godot/themes/phase4_readonly_core.tres`（variation 既存のみ使用）
+- `project.godot`、他 scene、export / tests / mock、README / docs、reports
+
+**実装方針（推奨2コミット分割）**:
+
+| 順 | コミット | ファイル | 内容 |
+|----|----------|----------|------|
+| 1 | `.tscn` | `roster_view.tscn` | `TableCard` + `Phase4SummaryCard`、`RowList` 再親化 |
+| 2 | `.gd` | `roster_view.gd` | OnDark → **Phase4TableHead/Cell** |
+
+※ **コミット1のみで止めない**（OnDark のまま白カード上に載ると可読性低下）。
+
+**Theme 適用方針**:
+- 新規 StyleBox / Theme `.tres` 編集はしない。
+- 既存 `Phase4SummaryCard` + `Phase4TableHead` + `Phase4TableCell` を使用。
+
+**ノード名・unique_name**:
+- **`%RowList` 維持**（親パス変更のみ）。
+- **HomeNavButton / connection / handler 名維持**。
+
+**Scroll / 動的Label / 表**:
+- **RowList 内の動的生成ロジックは維持**（HBox + Label.new の構造は第2段）。
+- **今回触るのは Panel ラッパーと Label variation のみ**。
+
+**確認コマンド**:
+```
+git diff -- godot/scenes/roster_view.tscn
+git diff -- godot/scripts/roster_view.gd
+```
+
+**テスト**:
+```
+py -m pytest basketball_sim/tests/test_roster_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+```
+
+**コミット名案**:
+- `GodotロスターにTableCardのPhase4Themeを適用`
+- `Godotロスター表をPhase4TableHeadCellへ切替`
+- 記録: `GodotロスターTheme第1段の確認を記録`
+
+
+================================================================================
+## 7. 後回しにする案と理由
+================================================================================
+
+| 案 | 理由 |
+|----|------|
+| **B 完了8画面の第2段** | すべて `.gd` の構造・レイアウト。第1段未完了のロスターを先に |
+| **B 日程 NextGameCard のみ** | `.tscn` のみで小さいが、**横展開締めにならない** |
+| **契約人事 RiskRows 第2段** | 第1段＋色補正済み。急ぎではない |
+| **C 総点検レポート** | 本レポート + 既存 after_* 系列で代替可能 |
+| **ロスター Header chip のみ** | 効果が小さく、表本体の課題を残す |
+| **Theme .tres に新 variation 追加** | 既存 Phase4TableHead/Cell で足りる想定 |
+
+
+================================================================================
+## 8. 変更していないファイル
+================================================================================
+
+- `godot/scenes/*.tscn`（本レポート新規除く）
+- `godot/scripts/*.gd`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- `reports/godot_phase4_detail_screens_ui_survey_2026-05.txt`
+- `reports/godot_phase4_after_facility_theme_next_task_2026-05.txt`
+- `reports/godot_phase4_after_three_detail_themes_next_task_2026-05.txt`
+- `reports/godot_phase4_after_four_detail_themes_next_task_2026-05.txt`
+- `reports/godot_phase4_after_five_detail_themes_next_task_2026-05.txt`
+- `reports/godot_phase4_after_six_detail_themes_next_task_2026-05.txt`
+- `reports/godot_phase4_after_seven_detail_themes_next_task_2026-05.txt`
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- `godot/scenes/home_production_wire_preview*.tscn`
+- `docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md`
+
+
+================================================================================
+## 参照コミット・レポート
+================================================================================
+
+- 契約人事: `5d1afa2` / `1df4820` / 記録 `092a0b1`
+- 選定（契約人事前）: `a01de09` + `reports/godot_phase4_after_seven_detail_themes_next_task_2026-05.txt`
+- ロスター OnDark: `d33edb6` / ヘッダー: `2bb594c`
+- docs 現在地: `092a0b1`（README / GODOT_GUI_INFORMATION_ARCHITECTURE / GODOT_NAVIGATION_PHASE4）
