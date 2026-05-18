@@ -117,7 +117,7 @@ func _fill_mission_rows(raw: Variant) -> void:
 		var lab := Label.new()
 		lab.autowrap_mode = 2
 		lab.add_theme_font_size_override("font_size", 13)
-		lab.add_theme_color_override("font_color", Color(0.86, 0.9, 0.95))
+		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = "今季ミッションはありません。"
 		_missions_body.add_child(lab)
 		return
@@ -129,7 +129,7 @@ func _fill_mission_rows(raw: Variant) -> void:
 		var lab := Label.new()
 		lab.autowrap_mode = 2
 		lab.add_theme_font_size_override("font_size", 13)
-		lab.add_theme_color_override("font_color", Color(0.86, 0.9, 0.95))
+		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = block
 		_missions_body.add_child(lab)
 
