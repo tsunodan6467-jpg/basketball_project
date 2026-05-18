@@ -393,7 +393,7 @@
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **詳細画面 Theme 横展開第1号・第1段**（`5987821`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の `facility_summary_view.gd` による **`Label.new()`** は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`23a8fcf`** 調査（Header+Summary 型・`.tscn` のみ・HeaderNavRow 到達・DTO 安定・クラブ史/順位表へ横展開しやすい）。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **詳細画面 Theme 横展開第2号・第1段**（`682a941`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の段落・シーズン表（`club_history_view.gd` の **`Label.new()` / シーズン表 `HBoxContainer`**）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`64abb9c`**（施設第2段より先に横展開推奨・同型・順位表より Scroll ギャップ小）。
 - **順位表閲覧**（`standings_view.tscn`）: **詳細画面 Theme 横展開第3号・第1段**（`927e918`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の **8 列表・動的行**（`standings_view.gd` の **`Label.new()`** 等）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。
-- **日程閲覧**（`schedule_view.tscn`）: **詳細画面 Theme 横展開第4号・第1段**（`440c3f6`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`Scroll/ScrollMain/SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置。**`StyleBoxFlat_nextgame` は NextGameCard 用に残置**）。**`NextGameCard`**・**`ScrollContent`**（試合リスト — `schedule_view.gd` の動的生成）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`a5eec31`**（残り横展開継続・HeaderNavRow 到達・**Scroll 内 SummaryCard 型**）。
+- **日程閲覧**（`schedule_view.tscn`）: **詳細画面 Theme 横展開第4号・第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**。**`SummaryCard`**・**`NextGameCard`**＝**`Phase4SummaryCard`**（**`StyleBoxFlat_nextgame` SubResource は残置**）。**`ScrollContent`**（試合リスト — `schedule_view.gd` の動的生成）は**第2段・後半**（暗背景＋明文字のまま）。**`schedule_view.gd`・Theme `.tres`・DTO/export/mock は第1段以降不変**。選定: 第1段 **`a5eec31`**、第2段初手 **`8fc2d91`**。詳細は §15.1 日程節。
 - **財務サマリー閲覧**（`finance_summary_view.tscn` / `finance_summary_view.gd`）: **詳細画面 Theme 横展開第5号・第1段**（`4b43da5`）＋**履歴行文字色の最小補正**（`6c3dc43`）。選定は **`99c279d`**（4画面第1段完了後、**Scroll 第2段より先に残り詳細へ**。**未Theme・ユーザー価値高**・**Header + Scroll 内静的5カード**・**`.tscn` のみで第1段可能**・**`finance_summary_readonly` + pytest 安定**・**OM 等へ進む前に Scroll 内複数 Panel の手順を固められる**）。
   - **`4b43da5` 実装範囲**（**`finance_summary_view.tscn` のみ**）: ルート **`phase4_readonly_core.tres`**。**`HeaderCard`**＝**`Phase4HeaderCard`**。**Scroll/ScrollContent 内** **Finance / Prior / Salary / History / Caution** の5枚＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。Header・各カード・**`NotesFooterLabel`** のラベル濃色化。**`HomeNavButton` / `%DataSourceLabel` / from_python・mock 読込は維持**。
   - **`4b43da5` 実装境界**: **`.gd`・Theme `.tres`・DTO/export/mock 未変更**。**`%HistoryBody` 内動的履歴行は未変更**（第2段扱い）。
@@ -480,10 +480,19 @@
     - **実装範囲**: **`schedule_view.tscn` のみ**。ルート **`phase4_readonly_core.tres`**。**`HeaderCard`** → **`Phase4HeaderCard`**、**`Scroll/ScrollMain/SummaryCard`** → **`Phase4SummaryCard`**。**panel override のみ除去**（SubResource 残置）。**Header + `SummaryBlockLabel` 濃色化**。
     - **情報構造（不変）**: **`HeaderCard`** → **`Scroll/ScrollMain`**（**`SummaryCard`** → **`NextGameCard`** → **`ScrollContent`** 試合リスト — **`.gd` で動的生成**）。
     - **実装境界**: **`schedule_view.gd`・Theme `.tres`・export / mock JSON 未変更**。
-    - **第2段（未着手）**: **`NextGameCard`**（`StyleBoxFlat_nextgame` のまま）・**`ScrollContent` / 試合リスト**の白カード化・行レイアウト整理（**`.gd` 必須**）。
-    - **ユーザー環境 Godot**: **ホーム → 日程 OK**・**表示・Header/Scroll内Summary 見た目・可読性・DataSourceLabel OK**・**NextGameCard 残存 OK**・**試合リスト残存 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+    - **第2段（第1段時点・未着手）**: **`NextGameCard`**（`StyleBoxFlat_nextgame` のまま）・**`ScrollContent` / 試合リスト**（**第2段・前半 `986c4ab` で NextGameCard のみ対応**）。
+    - **ユーザー環境 Godot（第1段 `440c3f6`）**: **ホーム → 日程 OK**・**Header/Scroll内Summary 見た目 OK**・**NextGameCard 暗色残存 OK**・**試合リスト残存 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
     - **横展開テンプレ**: RootCol 直下 Header+Summary 型に加え、**Scroll 内 SummaryCard 型**でも第1段が成功 — **構造バリエーションへの横展開が開始**された。
-    - **今後**: **残り詳細画面**（OM・戦術・契約人事・ロスター続き）への横展開か、完了済み画面の **NextGame / Scroll / HistoryBody 第2段**（**LeftRail クリック化は別工程**）。
+  - **日程閲覧・Phase4 Theme 第2段・前半 — NextGameCard 白カード化（`986c4ab`）** — **主要10画面 Theme 第1段完了後の第2段初手**:
+    - **選定（`8fc2d91`）**: ロスター第1段記録（`19781ac`）後、**完了済み10画面の第2段候補を比較**。**日程 `NextGameCard`** を第2段初手に推奨 — **理由**: **`.tscn` のみで閉じられる**・**静的1カードでリスクが小さい**・**SummaryCard は白系済みで NextGameCard だけ暗色残り**・**`.gd` の動的行や表改修に入る前の安全な第2段入口**・**ScrollContent / 試合リストは後半へ分割できる**。
+    - **実装範囲（`986c4ab`）**: **`schedule_view.tscn` のみ**。**`NextGameCard`** → **`Phase4SummaryCard`**（**`theme_override_styles/panel` 除去**・**`theme_type_variation` へ置換**・**`StyleBoxFlat_nextgame` SubResource 定義は残置**）。**NextGameCard 内ラベル**を白カード向け濃色化（**SectionTitle / NextGameLabel**＝`Color(0.08, 0.11, 0.18, 1)`、**Competition / Round / Opponent**＝`Color(0.16, 0.2, 0.3, 1)`、**HomeAway / Status**＝`Color(0.2, 0.25, 0.36, 1)`）。
+    - **実装境界**: **`schedule_view.gd`・Theme `.tres`・export / mock JSON 未変更**。**`%ScrollContent` / 試合リスト未変更**。**HeaderCard / SummaryCard / HomeNavButton / DataSourceLabel 維持**。
+    - **pytest（`986c4ab`）**: schedule 10 / home_dashboard 10 / roster 10 / phase0 smoke 1 — いずれも passed。
+    - **ユーザー環境 Godot（ローカル目視）**: **ホーム → 日程遷移 OK**・**日程画面表示 OK**・**HeaderCard / SummaryCard は従来どおり OK**・**NextGameCard 白カード化 OK**・**NextGameCard 内ラベル可読性 OK**・**ScrollContent / 試合リスト残存 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし・実行後 git 差分なし**。
+    - **到達点**: **日程閲覧 Phase4 Theme 第2段・前半完了**（**第2段全体・日程画面の完全仕上げではない**）。
+    - **第2段・後半（未着手）**: **`%ScrollContent` / 試合リスト**の白カード化・**試合リスト行の余白・区切り・カード化**・行レイアウト整理（**必要に応じ `schedule_view.gd`**）。
+    - **横展開全体の意味**: **主要10画面 Theme 第1段完了後、第2段の最初の実装として成功** — **財務 HistoryBody / OM MissionsBody / 戦術 PlayerRolesBody / 契約 RiskRows / ロスター表行など、より重い `.gd` 第2段へ進む前の安全な実績**。
+    - **今後**: **日程 ScrollContent 第2段後半**、または **財務 HistoryBody 行区切り** 等の他画面第2段を個別判断（**LeftRail クリック化は別工程**）。
   - **財務サマリー閲覧・Phase4 Theme 第1段（`4b43da5`）＋履歴行文字色最小補正（`6c3dc43`）** — **9詳細画面 UI 整備のテンプレ候補第5号**:
     - **選定（`99c279d`）**: 4画面第1段完了後、**完了済み4画面の Scroll 第2段（`.gd` 必須）より先に残り詳細へ**。**財務**は **CardNavMenu 経営列 #7**（**HeaderNavRow 非搭載**）・**`finance_summary_readonly` + pytest 安定**・**Scroll 内静的5カード**（Finance / Prior / Salary / History / Caution）・**`.tscn` のみで第1段を閉じやすい**。
     - **実装範囲（`4b43da5`）**: **`finance_summary_view.tscn` のみ**。ルート **`phase4_readonly_core.tres`**。**`HeaderCard`** → **`Phase4HeaderCard`**。**Scroll/ScrollContent 内5枚** → **`Phase4SummaryCard`**。**panel override のみ除去**（SubResource 残置）。**静的ラベル**を白カード向け濃色。
@@ -536,7 +545,7 @@
     - **補正（`407f014`）**: **`roster_view.gd` のみ** — **`Phase4OnDarkTableHead` → `Phase4TableHead`**、**`Phase4OnDarkTableCell` → `Phase4TableCell`**（**Theme variation 切替のみ・第2段本格整備ではない**）。**scene / Theme / DTO 不変**。**9列・列幅・行生成順・JSON key 不変**。
     - **第2段（未着手）**: **表行の Panel 化**、**余白・区切り・カード化**、**ReadonlyBadge / ModeStrip 暗 chip 整理**、**行レイアウトの本格調整**。
     - **ユーザー環境 Godot**: **HeaderNavRow または CardNavMenu → ロスター OK**・**白 TableCard 内9列表 OK**・**表ヘッダー/セル可読性 OK**・**DataSourceLabel OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
-    - **横展開全体**: **施設・クラブ史・順位表・日程・財務・OM・戦術・契約人事・ロスター**を含む **主要10画面の Theme 第1段が一通り完了** — **以後は各画面の第2段**（動的行・表・行レイアウト）を個別判断。
+    - **横展開全体**: **主要10画面の Theme 第1段が一通り完了**。**第2段着手**: **日程 NextGameCard 白カード化（`986c4ab`・前半）** — **以後は各画面の第2段**（日程試合リスト・動的行・表・行レイアウト）を個別判断。
   - **本線ホーム 表示用 LeftRail（`a5e548f`）**: **`home_dashboard.tscn` のみ**。**レイアウト構造（情報設計）**:
     - **`HeaderCard`** — 全幅（クラブ帯・**`HeaderNavRow` 5 ボタン**）。
     - **`StatusLabel`** — 全幅。
