@@ -85,7 +85,7 @@
 - **`home_dashboard.gd` は未変更**（**`83d7fc0` / `ed106c8` / `8676095` / `762f5bc` / `d18bf1f` / `2471b67` いずれでも変更なし**）。**from_python / mock の候補パス・読込経路は未変更**。**`83d7fc0` は HeaderCard のみ**で **`Scroll` 以下は未着手だった**が、その後 **`ed106c8` で `CardNews`、`8676095` で `CardNext`、`762f5bc` で `CardWarnings`、`d18bf1f` で `CardTasks`、`2471b67` で MetricsRow の `CardRank` / `CardMoney`** Theme 限定適用（下記「Scroll 以下 `CardNews`」〜「MetricsRow」節）。
 - **左レール**は **`a5e548f` 以前は本線未実装**（**表示用の最小追加は下記「表示用 LeftRail」節**）。**右サマリー比較scene**（`home_production_wire_preview_right_summary.tscn`）は**本線未接続**（上記「右サマリー列あり版」節）。
 - **ユーザー環境 Godot 4.6.2**: 通常起動 / F6 で **仮ロゴ枠・ClubName / Season / DataSourceLabel・HeaderNavRow** が問題なく表示。**UID エラーなし**。**実行後の不要差分なし**（手元運用の目安）。
-- **今後（Header 節・`83d7fc0` 時点の補足）**: Scroll 以下 Theme・**`club_summary` 状況メモ化**（`91cfaed`）・**`CardTeamExtras` / `CardSummary` Theme**（`dc0182a`・`1d070ba`）は**別節**。**残る暗色は `CardNavMenu` のみ**（ナビ設計と合わせて判断）。**News 1 行化**・**Header 資金・成績本格移植**は **別タスク**（**左レールの表示追加は `a5e548f` で実施済み・クリック化は別タスク**）。
+- **今後（Header 節・`83d7fc0` 時点の補足）**: Scroll 以下 Theme・**`club_summary` 状況メモ化**（`91cfaed`）・**`CardTeamExtras` / `CardSummary` / `CardNavMenu` Theme**（`dc0182a`・`1d070ba`・`d9bd713`）は**別節**。**News 1 行化**・**Header 資金・成績本格移植**は **別タスク**（**左レールの表示追加は `a5e548f` で実施済み・クリック化は別タスク**）。
 
 ### 本線ホーム Scroll 以下 `CardNews` の Theme 限定適用（`ed106c8`）
 
@@ -148,19 +148,27 @@
 ### 本線ホーム `CardSummary` の Theme 限定適用（`1d070ba`）
 
 - **`home_dashboard.tscn` のみ**（**`91cfaed` の状況メモ化の後**）。`CardTeamExtras` と同型の **SummaryCard** 化。
-- **Scroll 内の暗色カード**: **`CardNavMenu` のみ**残存（**単純 Theme 化は未着手** — **HeaderNavRow / 左レール / 10 画面導線**と合わせて判断）。
-
-- **今後**: **`CardNavMenu`** は **HeaderNavRow との二重導線**・**表示用 LeftRail**・**10 画面導線整理**と絡むため、**見た目だけの Theme 化は急がない**（設計判断を挟む）。**`CardNews` の 1 行化**は **`.gd` または `news_headline` 等**を**別タスク**。**Header へ資金・成績行の本格移植**は **MetricsRow との重複整理**を**別途**。
 
 ### 本線ホーム 表示用 LeftRail（`a5e548f`）
 
 - **変更ファイル**: **`home_dashboard.tscn` のみ**（`a5e548f`「Godot本線ホームに表示用左レールを追加」）。**大レイアウト全面移植ではなく、`MainRow` 挿入による第 1 段**。
 - **構造**: `HeaderCard`・`StatusLabel`・`FooterNote` は**全幅維持**。**`StatusLabel` 直下**に **`MainRow`（HBox・separation 14）** → **左** `LeftRail`（**200px**）・**右** 既存 **`Scroll` / `Inner`**（`CardNavMenu` → MetricsRow → 各カードの順序は不変）。
 - **LeftRail**: sandbox 本命（`home_production_wire_preview.tscn`）を参考。**大分類 5**（**ホーム**＝現在地強調、**チーム**・**リーグ**・**経営**・**クラブ**）。**Panel + Label**、**`mouse_filter = 2`**。**Button 化・`[connection]` 追加・`home_dashboard.gd` 変更なし**。タイトル **MAIN**、注記 **「表示のみ / 詳細は中央メニュー」**。
-- **維持**: **`HeaderNavRow`（5 ボタン）**、**`CardNavMenu`（8 ボタン・#7〜#10 の主入口含む）** — **削除・縮小・Theme 化なし**。CardNavMenu 側の connection は **`Margin/RootCol/MainRow/Scroll/...`** へパス更新のみ（**既存 9 handler 名は不変**）。
+- **維持**: **`HeaderNavRow`（5 ボタン）**、**`CardNavMenu`（8 ボタン・#7〜#10 の主入口含む）** — **削除・縮小なし**（**`d9bd713` で CardNavMenu のみ Theme 化 — 下記節**）。CardNavMenu 側の connection は **`Margin/RootCol/MainRow/Scroll/...`** へパス更新のみ（**既存 9 handler 名は不変**）。
 - **未変更**: **`home_dashboard.gd`**、**Theme `.tres`**、**export / mock JSON**、**`project.godot`**。
 - **ユーザー環境 Godot（ローカル目視・スクショ約 1216×684）**: **大きなレイアウト崩れなし**。**HeaderCard 全幅**・**LeftRail 左表示**・**CardNavMenu 4 列**・**MetricsRow 以降のカード**・**FooterNote** 表示 OK。**HeaderNavRow** のメニュー遷移 OK。**CardNavMenu**（画面メニュー）のメニュー遷移 OK。**左の MAIN / LeftRail はクリック遷移しないのが正しい**（**表示のみ**）。
 - **今後**: LeftRail を**クリック可能**にするかは**別タスク・別設計判断**（大分類と複数画面の対応・handler 流用・CardNavMenu 縮小可否）。
+
+### 本線ホーム `CardNavMenu` の Theme 限定適用（`d9bd713`）
+
+- **変更ファイル**: **`home_dashboard.tscn` のみ**（`d9bd713`「Godot本線ホームCardNavMenuにThemeを限定適用」）。**導線・ナビ構造の再設計ではない**。
+- **`CardNavMenu`**: `theme` + **`Phase4SummaryCard`**。**`StyleBoxFlat_card` の panel override のみ除去**（**SubResource 定義は削除せず残置**）。
+- **ラベル**: `NavTitle` / カテゴリラベル（`CatTeam` 等）を白カード向け濃色（`CardTeamExtras` / `CardSummary` と同系）。**8 ボタン**のノード名・text・tooltip・**14 connection**・**9 handler 名は不変**。
+- **維持**: **`HeaderNavRow`**、**表示のみ `LeftRail`**（Button / connection / script 追加なし）。**`CardNavMenu` は削除・縮小していない**。
+- **未変更**: **`home_dashboard.gd`**、**Theme `.tres`**、**export / mock JSON**。
+- **ユーザー環境 Godot（ローカル目視・1280×720）**: **大きなレイアウト崩れなし**。**CardNavMenu 白系カード化**（Scroll 内の**唯一暗色カード状態は解消**）。**4 列表示成立**。**8 ボタン視認 OK**。**#7〜#10 入口表示 OK**（財務サマリー・オーナーミッション・戦術サマリー・契約・人事サマリー）。**CardNavMenu 遷移 OK**。**LeftRail は表示のみ**（**遷移しないのが正しい**）。**実行後 git 差分なし**（手元確認）。
+- **現在のホーム到達点（ナビ）**: **HeaderNavRow**＝上部主要5導線、**LeftRail**＝大分類・現在地の表示、**CardNavMenu**＝**実操作用**の中央画面メニュー（9詳細・#7〜10含む）。
+- **今後**: **LeftRail クリック化**は**別タスク**。**次の自然な進め方**は **他詳細画面への Theme 方針展開**（次画面選定調査 → 1画面ずつ）または **ホーム DTO/表示の別整理**（`CardNews` 1行化等）。**CardNavMenu の削除・縮小は当面しない**。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -176,7 +184,7 @@
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **暗地前提のまま**で、**白カード化・Theme 統一は未着手**（別タスクで `.gd` 調整が必要）。
 - **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**ヘッダー**は `Phase4HeaderCard` + ヘッダー Label 濃色。**表**（`Scroll` / `RowList` 内の動的 `Label`）は **暗背景のまま**、`roster_view.gd` で `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` の **`theme_type_variation` に寄せた最小対応**（白カード化はしていない）。
-- **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で `MainRow` 左に表示用 `LeftRail`（200px・大分類 5・クリック不可）**。**MetricsRow** 3 枚 **`Phase4SummaryCard`**（`f66bcd2`・`2471b67`）。**Scroll 以下**: **`CardNews` / `CardNext` / `CardTasks`** SummaryCard、**`CardWarnings`** WarningCard、**`CardTeamExtras` / `CardSummary`** SummaryCard（**`dc0182a`・`1d070ba`**）。**暗色 `StyleBoxFlat_card` は `CardNavMenu` のみ**（**`91cfaed` で `club_summary` は状況メモ化済み・export/mock のみ**）。**`home_dashboard.gd`・Theme `.tres` は上記段階で不変**。**HeaderNavRow**・**CardNavMenu** は **ボタン数・接続・遷移先不変**（実操作導線）。**LeftRail は表示のみ**（下記節）。
+- **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で表示用 `LeftRail`（200px・クリック不可）**。**MetricsRow** 3 枚 + **Scroll 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`home_dashboard.gd`・Theme `.tres` は不変**。**HeaderNavRow**・**CardNavMenu**＝実操作導線（**LeftRail は表示のみ** — 下記2節）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
 
@@ -248,7 +256,9 @@
 ★ README/docs に状況メモ化とカード Theme 到達点を記録（`1afaacc`）
 ◎ 本線 `home_dashboard` に表示用 LeftRail を追加（`a5e548f`）
 ◎ 表示用 LeftRail・HeaderNavRow・CardNavMenu のローカル目視確認 OK（ユーザー環境 Godot・約 1216×684）
-□ CardNavMenu の扱い（HeaderNavRow / 表示用 LeftRail / 10 画面導線と合わせて判断）
+◎ 本線 `home_dashboard` の `CardNavMenu` に Theme を限定適用（`d9bd713`）
+◎ CardNavMenu 白系化・4列・8ボタン・#7〜#10・遷移確認 OK（ユーザー環境 Godot・1280×720）
+□ 次詳細画面の Theme 方針展開（次画面選定調査 → 1画面ずつ）
 □ CardNews 1 行化の表示制御 / DTO 整理判断
 □ Header 資金・成績行の本格移植判断
 □ home DTO / JSON の追加整理
@@ -257,7 +267,6 @@
 □ 本線 `home_dashboard` 中央カード密度の大移植判断
 □ LeftRail クリック化・CardNavMenu 縮小の設計判断（表示用追加は `a5e548f` 済み）
 □ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
-□ ホーム・CardNavMenu（Scroll 内唯一の暗色カード・ナビ設計と合わせて判断）
 □ ホーム全体への Theme 拡大（ルート一括など）
 □ LeftRail クリック接続（別タスク。sandbox は引き続き研究可）
 □ ホーム「データ更新」表示 / ボタン判断
@@ -428,7 +437,7 @@
   ◎ 本線ホームCardTeamExtras Theme限定適用（`dc0182a`）
   ◎ 本線ホームCardSummary Theme限定適用（`1d070ba`）
   ★ README/docsに状況メモ化とカードTheme到達点を記録（本コミット）
-□ CardNavMenuの扱い（HeaderNavRow/左レール/10画面導線）
+◎ CardNavMenu Theme化済み・導線維持（`d9bd713`）
 □ CardNews1行化の表示制御 / DTO整理判断
 □ Header資金・成績行の本格移植判断
 □ home DTO / JSON の追加整理
@@ -475,7 +484,7 @@
 - **配布用に export 専用 exe を同梱し Godot から起動する**こと（未実装）
 - **`generated_at` を全 DTO に一斉追加する**こと、**Godot 側で JSON の更新時刻だけを常時表示する**こと（未実装・要別判断）
 - **契約 / 人事サマリー画面の本格ビジュアル調整**（現状は読み取りプロトタイプ優先）
-- **10 画面すべてへの共通 Theme の一括適用**、**ホームの Scroll 以下まで含む全体 Theme 化**（**限定適用の検証段階**。ホーム Scroll 以下は **Summary / Warning 系カードがほぼ白カード化済み**。**暗色 `StyleBoxFlat_card` は `CardNavMenu` のみ** — **ナビ設計判断を挟むまで Theme 化しない方針**）
+- **10 画面すべてへの共通 Theme の一括適用**、**ホームの Scroll 以下まで含む全体 Theme 化**（**限定適用の検証段階**。ホーム Scroll 以下は **Summary / Warning 系で白カード化済み**（**`CardNavMenu` 含む・`d9bd713`**）。**詳細9画面の Theme 展開は未着手**）
 - **本番ホームワイヤー sandbox**（`scenes/home_production_wire_preview.tscn`）および **右サマリー比較scene**（`scenes/home_production_wire_preview_right_summary.tscn`）を **本線ホームに自動接続**すること（**script なし・JSON なし・本線遷移なし**。研究・比較用。詳細は「本番ホームワイヤー sandbox」「右サマリー列あり版」節）
 - **Godot 本番 GUI の一本化**
 
