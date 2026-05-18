@@ -1,0 +1,344 @@
+# Godot Phase 4 home_dashboard 次タスク候補整理（2026-05）
+
+本ファイルは調査・方針比較のみ。実装・シーン・スクリプト・Theme・docs/README・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `91e16c8`（Godot本線ホーム左レール表示確認を記録）
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**
+
+### 1.1 home_dashboard の到達点
+
+| 領域 | 状態 |
+|------|------|
+| **DTO** | `club_summary` 状況メモ化済み（`91cfaed`・export/mock/tests） |
+| **Theme（Scroll）** | MetricsRow 3枚、`CardTeamExtras`、`CardSummary`、`CardNews/Next/Tasks`、`CardWarnings` → Summary/Warning 系 |
+| **暗色残り** | **`CardNavMenu` のみ**（`StyleBoxFlat_card` panel override） |
+| **Header** | ClubBand 風 + **`HeaderNavRow` 5ボタン**（遷移維持） |
+| **LeftRail** | **`a5e548f` 表示用追加**（200px・大分類5・Panel+Label・クリック不可） |
+| **script / Theme.tres** | **不変**（左レール追加以降も） |
+| **10画面導線** | Header 5 + CardNavMenu 9詳細すべて到達可（前回 route matrix 正本） |
+
+### 1.2 ナビ3要素の現在役割
+
+| 要素 | 役割 | 操作 |
+|------|------|------|
+| **HeaderNavRow** | 主要5画面の上部ショートカット | **遷移あり**（5 handler） |
+| **CardNavMenu** | 9詳細への中央メニュー（#7〜#10 の主入口含む） | **遷移あり**（8ボタン・9 handler） |
+| **LeftRail** | 現在地・大分類の**視覚表示** | **遷移なし**（意図的） |
+
+### 1.3 直近ユーザー確認（`91e16c8` 記録・ローカル Godot）
+
+- **表示サイズ目安**: スクショ約 **1216×684**（1280×720 固定とは記載しない）
+- **レイアウト**: 大きな崩れなし
+- **HeaderNavRow / CardNavMenu**: 遷移 OK
+- **CardNavMenu**: **4列表示成立**
+- **LeftRail**: 表示のみ・**遷移しないのが正しい**
+
+### 1.4 直近調査の消化状況
+
+| report / コミット | 当時の「次」 | 現状 |
+|-------------------|-------------|------|
+| `godot_card_navmenu_policy_survey` | 推奨 **D**（Theme 保留）・次は導線表 | **導線表・役割案・左レール可否は完了** |
+| `godot_home_navigation_route_matrix` | 到達経路正本 | **完了** |
+| `godot_home_navigation_role_options` | 案3・左レール準備調査へ | **完了** |
+| `godot_home_left_rail_integration_survey` | 案A・表示のみ本線追加 | **`a5e548f` 完了** |
+
+→ **CardNavMenu 方針調査当時の「IA 調査を先に」前提は満た済み**。残るホーム内の**目立つ未整理**は **Scroll 内暗色1枚（CardNavMenu）**。
+
+
+================================================================================
+## 2. 残っている主な論点
+================================================================================
+
+1. **CardNavMenu が暗色のまま** — 右ペイン内で他カードは白系、**視覚的に唯一の未統一ブロック**。
+2. **CardNavMenu は消せない** — **#7 財務・#8 OM・#9 戦術・#10 契約人事**の**主入口**（Header に載せない設計の結果）。
+3. **LeftRail クリック化は未設計** — 大分類1つに複数画面（例: チーム＝ロスター+戦術）。**急ぐべきでない**（ユーザー方針・前回 reports 一致）。
+4. **HeaderNavRow / CardNavMenu / LeftRail の役割** — README/docs §2.4 等で**文書化済み**。実装 IA は**暫定安定**扱い可。
+5. **詳細9画面の Theme** — 多くが **`StyleBoxFlat_summary` 暗色パネル主体**（`Phase4HeaderCard` 未適用が多数）。**ホームより未整備が大きい**。
+6. **Phase 4 全体優先** — 「ホームを仕上げる」か「他画面へ方針展開」かの**分岐点**が今回の論点。
+
+
+================================================================================
+## 3. 候補A〜Fの比較
+================================================================================
+
+### 候補A: CardNavMenu を現状維持のまま次へ進む
+
+| 項目 | 内容 |
+|------|------|
+| **内容** | 暗色 CardNavMenu・表示のみ LeftRail を維持。ホームナビは触らず、他画面や DTO へ。 |
+| **変更範囲** | なし（ホーム）または他領域 |
+| **メリット** | **最安全**。IA・導線リスクゼロ。 |
+| **デメリット** | ホーム右ペインの**未統一感が残る**。ホーム改善の機会を逃す。 |
+| **リスク** | **低** |
+| **必要な確認** | 特になし |
+| **今やる優先度** | **低〜中**（安定最優先なら可） |
+
+---
+
+### 候補B: CardNavMenu を最小 Theme 化
+
+| 項目 | 内容 |
+|------|------|
+| **内容** | **導線・ボタン・connection・handler 不変**。**`CardNavMenu` のみ** `Phase4SummaryCard` + ラベル濃色化（`dc0182a` / `1d070ba` と同型）。**`.tscn` のみ**想定。 |
+| **変更範囲** | `home_dashboard.tscn` のみ（1コミット） |
+| **メリット** | Scroll 内**最後の暗色解消**。**実操作導線不変**。**#7〜#10 維持**。**実装パターン実績あり**。ユーザーが今見ているホームの**仕上げ効果が大きい**。 |
+| **デメリット** | 二重5導線・縦占有は残る。**左レール本線化で CardNavMenu 縮小時**、panel/ラベル調整は**捨て戻し中**になりうる（`a88f7c7` 指摘・依然有効）。 |
+| **リスク** | **技術: 低〜中**（4列・狭い右ペインでボタン可読性は**目視必須**）。**戦略: 中**（将来ナビ再設計時）。 |
+| **必要な確認** | Godot 目視（**約1216×684 または 1280×720**）。4列・8ボタン・遷移14本。 |
+| **今やる優先度** | **高**（前提調査完了後のホーム仕上げとして） |
+
+**注意**: 「次に必ず Theme 化」とは書かない。**IA 判断が一段落した今**の**任意の仕上げ候補**。
+
+---
+
+### 候補C: LeftRail クリック化の調査へ進む
+
+| 項目 | 内容 |
+|------|------|
+| **内容** | 大分類→画面のマップ、代表遷移先、Header/CardNavMenu との住み分け調査。 |
+| **変更範囲** | report のみ（実装なし）または sandbox/.gd |
+| **メリット** | 長期 IA に前進。 |
+| **デメリット** | **1カテゴリ複数画面**で直行設計が難しい。**三重導線**リスク。ユーザー方針で**まだ早い**。 |
+| **リスク** | **中〜高**（早い実装） |
+| **必要な確認** | IA 表・チーム合意 |
+| **今やる優先度** | **低**（明示的に後回し） |
+
+---
+
+### 候補D: home_dashboard の次の微調整
+
+| 項目 | 内容 |
+|------|------|
+| **内容** | LeftRail 文言、CardNavMenu 列間隔、注記の軽微調整。構造変更なし。 |
+| **変更範囲** | `home_dashboard.tscn` のみ |
+| **メリット** | 目視後の細部改善。 |
+| **デメリット** | ユーザー確認で**大きな崩れなし** — **効果限定的**。暗色問題は残る。 |
+| **リスク** | **低** |
+| **必要な確認** | 目視 |
+| **今やる優先度** | **低**（CardNavMenu Theme より優先度低い） |
+
+---
+
+### 候補E: 次の主要画面の UI 整備へ進む
+
+| 項目 | 内容 |
+|------|------|
+| **内容** | 詳細画面へ `Phase4HeaderCard` / `Phase4SummaryCard` を**1画面ずつ**展開。 |
+| **変更範囲** | 対象 `*_view.tscn`（場合により `.gd`） |
+
+**現物 Theme 状況（2026-05 読取）**:
+
+| scene | Header Theme | 本文カード | 備考 |
+|-------|:------------:|:----------:|------|
+| `roster_view` | ○ Header | 表は OnDark（`.gd`） | ヘッダー済み・表は別タスク |
+| `contract_personnel_summary_view` | ○ | 一部 Summary、人事/契約選手は暗色 | 部分適用済み |
+| `facility_summary_view` | × | 暗色 `StyleBoxFlat_summary` | **パネル少・1画面1コミット向き** |
+| `standings_view` | × | 暗色 | 同型 |
+| `schedule_view` | × | 暗色 | 同型 |
+| `club_history_view` | × | 暗色 | 同型 |
+| `finance_summary_view` | × | 暗色複数 | パネル多 |
+| `owner_mission_view` | × | 暗色複数 | 同型 |
+| `tactics_summary_view` | × | 暗色最多級 | 作業量大 |
+
+| 項目 | 評価 |
+|------|------|
+| **メリット** | Phase 4 **全体の見た目統一**に直結。ホーム以外の**初回体験**改善。 |
+| **デメリット** | ホームに**暗色 CardNavMenu が残ったまま**離脱。1画面でも**複数パネル**があり home の「1カード1コミット」より重い画面あり。 |
+| **リスク** | **中**（画面選定ミス・スコープ膨張） |
+| **必要な確認** | **次画面選定調査**を挟むのが安全（いきなり実装しない） |
+| **今やる優先度** | **中〜高**（**選定調査後**）。**いきなり実装**より **E′: 次画面選定 survey** が先 |
+
+---
+
+### 候補F: Phase 4 小ロードマップを docs に整理
+
+| 項目 | 内容 |
+|------|------|
+| **内容** | 今後5〜8手の順序を README/docs に明文化。 |
+| **変更範囲** | docs のみ |
+| **メリット** | 計画の共有。 |
+| **デメリット** | **reports + README ロードマップは既に厚い**。実装進捗は出ない。 |
+| **リスク** | **低** |
+| **必要な確認** | 重複整理 |
+| **今やる優先度** | **低**（実装可能段階に入っている） |
+
+
+================================================================================
+## 4. 比較表
+================================================================================
+
+| 候補 | 安全性 | ユーザーに見える効果 | 実装量 | 後戻りリスク | Phase4ロードマップ整合 | 推奨度 |
+|------|:------:|:--------------------:|:------:|:------------:|:----------------------:|:------:|
+| **A 現状維持** | ◎ | △ | ◎ 小 | ◎ | ○ | **中** |
+| **B CardNavMenu Theme** | ○ | ◎（ホーム） | ○ 小 | △〜中 | ◎（1カード1コミット） | **高** |
+| **C LeftRailクリック調査** | ○ 調査のみ | △ | 中 | 中 | △ | **低** |
+| **D 微調整** | ◎ | △ | ◎ 小 | ◎ | ○ | **低** |
+| **E 他画面UI** | ○〜△ | ◎（別画面） | 中〜大 | 中 | ◎ | **中**（調査挟み） |
+| **F 小ロードマップ** | ◎ | × | 小 | ◎ | ○ | **低** |
+
+**読み方**: ホーム**仕上げ1手**なら **B**。**プロジェクト全体の次画面**なら **E（選定調査→1画面）**。
+
+
+================================================================================
+## 5. 推奨する次タスク
+================================================================================
+
+### 推奨（1件）: **候補B — CardNavMenu を導線不変のまま最小 Theme 化**
+
+---
+
+### なぜ今 B か
+
+1. **前提調査は完了** — 導線表・役割3案・左レール表示追加・ユーザー目視まで終わり、**`a88f7c7` の「Theme の前に IA」条件は満たした**。
+2. **ホーム Scroll の Theme ロードマップ上、残りは CardNavMenu 1枚** — `CardTeamExtras` / `CardSummary` まで済み。**同じ「.tscn のみ・1カード」規律で閉じられる**。
+3. **ユーザー可視効果がホームで最大** — 左レール追加直後のホームで、**右ペイン唯一の暗色**が最も目立つ。
+4. **実装安全性** — handler / connection / `#7〜#10` 入口を**触らない**。**`.gd`・export 不要**。
+5. **1216×684 で CardNavMenu 4列が成立済み** — Theme 化は列構造を変えない想定。**目視で再確認**すれば足りる。
+
+---
+
+### なぜ他候補を後回しにするか
+
+| 候補 | 後回し理由 |
+|------|------------|
+| **A** | 安全だが**ホームの見た目仕上げ機会を残すだけ**。 |
+| **C** | **ユーザー明示・設計未了** — 大分類→複数画面の直行は別レポート級。 |
+| **D** | 崩れなし報告のため**効果小**。暗色は残る。 |
+| **E** | **有効だが順序としてはホーム未完了のまま離脱**。`facility_summary_view` 等は**選定調査→1画面1コミット**が正道（次の次でも可）。**B の後**が自然。 |
+| **F** | 計画は docs/reports で**十分**。 |
+
+**有力案2（E の選定調査）** は、**B 完了後**または **B を意図的にスキップしてホームナビを凍結する場合**に推す。
+
+---
+
+### 変更対象ファイルの想定
+
+- **変更可**: `godot/scenes/home_dashboard.tscn` **のみ**
+- **変更不可**: `home_dashboard.gd`、`phase4_readonly_core.tres`、`project.godot`、sandbox、export/tests/mock、README/docs（**実装コミットでは触らない**。到達点記録は**別コミット**）
+
+---
+
+### 実装する場合の安全条件
+
+1. **`CardNavMenu` のみ** `theme` + `Phase4SummaryCard`。**panel の `StyleBoxFlat_card` override 除去**（SubResource 定義は**削除しない** — 他で未使用でも残置可）。
+2. **`NavTitle` / `NavHelp` / `CatTeam`〜`CatMgmt` / ボタン** — 白カード向け**濃色**（`CardSummary` 等と同系）。**ボタンは Godot デフォルトまたは既存 Theme ボタン**（connection 不変）。
+3. **`HeaderNavRow`・LeftRail・他カード・14 connection・handler 名** — **不変**。
+4. **CardNavMenu 削除・縮小・列削減・Header 統合** — **しない**。
+5. **コミット後 Godot 目視必須** — 4列・8ボタン遷移・#7〜#10 到達。
+
+---
+
+### Godot 目視確認
+
+- **必要: はい**（実装後・ユーザーまたは Cursor 環境で）
+- **ポイント**: 約1216×684〜1280×720、右ペイン狭化後の **4列・ボタン可読性**、Header/CardNavMenu 遷移、LeftRail **非クリック**
+
+---
+
+### pytest
+
+- **必須ではない**（`.tscn` のみ・export 不変）
+- **念のため**: `test_home_dashboard_readonly_export.py`（10 passed 想定）
+
+---
+
+### B を採らない条件（例外）
+
+- チームが **「左レールクリック化までホーム .tscn を凍結」** と決めた場合 → **A または C 調査**へ。
+- **4列が Theme 化で破綻**した場合 → **revert または D（間隔のみ）**。
+
+
+================================================================================
+## 6. 推奨タスクの最小実装案（Cursor 依頼骨子）
+================================================================================
+
+### 目的
+
+`CardNavMenu` を**導線・handler を変えず**に `Phase4SummaryCard` 化し、ホーム Scroll 内の**暗色カードを解消**する。
+
+### 変更してよいファイル
+
+- `godot/scenes/home_dashboard.tscn` **のみ**
+
+### 変更してはいけないファイル
+
+- `home_dashboard.gd`
+- `godot/themes/phase4_readonly_core.tres`
+- `project.godot`
+- sandbox scene
+- README/docs（**本実装コミットでは**）
+- export / tests / mock JSON
+- reports（既存）
+
+### 実装方針
+
+1. `CardNavMenu` に `theme = ExtResource("2_theme")`、`theme_type_variation = Phase4SummaryCard`。
+2. `theme_override_styles/panel = SubResource("StyleBoxFlat_card")` を**除去**。
+3. `NavTitle` / `NavHelp` / カテゴリ Label を濃色化（既存 Summary カードの色値に合わせる）。
+4. **ボタン・NavColumns 構造・connection 14本は不変**。
+5. LeftRail / HeaderNavRow / 他カードに**触らない**。
+
+### 確認コマンド
+
+```
+git diff -- godot/scenes/home_dashboard.tscn
+git diff -- godot/scripts/home_dashboard.gd
+Select-String -Path godot/scenes/home_dashboard.tscn -Pattern "CardNavMenu|connection|StyleBoxFlat_card|Phase4SummaryCard"
+```
+
+### テスト（任意）
+
+```
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+```
+
+### 目視確認ポイント
+
+- CardNavMenu が白系カード化
+- 4列・8ボタン表示
+- HeaderNavRow / CardNavMenu 全遷移
+- LeftRail は表示のみのまま
+- #7〜#10 が CardNavMenu から到達可能
+
+### コミット名案
+
+`Godot本線ホームCardNavMenuにThemeを限定適用`
+
+### 実装後（別タスク）
+
+- README/docs へ到達点記録
+- 次の候補: **E — `facility_summary_view` 等の次画面選定調査** または **LeftRail クリック IA 調査**
+
+
+================================================================================
+## 7. 変更していないファイル
+================================================================================
+
+- godot/scenes/home_dashboard.tscn
+- godot/scripts/home_dashboard.gd
+- godot/themes/phase4_readonly_core.tres
+- godot/project.godot
+- godot/README.md
+- docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md
+- docs/GODOT_NAVIGATION_PHASE4_2026-05.md
+- reports/godot_card_navmenu_policy_survey_2026-05.txt
+- reports/godot_home_navigation_route_matrix_2026-05.txt
+- reports/godot_home_navigation_role_options_2026-05.txt
+- reports/godot_home_left_rail_integration_survey_2026-05.txt
+- basketball_sim/export/home_dashboard_readonly.py
+- basketball_sim/tests/test_home_dashboard_readonly_export.py
+- godot/data/home_dashboard_mock.json
+- godot/scenes/home_production_wire_preview.tscn
+- godot/scenes/home_production_wire_preview_right_summary.tscn
+
+================================================================================
+（以上）
+================================================================================
