@@ -1,0 +1,362 @@
+# Godot Phase 4 施設Theme第1段後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `c8ec528`（Godot施設サマリーTheme第1段の確認を記録）
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**
+
+### 1.1 home_dashboard（一区切り完了）
+
+- HeaderCard / HeaderNavRow / LeftRail（表示のみ）/ CardNavMenu（Theme 化済み）/ Scroll 以下カード群
+- ユーザー環境 1280×720 目視・遷移確認済み（`b1cc957` 等）
+
+### 1.2 施設サマリー第1段（完了）
+
+| 項目 | 内容 |
+|------|------|
+| **実装** | `5987821` — `facility_summary_view.tscn` のみ |
+| **記録** | `c8ec528` — README/docs にユーザー確認を記録 |
+| **Theme** | ルート `phase4_readonly_core.tres` / `HeaderCard`→`Phase4HeaderCard` / `SummaryCard`→`Phase4SummaryCard` |
+| **未変更** | `facility_summary_view.gd` / Theme `.tres` / DTO・export・mock |
+| **到達点** | **Header + Summary の白カード化第1段**（画面完全仕上げではない） |
+| **残課題** | Scroll 内 `Label.new()` — 暗背景＋明文字 |
+
+### 1.3 今回の調査目的
+
+施設第1段完了後、次に進むべき1タスクを **案A（施設第2段）** と **案B/C（同型横展開）** で比較し、**1画面・1コミット・安全性** を最優先して決定する。
+
+
+================================================================================
+## 2. 施設サマリー第2段の現状
+================================================================================
+
+### 2.1 Scroll 内動的 Label の現状
+
+- **コンテナ**: `%ScrollContent`（`VBoxContainer`）— `.tscn` 上は空。中身は **`facility_summary_view.gd` が `_ready` で生成**。
+- **生成関数**（いずれも `Label.new()` を `_scroll_content.add_child`）:
+  - `_add_scroll_heading` — 見出し（font 17・明色 `0.94,0.96,0.99`）
+  - `_add_scroll_subheading` — 小見出し（font 14）
+  - `_add_scroll_paragraph` — 本文（引数で font_size / `font_color`）
+- **データ駆動**:
+  - `facilities[]` — 各施設2行（名称+レベル / effect_hint）
+  - `sections[]` — タイトル + `lines[]`
+  - 区切りに `HSeparator.new()`
+- **色はすべて `.gd` 内ハードコード**（暗地前提の明色）。**JSON キー・DTO 構造は変更不要**。
+
+### 2.2 .gd 変更が必要か
+
+**はい — 第2段で Scroll を白カード系に寄せるなら `.gd` 変更は実質必須。**
+
+| 手段 | 内容 | .tscn のみ | 白カード化 |
+|------|------|-----------|-----------|
+| **OnDark 系** | `theme_type_variation = Phase4OnDarkTitle` 等（`roster_view.gd` 先例） | × | 暗背景のまま・可読性改善のみ |
+| **色だけ差し替え** | `_add_scroll_paragraph` の `Color` を濃色に | × | 白背景上で読めない可能性大 |
+| **Panel ラップ** | 各ブロックを `PanelContainer` + `Phase4SummaryCard` で生成 | × | 可能だが **生成ロジック大幅変更** |
+| **Scroll 背景のみ** | `ScrollContainer` に StyleBox（`.tscn`） | △ 一部 | ラベル色は依然 `.gd` |
+
+→ **「Scroll の白カード化」＝第2段は `.gd`（＋場合により Theme variation 利用）**。**.tscn のみでは閉じない**。
+
+### 2.3 変更範囲・リスク
+
+- **変更ファイル想定**: `facility_summary_view.gd`（主）。必要なら `facility_summary_view.tscn`（Scroll 背景・余白）。
+- **リスク**: 中 — 生成ラベル全経路の目視・長文折返・施設4件+sections の表示確認が必要。
+- **1コミット**: **厳しめ** — OnDark 最小対応なら1コミット可、白カード化は分割推奨。
+- **横展開性**: 低 — 施設専用の完成度向上。他画面は別パターン（表形式あり）。
+
+### 2.4 メリット・今すぐ進むべきか
+
+| メリット | デメリット |
+|----------|------------|
+| 施設画面の上下が白カードで統一 | `.gd` 必須・回帰範囲が読取表示全体 |
+| 第1段の「半端さ」を解消 | 他詳細画面の統一感は広がらない |
+| 施設テンプレの完成例になる | pytest は通る想定だが **目視負荷大** |
+
+**結論**: **今すぐ最優先ではない**。docs（`c8ec528`）も「第2段または横展開を判断」と整理済み。**横展開でテンプレを2画面目まで広げてから**、施設第2段に戻る方が Phase4 全体の足場として合理的。
+
+
+================================================================================
+## 3. クラブ史の現状
+================================================================================
+
+### 3.1 scene 構造（`club_history_view.tscn`）
+
+- **施設サマリー第1段前と同型**:
+  - `ClubHistoryView`（Control）→ `Background` → `Margin/RootCol`
+  - **`HeaderCard`**（`StyleBoxFlat_header` 暗色 override）— **Theme 未着手**
+  - **`SummaryCard`**（`StyleBoxFlat_summary` 暗色 override）— **Theme 未着手**
+  - `StatusLabel` / **`Scroll` / `ScrollContent`**
+- **HomeNavButton**: `HeaderNavRow` 内、connection → `_on_home_nav_button_pressed` ○
+- **ルートに `phase4_readonly_core.tres` なし**（施設 `5987821` 前と同じ）
+
+### 3.2 script 参照（`club_history_view.gd`）
+
+| unique / 参照 | 用途 |
+|---------------|------|
+| `%ScreenTitleLabel` | 画面タイトル |
+| `%TeamNameLabel` | チーム名 |
+| `%LeagueMetaLabel` | リーグ段階 |
+| `%SummaryBlockLabel` | サマリー本文 |
+| `%DataSourceLabel` | 読込元 |
+| `%ScrollContent` | 動的生成先 |
+| `%FooterNoteLabel` 等 | 注記 |
+
+- **Scroll 生成**: 施設と同系の `_add_scroll_heading` / `_add_scroll_subheading` / `_add_scroll_paragraph` **に加え**、**シーズン表**（`_add_season_table_header` / `_add_season_table_row` — `HBoxContainer` + 複数 `Label.new()`）。
+- **from_python / mock**: `club_history_from_python.json` → `club_history_mock.json` ○
+- **export / pytest**: `club_history_readonly.py` / `test_club_history_readonly_export.py` あり
+
+### 3.3 .tscn のみで第1段 Theme 化
+
+**可能 — 施設 `5987821` と同一手順をそのまま適用できる。**
+
+- ルート Theme 割当 + `HeaderCard`→`Phase4HeaderCard` + `SummaryCard`→`Phase4SummaryCard`
+- panel override 除去、SubResource 残置、静的 Label 濃色化（施設・`roster_view` ヘッダーと同系）
+- **Scroll / シーズン表は触らない**（第1段方針）
+
+### 3.4 横展開第2号としての適性
+
+| 観点 | 評価 |
+|------|------|
+| 同型性 | **◎** — `.tscn` ノードツリーが施設とほぼ同一 |
+| .tscn のみ | **◎** |
+| ユーザー効果 | **中〜高** — HeaderNavRow 第2ボタン・CardNavMenu クラブ列 |
+| 目視確認 | **容易** — ホーム→クラブ史→戻る |
+| テンプレ検証 | **◎** — 施設以外でも手順再現できるか確認できる |
+
+**注意**: Scroll に **シーズン表（HBox 行）** があり、第1段後も Scroll は暗色のまま → 施設と同じ「上は白・下は暗」の段階的見た目。
+
+
+================================================================================
+## 4. 順位表の現状
+================================================================================
+
+### 4.1 scene 構造（`standings_view.tscn`）
+
+- **Header + Summary + Scroll の骨格は施設・クラブ史と同型**。
+- 差分: メタ Label が `%ContextMetaLabel`（他画面は `LeagueMetaLabel` 等）。**Theme 未着手**（暗色 StyleBox）。
+- **HomeNavButton** / **DataSourceLabel** / **ScrollContent** — いずれも存在。
+
+### 4.2 script 参照（`standings_view.gd`）
+
+- **Scroll 生成がより重い**:
+  - 施設・クラブ史と同じ heading / paragraph 系
+  - **`_add_standings_header_row`** — 8列ヘッダー `HBoxContainer`
+  - **`_add_standings_data_row`** — 8列データ行（自チーム行は色強調）
+  - ディビジョン単位でブロック繰り返し
+- **表・列幅** — `_standings_col_width` で固定幅（ロスター表に近い）
+
+### 4.3 .tscn のみで第1段 Theme 化
+
+**可能 — HeaderCard / SummaryCard のみなら施設と同手順。**
+
+- **注意**: Scroll が **順位表グリッド主体**のため、第1段後の **コントラスト（白ヘッダ+暗い表）** が施設・クラブ史より **目立ちやすい**（`roster_view` 部分 Theme 化と同種の課題）。
+
+### 4.4 横展開第2号としての適性
+
+| 観点 | 評価 |
+|------|------|
+| 同型性（第1段） | **○** — Header/Summary は同一 |
+| .tscn のみ | **◎** |
+| ユーザー効果 | **高** — リーグ閲覧の利用頻度 |
+| 目視確認 | **容易** |
+| テンプレ検証 | **○** — 表画面でも第1段手順は同じだが、**第2段は .gd 必須度が高い** |
+
+**結論**: 横展開 **第3号候補として有力**だが、**第2号はクラブ史の方が安全**（Scroll が段落中心で施設に近い）。
+
+
+================================================================================
+## 5. 3案比較表
+================================================================================
+
+| 案 | 対象 | 変更範囲 | .tscnのみ | .gdリスク | ユーザー効果 | 横展開テンプレ | 1コミット安全 | 推奨度 |
+|----|------|----------|-----------|-----------|--------------|----------------|---------------|--------|
+| **A** 施設第2段 | `facility_summary_view.gd`（＋場合により `.tscn`） | Scroll 全生成ロジック | **×** | **高** | 中（1画面完成度） | 低 | △ | △ |
+| **B** クラブ史第1段 | `club_history_view.tscn` のみ | Header + Summary | **◎** | **なし** | 中〜高（2画面目） | **◎** | **◎** | **◎** |
+| **C** 順位表第1段 | `standings_view.tscn` のみ | Header + Summary | **◎** | **なし** | 高（2〜3画面目） | ○ | **◎** | ○ |
+
+**比較の結論**:
+- **案A** は価値あるが **`.gd` 必須・1コミット閉じにくい・横展開が止まる** → **後回し**。
+- **案B と案C** はいずれも **施設 `5987821` のコピー適用**で第1段が取れる。
+- **案B（クラブ史）を先** — 構造一致度・Scroll の単純さ・HeaderNavRow 順序・docs 上の横展開順序と整合。
+
+
+================================================================================
+## 6. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**クラブ史閲覧へ施設サマリー第1段テンプレの横展開（Phase4 Header + Summary）**
+
+### 対象
+
+- **scene**: `godot/scenes/club_history_view.tscn`
+- **script**: `godot/scripts/club_history_view.gd`（**変更しない**）
+
+### なぜ今それを選ぶのか
+
+1. **施設 `5987821` と `.tscn` 構造がほぼ同一** — 手順・ラベル色・SubResource 残置方針を **そのまま流用**できる（実績あるテンプレの検証）。
+2. **`.tscn` のみで1コミット完結** — Phase4 の「1画面・安全に閉じる」規律を維持。
+3. **`.gd` / DTO / Theme `.tres` を触らない** — 回帰リスク最小。Scroll・シーズン表の表示ロジック不変。
+4. **詳細画面 Theme 横展開の第2号** — ホーム＋施設に加え、**クラブ史**まで白ヘッダ+サマリー帯が広がり、**ユーザーに見える進捗**が大きい。
+5. **HeaderNavRow から到達容易** — ホーム上部第2ボタン + CardNavMenu クラブ列。目視確認パスが明確。
+6. **docs / 前回調査（`23a8fcf`・`c8ec528`）** — 「施設パターン確定後、クラブ史・順位表へ横展開」と一致。
+
+### なぜ他案を後回しにするか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **A 施設第2段** | **`.gd` 変更必須**。1画面の完成度は上がるが **他画面への展開が止まる**。OnDark だけなら白カード目標に届かない。 |
+| **C 順位表第1段** | 第1段手順は同じだが **Scroll が8列表**で、第1段後の見た目ギャップが大きい。**クラブ史でテンプレ再現を確認してから**の方が安全。 |
+
+### 変更対象ファイルの想定
+
+- **変更可**: `godot/scenes/club_history_view.tscn` **のみ**
+
+### 変更してはいけないファイル
+
+- `club_history_view.gd`
+- `facility_summary_view.tscn` / `facility_summary_view.gd`
+- `standings_view.tscn` / `standings_view.gd`
+- `phase4_readonly_core.tres` / `project.godot` / `home_dashboard.tscn`
+- export / tests / mock JSON / README/docs（**実装コミットでは触らない**）
+
+### 実装する場合の安全条件
+
+1. 施設 `5987821` と同型: ルート Theme + `Phase4HeaderCard` + `Phase4SummaryCard` + panel override 除去のみ。
+2. **`%ScreenTitleLabel` / `%TeamNameLabel` / `%LeagueMetaLabel` / `%SummaryBlockLabel` / `%DataSourceLabel`** 等 **unique 名不変**。
+3. **`HomeNavButton` の text / tooltip / connection / handler 不変**。
+4. **`Scroll` / `%ScrollContent` は触らない**（動的 Label・シーズン表は暗色のまま）。
+5. **`ContextMetaLabel` はクラブ史に無し** — クラブ史は `LeagueMetaLabel`（施設と同じ）のみ濃色化対象。
+
+### Godot 目視確認ポイント
+
+- ホーム **HeaderNavRow「クラブ史」** または **CardNavMenu・クラブ列** → クラブ史
+- Header / Summary 白系、ラベル可読性、DataSourceLabel
+- **HomeNavButton でホーム復帰**
+- Scroll・シーズン表は **従来どおり表示**（暗背景のままでよい）
+- 1280×720 で大きな崩れなし
+
+### pytest
+
+- **第1段（.tscn のみ）**: **必須ではない**
+- **念のため**: `test_home_dashboard_readonly_export.py`（10）/ `test_club_history_readonly_export.py`（存在確認済み・件数は実行時確認）/ `test_facility_summary_readonly_export.py`（9）
+
+
+================================================================================
+## 7. 推奨タスクの最小実装案（Cursor 依頼骨子）
+================================================================================
+
+### 目的
+
+`club_history_view.tscn` に、施設サマリー `5987821` と同規律で **Header + Summary の Phase4 Theme 第1段**を適用し、
+**詳細画面横展開第2号**とする。
+
+### 変更してよいファイル
+
+- `godot/scenes/club_history_view.tscn` **のみ**
+
+### 変更してはいけないファイル
+
+- `club_history_view.gd` / Theme `.tres` / DTO・export・mock / 他 scene / README・docs
+
+### 実装方針
+
+- `facility_summary_view.tscn`（`5987821` 後）と `club_history_view.tscn` を **diff 参照**し、Theme 関連差分のみ移植。
+- `ext_resource` Theme 追加、`ClubHistoryView.theme` 割当。
+- `HeaderCard` / `SummaryCard` の `theme_type_variation` とラベル `font_color` 更新。
+
+### Theme 適用方針
+
+- `Phase4HeaderCard` / `Phase4SummaryCard` のみ。**Theme `.tres` は編集しない**。
+
+### ノード名・unique_name 維持
+
+- 施設と同名の `%` ノードは **一切リネームしない**。
+
+### Scroll / 動的 Label を触るか
+
+- **触らない**（第1段）。シーズン表・出来事リストは `.gd` 生成のまま。
+
+### 確認コマンド
+
+```text
+git diff -- godot/scenes/club_history_view.tscn
+git diff -- godot/scripts/club_history_view.gd
+git status --short
+```
+
+（任意）`py -m pytest basketball_sim/tests/test_club_history_readonly_export.py -q`
+
+### 目視確認ポイント
+
+- ホーム → クラブ史 → 戻る
+- Header/Summary 白系、Scroll は暗色のまま許容
+
+### テスト方針
+
+- 基本 pytest 任意。export 不変なら `test_club_history_readonly_export` で念のため可。
+
+### コミット名案
+
+`Godotクラブ史にPhase4Themeを限定適用`
+
+
+================================================================================
+## 8. 後回しにする案と理由
+================================================================================
+
+### 案A: 施設サマリー第2段
+
+- Scroll 本文は **`facility_summary_view.gd` の `Label.new()` のみ**で構成。白カード化は **panel ラップまたは OnDark** であり **`.tscn` だけでは不可**。
+- 1画面の縦の統一は進むが、**クラブ史・順位表・財務…と比べて横展開が止まる**。
+- **クラブ史第1段でテンプレを2画面化してから**、施設第2段（OnDark 最小 or 白カード本格）を検討するのがよい。
+
+### 案C: 順位表第1段横展開
+
+- **第1段の .tscn 手順はクラブ史と同一**で実施可能。
+- ただし Scroll が **8列順位表**中心で、第1段後の **上白下暗** が目立ちやすい。**クラブ史で横展開手順をもう1回成功させてから**順位表に進む方が、レビュー・目視の比較基準が揃う。
+
+
+================================================================================
+## 9. 変更していないファイル
+================================================================================
+
+本調査では以下に **一切手を入れていない**。
+
+- `godot/scenes/facility_summary_view.tscn`
+- `godot/scripts/facility_summary_view.gd`
+- `godot/scenes/club_history_view.tscn`
+- `godot/scripts/club_history_view.gd`
+- `godot/scenes/standings_view.tscn`
+- `godot/scripts/standings_view.gd`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 `reports/*.txt`（本ファイルの新規作成のみ）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+
+
+================================================================================
+## 10. 調査コマンド実施メモ
+================================================================================
+
+- `git log` — `c8ec528` / `5987821` 確認
+- `godot/README.md` / `docs/GODOT_*` / `reports/godot_phase4_detail_screens_ui_survey_2026-05.txt` — Select-String
+- `facility_summary_view.tscn` / `.gd` — Phase4 適用済み・Scroll 生成3関数+データループ
+- `club_history_view.tscn` / `.gd` — 施設同型・シーズン表 HBox 追加
+- `standings_view.tscn` / `.gd` — 施設同型 Header/Summary・8列順位表
+- `basketball_sim/tests` — `test_club_history_readonly_export.py` / `test_standings_readonly_export.py` 存在確認
+
+**pytest**: 本調査では **未実施**（調査レポート追加のみ）。
