@@ -410,6 +410,14 @@
   - **第2段（未着手）**: **MissionsBody 構造の白カード化**、**ミッション行レイアウト整理**、行の余白・区切り・カード化など。
   - **ユーザー環境 Godot**: **CardNavMenu #8 → オーナーミッション OK**・**表示・Header/4静的カード・DataSourceLabel OK**・**`2f808e5` 後は今季ミッションの可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
   - **横展開テンプレ**: 財務に続き **OM でも Scroll 内複数静的 Panel 型**へ第1段が成功 — **動的行可読性の最小補正も財務 `6c3dc43` と同手順** — **戦術 / 契約人事 / ロスターへ進む判断材料**。
+- **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn` / `tactics_summary_view.gd`）: **詳細画面 Theme 横展開第7号・第1段**（`44b0584`）＋**選手ロール動的行文字色の最小補正**（`7bbbb4e`）。選定は **`6afb201`**（6画面第1段完了後、**残り詳細のうちフル第1段が可能**・**Header + Scroll 内6静的カード**・**`.tscn` のみで第1段可能**・**`tactics_summary_readonly` + pytest 15 安定**・**財務/OM で固めた Scroll 内複数 Panel 手順の横展開**）。
+  - **`44b0584` 実装範囲**（**`tactics_summary_view.tscn` のみ**）: ルート **`phase4_readonly_core.tres`**。**`HeaderCard`**＝**`Phase4HeaderCard`**。**Scroll/ScrollContent 内** **Overview / Attack / Defense / Rotation / PlayerRoles / Notes** の6枚＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。Header・各カードのラベル濃色化。**`HomeNavButton` / `%DataSourceLabel` / from_python・mock 読込は維持**。
+  - **`44b0584` 実装境界**: **`tactics_summary_view.gd`・Theme `.tres`・export / mock JSON 未変更**。**`%PlayerRolesBody` 動的選手ロール行は第2段扱いで未変更**。
+  - **目視課題**: 第1段適用後、**選手ロールカード内**の動的選手ロール行が**白カード上で薄く読みにくい**。
+  - **`7bbbb4e` 補正範囲**（**`tactics_summary_view.gd` のみ・第2段本格整備ではない**）: **`_fill_player_roles`** の選手ロール行 `Label` と空表示 **`lab`** の **`font_color`** を **`Color(0.16, 0.2, 0.3, 1)`** へ（白カード本文と同系）。**PlayerRolesBody 構造・選手ロール行の文言・件数・生成順・JSON key・scene・Theme・DTO は未変更**。
+  - **第2段（未着手）**: **PlayerRolesBody 構造**の白カード化、**選手ロール行レイアウト**・余白・区切り・カード化（**`.gd` 調整が必要**）。
+  - **ユーザー環境 Godot**: **CardNavMenu #9 → 戦術サマリー OK**・**表示・Header/6静的カード・DataSourceLabel OK**・**`7bbbb4e` 後は選手ロールの可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+  - **横展開テンプレ**: 財務・OM に続き **戦術でも Scroll 内複数静的 Panel 型**（6枚）へ第1段が成功 — **動的行色補正は財務 `6c3dc43` / OM `2f808e5` と同手順** — **契約人事 / ロスターへ進む判断材料**。
 - **ホーム**（`home_dashboard.tscn`）: **ルートに Theme なし**。**`HeaderCard` のみ**に `phase4_readonly_core.tres` を割当し **`Phase4HeaderCard`**。**`83d7fc0` で HeaderCard 内に ClubBand 風クラブ帯**。**`a5e548f` で `MainRow` 左に表示用 `LeftRail`（200px・大分類 5・クリック不可）** — 構造は §15.2 参照。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も最小 Theme 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`91cfaed` で `club_summary` 状況メモ化**（export / mock のみ）。**`home_dashboard.gd`・JSON / Python / DTO・Theme `.tres` は不変**。**HeaderNavRow・CardNavMenu・10 画面導線は維持**（実操作導線）。**LeftRail は表示のみ**。
 - **読込・導線**: `from_python` / mock、**HeaderNavRow のボタン数・接続・遷移先のシーン定義は変更していない**（`afb482d` は HeaderCard とラベル色・SubResource 整理のみ）、**Godot から Python 自動起動なし**（§14.1 と同じ）。
 - **運用**: シーン保存後は **UID 参照エラー**が出ないか Godot で確認。**エディタ実行後**は `git status` で意図しない差分が混ざっていないか確認（`*_from_python.json` は **コミットしない**）。**UID の再シリアライズ**で他画面参照が壊れないか、差分レビュー時に注意。
@@ -497,7 +505,18 @@
     - **第2段（未着手）**: **MissionsBody 構造**の白カード化、**ミッション行レイアウト**・余白・区切り・カード化（**`.gd` 調整が必要**）。
     - **ユーザー環境 Godot**: **CardNavMenu #8 → オーナーミッション OK**・**Header/4静的カード・DataSourceLabel OK**・**`2f808e5` 後は今季ミッションの可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
     - **横展開テンプレ**: 財務に続き **経営系 OM でも Scroll 内複数静的 Panel 型**で第1段成功 — **動的行色補正は財務 `6c3dc43` と同型**。
-    - **今後**: **残り詳細画面**（戦術・契約人事・ロスター）への同型第1段か、完了済み画面の **Scroll / MissionsBody 第2段**（**LeftRail クリック化は別工程**）。
+    - **今後**: **残り詳細画面**（契約人事・ロスター）への同型第1段か、完了済み画面の **Scroll / PlayerRolesBody / MissionsBody 第2段**（**LeftRail クリック化は別工程**）。
+  - **戦術 / ローテーションサマリー閲覧・Phase4 Theme 第1段（`44b0584`）＋選手ロール動的行文字色最小補正（`7bbbb4e`）** — **9詳細画面 UI 整備のテンプレ候補第7号**:
+    - **選定（`6afb201`）**: 6画面第1段完了後、**未Themeの残り3画面のうちフル第1段が可能**。**戦術サマリー**は **CardNavMenu チーム列 #9**（**HeaderNavRow 非搭載**）・**`tactics_summary_readonly` + pytest 15 安定**・**Scroll 内静的6カード**（Overview / Attack / Defense / Rotation / PlayerRoles / Notes）・**`.tscn` のみで第1段を閉じやすい**（財務5枚・OM4枚と同型）。
+    - **実装範囲（`44b0584`）**: **`tactics_summary_view.tscn` のみ**。ルート **`phase4_readonly_core.tres`**。**`HeaderCard`** → **`Phase4HeaderCard`**。**Scroll/ScrollContent 内6枚** → **`Phase4SummaryCard`**。**panel override のみ除去**（SubResource 残置）。**静的ラベル**を白カード向け濃色。
+    - **情報構造（不変）**: **`HeaderCard`** → **`Scroll/ScrollContent`**（6枚静的カード ＋ **`%PlayerRolesBody`** 動的選手ロール行 — **選手ロール行は `.gd` で `Label.new()`**）。
+    - **実装境界（`44b0584`）**: **`tactics_summary_view.gd`・Theme `.tres`・export / mock JSON 未変更**。**`%PlayerRolesBody` 動的選手ロール行は第2段扱いで未変更**。
+    - **目視課題**: 第1段適用後、**選手ロールカード内**の動的選手ロール行が**白カード上で薄く読みにくい**。
+    - **補正（`7bbbb4e`）**: **`tactics_summary_view.gd` のみ** — **`_fill_player_roles`** の **`font_color`** を **`Color(0.16, 0.2, 0.3, 1)`** へ（**第2段本格整備ではなく可読性の最小補正**）。**scene / Theme / DTO 不変**。
+    - **第2段（未着手）**: **PlayerRolesBody 構造**の白カード化、**選手ロール行レイアウト**・余白・区切り・カード化（**`.gd` 調整が必要**）。
+    - **ユーザー環境 Godot**: **CardNavMenu #9 → 戦術サマリー OK**・**Header/6静的カード・DataSourceLabel OK**・**`7bbbb4e` 後は選手ロールの可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+    - **横展開テンプレ**: 財務・OM に続き **チーム系戦術でも Scroll 内複数静的 Panel 型**（6枚）で第1段成功 — **動的行色補正は財務 `6c3dc43` / OM `2f808e5` と同型**。
+    - **今後**: **残り詳細画面**（契約人事・ロスター）への同型第1段か、完了済み画面の **Scroll / PlayerRolesBody 第2段**（**LeftRail クリック化は別工程**）。
   - **本線ホーム 表示用 LeftRail（`a5e548f`）**: **`home_dashboard.tscn` のみ**。**レイアウト構造（情報設計）**:
     - **`HeaderCard`** — 全幅（クラブ帯・**`HeaderNavRow` 5 ボタン**）。
     - **`StatusLabel`** — 全幅。
