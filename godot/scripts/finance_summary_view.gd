@@ -173,6 +173,8 @@ func _fill_history_rows(raw: Variant) -> void:
 		line.autowrap_mode = 2
 		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_history_body.add_child(line)
+		if i < lim - 1:
+			_history_body.add_child(HSeparator.new())
 
 
 func _build_caution_text(raw_notes: Variant) -> String:
