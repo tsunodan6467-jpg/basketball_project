@@ -205,27 +205,28 @@ func _add_upcoming_block(row: Dictionary) -> void:
 		line3 = "ラベル: %s" % label_s
 
 	var panel: PanelContainer = PanelContainer.new()
+	panel.theme_type_variation = &"Phase4SummaryCard"
 	var inner: VBoxContainer = VBoxContainer.new()
 	inner.add_theme_constant_override("separation", 4)
 	var l1: Label = Label.new()
 	l1.text = line1
 	l1.autowrap_mode = 2
 	l1.add_theme_font_size_override("font_size", 13)
-	l1.add_theme_color_override("font_color", Color(0.9, 0.93, 0.97, 1))
+	l1.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 	l1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(l1)
 	var l2: Label = Label.new()
 	l2.text = line2
 	l2.autowrap_mode = 2
 	l2.add_theme_font_size_override("font_size", 13)
-	l2.add_theme_color_override("font_color", Color(0.86, 0.9, 0.95, 1))
+	l2.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
 	l2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(l2)
 	var l3: Label = Label.new()
 	l3.text = line3
 	l3.autowrap_mode = 2
 	l3.add_theme_font_size_override("font_size", 11)
-	l3.add_theme_color_override("font_color", Color(0.62, 0.68, 0.76, 1))
+	l3.add_theme_color_override("font_color", Color(0.2, 0.25, 0.36, 1))
 	l3.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(l3)
 	panel.add_child(inner)
