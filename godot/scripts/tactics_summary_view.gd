@@ -119,7 +119,7 @@ func _fill_player_roles(raw: Array) -> void:
 		var lab := Label.new()
 		lab.autowrap_mode = 2
 		lab.add_theme_font_size_override("font_size", 13)
-		lab.add_theme_color_override("font_color", Color(0.86, 0.9, 0.95))
+		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = "選手ロール情報はありません。"
 		_player_roles_body.add_child(lab)
 		return
@@ -134,7 +134,7 @@ func _fill_player_roles(raw: Array) -> void:
 		var lab := Label.new()
 		lab.autowrap_mode = 2
 		lab.add_theme_font_size_override("font_size", 13)
-		lab.add_theme_color_override("font_color", Color(0.86, 0.9, 0.95))
+		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = line
 		_player_roles_body.add_child(lab)
 		shown += 1
