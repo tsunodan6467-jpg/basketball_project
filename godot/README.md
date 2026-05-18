@@ -235,7 +235,26 @@
   - **`4b43da5` 後**: **CardNavMenu → 財務サマリー遷移 OK**（**HeaderNavRow には載せない — 経営列 #7**）。**財務サマリー表示 OK**。**HeaderCard Phase4 系・Scroll 内5静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**ただし財務履歴カード内の動的履歴行テキストが白カード上で薄く読みにくい**ことが判明。
   - **`6c3dc43` 後**: **財務履歴の動的履歴行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
 - **到達点**: **ルート Theme + HeaderCard + Scroll 内5静的カードの白カード化第1段完了** ＋ **HistoryBody 動的履歴行の文字色のみ最小補正済み**（**画面全体の完全仕上げではない**。**HistoryBody 構造・履歴行レイアウト整理は第2段**）。
-- **詳細画面 Theme 横展開の現在地**: **第1号 施設**・**第2号 クラブ史**・**第3号 順位表**（RootCol 直下 Header+Summary）・**第4号 日程**（Scroll 内 SummaryCard 型）・**第5号 財務サマリー**（Scroll 内複数静的カード型 ＋ 履歴行文字色最小補正）— 第1段（＋最小補正）完了。**次候補**: **残り詳細画面**（OM・戦術・契約人事・ロスター続き）への横展開か、完了済み画面の **Scroll / HistoryBody 第2段**を判断。
+
+### オーナーミッション / クラブ評価閲覧 `Phase4` Theme 限定適用・第1段（`e6acce0`）＋今季ミッション動的行文字色最小補正（`2f808e5`）
+
+- **9詳細画面 Theme 横展開の第6号**（選定調査 `130137a` → 実装 `e6acce0` → 可読性補正 `2f808e5`）。**財務サマリーと同型の経営系・Scroll 内複数静的カード型**。**RootCol 直下 `SummaryCard` はなし**。
+- **`e6acce0`（Theme 第1段）**: **変更ファイル** **`owner_mission_view.tscn` のみ**。
+  - **ルート** `OwnerMissionView` に `phase4_readonly_core.tres` を割当。**`HeaderCard`** → **`Phase4HeaderCard`**。
+  - **Scroll/ScrollContent 内静的4カード** → **`Phase4SummaryCard`**（**Trust / Missions / Eval / Caution**）。**`theme_override_styles/panel` を除去**し **`theme_type_variation` へ置換**。**`StyleBoxFlat_header` / `chip` / `summary` の SubResource 定義は残置**。**`ReadonlyBadge` / `ModeStrip`** の chip override は維持。
+  - **ラベル**: Header・各カード見出し/本文・**`NotesFooterLabel`** を白カード向け濃色（財務第1段と同系）。
+  - **維持**: **`HomeNavButton`**（text / tooltip / connection / `_on_home_nav_button_pressed`）、**`%DataSourceLabel`** / **`%CardTrustBody`** 等 **unique 名**、**from_python / mock** 読込（**`owner_mission_view.gd` 不変**）。
+  - **未変更**: **`owner_mission_view.gd`**、**Theme `.tres`**、**export / mock JSON**、**`project.godot`**、他 detail scene。
+  - **第2段（`e6acce0` 時点・未変更）**: **`%MissionsBody`** 内の動的ミッション行（`.gd` の **`Label.new()`**）。
+- **`2f808e5`（可読性の最小補正 — 第2段本格整備ではない）**: **変更ファイル** **`owner_mission_view.gd` のみ**。
+  - **`_fill_mission_rows`** のミッション行 `Label` の `font_color` を **`Color(0.16, 0.2, 0.3, 1)`** へ（旧 **`Color(0.86, 0.9, 0.95)`**）。ミッションなし時 **`lab`** も同色（旧 **`Color(0.86, 0.9, 0.95)`**）。
+  - **未変更**: **MissionsBody 構造**、ミッション行の文言・件数・生成順、JSON key、Header/静的4カードの色、**`owner_mission_view.tscn`**、Theme / DTO / mock。
+- **pytest**（`e6acce0` / `2f808e5` いずれも）: `test_home_dashboard_readonly_export` 10 / `test_roster_readonly_export` 10 / phase0 smoke 1 / **`test_owner_mission_readonly_export` 13** — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**:
+  - **`e6acce0` 後**: **CardNavMenu → オーナーミッション遷移 OK**（**HeaderNavRow には載せない — 経営列 #8**）。**オーナーミッション表示 OK**。**HeaderCard Phase4 系・Scroll 内4静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**ただし今季ミッションカード内の MissionsBody 動的行テキストが白カード上で薄く読みにくい**ことが判明。
+  - **`2f808e5` 後**: **今季ミッションの動的行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
+- **到達点**: **ルート Theme + HeaderCard + Scroll 内4静的カードの白カード化第1段完了** ＋ **MissionsBody 動的ミッション行の文字色のみ最小補正済み**（**画面全体の完全仕上げではない**。**MissionsBody 構造・ミッション行レイアウト整理は第2段**）。
+- **詳細画面 Theme 横展開の現在地**: **第1号 施設**・**第2号 クラブ史**・**第3号 順位表**（RootCol 直下 Header+Summary）・**第4号 日程**（Scroll 内 SummaryCard 型）・**第5号 財務サマリー**（Scroll 内複数静的カード型 ＋ 履歴行文字色最小補正）・**第6号 オーナーミッション**（Scroll 内4静的カード型 ＋ 今季ミッション動的行文字色最小補正）— 第1段（＋最小補正）完了。**次候補**: **残り詳細画面**（戦術・契約人事・ロスター続き）への横展開か、完了済み画面の **Scroll / MissionsBody / HistoryBody 第2段**を判断。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -255,6 +274,8 @@
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
 - **順位表閲覧**（`standings_view.tscn`）: **第1段**（`927e918`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内 8 列表・動的行**は**未着手**（第2段）。詳細は上記「順位表閲覧 `Phase4` Theme」節。
 - **日程閲覧**（`schedule_view.tscn`）: **第1段**（`440c3f6`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`Scroll/ScrollMain/SummaryCard`**＝`Phase4SummaryCard`。**NextGameCard**・**ScrollContent / 試合リスト**は**未着手**（第2段）。詳細は上記「日程閲覧 `Phase4` Theme」節。
+- **財務サマリー閲覧**（`finance_summary_view.tscn`）: **第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）— 詳細は上記「財務サマリー閲覧 `Phase4` Theme」節。
+- **オーナーミッション閲覧**（`owner_mission_view.tscn`）: **第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）— 詳細は上記「オーナーミッション / クラブ評価閲覧 `Phase4` Theme」節。
 - **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で表示用 `LeftRail`（200px・クリック不可）**。**MetricsRow** 3 枚 + **Scroll 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`home_dashboard.gd`・Theme `.tres` は不変**。**HeaderNavRow**・**CardNavMenu**＝実操作導線（**LeftRail は表示のみ** — 下記2節）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。

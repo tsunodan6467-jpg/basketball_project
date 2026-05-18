@@ -402,6 +402,14 @@
   - **第2段（未着手）**: **HistoryBody 構造の白カード化**、**履歴行レイアウト整理**、行の余白・区切り・カード化など。
   - **ユーザー環境 Godot**: **CardNavMenu → 財務サマリー OK**・**表示・Header/5静的カード・DataSourceLabel OK**・**`6c3dc43` 後は財務履歴の可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
   - **横展開テンプレ**: 日程の **Scroll 内カード型**に続き、**Scroll 内複数静的 Panel 型**でも第1段が成功 — **財務で手順を固め、OM 等への判断材料**となる。
+- **オーナーミッション / クラブ評価閲覧**（`owner_mission_view.tscn` / `owner_mission_view.gd`）: **詳細画面 Theme 横展開第6号・第1段**（`e6acce0`）＋**今季ミッション動的行文字色の最小補正**（`2f808e5`）。選定は **`130137a`**（5画面第1段完了後、**財務 `4b43da5` と同型の経営系**・**Header + Scroll 内4静的カード**・**`.tscn` のみで第1段可能**・**`owner_mission_readonly` + pytest 安定**・**財務で固めた Scroll 内複数 Panel 手順の横展開**）。
+  - **`e6acce0` 実装範囲**（**`owner_mission_view.tscn` のみ**）: ルート **`phase4_readonly_core.tres`**。**`HeaderCard`**＝**`Phase4HeaderCard`**。**Scroll/ScrollContent 内** **Trust / Missions / Eval / Caution** の4枚＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。Header・各カード・**`NotesFooterLabel`** のラベル濃色化。**`HomeNavButton` / `%DataSourceLabel` / from_python・mock 読込は維持**。
+  - **`e6acce0` 実装境界**: **`.gd`・Theme `.tres`・DTO/export/mock 未変更**。**`%MissionsBody` 内動的ミッション行は未変更**（第2段扱い）。
+  - **目視で発見された課題**: **今季ミッションカード内**の MissionsBody 動的行テキストが**白カード上で薄く読みにくい**（暗背景向け明色のまま）。
+  - **`2f808e5` 補正範囲**（**`owner_mission_view.gd` のみ・第2段本格整備ではない**）: **`_fill_mission_rows`** のミッション行 `Label` とミッションなし **`lab`** の **`font_color`** を **`Color(0.16, 0.2, 0.3, 1)`**（白カード本文と同系）へ。**MissionsBody 構造・ミッション行の文言・件数・生成順・JSON key・scene・Theme・DTO は未変更**。
+  - **第2段（未着手）**: **MissionsBody 構造の白カード化**、**ミッション行レイアウト整理**、行の余白・区切り・カード化など。
+  - **ユーザー環境 Godot**: **CardNavMenu #8 → オーナーミッション OK**・**表示・Header/4静的カード・DataSourceLabel OK**・**`2f808e5` 後は今季ミッションの可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+  - **横展開テンプレ**: 財務に続き **OM でも Scroll 内複数静的 Panel 型**へ第1段が成功 — **動的行可読性の最小補正も財務 `6c3dc43` と同手順** — **戦術 / 契約人事 / ロスターへ進む判断材料**。
 - **ホーム**（`home_dashboard.tscn`）: **ルートに Theme なし**。**`HeaderCard` のみ**に `phase4_readonly_core.tres` を割当し **`Phase4HeaderCard`**。**`83d7fc0` で HeaderCard 内に ClubBand 風クラブ帯**。**`a5e548f` で `MainRow` 左に表示用 `LeftRail`（200px・大分類 5・クリック不可）** — 構造は §15.2 参照。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も最小 Theme 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`91cfaed` で `club_summary` 状況メモ化**（export / mock のみ）。**`home_dashboard.gd`・JSON / Python / DTO・Theme `.tres` は不変**。**HeaderNavRow・CardNavMenu・10 画面導線は維持**（実操作導線）。**LeftRail は表示のみ**。
 - **読込・導線**: `from_python` / mock、**HeaderNavRow のボタン数・接続・遷移先のシーン定義は変更していない**（`afb482d` は HeaderCard とラベル色・SubResource 整理のみ）、**Godot から Python 自動起動なし**（§14.1 と同じ）。
 - **運用**: シーン保存後は **UID 参照エラー**が出ないか Godot で確認。**エディタ実行後**は `git status` で意図しない差分が混ざっていないか確認（`*_from_python.json` は **コミットしない**）。**UID の再シリアライズ**で他画面参照が壊れないか、差分レビュー時に注意。
@@ -478,7 +486,18 @@
     - **第2段（未着手）**: **HistoryBody 構造**の白カード化、**履歴行レイアウト**・余白・区切り・カード化（**`.gd` 調整が必要**）。
     - **ユーザー環境 Godot**: **CardNavMenu → 財務サマリー OK**・**Header/5静的カード・DataSourceLabel OK**・**`6c3dc43` 後は財務履歴の可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
     - **横展開テンプレ**: **Scroll 内複数静的 Panel 型**でも第1段が成功 — **OM（4枚・Missions 動的は第2段）等への手順が固まった**。
-    - **今後**: **残り詳細画面**への同型第1段か、完了済み画面の **Scroll / HistoryBody 第2段**（**LeftRail クリック化は別工程**）。
+    - **今後**: **残り詳細画面**（戦術・契約人事・ロスター続き）への同型第1段か、完了済み画面の **Scroll / MissionsBody / HistoryBody 第2段**（**LeftRail クリック化は別工程**）。
+  - **オーナーミッション / クラブ評価閲覧・Phase4 Theme 第1段（`e6acce0`）＋今季ミッション動的行文字色最小補正（`2f808e5`）** — **9詳細画面 UI 整備のテンプレ候補第6号**:
+    - **選定（`130137a`）**: 5画面第1段完了後、**財務 `4b43da5` と同型の経営系横展開**。**オーナーミッション**は **CardNavMenu 経営列 #8**（**HeaderNavRow 非搭載**）・**`owner_mission_readonly` + pytest 安定**・**Scroll 内静的4カード**（Trust / Missions / Eval / Caution）・**`.tscn` のみで第1段を閉じやすい**。
+    - **実装範囲（`e6acce0`）**: **`owner_mission_view.tscn` のみ**。ルート **`phase4_readonly_core.tres`**。**`HeaderCard`** → **`Phase4HeaderCard`**。**Scroll/ScrollContent 内4枚** → **`Phase4SummaryCard`**。**panel override のみ除去**（SubResource 残置）。**静的ラベル**を白カード向け濃色。
+    - **情報構造（不変）**: **`HeaderCard`** → **`Scroll/ScrollContent`**（4枚静的カード ＋ **`%MissionsBody`** 動的ミッション行 ＋ **`NotesFooterLabel`** — **ミッション行は `.gd` で `Label.new()`**）。
+    - **実装境界（`e6acce0`）**: **`owner_mission_view.gd`・Theme `.tres`・export / mock JSON 未変更**。**`%MissionsBody` 動的ミッション行は第2段扱いで未変更**。
+    - **目視課題**: 第1段適用後、**今季ミッションカード内**の動的ミッション行が**白カード上で薄く読みにくい**。
+    - **補正（`2f808e5`）**: **`owner_mission_view.gd` のみ** — **`_fill_mission_rows`** の **`font_color`** を **`Color(0.16, 0.2, 0.3, 1)`** へ（**第2段本格整備ではなく可読性の最小補正**）。**scene / Theme / DTO 不変**。
+    - **第2段（未着手）**: **MissionsBody 構造**の白カード化、**ミッション行レイアウト**・余白・区切り・カード化（**`.gd` 調整が必要**）。
+    - **ユーザー環境 Godot**: **CardNavMenu #8 → オーナーミッション OK**・**Header/4静的カード・DataSourceLabel OK**・**`2f808e5` 後は今季ミッションの可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+    - **横展開テンプレ**: 財務に続き **経営系 OM でも Scroll 内複数静的 Panel 型**で第1段成功 — **動的行色補正は財務 `6c3dc43` と同型**。
+    - **今後**: **残り詳細画面**（戦術・契約人事・ロスター）への同型第1段か、完了済み画面の **Scroll / MissionsBody 第2段**（**LeftRail クリック化は別工程**）。
   - **本線ホーム 表示用 LeftRail（`a5e548f`）**: **`home_dashboard.tscn` のみ**。**レイアウト構造（情報設計）**:
     - **`HeaderCard`** — 全幅（クラブ帯・**`HeaderNavRow` 5 ボタン**）。
     - **`StatusLabel`** — 全幅。
