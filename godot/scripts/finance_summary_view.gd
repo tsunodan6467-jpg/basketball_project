@@ -149,7 +149,7 @@ func _fill_history_rows(raw: Variant) -> void:
 	if rows.is_empty():
 		var empty_lab := Label.new()
 		empty_lab.text = "（履歴がありません）"
-		empty_lab.add_theme_color_override("font_color", Color(0.62, 0.66, 0.74, 1))
+		empty_lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		empty_lab.add_theme_font_size_override("font_size", 12)
 		empty_lab.autowrap_mode = 2
 		empty_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -168,7 +168,7 @@ func _fill_history_rows(raw: Variant) -> void:
 		var cf: String = _str_cell(row.get("cashflow_label", row.get("cashflow", null)))
 		var memo: String = _str_cell(row.get("memo", null))
 		line.text = "%s  収入 %s / 支出 %s / 収支 %s\n   %s" % [season_s, rev, exp, cf, memo]
-		line.add_theme_color_override("font_color", Color(0.86, 0.9, 0.95, 1))
+		line.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		line.add_theme_font_size_override("font_size", 12)
 		line.autowrap_mode = 2
 		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
