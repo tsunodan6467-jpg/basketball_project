@@ -198,7 +198,7 @@ text = "（契約概要）"
 [node name="RiskCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="RiskVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/RiskCard"]
 layout_mode = 2
@@ -206,13 +206,13 @@ theme_override_constants/separation = 6
 
 [node name="RiskTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/RiskCard/RiskVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 16
 text = "人事リスク（簡易目安）"
 
 [node name="RiskHint" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/RiskCard/RiskVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.2, 0.25, 0.36, 1)
 theme_override_font_sizes/font_size = 11
 autowrap_mode = 2
 text = "以下は表示用の簡易判定です。厳密な契約査定や市場シミュレーションは含みません。"
@@ -226,7 +226,7 @@ theme_override_constants/separation = 8
 [node name="PlayersCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="PlayersVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/PlayersCard"]
 layout_mode = 2
@@ -234,7 +234,7 @@ theme_override_constants/separation = 6
 
 [node name="PlayersTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/PlayersCard/PlayersVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 16
 text = "主要契約選手"
 
