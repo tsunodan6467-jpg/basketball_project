@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3 uid="uid://bgfmfinancesum01"]
+[gd_scene load_steps=5 format=3 uid="uid://bgfmfinancesum01"]
 
 [ext_resource type="Script" path="res://scripts/finance_summary_view.gd" id="1_script"]
+[ext_resource type="Theme" uid="uid://c9phase4rocore01" path="res://themes/phase4_readonly_core.tres" id="2_theme"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_header"]
 content_margin_left = 16.0
@@ -58,6 +59,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
+theme = ExtResource("2_theme")
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -88,7 +90,7 @@ theme_override_constants/separation = 12
 [node name="HeaderCard" type="PanelContainer" parent="Margin/RootCol"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_header")
+theme_type_variation = &"Phase4HeaderCard"
 
 [node name="HeaderInner" type="VBoxContainer" parent="Margin/RootCol/HeaderCard"]
 layout_mode = 2
@@ -129,21 +131,21 @@ tooltip_text = "ホーム画面へ表示切替します。保存・進行・編�
 [node name="ScreenTitleLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.97, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 22
 text = "（画面タイトル）"
 
 [node name="TeamNameLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.9, 0.95, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 20
 text = "（チーム名）"
 
 [node name="LeagueMetaLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.76, 0.84, 1)
+theme_override_colors/font_color = Color(0.2, 0.25, 0.36, 1)
 theme_override_font_sizes/font_size = 14
 autowrap_mode = 2
 text = "（クラブ / D）"
@@ -151,7 +153,7 @@ text = "（クラブ / D）"
 [node name="ReadonlyStripLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.2, 0.25, 0.36, 1)
 theme_override_font_sizes/font_size = 12
 autowrap_mode = 2
 text = "読み取り専用表示"
@@ -159,7 +161,7 @@ text = "読み取り専用表示"
 [node name="DataSourceLabel" type="Label" parent="Margin/RootCol/HeaderCard/HeaderInner"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.52, 0.58, 0.66, 1)
+theme_override_colors/font_color = Color(0.18, 0.28, 0.55, 1)
 theme_override_font_sizes/font_size = 12
 autowrap_mode = 2
 text = ""
@@ -189,7 +191,7 @@ theme_override_constants/separation = 10
 [node name="FinanceCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="FinanceVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/FinanceCard"]
 layout_mode = 2
@@ -197,14 +199,14 @@ theme_override_constants/separation = 6
 
 [node name="FinanceTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/FinanceCard/FinanceVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 16
 text = "財務概要"
 
 [node name="CardFinanceBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/FinanceCard/FinanceVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 text = "（財務概要）"
@@ -212,7 +214,7 @@ text = "（財務概要）"
 [node name="PriorCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="PriorVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/PriorCard"]
 layout_mode = 2
@@ -220,14 +222,14 @@ theme_override_constants/separation = 6
 
 [node name="PriorTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/PriorCard/PriorVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 16
 text = "前季収支"
 
 [node name="CardPriorBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/PriorCard/PriorVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 text = "（前季収支）"
@@ -235,7 +237,7 @@ text = "（前季収支）"
 [node name="SalaryCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="SalaryVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/SalaryCard"]
 layout_mode = 2
@@ -243,14 +245,14 @@ theme_override_constants/separation = 6
 
 [node name="SalaryTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/SalaryCard/SalaryVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 16
 text = "サラリー状況"
 
 [node name="CardSalaryBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/SalaryCard/SalaryVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 text = "（サラリー）"
@@ -258,7 +260,7 @@ text = "（サラリー）"
 [node name="HistoryCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="HistoryVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/HistoryCard"]
 layout_mode = 2
@@ -266,7 +268,7 @@ theme_override_constants/separation = 6
 
 [node name="HistoryTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/HistoryCard/HistoryVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 16
 text = "財務履歴"
 
@@ -279,7 +281,7 @@ theme_override_constants/separation = 4
 [node name="CautionCard" type="PanelContainer" parent="Margin/RootCol/Scroll/ScrollContent"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_summary")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="CautionVBox" type="VBoxContainer" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard"]
 layout_mode = 2
@@ -287,14 +289,14 @@ theme_override_constants/separation = 6
 
 [node name="CautionTitle" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard/CautionVBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.94, 0.96, 0.99, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 16
 text = "注意"
 
 [node name="CardCautionBody" type="Label" parent="Margin/RootCol/Scroll/ScrollContent/CautionCard/CautionVBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 2
 text = "（注意）"
@@ -302,7 +304,7 @@ text = "（注意）"
 [node name="NotesFooterLabel" type="Label" parent="Margin/RootCol/Scroll/ScrollContent"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.55, 0.62, 1)
+theme_override_colors/font_color = Color(0.2, 0.25, 0.36, 1)
 theme_override_font_sizes/font_size = 11
 autowrap_mode = 2
 text = ""
