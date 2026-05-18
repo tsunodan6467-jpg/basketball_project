@@ -273,7 +273,25 @@
   - **`44b0584` 後**: **CardNavMenu #9 → 戦術サマリー遷移 OK**（**HeaderNavRow には載せない — チーム列 #9**）。**戦術サマリー表示 OK**。**HeaderCard Phase4 系・Scroll 内6静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**ただし選手ロールカード内の PlayerRolesBody 動的行テキストが白カード上で薄く読みにくい**ことが判明。
   - **`7bbbb4e` 後**: **選手ロールの動的行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
 - **到達点**: **ルート Theme + HeaderCard + Scroll 内6静的カードの白カード化第1段完了** ＋ **PlayerRolesBody 動的選手ロール行の文字色のみ最小補正済み**（**画面全体の完全仕上げではない**。**PlayerRolesBody 構造・選手ロール行レイアウト整理は第2段**）。
-- **詳細画面 Theme 横展開の現在地**: **第1号 施設**・**第2号 クラブ史**・**第3号 順位表**（RootCol 直下 Header+Summary）・**第4号 日程**（Scroll 内 SummaryCard 型）・**第5号 財務サマリー**（Scroll 内5静的カード型 ＋ 履歴行文字色最小補正）・**第6号 オーナーミッション**（Scroll 内4静的カード型 ＋ 今季ミッション動的行文字色最小補正）・**第7号 戦術サマリー**（Scroll 内6静的カード型 ＋ 選手ロール動的行文字色最小補正）— 第1段（＋最小補正）完了。**次候補**: **残り詳細画面**（契約人事・ロスター続き）への横展開か、完了済み画面の **Scroll / PlayerRolesBody / MissionsBody / HistoryBody 第2段**を判断。
+
+### 契約 / 人事サマリー閲覧 `Phase4` Theme 残り第1段（`5d1afa2`）＋RiskRows / PlayerRows 動的行文字色最小補正（`1df4820`）
+
+- **詳細画面 Theme 横展開の第8号相当**（選定調査 `a01de09` → 実装 `5d1afa2` → 可読性補正 `1df4820`）。**部分 Theme 済み画面の暗色残り2枚のみ**。**ルート Theme + Header + Contract / Balance / Caution は実装前から Phase4 系**。
+- **`5d1afa2`（Theme 残り第1段）**: **変更ファイル** **`contract_personnel_summary_view.tscn` のみ**。
+  - **`RiskCard`**・**`PlayersCard`** → **`Phase4SummaryCard`**（**`theme_override_styles/panel` を除去**し **`theme_type_variation` へ置換**。**`StyleBoxFlat_summary` の SubResource 定義は残置**）。
+  - **ラベル**: **RiskTitle** / **PlayersTitle** → **`Color(0.08, 0.11, 0.18, 1)`**。**RiskHint** → **`Color(0.2, 0.25, 0.36, 1)`**。
+  - **維持**: **`HomeNavButton`**（text / tooltip / connection / `_on_home_nav_button_pressed`）、**`%DataSourceLabel`** / **`%ContractCardBody`** 等 **unique 名**、**from_python / mock** 読込（**`contract_personnel_summary_view.gd` 不変**）。**ContractCard / BalanceCard / CautionCard / HeaderCard は変更しない**（既に Phase4）。
+  - **未変更**: **`contract_personnel_summary_view.gd`**、**Theme `.tres`**、**export / mock JSON**、**`project.godot`**、他 detail scene。
+  - **第2段（`5d1afa2` 時点・未変更）**: **`%RiskRows`**・**`%PlayerRows`** 内の動的行（`.gd` の **`Label.new()`**）。
+- **`1df4820`（可読性の最小補正 — 第2段本格整備ではない）**: **変更ファイル** **`contract_personnel_summary_view.gd` のみ**。
+  - **`_fill_risk_rows`** の空表示・リスク行ブロック、**`_fill_player_rows`** の空表示・選手行（最大8件）の **`font_color`** を **`Color(0.16, 0.2, 0.3, 1)`** へ（**`_style_body_label` 経由**。旧 **`Color(0.86, 0.9, 0.95)`** / 空表示 **`Color(0.62, 0.66, 0.74)`**）。
+  - **未変更**: **RiskRows / PlayerRows 構造**、動的行の文言・件数・生成順、JSON key、Header/静的カードの色、**`contract_personnel_summary_view.tscn`**、Theme / DTO / mock。
+- **pytest**（`5d1afa2` / `1df4820` いずれも）: `test_home_dashboard_readonly_export` 10 / `test_roster_readonly_export` 10 / phase0 smoke 1 / **`test_contract_personnel_summary_readonly_export` 16** — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**:
+  - **`5d1afa2` 後**: **CardNavMenu #10 → 契約・人事サマリー遷移 OK**（**HeaderNavRow には載せない — 経営列 #10**）。**契約・人事サマリー表示 OK**。**RiskCard / PlayersCard 白カード化 OK**。**Scroll 内カード白系統一 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**ただし人事リスク / 主要契約選手の RiskRows / PlayerRows 動的行テキストが白カード上で薄く読みにくい**ことが判明。
+  - **`1df4820` 後**: **人事リスクの動的行テキストの可読性改善 OK**。**主要契約選手の動的行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
+- **到達点**: **RiskCard / PlayersCard の Phase4 Theme 残り第1段完了** ＋ **RiskRows / PlayerRows 動的行の文字色のみ最小補正済み**（**画面全体の完全仕上げではない**。**RiskRows / PlayerRows 構造・行レイアウト整理は第2段**）。
+- **詳細画面 Theme 横展開の現在地**: **第1号 施設**・**第2号 クラブ史**・**第3号 順位表**（RootCol 直下 Header+Summary）・**第4号 日程**（Scroll 内 SummaryCard 型）・**第5号 財務サマリー**（Scroll 内5静的カード型 ＋ 履歴行文字色最小補正）・**第6号 オーナーミッション**（Scroll 内4静的カード型 ＋ 今季ミッション動的行文字色最小補正）・**第7号 戦術サマリー**（Scroll 内6静的カード型 ＋ 選手ロール動的行文字色最小補正）・**第8号相当 契約・人事サマリー**（Risk/Players 残り第1段 ＋ RiskRows/PlayerRows 動的行文字色最小補正）— 第1段（＋最小補正）完了。**次候補**: **ロスター**への横展開か、完了済み画面の **Scroll / RiskRows / PlayerRows / PlayerRolesBody / MissionsBody / HistoryBody 第2段**を判断。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -287,7 +305,7 @@
 **位置づけ**: **本番 GUI の完成や Theme の全面適用ではない**。`themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`scenes/theme_preview.tscn` による **第 0 段 preview** で、見た目と variation の確認を進めている段階である。**既存 10 画面すべてに一括で当てる予定ではない**。
 
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
-- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルートに上記 Theme を割当。**ヘッダー**は `Phase4HeaderCard` とヘッダー内 Label の濃色 override。**契約概要**・**ロスター構成**は `Phase4SummaryCard`。**注意**は `Phase4WarningCard`。**人事リスク**・**主要契約選手**は従来の暗色 `StyleBoxFlat_summary` パネルのまま。動的に `Label.new()` している行は **暗地前提のまま**で、**白カード化・Theme 統一は未着手**（別タスクで `.gd` 調整が必要）。
+- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**契約概要**・**ロスター構成**・**RiskCard**・**PlayersCard**＝`Phase4SummaryCard`。**注意**＝`Phase4WarningCard`。**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
 - **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**ヘッダー**は `Phase4HeaderCard` + ヘッダー Label 濃色。**表**（`Scroll` / `RowList` 内の動的 `Label`）は **暗背景のまま**、`roster_view.gd` で `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` の **`theme_type_variation` に寄せた最小対応**（白カード化はしていない）。
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
@@ -296,6 +314,7 @@
 - **財務サマリー閲覧**（`finance_summary_view.tscn`）: **第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）— 詳細は上記「財務サマリー閲覧 `Phase4` Theme」節。
 - **オーナーミッション閲覧**（`owner_mission_view.tscn`）: **第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）— 詳細は上記「オーナーミッション / クラブ評価閲覧 `Phase4` Theme」節。
 - **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn`）: **第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）— 詳細は上記「戦術 / ローテーションサマリー閲覧 `Phase4` Theme」節。
+- **契約 / 人事サマリー閲覧**（`contract_personnel_summary_view.tscn`）: **Risk/Players 残り第1段**（`5d1afa2`）＋**RiskRows/PlayerRows 動的行文字色最小補正**（`1df4820`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
 - **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で表示用 `LeftRail`（200px・クリック不可）**。**MetricsRow** 3 枚 + **Scroll 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`home_dashboard.gd`・Theme `.tres` は不変**。**HeaderNavRow**・**CardNavMenu**＝実操作導線（**LeftRail は表示のみ** — 下記2節）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
@@ -389,7 +408,9 @@
 □ sandbox 色・質感バリエーション追加試験
 □ 本線 `home_dashboard` 中央カード密度の大移植判断
 □ LeftRail クリック化・CardNavMenu 縮小の設計判断（表示用追加は `a5e548f` 済み）
-□ 契約・人事サマリー・人事リスク / 主要契約選手（動的行・.gd）
+◎ 契約・人事サマリー・RiskCard / PlayersCard（Phase4SummaryCard・5d1afa2）
+◎ 契約・人事サマリー・RiskRows / PlayerRows 動的行文字色（1df4820）
+□ 契約・人事サマリー・RiskRows / PlayerRows 構造・行レイアウト（第2段・.gd）
 □ ホーム全体への Theme 拡大（ルート一括など）
 □ LeftRail クリック接続（別タスク。sandbox は引き続き研究可）
 □ ホーム「データ更新」表示 / ボタン判断
@@ -569,7 +590,8 @@
 □ 本線home_dashboard中央カード密度の大移植判断
 □ home DTO / JSON の追加整理
 □ LeftRail クリック化・CardNavMenu 縮小の設計判断（表示用追加は `a5e548f` 済み）
-□ 契約・人事サマリー・動的行（人事リスク・主要契約選手）のTheme／色整理（.gd 前提）
+◎ 契約・人事サマリー・RiskRows / PlayerRows 動的行文字色（1df4820・可読性最小補正）
+□ 契約・人事サマリー・RiskRows / PlayerRows 構造・行レイアウト（第2段・.gd）
 □ ホーム・Scroll以下カードのTheme／本番ビジュアル調整
 □ Theme全面適用（10画面一括・ルート一括など）
 □ ホーム「データ更新」表示/ボタン判断
