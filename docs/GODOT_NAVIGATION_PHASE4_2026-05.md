@@ -38,6 +38,7 @@
 - **施設サマリー閲覧**: **Theme 第1段**（`5987821`・**`facility_summary_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 動的本文は未変更**（§2.5）。
 - **クラブ史閲覧**: **Theme 第1段**（`682a941`・**`club_history_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内段落・シーズン表は未変更**（§2.6）。
 - **順位表閲覧**: **Theme 第1段**（`927e918`・**`standings_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内 8 列表・動的行は未変更**（§2.7）。
+- **日程閲覧**: **Theme 第1段**（`440c3f6`・**`schedule_view.tscn` のみ**）。**ルート Theme + Header + Scroll 内 SummaryCard** の Phase4 化。**NextGameCard / ScrollContent / 試合リストは未変更**（§2.8）。
 - **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み** — §2.3）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内の暗色カード問題は解消済み**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
 - **本線 LeftRail**: **`a5e548f` で表示用のみ追加済み**（§2.4）。**クリック・遷移は未実装**。**実操作導線**は引き続き **HeaderNavRow + CardNavMenu**。
 - **本格ナビの全面実装**（LeftRail クリック化・CardNavMenu 整理等）は **未着手**（§10）。**第 11 画面を急いで増やすより**、いまは **本番 GUI 化の足場**（Theme 限定適用・読み取り導線の安定）を優先する段階、という整理でよい（優先度の最終判断はチーム）。
@@ -116,6 +117,17 @@
 - **順位表からホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**text / tooltip / connection / handler 名は維持**。
 - **ユーザー環境 Godot（ローカル目視・1280×720）**: **ホーム → 順位表遷移 OK**。**順位表画面表示 OK**。**HomeNavButton でホームへ戻る OK**。**HeaderNavRow / CardNavMenu の役割分担は維持**（Theme 適用は順位表画面の Header/Summary のみ）。
 - **Theme 適用範囲**: **`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内 8 列表・動的行は第2段**（暗背景＋明文字のまま・今回未変更）。
+
+### 2.8 日程閲覧・Theme 第1段と導線確認（`440c3f6`）
+
+- **到達点**: **`schedule_view.tscn` のみ**（**ナビ構造の変更ではない**・**見た目第1段**）。**`schedule_view.gd`・Theme `.tres` 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`HeaderNavRow`** — 5 導線のうち **日程閲覧**（第5画面）。
+  - **`CardNavMenu`** — **リーグ**列の **日程** ボタン（**HeaderNavRow と二重導線**）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、日程画面へのショートカットではない**。
+- **日程からホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**text / tooltip / connection / handler 名は維持**。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 日程遷移 OK**。**日程画面表示 OK**。**HomeNavButton でホームへ戻る OK**。**HeaderNavRow / CardNavMenu の役割分担は維持**（Theme 適用は Header と Scroll 内 SummaryCard のみ）。
+- **Theme 適用範囲**: **`HeaderCard`**＝`Phase4HeaderCard`、**`Scroll/ScrollMain/SummaryCard`**＝`Phase4SummaryCard`。**`NextGameCard`**・**`ScrollContent` / 試合リストは第2段**（暗背景＋明文字のまま・今回未変更）。
 
 ## 3. 現行ナビ構造
 

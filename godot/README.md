@@ -203,7 +203,19 @@
 - **pytest**（実装時）: `test_home_dashboard_readonly_export` 10 / `test_roster_readonly_export` 10 / phase0 smoke 1 / **`test_standings_readonly_export` 5** — いずれも passed。
 - **ユーザー環境 Godot（ローカル目視・1280×720）**: **ホーム → 順位表遷移 OK**（**HeaderNavRow** または **CardNavMenu・リーグ列**）。**順位表表示 OK**。**HeaderCard Phase4 系・SummaryCard 白系 OK**。**ラベル可読性・DataSourceLabel OK**。**Scroll 内 8 列表の残存 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **到達点**: **Header + Summary の白カード化第1段完了**（**画面全体の完全仕上げではない**）。
-- **詳細画面 Theme 横展開の現在地**: **第1号 施設サマリー**・**第2号 クラブ史**・**第3号 順位表** — Header + Summary 第1段完了。**次候補**: **残り詳細画面**への同型横展開か、施設/クラブ史/順位表の **Scroll 第2段**を判断。
+
+### 日程（スケジュール）閲覧 `Phase4` Theme 限定適用・第1段（`440c3f6`）
+
+- **9詳細画面 Theme 横展開の第4号**（選定調査 `a5eec31` → 実装 `440c3f6`）。**施設・クラブ史・順位表と同手順の横展開**だが、**`SummaryCard` は RootCol 直下ではなく `Scroll/ScrollMain` 内**。**変更ファイル**: **`schedule_view.tscn` のみ**。
+- **ルート** `ScheduleView` に `phase4_readonly_core.tres` を割当。**`HeaderCard`** → **`Phase4HeaderCard`**。**`Scroll/ScrollMain/SummaryCard`** → **`Phase4SummaryCard`**（**`theme_override_styles/panel` を除去**し **`theme_type_variation` へ置換**。**`StyleBoxFlat_header` / `StyleBoxFlat_summary` / `StyleBoxFlat_chip` / `StyleBoxFlat_nextgame` の SubResource 定義は残置**）。**`ReadonlyBadge` / `ModeStrip`** の chip は維持。
+- **ラベル**: **Header** と **`SummaryBlockLabel`** を白カード向け濃色（完了3画面と同系）。**NextGameCard 内ラベル**・**StatusLabel** は**未変更**。
+- **維持**: **`HomeNavButton`**（text / tooltip / connection / `_on_home_nav_button_pressed`）、**`%DataSourceLabel`** / **`%SummaryBlockLabel`** 等 **unique 名**、**from_python / mock** 読込（**`schedule_view.gd` 不変**）。
+- **未変更**: **`schedule_view.gd`**、**Theme `.tres`**、**export / mock JSON**、**`project.godot`**、他 detail scene。
+- **第2段（未変更）**: **`NextGameCard`**（`StyleBoxFlat_nextgame` のまま）、**`ScrollContent`** / **試合リスト**（`.gd` の動的生成 — 暗背景＋明文字のまま許容）。
+- **pytest**（実装時）: `test_home_dashboard_readonly_export` 10 / `test_roster_readonly_export` 10 / phase0 smoke 1 / **`test_schedule_readonly_export` 10** — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 日程遷移 OK**（**HeaderNavRow** または **CardNavMenu・リーグ列**）。**日程表示 OK**。**HeaderCard Phase4 系・Scroll 内 SummaryCard 白系 OK**。**ラベル可読性・DataSourceLabel OK**。**NextGameCard 残存 OK**。**ScrollContent / 試合リスト残存 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **到達点**: **ルート Theme + HeaderCard + Scroll 内 SummaryCard の白カード化第1段完了**（**画面全体の完全仕上げではない**）。
+- **詳細画面 Theme 横展開の現在地**: **第1号 施設サマリー**・**第2号 クラブ史**・**第3号 順位表**（RootCol 直下 Header+Summary）・**第4号 日程**（Scroll 内 SummaryCard 型）— 第1段完了。**次候補**: **残り詳細画面**への横展開か、完了済み画面の **Scroll / NextGame 第2段**を判断。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -222,6 +234,7 @@
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
 - **順位表閲覧**（`standings_view.tscn`）: **第1段**（`927e918`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内 8 列表・動的行**は**未着手**（第2段）。詳細は上記「順位表閲覧 `Phase4` Theme」節。
+- **日程閲覧**（`schedule_view.tscn`）: **第1段**（`440c3f6`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`Scroll/ScrollMain/SummaryCard`**＝`Phase4SummaryCard`。**NextGameCard**・**ScrollContent / 試合リスト**は**未着手**（第2段）。詳細は上記「日程閲覧 `Phase4` Theme」節。
 - **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で表示用 `LeftRail`（200px・クリック不可）**。**MetricsRow** 3 枚 + **Scroll 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`home_dashboard.gd`・Theme `.tres` は不変**。**HeaderNavRow**・**CardNavMenu**＝実操作導線（**LeftRail は表示のみ** — 下記2節）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
@@ -304,7 +317,10 @@
 ◎ クラブ史・遷移・表示・戻り・Scroll残存・可読性確認 OK（ユーザー環境 Godot）
 ◎ 順位表・Header+Summary Phase4 Theme 第1段（`927e918`）
 ◎ 順位表・遷移・表示・1280×720・戻り・Scroll8列残存・可読性確認 OK（ユーザー環境 Godot）
-□ 施設/クラブ史/順位表 Scroll 第2段、または残り詳細画面への同型横展開判断
+◎ 詳細Theme3画面後次タスク比較（`a5eec31`・reports）
+◎ 日程・ルートTheme+Header+Scroll内Summary Phase4 Theme 第1段（`440c3f6`）
+◎ 日程・遷移・表示・NextGame/試合リスト残存・戻り・可読性確認 OK（ユーザー環境 Godot）
+□ 完了済み画面のScroll/NextGame第2段、または残り詳細画面への横展開判断
 □ CardNews 1 行化の表示制御 / DTO 整理判断
 □ Header 資金・成績行の本格移植判断
 □ home DTO / JSON の追加整理
