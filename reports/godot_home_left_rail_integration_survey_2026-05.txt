@@ -1,0 +1,509 @@
+# Godot本線 home_dashboard 左レール導入可否調査（2026-05）
+
+本ファイルは調査・方針整理のみ。実装・シーン・スクリプト・Theme・docs/README・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-15
+- **調査時点 HEAD**: `5468393`（Godot本線ホームのナビ役割分担案を調査）
+- **前回 report の推奨**（`godot_home_navigation_role_options_2026-05.txt`）:
+  - **案3: 左レール本線導入準備型** — 今すぐ左レール実装・CardNavMenu 削除/Theme 化はしない
+  - **次段階**: sandbox 左レールの本線導入可否（影響範囲・最小移植・段階コミット）
+- **今回の目的**: 上記「次段階」の実施 — **実装前の安全確認**
+- **実装変更**: **なし**
+- **Godot 目視確認**: **未実施**（本調査はソース読取のみ）
+
+
+================================================================================
+## 2. 本線 home_dashboard の現状構造
+================================================================================
+
+### 2.1 ノード階層（要約）
+
+```
+HomeDashboard (Control, script=home_dashboard.gd, Theme=phase4_readonly_core.tres)
+├── Background (ColorRect)
+└── Margin (MarginContainer: L/R/T/B 16/14/16/12)
+    └── RootCol (VBoxContainer)                    ← 現状は縦積み一本
+        ├── HeaderCard (Phase4HeaderCard)
+        │   └── HeaderInner (VBox)
+        │       ├── HeaderTopRow (Badge / Placeholder)
+        │       ├── HeaderClubBandRow (HomeLogoSlot / ClubName / Season / DataSource)
+        │       └── HeaderNavRow (5× Button)
+        ├── StatusLabel (%StatusLabel)
+        ├── Scroll (ScrollContainer, min_h=128, expand vertical)
+        │   └── Inner (VBox)
+        │       ├── CardNavMenu (暗色 StyleBoxFlat_card)  ← Scroll 最上段
+        │       ├── SecMetricsTitle
+        │       ├── MetricsRow (CardDivision / CardRank / CardMoney)
+        │       ├── CardTeamExtras (%)
+        │       ├── CardWarnings (%)
+        │       ├── CardNext (%NextGameLabel)
+        │       ├── CardSummary (%ClubSummaryLabel)
+        │       ├── CardTasks (%TasksLabel)
+        │       └── CardNews (%NewsLabel)
+        └── FooterNote (Label, JSON 読込案内)
+```
+
+### 2.2 接続（遷移）
+
+- **14 connections**（Header 5 + CardNavMenu 8）→ 既存 9 handler（5 画面は二重接続）
+- **handler はすべて `home_dashboard.gd` 内**（`change_scene_to_file`）
+
+### 2.3 script 参照（unique_name）
+
+`home_dashboard.gd` の `@onready` は **データ表示ラベル・行・カードのみ**（計 17 参照）。
+**HeaderNavRow / CardNavMenu のノードは script 未参照**（connection のみ）。
+
+| unique_name | 用途 |
+|-------------|------|
+| StatusLabel, DataSourceLabel, ClubNameLabel, SeasonLabel | ヘッダー/状態 |
+| DivisionLabel, RankRecordLabel, MoneyLabel | MetricsRow |
+| OwnerTrustRow/Label, SalaryCapRow/Label, RecentFormRow/Label | CardTeamExtras |
+| CardWarnings, WarningsRow, WarningsLabel | 警告 |
+| NextGameLabel, ClubSummaryLabel, TasksLabel, NewsLabel | Scroll カード |
+
+**左レール追加時**: 上記 unique ノードの **パスを変えなければ `.gd` 変更不要**。
+（例: `RootCol` を `MainRow/ContentCol` の子に移すだけなら、**% 参照は維持可能**）
+
+### 2.4 左レール導入で触る構造
+
+| 要素 | 影響 |
+|------|------|
+| **RootCol** | `MainRow`（HBox）の右子に移すか、`MainRow` を `Margin` 直下に新設 |
+| **HeaderCard** | 右ペイン内に残す想定（sandbox とは異なり**全幅ヘッダーは捨てず**最小移植） |
+| **Scroll / Inner** | 右ペイン内・パス接頭が変わる → **connection パス要更新**（14 本） |
+| **FooterNote** | 右ペイン下端に維持可能 |
+| **CardNavMenu** | 横幅 **約 200px 減**（左レール分）。4 列 HBox は**窮屈化リスク** |
+
+### 2.5 横幅の目安（1280×720）
+
+- `Margin` 左右 16+16 → 実効幅 **約 1248px**
+- 左レール **200px** + `MainRow` separation **14px** → 右ペイン **約 1034px**
+- 現状フル幅で組んだ **HeaderNavRow 5 ボタン**・**CardNavMenu 4 列**は、**1034px でも概ね収まる想定**だが、**Godot 目視必須**（ボタン折返し・列幅は未検証）
+
+
+================================================================================
+## 3. sandbox 左レールの現状
+================================================================================
+
+### 3.1 対象 scene
+
+| scene | 位置づけ（docs/README） |
+|-------|-------------------------|
+| `home_production_wire_preview.tscn` | **本命候補**（2 カラム: 左レール + 右スタック） |
+| `home_production_wire_preview_right_summary.tscn` | **参考案**（3 カラム・中央が詰まりやすい） |
+
+両方とも **script なし**、**[connection] 0 件**、ルート `Control` のみ。
+
+### 3.2 LeftRail 構造（通常版）
+
+```
+RootMargin/MainRow (HBox)
+├── LeftRail (PanelContainer, min_width=200, mouse_filter=IGNORE)
+│   └── RailVBox
+│       ├── WireTitle / WireHint（preview 用説明）
+│       ├── NavItemsVBox
+│       │   ├── NavHome（現在地強調 StyleBoxFlat_nav_active）
+│       │   │   ├── NavHomeBadge「現在地」
+│       │   │   └── NavHomeTitle「ホーム」
+│       │   ├── NavTeam「チーム」
+│       │   ├── NavLeague「リーグ」
+│       │   ├── NavMgmt「経営」
+│       │   └── NavClub「クラブ」
+│       └── NavFootnote「サブ画面は中央のカードから…」
+└── RightStack (VBox, expand) … ClubBand / MidScroll / BottomStrip
+```
+
+- **ノード種別**: すべて **PanelContainer + Label**（**Button ではない**）
+- **mouse_filter = 2 (IGNORE)** — **クリック不可・装飾のみ**
+- **大分類ナビ**: **5 項目**（ホーム + 4 カテゴリ）。**画面直行ボタンは無い**
+- **現在地表示**: **NavHome のみ**（badge「現在地」+ active スタイル）
+
+### 3.3 sandbox 独自要素（本線にそのまま載せないもの）
+
+| 要素 | 理由 |
+|------|------|
+| WireTitle / WireHint | sandbox 専用説明（「preview」「未接続」） |
+| RightStack 全体 | 本線は HeaderCard + Scroll 構成が既に別物 |
+| CardShortcuts | 中央右列の 1 行補助（本線は CardNavMenu が代替） |
+| MidScroll 2 カラムカード群 | 本線カード順序・内容が異なる |
+
+### 3.4 移植しやすい要素
+
+- **LeftRail  subtree**（Panel + VBox + 5 Nav* パネル）
+- **SubResource**: `StyleBoxFlat_rail`, `nav_item`, `nav_active`（sandbox と同様 **scene 内 SubResource** で可 → **Theme `.tres` 不要**）
+- **Phase4OnDark*** の theme_type_variation（本線も同一 Theme 参照済み）
+
+### 3.5 通常版 vs 右サマリー版
+
+- **LeftRail 構造は同一**（200px・5 大分類・現在地ホーム）
+- 右サマリー版は **第 3 列**で中央が狭い → docs **本命は通常 2 カラム版**
+- 本線移植の参照元は **`home_production_wire_preview.tscn` を正**とする
+
+
+================================================================================
+## 4. 10画面導線との関係
+================================================================================
+
+### 4.1 現状（再掲）
+
+| 経路 | 到達 |
+|------|------|
+| HeaderNavRow | #2 ロスター, #3 クラブ史, #4 順位表, #5 日程, #6 施設サマリー |
+| CardNavMenu | 上記 5 + #7 財務, #8 OM, #9 戦術, #10 契約人事 |
+| CardNavMenu のみ | #7, #8, #9, #10 |
+| Header のみ | **なし** |
+
+**scene 正本**（`godot/scenes/` 確認）:
+`home_dashboard.tscn`, `roster_view.tscn`, `club_history_view.tscn`, `standings_view.tscn`,
+`schedule_view.tscn`, `facility_summary_view.tscn`, `finance_summary_view.tscn`,
+`owner_mission_view.tscn`, `tactics_summary_view.tscn`, `contract_personnel_summary_view.tscn`
+（**`facility_view.tscn` / `tactics_view.tscn` は存在しない**）
+
+### 4.2 左レールを「大分類ナビ」のまま本線化した場合
+
+| 大分類 | 対応する詳細画面（CardNavMenu 列と一致） |
+|--------|------------------------------------------|
+| ホーム | ホームのみ（遷移なし） |
+| チーム | ロスター, 戦術サマリー |
+| リーグ | 順位表, 日程 |
+| クラブ | クラブ史, 施設サマリー |
+| 経営 | 財務サマリー, OM, 契約人事 |
+
+**重要**: sandbox 左レールは **1 カテゴリ = 複数画面** を内包する設計。
+**左レールだけでは #2〜#10 の直行は完結しない**（sandbox も **中央カード / CardShortcuts** で補完）。
+
+→ **導線欠落を防ぐ条件**:
+1. 左レール導入初回でも **CardNavMenu（または同等の画面ボタン群）を残す**
+2. または **HeaderNavRow + カテゴリ内サブメニュー**を新設（未設計・script 増）
+3. 左レールクリックで遷移するなら **1 カテゴリ 1 画面に割り当てる IA** を先に決める（例: チーム→ロスターのみ）→ **他画面が落ちる**ため **現時点では非推奨**
+
+### 4.3 左レールを「全画面直行ナビ」にした場合
+
+- docs 方針: **「10 画面を左に全部並べない」**
+- 9 ボタン縦並びは **方針と矛盾** → **本命案ではない**
+- HeaderNavRow / CardNavMenu の **置換先としては不採用**
+
+
+================================================================================
+## 5. HeaderNavRow の残し方
+================================================================================
+
+### 5.1 残す（推奨・初回）
+
+| 観点 | 評価 |
+|------|------|
+| 安全性 | ◎ 既存 5 画面の確実な入口を維持 |
+| 導線重複 | △ CardNavMenu / 将来左レール操作と三重化しうる |
+| 画面密度 | △ 右ペイン狭化後も Header 内 5 ボタンは維持 |
+| handler 流用 | ◎ 変更不要 |
+| 捨て戻し | ◎ 左レール削除時も Header だけで 5 画面到達可 |
+| 初回導入 | **最適** — 左レール表示のみと併用しても機能退行なし |
+
+### 5.2 薄くする / 役割縮小
+
+- 例: ボタン文言短縮・tooltip のみ・視覚的に弱める
+- **メリット**: 左レールとの役割分担を徐々に整理
+- **デメリット**: ユーザーが「どちらが正」のか迷う期間が伸びる
+- **リスク**: 中 — IA 未確定のまま手を入れると docs「仮整理」と混同
+- **初回**: **不要**（左レール追加だけで十分）
+
+### 5.3 削除する
+
+- **メリット**: 二重 5 導線の解消
+- **デメリット**: **#2〜#6 が CardNavMenu のみ**に依存（Scroll 内・暗色カード）
+- **リスク**: **高** — 左レールが大分類のみの間は **頻出操作が遠くなる**
+- **初回**: **非推奨**（CardNavMenu 整理と**同時に**でない限り行わない）
+
+
+================================================================================
+## 6. CardNavMenu の残し方
+================================================================================
+
+### 6.1 残す（推奨・初回）
+
+| 観点 | 評価 |
+|------|------|
+| #7〜#10 | ◎ **唯一のホーム発進路**を維持 |
+| 左レールとの関係 | 大分類（左）+ 画面ボタン（CardNavMenu）で sandbox 設計と一致 |
+| 安全性 | ◎ |
+| 見た目 | △ 暗色 1 枚は残る |
+| 初回 | **必須に近い** |
+
+### 6.2 縮小する
+
+- 例: 4 列→1 行ヒント（sandbox CardShortcuts 級）、列タイトルのみ
+- **メリット**: 縦スペース節約
+- **デメリット**: **#7〜#10 ボタンが小さく/隠れる**リスク
+- **リスク**: 中〜高 — 縮小仕様の設計が必要
+- **初回**: **後回し**（左レール表示追加と**別コミット**）
+
+### 6.3 削除する
+
+- **前提**: 左レールまたは別 UI で **9 画面すべて**に到達可能であること
+- **現状**: 左レールは **大分類のみ** → **条件未充足**
+- **リスク**: **致命的**（#7〜#10 欠落）
+- **初回**: **禁止**
+
+### 6.4 左レールがクリック可能になるまで残す
+
+- **前回・今回の合意どおり**
+- 左レールに遷移を付けても、**大分類クリックだけでは 9 画面に届かない**ため、
+  **CardNavMenu 縮小・削除は「サブナビ IA 確定後」**
+
+
+================================================================================
+## 7. 左レール初回導入の方式比較
+================================================================================
+
+### 案A: 表示だけ左レールを本線に追加
+
+**内容**
+- `home_dashboard.tscn` のみ
+- `Margin` 下に `MainRow`（HBox）を挿入し、**LeftRail（sandbox 複製・文言調整）** + 既存 `RootCol`（改名 `ContentCol` 可）
+- **mouse_filter=IGNORE**、**connection なし**
+- HeaderNavRow / CardNavMenu **維持**
+- フットノートに **「表示のみ・遷移なし」** を明記（sandbox `NavFootnote` と同趣旨）
+
+**変更範囲**: `.tscn` のみ（**connection パス更新 14 本** + SubResource 追加 + ノード移動）
+
+**メリット**
+- **導線欠落ゼロ**
+- `.gd` / Theme / export **不変**
+- 1280×720 レイアウトリスクを**早期に目視**できる
+- docs「左レール本線未実装」→「枠のみ実装」へ段階的
+
+**デメリット**
+- **見た目はクリックできそう**だが動かない → 混乱の可能性（注記で緩和）
+- 暗色 LeftRail + 暗色 CardNavMenu で **暗色領域が増える**
+- **IA 問題（二重導線）は未解決**
+
+**リスク**: **低**（機能面）
+
+**適する条件**: **本線レイアウト変更の第一コミット**として最適
+
+---
+
+### 案B: 左レールを既存 handler へ接続して導入
+
+**内容**
+- Panel を **Button 化**するか、`gui_input` で接続
+- 大分類 → **代表 1 画面**へ `change_scene_to_file`（例: チーム→ロスター）
+- または **Scroll 内 CardNavMenu へフォーカス/スクロール**（**新規 script ロジック**）
+
+**変更範囲**: `.tscn` + **`.gd` 追加/変更の可能性大**
+
+**メリット**
+- ユーザーが触れる
+- 既存 9 handler の **一部は流用可能**（画面単位に割り当てる場合）
+
+**デメリット**
+- **1 カテゴリ複数画面**のため、**どの handler に繋ぐか IA 未決**だと誤誘導
+- チーム→ロスターのみ接続すると **戦術サマリーが左レールから届かない**
+- connection 増・**三重導線**（Header + CardNavMenu + LeftRail）
+
+**リスク**: **中〜高**（仕様・接続ミス）
+
+**適する条件**: **大分類→画面のマップとサブナビ方針が文書化された後**
+
+---
+
+### 案C: sandbox でクリック接続を先に試す
+
+**内容**
+- `home_production_wire_preview.tscn` に script 追加 or Button 化
+- 本線は未変更
+
+**変更範囲**: sandbox `.tscn` + 新規 `.gd`（本線触らない）
+
+**メリット**
+- 本線を壊さない
+- カテゴリナビの UX を F6 で試せる
+
+**デメリット**
+- **本線の横幅・Header 共存は検証できない**
+- sandbox と本線で **二重メンテ**
+- README「sandbox script なし」方針との整合要確認
+
+**リスク**: **低**（本線）/ **中**（方針ブレ）
+
+**適する条件**: **本線に入れる前にナビ操作だけ試したい**場合
+
+---
+
+### 案D: まだ本線導入せず docs で仕様固め
+
+**内容**
+- 実装なし。IA 表・ワイヤー・大分類→画面表を docs 化
+
+**メリット**
+- 最安全（コード差分ゼロ）
+- 接続方針を先に合意できる
+
+**デメリット**
+- **GUI 改善が進まない**
+- レイアウトリスク（1034px）が **未検証のまま**
+
+**リスク**: **低**（ただし判断が遅れる）
+
+**適する条件**: チームで **左レール＝大分類のみ**が合意できていない場合
+
+
+================================================================================
+## 8. 影響範囲
+================================================================================
+
+| 対象 | 左レール初回（案A想定） | 備考 |
+|------|-------------------------|------|
+| **home_dashboard.tscn** | **大** — レイアウト骨格・SubResource・connection パス | 1 コミットに収める方針可 |
+| **home_dashboard.gd** | **なし**（案A） / **あり**（案B・スクロール連動等） | unique パス維持が条件 |
+| **phase4_readonly_core.tres** | **なし**（sandbox 同様 SubResource で可） | |
+| **project.godot** | **なし** | main_scene 不変 |
+| **README / docs** | **なし**（実装コミット後の別タスク） | 今回調査では触らない |
+| **export / tests / mock JSON** | **なし** | |
+| **sandbox scene** | **なし**（案A） | 案C 時のみ sandbox |
+| **9 詳細 view .tscn** | **なし** | |
+| **Godot 目視** | **必須**（実装後） | 1280×720・Header 5・CardNavMenu 4 列・Scroll |
+| **pytest** | **不要**（レイアウトのみ） | export 不変なら省略可 |
+
+### 8.1 最小移植案（推奨レイアウト）
+
+**案 L1: 右ペインに既存 RootCol を丸ごと移す**（推奨）
+
+```
+Margin
+└── MainRow (HBox)                    ← 新規
+    ├── LeftRail (200px, 表示のみ)     ← sandbox から複製
+    └── RootCol (VBox, 既存のまま)      ← 親だけ変更
+        ├── HeaderCard …
+        ├── StatusLabel
+        ├── Scroll …
+        └── FooterNote
+```
+
+- **HeaderCard は全幅ではなく右ペイン幅**になる（sandbox の ClubBand 単独右列とは異なる）
+- **既存 HeaderClubBandRow / HeaderNavRow は維持**（`83d7fc0` 成果を壊さない）
+- **sandbox 全体（RightStack）の移植は不要**
+
+**案 L2: sandbox 完全準拠（Header を右スタックに分解）**
+
+- 変更量大・ClubBand 重複・**非推奨**（別タスク級）
+
+### 8.2 クリック接続を後から足す場合の script 影響
+
+| 方式 | .gd 影響 |
+|------|----------|
+| 大分類 Panel → Button 化 + 既存 handler | **小** — connection 追加のみ（**画面選定 IA 要**） |
+| 大分類 → CardNavMenu スクロール | **中** — `@onready` で Scroll/列参照、新メソッド |
+| 大分類 → サブメニュー展開 | **大** — 状態管理・新 UI |
+| 表示のみ維持 | **なし** |
+
+**既存 9 handler はそのまま流用可能**（新規 scene path 不要）。
+
+
+================================================================================
+## 9. 段階コミット案（実装時）
+================================================================================
+
+| 段 | 内容 | 主な変更 | 安全条件 |
+|----|------|----------|----------|
+| **1** | **左レール枠のみ（表示のみ）** | `home_dashboard.tscn` | HeaderNavRow・CardNavMenu・14 connection 先維持。注記ラベル付与 |
+| **2** | **Godot 目視** | なし | 1280×720・折返し・Scroll・UID エラーなし |
+| **3** | **（任意）左レール注記・文言本線化** | `.tscn` のみ | sandbox 用「preview」文言を除去 |
+| **4** | **（IA 確定後）大分類クリック試験** | `.tscn` + 場合により `.gd` | CardNavMenu **残したまま** |
+| **5** | **（IA 確定後）CardNavMenu 縮小検討** | `.tscn` | #7〜#10 到達表で検証 |
+| **6** | **README/docs 記録** | docs のみ | 実装確定後・別コミット |
+
+**やらないこと（初回〜4 まで）**:
+- CardNavMenu 削除
+- HeaderNavRow 削除
+- Theme `.tres` 編集
+- `project.godot` main_scene 変更
+
+**コミット粒度**: **1 は 1 コミット**（ユーザー規約: レイアウト 1 コミット）。**2 はコミット不要**（確認のみ）。
+
+
+================================================================================
+## 10. 推奨方針
+================================================================================
+
+### 10.1 導入可否の結論
+
+**結論: 本線への左レール導入は「可能」だが、段階実施が必須。**
+
+- **技術的**: `.tscn` のレイアウト変更 + connection パス更新で **案A（表示のみ）** は実現可能
+- **導線**: 左レール単体では **9 画面に届かない** → **HeaderNavRow + CardNavMenu を初回も維持**
+- **方針**: docs の **大分類ナビ + 中央から画面選択** と整合。右サマリー版ではなく **通常 sandbox を参照**
+- **追加調査**: **必須ではない** — 実装後の **Godot 目視**が次のゲート
+
+### 10.2 初回実装の推奨
+
+| 項目 | 推奨 |
+|------|------|
+| HeaderNavRow | **残す** |
+| CardNavMenu | **残す**（削除・縮小しない） |
+| 左レール初回 | **案A: 表示のみ本線追加**（案 L1 レイアウト） |
+| クリック | **初回は付けない**（案B は IA 表確定後） |
+| sandbox 先行試験（案C） | **必須ではない**（本線横幅は sandbox では検証不可） |
+
+**案D のみ先送り**は、**レイアウトリスク未検証**のままになるため、**案A を先に 1 コミット**する方がプロジェクト的には進む。
+
+### 10.3 実装へ進んでよいか
+
+| 判断 | 内容 |
+|------|------|
+| **進んでよい** | **段階1（表示のみ左レール）**に限れば、条件付きで **GO** |
+| **まだ全体 GO ではない** | 左レールクリック・CardNavMenu 整理・Header 縮小は **別判断** |
+| **ゲート** | コミット後 **Godot 4.6.2 F6** で 1280×720 目視 |
+
+
+================================================================================
+## 11. 次にやるべきこと（1件）
+================================================================================
+
+**推奨タスク（実装）**:
+
+> **本線 `home_dashboard.tscn` に LeftRail を「表示のみ」で最小追加する（案A + レイアウト L1）**
+
+**安全条件**:
+- 変更ファイルは **`godot/scenes/home_dashboard.tscn` のみ**（1 コミット）
+- **HeaderNavRow・CardNavMenu・既存 9 handler・14 connection を機能的に維持**（パス更新は可）
+- **LeftRail に「表示のみ・遷移なし」注記**（NavFootnote 相当）
+- **sandbox の WireTitle/WireHint は持ち込まない**（本線用文言に差し替え）
+- **`home_dashboard.gd` / Theme / export / docs は触らない**
+- 完了後 **Godot 目視必須**（本調査では未実施）
+
+**意図的にしない次タスク**:
+- CardNavMenu 削除・Theme 化
+- HeaderNavRow 削除
+- 左レールへの遷移接続（案B）— IA 表なしでは早い
+
+
+================================================================================
+## 12. 変更していないファイル
+================================================================================
+
+- godot/scenes/home_dashboard.tscn
+- godot/scenes/home_production_wire_preview.tscn
+- godot/scenes/home_production_wire_preview_right_summary.tscn
+- godot/scripts/home_dashboard.gd
+- godot/themes/phase4_readonly_core.tres
+- godot/project.godot
+- godot/README.md
+- docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md
+- docs/GODOT_NAVIGATION_PHASE4_2026-05.md
+- reports/godot_card_navmenu_policy_survey_2026-05.txt
+- reports/godot_home_navigation_route_matrix_2026-05.txt
+- reports/godot_home_navigation_role_options_2026-05.txt
+- basketball_sim/export/home_dashboard_readonly.py
+- basketball_sim/tests/test_home_dashboard_readonly_export.py
+- godot/data/home_dashboard_mock.json
+
+================================================================================
+（以上）
+================================================================================
