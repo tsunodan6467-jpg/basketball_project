@@ -151,7 +151,7 @@ func _fill_risk_rows(rows: Array) -> void:
 	if rows.is_empty():
 		var empty_lab := Label.new()
 		empty_lab.text = "（リスク項目がありません）"
-		_style_body_label(empty_lab, 12, Color(0.62, 0.66, 0.74, 1))
+		_style_body_label(empty_lab, 12, Color(0.16, 0.2, 0.3, 1))
 		_risk_rows.add_child(empty_lab)
 		return
 	for it in rows:
@@ -164,7 +164,7 @@ func _fill_risk_rows(rows: Array) -> void:
 		var memo: String = _str_cell(row.get("memo", null))
 		var block := Label.new()
 		block.text = "%s\n  表示: %s\n  重要度: %s\n  %s" % [lab, disp, sev, memo]
-		_style_body_label(block, 12, Color(0.86, 0.9, 0.95, 1))
+		_style_body_label(block, 12, Color(0.16, 0.2, 0.3, 1))
 		_risk_rows.add_child(block)
 
 
@@ -172,7 +172,7 @@ func _fill_player_rows(rows: Array) -> void:
 	if rows.is_empty():
 		var empty_lab := Label.new()
 		empty_lab.text = "（選手行がありません）"
-		_style_body_label(empty_lab, 12, Color(0.62, 0.66, 0.74, 1))
+		_style_body_label(empty_lab, 12, Color(0.16, 0.2, 0.3, 1))
 		_player_rows.add_child(empty_lab)
 		return
 	var lim: int = mini(rows.size(), 8)
@@ -199,7 +199,7 @@ func _fill_player_rows(rows: Array) -> void:
 			+ "  FA 目安: %s  リスク: %s\n"
 			+ "  メモ: %s"
 		) % [str(p.get("order", i + 1)), nm, pos, age_s, ovr, pot, sal, cy, nat, fa, rk, memo]
-		_style_body_label(line, 12, Color(0.86, 0.9, 0.95, 1))
+		_style_body_label(line, 12, Color(0.16, 0.2, 0.3, 1))
 		_player_rows.add_child(line)
 
 
