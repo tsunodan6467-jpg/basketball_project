@@ -39,6 +39,7 @@
 - **クラブ史閲覧**: **Theme 第1段**（`682a941`・**`club_history_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内段落・シーズン表は未変更**（§2.6）。
 - **順位表閲覧**: **Theme 第1段**（`927e918`・**`standings_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内 8 列表・動的行は未変更**（§2.7）。
 - **日程閲覧**: **Theme 第1段**（`440c3f6`・**`schedule_view.tscn` のみ**）。**ルート Theme + Header + Scroll 内 SummaryCard** の Phase4 化。**NextGameCard / ScrollContent / 試合リストは未変更**（§2.8）。
+- **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`・**`finance_summary_view.tscn` のみ**）＋**履歴行文字色最小補正**（`6c3dc43`・**`finance_summary_view.gd` のみ**）。**ルート Theme + Header + Scroll 内5静的カード** の Phase4 化。**`%HistoryBody` 構造・履歴行レイアウトは未変更**（§2.9）。
 - **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み** — §2.3）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内の暗色カード問題は解消済み**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
 - **本線 LeftRail**: **`a5e548f` で表示用のみ追加済み**（§2.4）。**クリック・遷移は未実装**。**実操作導線**は引き続き **HeaderNavRow + CardNavMenu**。
 - **本格ナビの全面実装**（LeftRail クリック化・CardNavMenu 整理等）は **未着手**（§10）。**第 11 画面を急いで増やすより**、いまは **本番 GUI 化の足場**（Theme 限定適用・読み取り導線の安定）を優先する段階、という整理でよい（優先度の最終判断はチーム）。
@@ -128,6 +129,20 @@
 - **日程からホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**text / tooltip / connection / handler 名は維持**。
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → 日程遷移 OK**。**日程画面表示 OK**。**HomeNavButton でホームへ戻る OK**。**HeaderNavRow / CardNavMenu の役割分担は維持**（Theme 適用は Header と Scroll 内 SummaryCard のみ）。
 - **Theme 適用範囲**: **`HeaderCard`**＝`Phase4HeaderCard`、**`Scroll/ScrollMain/SummaryCard`**＝`Phase4SummaryCard`。**`NextGameCard`**・**`ScrollContent` / 試合リストは第2段**（暗背景＋明文字のまま・今回未変更）。
+
+### 2.9 財務サマリー閲覧・Theme 第1段・可読性補正と導線確認（`4b43da5` / `6c3dc43`）
+
+- **到達点**: **`4b43da5`** は **`finance_summary_view.tscn` のみ**（**ナビ構造の変更ではない**・**見た目第1段**）。**`6c3dc43`** は **`finance_summary_view.gd` のみ**（**HistoryBody 動的履歴行の `font_color` のみ** — **第2段本格整備ではない**）。**Theme `.tres` 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`CardNavMenu`** — **経営**列の **財務サマリー** ボタン（**#7・主入口**）。
+  - **`HeaderNavRow` には載せない**（5 導線はロスター・クラブ史・順位表・日程・施設サマリーのみ — §3）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、財務サマリー画面へのショートカットではない**。
+- **財務サマリーからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderTopRow` 内** — **HeaderNavRow ではない**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**`4b43da5` / `6c3dc43` いずれも** text / tooltip / connection / handler 名は維持。
+- **ユーザー環境 Godot（ローカル目視）**:
+  - **`4b43da5` 後**: **CardNavMenu → 財務サマリー遷移 OK**。**財務画面表示 OK**。**HeaderCard Phase4 系・Scroll 内5静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし**。**財務履歴の動的履歴行は薄く読みにくい**ことが判明。
+  - **`6c3dc43` 後**: **財務履歴の動的履歴行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし**。
+- **Theme 適用範囲（`4b43da5`）**: **`HeaderCard`**＝`Phase4HeaderCard`、**Scroll/ScrollContent 内5枚静的カード**＝`Phase4SummaryCard`（Finance / Prior / Salary / History / Caution）。
+- **可読性補正（`6c3dc43`）**: **`%HistoryBody`** に追加される動的履歴行 `Label` の色のみ **`Color(0.16, 0.2, 0.3)`** へ。**HistoryBody 構造・履歴行レイアウトは第2段**（今回未変更）。
 
 ## 3. 現行ナビ構造
 

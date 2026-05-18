@@ -394,6 +394,14 @@
 - **クラブ史閲覧**（`club_history_view.tscn`）: **詳細画面 Theme 横展開第2号・第1段**（`682a941`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の段落・シーズン表（`club_history_view.gd` の **`Label.new()` / シーズン表 `HBoxContainer`**）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`64abb9c`**（施設第2段より先に横展開推奨・同型・順位表より Scroll ギャップ小）。
 - **順位表閲覧**（`standings_view.tscn`）: **詳細画面 Theme 横展開第3号・第1段**（`927e918`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の **8 列表・動的行**（`standings_view.gd` の **`Label.new()`** 等）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。
 - **日程閲覧**（`schedule_view.tscn`）: **詳細画面 Theme 横展開第4号・第1段**（`440c3f6`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`Scroll/ScrollMain/SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置。**`StyleBoxFlat_nextgame` は NextGameCard 用に残置**）。**`NextGameCard`**・**`ScrollContent`**（試合リスト — `schedule_view.gd` の動的生成）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`a5eec31`**（残り横展開継続・HeaderNavRow 到達・**Scroll 内 SummaryCard 型**）。
+- **財務サマリー閲覧**（`finance_summary_view.tscn` / `finance_summary_view.gd`）: **詳細画面 Theme 横展開第5号・第1段**（`4b43da5`）＋**履歴行文字色の最小補正**（`6c3dc43`）。選定は **`99c279d`**（4画面第1段完了後、**Scroll 第2段より先に残り詳細へ**。**未Theme・ユーザー価値高**・**Header + Scroll 内静的5カード**・**`.tscn` のみで第1段可能**・**`finance_summary_readonly` + pytest 安定**・**OM 等へ進む前に Scroll 内複数 Panel の手順を固められる**）。
+  - **`4b43da5` 実装範囲**（**`finance_summary_view.tscn` のみ**）: ルート **`phase4_readonly_core.tres`**。**`HeaderCard`**＝**`Phase4HeaderCard`**。**Scroll/ScrollContent 内** **Finance / Prior / Salary / History / Caution** の5枚＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。Header・各カード・**`NotesFooterLabel`** のラベル濃色化。**`HomeNavButton` / `%DataSourceLabel` / from_python・mock 読込は維持**。
+  - **`4b43da5` 実装境界**: **`.gd`・Theme `.tres`・DTO/export/mock 未変更**。**`%HistoryBody` 内動的履歴行は未変更**（第2段扱い）。
+  - **目視で発見された課題**: **財務履歴カード内**の動的履歴行テキストが**白カード上で薄く読みにくい**（暗背景向け明色のまま）。
+  - **`6c3dc43` 補正範囲**（**`finance_summary_view.gd` のみ・第2段本格整備ではない**）: **`_fill_history_rows`** の履歴行 `Label` と履歴なし **`empty_lab`** の **`font_color`** を **`Color(0.16, 0.2, 0.3)`**（白カード本文と同系）へ。**HistoryBody 構造・履歴行の文言・件数・生成順・JSON key・scene・Theme・DTO は未変更**。
+  - **第2段（未着手）**: **HistoryBody 構造の白カード化**、**履歴行レイアウト整理**、行の余白・区切り・カード化など。
+  - **ユーザー環境 Godot**: **CardNavMenu → 財務サマリー OK**・**表示・Header/5静的カード・DataSourceLabel OK**・**`6c3dc43` 後は財務履歴の可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+  - **横展開テンプレ**: 日程の **Scroll 内カード型**に続き、**Scroll 内複数静的 Panel 型**でも第1段が成功 — **財務で手順を固め、OM 等への判断材料**となる。
 - **ホーム**（`home_dashboard.tscn`）: **ルートに Theme なし**。**`HeaderCard` のみ**に `phase4_readonly_core.tres` を割当し **`Phase4HeaderCard`**。**`83d7fc0` で HeaderCard 内に ClubBand 風クラブ帯**。**`a5e548f` で `MainRow` 左に表示用 `LeftRail`（200px・大分類 5・クリック不可）** — 構造は §15.2 参照。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も最小 Theme 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`91cfaed` で `club_summary` 状況メモ化**（export / mock のみ）。**`home_dashboard.gd`・JSON / Python / DTO・Theme `.tres` は不変**。**HeaderNavRow・CardNavMenu・10 画面導線は維持**（実操作導線）。**LeftRail は表示のみ**。
 - **読込・導線**: `from_python` / mock、**HeaderNavRow のボタン数・接続・遷移先のシーン定義は変更していない**（`afb482d` は HeaderCard とラベル色・SubResource 整理のみ）、**Godot から Python 自動起動なし**（§14.1 と同じ）。
 - **運用**: シーン保存後は **UID 参照エラー**が出ないか Godot で確認。**エディタ実行後**は `git status` で意図しない差分が混ざっていないか確認（`*_from_python.json` は **コミットしない**）。**UID の再シリアライズ**で他画面参照が壊れないか、差分レビュー時に注意。
@@ -459,7 +467,18 @@
     - **第2段（未着手）**: **`NextGameCard`**（`StyleBoxFlat_nextgame` のまま）・**`ScrollContent` / 試合リスト**の白カード化・行レイアウト整理（**`.gd` 必須**）。
     - **ユーザー環境 Godot**: **ホーム → 日程 OK**・**表示・Header/Scroll内Summary 見た目・可読性・DataSourceLabel OK**・**NextGameCard 残存 OK**・**試合リスト残存 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
     - **横展開テンプレ**: RootCol 直下 Header+Summary 型に加え、**Scroll 内 SummaryCard 型**でも第1段が成功 — **構造バリエーションへの横展開が開始**された。
-    - **今後**: **残り詳細画面**（財務・OM・戦術・契約人事・ロスター続き）への横展開か、完了済み画面の **NextGame / Scroll 第2段**（**LeftRail クリック化は別工程**）。
+    - **今後**: **残り詳細画面**（OM・戦術・契約人事・ロスター続き）への横展開か、完了済み画面の **NextGame / Scroll / HistoryBody 第2段**（**LeftRail クリック化は別工程**）。
+  - **財務サマリー閲覧・Phase4 Theme 第1段（`4b43da5`）＋履歴行文字色最小補正（`6c3dc43`）** — **9詳細画面 UI 整備のテンプレ候補第5号**:
+    - **選定（`99c279d`）**: 4画面第1段完了後、**完了済み4画面の Scroll 第2段（`.gd` 必須）より先に残り詳細へ**。**財務**は **CardNavMenu 経営列 #7**（**HeaderNavRow 非搭載**）・**`finance_summary_readonly` + pytest 安定**・**Scroll 内静的5カード**（Finance / Prior / Salary / History / Caution）・**`.tscn` のみで第1段を閉じやすい**。
+    - **実装範囲（`4b43da5`）**: **`finance_summary_view.tscn` のみ**。ルート **`phase4_readonly_core.tres`**。**`HeaderCard`** → **`Phase4HeaderCard`**。**Scroll/ScrollContent 内5枚** → **`Phase4SummaryCard`**。**panel override のみ除去**（SubResource 残置）。**静的ラベル**を白カード向け濃色。
+    - **情報構造（不変）**: **`HeaderCard`** → **`Scroll/ScrollContent`**（5枚静的カード ＋ **`%HistoryBody`** 動的履歴行 ＋ **`NotesFooterLabel`** — **履歴行は `.gd` で `Label.new()`**）。
+    - **実装境界（`4b43da5`）**: **`finance_summary_view.gd`・Theme `.tres`・export / mock JSON 未変更**。**`%HistoryBody` 動的履歴行は第2段扱いで未変更**。
+    - **目視課題**: 第1段適用後、**財務履歴カード内**の動的履歴行が**白カード上で薄く読みにくい**。
+    - **補正（`6c3dc43`）**: **`finance_summary_view.gd` のみ** — **`_fill_history_rows`** の **`font_color`** を **`Color(0.16, 0.2, 0.3)`** へ（**第2段本格整備ではなく可読性の最小補正**）。**scene / Theme / DTO 不変**。
+    - **第2段（未着手）**: **HistoryBody 構造**の白カード化、**履歴行レイアウト**・余白・区切り・カード化（**`.gd` 調整が必要**）。
+    - **ユーザー環境 Godot**: **CardNavMenu → 財務サマリー OK**・**Header/5静的カード・DataSourceLabel OK**・**`6c3dc43` 後は財務履歴の可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+    - **横展開テンプレ**: **Scroll 内複数静的 Panel 型**でも第1段が成功 — **OM（4枚・Missions 動的は第2段）等への手順が固まった**。
+    - **今後**: **残り詳細画面**への同型第1段か、完了済み画面の **Scroll / HistoryBody 第2段**（**LeftRail クリック化は別工程**）。
   - **本線ホーム 表示用 LeftRail（`a5e548f`）**: **`home_dashboard.tscn` のみ**。**レイアウト構造（情報設計）**:
     - **`HeaderCard`** — 全幅（クラブ帯・**`HeaderNavRow` 5 ボタン**）。
     - **`StatusLabel`** — 全幅。

@@ -217,6 +217,26 @@
 - **到達点**: **ルート Theme + HeaderCard + Scroll 内 SummaryCard の白カード化第1段完了**（**画面全体の完全仕上げではない**）。
 - **詳細画面 Theme 横展開の現在地**: **第1号 施設サマリー**・**第2号 クラブ史**・**第3号 順位表**（RootCol 直下 Header+Summary）・**第4号 日程**（Scroll 内 SummaryCard 型）— 第1段完了。**次候補**: **残り詳細画面**への横展開か、完了済み画面の **Scroll / NextGame 第2段**を判断。
 
+### 財務サマリー閲覧 `Phase4` Theme 限定適用・第1段（`4b43da5`）＋履歴行文字色最小補正（`6c3dc43`）
+
+- **9詳細画面 Theme 横展開の第5号**（選定調査 `99c279d` → 実装 `4b43da5` → 可読性補正 `6c3dc43`）。**日程に続く Scroll 内複数静的カード型**。**RootCol 直下 `SummaryCard` はなし**。
+- **`4b43da5`（Theme 第1段）**: **変更ファイル** **`finance_summary_view.tscn` のみ**。
+  - **ルート** `FinanceSummaryView` に `phase4_readonly_core.tres` を割当。**`HeaderCard`** → **`Phase4HeaderCard`**。
+  - **Scroll/ScrollContent 内静的5カード** → **`Phase4SummaryCard`**（**Finance / Prior / Salary / History / Caution**）。**`theme_override_styles/panel` を除去**し **`theme_type_variation` へ置換**。**`StyleBoxFlat_header` / `chip` / `summary` の SubResource 定義は残置**。**`ReadonlyBadge` / `ModeStrip`** の chip override は維持。
+  - **ラベル**: Header・各カード見出し/本文・**`NotesFooterLabel`** を白カード向け濃色（他第1段完了画面と同系）。
+  - **維持**: **`HomeNavButton`**（text / tooltip / connection / `_on_home_nav_button_pressed`）、**`%DataSourceLabel`** / **`%CardFinanceBody`** 等 **unique 名**、**from_python / mock** 読込（**`finance_summary_view.gd` 不変**）。
+  - **未変更**: **`finance_summary_view.gd`**、**Theme `.tres`**、**export / mock JSON**、**`project.godot`**、他 detail scene。
+  - **第2段（`4b43da5` 時点・未変更）**: **`%HistoryBody`** 内の動的履歴行（`.gd` の **`Label.new()`**）。
+- **`6c3dc43`（可読性の最小補正 — 第2段本格整備ではない）**: **変更ファイル** **`finance_summary_view.gd` のみ**。
+  - **`_fill_history_rows`** の履歴行 `Label` の `font_color` を **`Color(0.16, 0.2, 0.3)`** へ（旧 **`Color(0.86, 0.9, 0.95)`**）。履歴なし時 **`empty_lab`** も同系（旧 **`Color(0.62, 0.66, 0.74)`**）。
+  - **未変更**: **HistoryBody 構造**、履歴行の文言・件数（最大5件）・生成順、JSON key、Header/静的5カードの色、**`finance_summary_view.tscn`**、Theme / DTO / mock。
+- **pytest**（`4b43da5` / `6c3dc43` いずれも）: `test_home_dashboard_readonly_export` 10 / `test_roster_readonly_export` 10 / phase0 smoke 1 / **`test_finance_summary_readonly_export` 10** — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**:
+  - **`4b43da5` 後**: **CardNavMenu → 財務サマリー遷移 OK**（**HeaderNavRow には載せない — 経営列 #7**）。**財務サマリー表示 OK**。**HeaderCard Phase4 系・Scroll 内5静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**ただし財務履歴カード内の動的履歴行テキストが白カード上で薄く読みにくい**ことが判明。
+  - **`6c3dc43` 後**: **財務履歴の動的履歴行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
+- **到達点**: **ルート Theme + HeaderCard + Scroll 内5静的カードの白カード化第1段完了** ＋ **HistoryBody 動的履歴行の文字色のみ最小補正済み**（**画面全体の完全仕上げではない**。**HistoryBody 構造・履歴行レイアウト整理は第2段**）。
+- **詳細画面 Theme 横展開の現在地**: **第1号 施設**・**第2号 クラブ史**・**第3号 順位表**（RootCol 直下 Header+Summary）・**第4号 日程**（Scroll 内 SummaryCard 型）・**第5号 財務サマリー**（Scroll 内複数静的カード型 ＋ 履歴行文字色最小補正）— 第1段（＋最小補正）完了。**次候補**: **残り詳細画面**（OM・戦術・契約人事・ロスター続き）への横展開か、完了済み画面の **Scroll / HistoryBody 第2段**を判断。
+
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
 - **確認方法**: Godot エディタで当該シーンを開き、**「現在のシーンを実行」（F6）** で単体起動する。
