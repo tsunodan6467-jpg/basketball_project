@@ -387,9 +387,9 @@
 **位置づけ**: **本番 GUI の確定デザインではない**。`godot/themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`godot/scenes/theme_preview.tscn` による **第 0 段 preview** で、variation とコントラストを確認している。**既存 10 画面へ一括適用したわけではない**。
 
 - **preview**: `theme_preview.tscn` は **本番10画面に未適用**。暗背景用に `Phase4OnDarkTitle` / `Phase4OnDarkTableHead` 等を使い分け、可読性を確認している。
-- **限定適用の方針**: まず **`.tscn` のみ**で済む **静的ヘッダー**・**静的 Panel カード**から当てる。**`Label.new()` + 暗地前提の明色 override** は、白い `Phase4SummaryCard` 内へ載せ替えるには **`.gd` で色を直す**最小補正が必要（財務 `6c3dc43` / OM `2f808e5` / 戦術 `7bbbb4e` / 契約人事 `1df4820` で実績あり）。**ロスター表の動的行**は `Phase4OnDarkTableHead` / `Phase4OnDarkTableCell` で **暗背景のまま**対応済み（`d33edb6`）。
+- **限定適用の方針**: まず **`.tscn` のみ**で済む **静的ヘッダー**・**静的 Panel カード**から当てる。**`Label.new()` + 暗地前提の明色 override** は、白い `Phase4SummaryCard` 内へ載せ替えるには **`.gd` で色を直す**最小補正が必要（財務 `6c3dc43` / OM `2f808e5` / 戦術 `7bbbb4e` / 契約人事 `1df4820` で実績あり）。**ロスター表**は **`TableCard` + `Phase4TableHead` / `Phase4TableCell`**（`f866f5b` / `407f014`）— 詳細は §15.1 ロスター節。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn` / `contract_personnel_summary_view.gd`）: **詳細画面 Theme 横展開第8号相当・残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色の最小補正**（`1df4820`）。ルート Theme。**`Phase4HeaderCard`**。**`Phase4SummaryCard`**: 契約概要・ロスター構成・**RiskCard**・**PlayersCard**。**`Phase4WarningCard`**: 注意。**`1df4820`**: **`_fill_risk_rows` / `_fill_player_rows`** の動的行色を **`Color(0.16, 0.2, 0.3, 1)`**（**RiskRows / PlayerRows 構造は第2段**）。詳細は §15.1 契約・人事節。
-- **ロスター閲覧**（`roster_view.tscn`）: ルート Theme。**`Phase4HeaderCard`**（ヘッダー）。**表**は `roster_view.gd` で動的 `Label` に **`theme_type_variation`**（OnDark 系）を付与（**白カード化なし**）。
+- **ロスター閲覧**（`roster_view.tscn` / `roster_view.gd`）: **詳細画面 Theme 横展開の締め（第9号相当）・第1段**（`f866f5b` + `407f014`）。ルート Theme。**`Phase4HeaderCard`**。**`Scroll/TableCard`**＝`Phase4SummaryCard`、**`%RowList`** 内9列表は **`Phase4TableHead` / `Phase4TableCell`**（**表行 Panel 化・行レイアウトは第2段**）。詳細は §15.1 ロスター節。
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **詳細画面 Theme 横展開第1号・第1段**（`5987821`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の `facility_summary_view.gd` による **`Label.new()`** は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`23a8fcf`** 調査（Header+Summary 型・`.tscn` のみ・HeaderNavRow 到達・DTO 安定・クラブ史/順位表へ横展開しやすい）。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **詳細画面 Theme 横展開第2号・第1段**（`682a941`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の段落・シーズン表（`club_history_view.gd` の **`Label.new()` / シーズン表 `HBoxContainer`**）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。選定は **`64abb9c`**（施設第2段より先に横展開推奨・同型・順位表より Scroll ギャップ小）。
 - **順位表閲覧**（`standings_view.tscn`）: **詳細画面 Theme 横展開第3号・第1段**（`927e918`）。ルート Theme。**`HeaderCard`**＝**`Phase4HeaderCard`**、**`SummaryCard`**＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。**Scroll 内**の **8 列表・動的行**（`standings_view.gd` の **`Label.new()`** 等）は**暗背景＋明文字のまま**（**第2段**）。**`.gd`・Theme `.tres`・DTO/export/mock 不変**。
@@ -527,7 +527,16 @@
     - **第2段（未着手）**: **RiskRows / PlayerRows 構造**・行レイアウト（**`.gd` 調整が必要**）。
     - **ユーザー環境 Godot**: **CardNavMenu #10 → 契約・人事サマリー OK**・**表示・Scroll 内カード白系統一・DataSourceLabel OK**・**Risk/Players 白カード化 OK**・**`1df4820` 後は人事リスク・主要契約選手の可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
     - **横展開テンプレ**: **部分 Theme 済み画面**でも **暗色残り2枚**の `.tscn` 限定適用で Scroll 白系統一 — **動的行色は財務/OM/戦術と同手順の最小補正**。
-    - **今後**: **ロスター**への横展開か、完了済み画面の **Scroll / RiskRows / PlayerRows 第2段**（**LeftRail クリック化は別工程**）。
+    - **今後**: 完了済み画面の **Scroll / RiskRows / PlayerRows 第2段**（**LeftRail クリック化は別工程**）。
+  - **ロスター閲覧・Phase4 Theme 第1段（`f866f5b`）＋表 Theme 通常 Table 化（`407f014`）** — **9詳細画面 UI 整備のテンプレ候補第9号相当（横展開の締め）**:
+    - **選定（`cccbc6d`）**: 契約人事第1段記録後、**主要詳細画面の第1段で残っていた重要画面**。**ロスター**は **CardNavMenu チーム列 #1** ＋ **HeaderNavRow 先頭**・**ゲーム中心価値が高い**。**HeaderCard は既に Phase4**。**表 `%RowList` は `.gd` 動的9列**で **OnDark 系 Theme**。**`.tscn` の白カード化だけでは可読性破綻**のため **TableCard 追加（`f866f5b`）と表 Theme 切替（`407f014`）を2コミットで分割**。
+    - **実装範囲（`f866f5b`）**: **`roster_view.tscn` のみ**。**`Scroll` 直下 `TableCard`** → **`Phase4SummaryCard`**。**`%RowList`** を **`Scroll/TableCard` の子へ移動**（**unique_name 維持**）。**Header / HomeNavButton / DataSourceLabel / connection 維持**。
+    - **情報構造（不変）**: **`HeaderCard`** → **`Scroll/TableCard/RowList`**（**9列表は `.gd` で `HBoxContainer` + `Label.new()`**）。
+    - **実装境界（`f866f5b`）**: **`roster_view.gd`・Theme `.tres`・DTO/export/mock 未変更**。
+    - **補正（`407f014`）**: **`roster_view.gd` のみ** — **`Phase4OnDarkTableHead` → `Phase4TableHead`**、**`Phase4OnDarkTableCell` → `Phase4TableCell`**（**Theme variation 切替のみ・第2段本格整備ではない**）。**scene / Theme / DTO 不変**。**9列・列幅・行生成順・JSON key 不変**。
+    - **第2段（未着手）**: **表行の Panel 化**、**余白・区切り・カード化**、**ReadonlyBadge / ModeStrip 暗 chip 整理**、**行レイアウトの本格調整**。
+    - **ユーザー環境 Godot**: **HeaderNavRow または CardNavMenu → ロスター OK**・**白 TableCard 内9列表 OK**・**表ヘッダー/セル可読性 OK**・**DataSourceLabel OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
+    - **横展開全体**: **施設・クラブ史・順位表・日程・財務・OM・戦術・契約人事・ロスター**を含む **主要10画面の Theme 第1段が一通り完了** — **以後は各画面の第2段**（動的行・表・行レイアウト）を個別判断。
   - **本線ホーム 表示用 LeftRail（`a5e548f`）**: **`home_dashboard.tscn` のみ**。**レイアウト構造（情報設計）**:
     - **`HeaderCard`** — 全幅（クラブ帯・**`HeaderNavRow` 5 ボタン**）。
     - **`StatusLabel`** — 全幅。
