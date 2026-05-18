@@ -426,7 +426,9 @@ theme_override_constants/separation = 12
 
 [node name="CardNavMenu" type="PanelContainer" parent="Margin/RootCol/MainRow/Scroll/Inner"]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+mouse_filter = 2
+theme = ExtResource("2_theme")
+theme_type_variation = &"Phase4SummaryCard"
 
 [node name="VBoxNav" type="VBoxContainer" parent="Margin/RootCol/MainRow/Scroll/Inner/CardNavMenu"]
 layout_mode = 2
@@ -434,13 +436,13 @@ theme_override_constants/separation = 10
 
 [node name="NavTitle" type="Label" parent="Margin/RootCol/MainRow/Scroll/Inner/CardNavMenu/VBoxNav"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.82, 0.9, 1)
-theme_override_font_sizes/font_size = 13
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
+theme_override_font_sizes/font_size = 12
 text = "画面メニュー（読み取り）"
 
 [node name="NavHelp" type="Label" parent="Margin/RootCol/MainRow/Scroll/Inner/CardNavMenu/VBoxNav"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 0.6, 0.68, 1)
+theme_override_colors/font_color = Color(0.16, 0.2, 0.3, 1)
 theme_override_font_sizes/font_size = 11
 autowrap_mode = 2
 text = "読み取り専用の各画面へ移動します。進行・保存・編集・Python自動起動は行いません。"
@@ -456,7 +458,7 @@ theme_override_constants/separation = 8
 
 [node name="CatTeam" type="Label" parent="Margin/RootCol/MainRow/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColTeam"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 11
 text = "チーム"
 
@@ -481,7 +483,7 @@ theme_override_constants/separation = 8
 
 [node name="CatLeague" type="Label" parent="Margin/RootCol/MainRow/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColLeague"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 11
 text = "リーグ"
 
@@ -506,7 +508,7 @@ theme_override_constants/separation = 8
 
 [node name="CatClub" type="Label" parent="Margin/RootCol/MainRow/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColClub"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 11
 text = "クラブ"
 
@@ -531,7 +533,7 @@ theme_override_constants/separation = 8
 
 [node name="CatMgmt" type="Label" parent="Margin/RootCol/MainRow/Scroll/Inner/CardNavMenu/VBoxNav/NavColumns/ColMgmt"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.62, 0.68, 0.76, 1)
+theme_override_colors/font_color = Color(0.08, 0.11, 0.18, 1)
 theme_override_font_sizes/font_size = 11
 text = "経営"
 
