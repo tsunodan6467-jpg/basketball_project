@@ -123,13 +123,16 @@ func _fill_player_roles(raw: Array) -> void:
 		lab.text = "選手ロール情報はありません。"
 		_player_roles_body.add_child(lab)
 		return
-	var shown := 0
+	var roles: Array = []
 	for it in raw:
-		if shown >= 8:
+		if roles.size() >= 8:
 			break
 		if typeof(it) != TYPE_DICTIONARY:
 			continue
-		var row: Dictionary = it as Dictionary
+		roles.append(it as Dictionary)
+	var n: int = roles.size()
+	for i in range(n):
+		var row: Dictionary = roles[i]
 		var line := _player_role_line(row)
 		var lab := Label.new()
 		lab.autowrap_mode = 2
@@ -137,7 +140,8 @@ func _fill_player_roles(raw: Array) -> void:
 		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = line
 		_player_roles_body.add_child(lab)
-		shown += 1
+		if i < n - 1:
+			_player_roles_body.add_child(HSeparator.new())
 
 
 func _player_role_line(row: Dictionary) -> String:
