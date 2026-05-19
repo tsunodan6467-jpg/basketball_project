@@ -41,7 +41,7 @@
 - **日程閲覧**: **Theme 第1段**（`440c3f6`・**`schedule_view.tscn` のみ**）。**ルート Theme + Header + Scroll 内 SummaryCard** の Phase4 化。**NextGameCard / ScrollContent / 試合リストは未変更**（§2.8）。
 - **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`・**`_fill_history_rows` のみ** — §2.9a）。**`%HistoryBody` 構造全面整理は別タスク**。
 - **オーナーミッション / クラブ評価閲覧**: **Theme 第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`・**`_fill_mission_rows` のみ** — §2.10a）。**`%MissionsBody` 構造全面整理は別タスク**。
-- **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`・**`tactics_summary_view.tscn` のみ**）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`・**`tactics_summary_view.gd` のみ**）。**ルート Theme + Header + Scroll 内6静的カード** の Phase4 化。**`%PlayerRolesBody` 構造・選手ロール行レイアウトは未変更**（§2.11）。
+- **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`・**`_fill_player_roles` のみ** — §2.11a）。**`%PlayerRolesBody` 構造全面整理は別タスク**。
 - **契約 / 人事サマリー閲覧**: **Theme 残り第1段**（`5d1afa2`・**`contract_personnel_summary_view.tscn` のみ**）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`・**`contract_personnel_summary_view.gd` のみ**）。**RiskCard / PlayersCard** の Phase4 化（**ルート + Header + Contract / Balance / Caution は既に Phase4 済み**）。**`%RiskRows` / `%PlayerRows` 構造・行レイアウトは未変更**（§2.12）。
 - **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）。**`TableCard` + 9列表** の Phase4 化（**Header は既に Phase4 済み**）。**表行 Panel 化・行レイアウトは未変更**（§2.13）。
 - **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み** — §2.3）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内の暗色カード問題は解消済み**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
@@ -221,7 +221,19 @@
   - **`44b0584` 後**: **CardNavMenu #9 → 戦術サマリー遷移 OK**。**戦術サマリー画面表示 OK**。**HeaderCard Phase4 系・Scroll 内6静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし**。**選手ロールカード内の PlayerRolesBody 動的行は薄く読みにくい**ことが判明。
   - **`7bbbb4e` 後**: **選手ロールの動的行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし**。
 - **Theme 適用範囲（`44b0584`）**: **`HeaderCard`**＝`Phase4HeaderCard`、**Scroll/ScrollContent 内6枚静的カード**＝`Phase4SummaryCard`（Overview / Attack / Defense / Rotation / PlayerRoles / Notes）。
-- **可読性補正（`7bbbb4e`）**: **`%PlayerRolesBody`** に追加される動的選手ロール行 `Label` の色のみ **`Color(0.16, 0.2, 0.3, 1)`** へ。**PlayerRolesBody 構造・選手ロール行レイアウトは第2段**（今回未変更）。
+- **可読性補正（`7bbbb4e`）**: **`%PlayerRolesBody`** に追加される動的選手ロール行 `Label` の色のみ **`Color(0.16, 0.2, 0.3, 1)`** へ。**PlayerRolesBody 構造・選手ロール行レイアウト本格整理は第2段**（**第2段・最小 `c9216d0` で行区切りのみ対応** — §2.11a）。
+
+### 2.11a 戦術 / ローテーションサマリー閲覧・Theme 第2段（最小）と導線確認（`c9216d0`）
+
+- **到達点**: **`tactics_summary_view.gd` の `_fill_player_roles` のみ**（**ナビ構造の変更ではない**・**見た目第2段・最小**）。**`tactics_summary_view.tscn`・Theme `.tres` 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`CardNavMenu`** — **チーム**列の **戦術サマリー** ボタン（**#9・主入口**）。
+  - **`HeaderNavRow` には載せない**（§3）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、戦術サマリー画面へのショートカットではない**。
+- **戦術サマリーからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderTopRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`c9216d0` 後もユーザー確認済み）。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 戦術サマリー遷移 OK**。**戦術サマリー画面表示 OK**。**HeaderCard / 6静的カードは従来どおり OK**。**PlayerRolesBody 行区切り OK**。**最終行後の不要区切りなし OK**。**選手ロール行可読性 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **Theme 適用範囲（第2段・最小）**: **`%PlayerRolesBody` 内動的選手ロール行**の**行間 `HSeparator`**（**Panel 化・カード化は別タスク**）。
+- **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
 
 ### 2.12 契約 / 人事サマリー閲覧・Theme 残り第1段・可読性補正と導線確認（`5d1afa2` / `1df4820`）
 

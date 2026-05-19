@@ -326,7 +326,22 @@
 - **ユーザー環境 Godot（ローカル目視）**:
   - **`44b0584` 後**: **CardNavMenu #9 → 戦術サマリー遷移 OK**（**HeaderNavRow には載せない — チーム列 #9**）。**戦術サマリー表示 OK**。**HeaderCard Phase4 系・Scroll 内6静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**ただし選手ロールカード内の PlayerRolesBody 動的行テキストが白カード上で薄く読みにくい**ことが判明。
   - **`7bbbb4e` 後**: **選手ロールの動的行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
-- **到達点**: **ルート Theme + HeaderCard + Scroll 内6静的カードの白カード化第1段完了** ＋ **PlayerRolesBody 動的選手ロール行の文字色のみ最小補正済み**（**画面全体の完全仕上げではない**。**PlayerRolesBody 構造・選手ロール行レイアウト整理は第2段**）。
+- **到達点**: **ルート Theme + HeaderCard + Scroll 内6静的カードの白カード化第1段完了** ＋ **PlayerRolesBody 動的選手ロール行の文字色のみ最小補正済み**（**画面全体の完全仕上げではない**）。
+
+### 戦術 / ローテーションサマリー閲覧 `Phase4` Theme 第2段（最小）— PlayerRolesBody 選手ロール行区切り（`c9216d0`）
+
+- **Body系第2段（最小）第3号**（選定調査 `b73feb7` → 実装 `c9216d0`）。**OM MissionsBody 行区切り（`5a3ae2c`）成功後**、同型横展開として **戦術 PlayerRolesBody 行区切り**を次タスクに選定。
+- **`c9216d0`（第2段・最小）**: **変更ファイル** **`tactics_summary_view.gd` のみ**。**変更関数** **`_fill_player_roles` のみ**。
+  - 有効な選手ロール（Dictionary）を最大8件まで配列 **`roles`** に集約し、**`for i in range(n)`** で従来どおり `Label` を生成。
+  - 各 `Label` 追加直後、**`i < n - 1` のときだけ** **`HSeparator.new()`**（**最終行後には区切りなし**）。
+  - **選手ロールなし時**は空表示 `Label`（`選手ロール情報はありません。`）のみで **return**（**HSeparator なし**）。
+  - **`7bbbb4e` の `font_color` 補正は維持**。**`_player_role_line` は未変更**。
+  - **未変更**: **`tactics_summary_view.tscn`**、**Theme `.tres`**、**`_fill_player_roles` 以外**、選手ロール文言・最大8件制限・並び順・JSON key、export / mock JSON。
+  - **維持**: **HeaderCard / 6静的カード**、**HomeNavButton**、**DataSourceLabel**、**from_python / mock**。
+- **pytest**（`c9216d0`）: tactics_summary 15 / home_dashboard 10 / roster 10 / phase0 smoke 1 — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 戦術サマリー遷移 OK**。**戦術サマリー画面表示 OK**。**PlayerRolesBody 行区切り OK**。**最終行後の不要区切りなし OK**。**選手ロール行可読性 OK**。**HeaderCard / 6静的カードは従来どおり OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **到達点**: **Body系第2段（最小）第3号 — 戦術 PlayerRolesBody 動的選手ロール行の行区切り追加完了**（**戦術 PlayerRolesBody 全体の第2段完了ではない**）。
+- **別タスク（未着手）**: **PlayerRolesBody の Panel 化**、選手ロール行カード化、余白・行レイアウト本格調整、**契約人事 RiskRows / PlayerRows** への横展開。
 
 ### 契約 / 人事サマリー閲覧 `Phase4` Theme 残り第1段（`5d1afa2`）＋RiskRows / PlayerRows 動的行文字色最小補正（`1df4820`）
 
@@ -366,7 +381,7 @@
   - **スクショ上でも**白 TableCard 内に9列表が収まり、ヘッダーと各セルが白背景上で読める状態を確認。
 - **到達点**: **TableCard 白カード化 ＋ 表 Theme 通常 Table 化まで第1段完了**（**画面全体の完全仕上げではない**）。
 - **第2段（未着手）**: **表行の Panel 化**、**余白・区切り・カード化**、**ReadonlyBadge / ModeStrip の暗 chip 整理**、**行レイアウトの本格調整**（**`.gd` 構造変更**）。
-- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**。**次候補**: **戦術 PlayerRolesBody 行区切り**、**日程 Scroll 見出し / advance_hint 等**、**ロスター表行 Panel 化** — 個別判断。
+- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**。**Body系第2段（最小）**: **財務 HistoryBody（`d57b021`）**＋**OM MissionsBody（`5a3ae2c`）**＋**戦術 PlayerRolesBody（`c9216d0`）**。**次候補**: **契約 RiskRows / PlayerRows 行区切り**、**日程 Scroll 見出し / advance_hint 等**、**ロスター表行 Panel 化** — 個別判断。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -388,7 +403,7 @@
 - **日程閲覧**（`schedule_view.tscn` / `schedule_view.gd`）: **第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`・`.tscn`）＋**第2段・後半（最小）**（`7fecb99`・`_add_upcoming_block`）— **Header / SummaryCard / NextGameCard / upcoming 試合ブロック**＝`Phase4SummaryCard`。**見出し / advance_hint / Scroll 全体整理**は**別タスク**。詳細は上記「日程閲覧 `Phase4` Theme」節。
 - **財務サマリー閲覧**（`finance_summary_view.tscn` / `finance_summary_view.gd`）: **第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`・`_fill_history_rows`）— 詳細は上記「財務サマリー閲覧 `Phase4` Theme」節。
 - **オーナーミッション閲覧**（`owner_mission_view.tscn` / `owner_mission_view.gd`）: **第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`・`_fill_mission_rows`）— 詳細は上記「オーナーミッション / クラブ評価閲覧 `Phase4` Theme」節。
-- **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn`）: **第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）— 詳細は上記「戦術 / ローテーションサマリー閲覧 `Phase4` Theme」節。
+- **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn` / `tactics_summary_view.gd`）: **第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`・`_fill_player_roles`）— 詳細は上記「戦術 / ローテーションサマリー閲覧 `Phase4` Theme」節。
 - **契約 / 人事サマリー閲覧**（`contract_personnel_summary_view.tscn`）: **Risk/Players 残り第1段**（`5d1afa2`）＋**RiskRows/PlayerRows 動的行文字色最小補正**（`1df4820`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
 - **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で表示用 `LeftRail`（200px・クリック不可）**。**MetricsRow** 3 枚 + **Scroll 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`home_dashboard.gd`・Theme `.tres` は不変**。**HeaderNavRow**・**CardNavMenu**＝実操作導線（**LeftRail は表示のみ** — 下記2節）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
@@ -484,7 +499,9 @@
 ◎ 財務・第2段最小・履歴行区切り・最終行後区切りなし・可読性・戻り確認 OK（ユーザー環境 Godot）
 ◎ オーナーミッション・MissionsBody行区切り Phase4 Theme 第2段（最小）（`5a3ae2c`）
 ◎ オーナーミッション・第2段最小・行区切り・最終行後区切りなし・可読性・戻り確認 OK（ユーザー環境 Godot）
-□ 日程・Scroll見出し/advance_hint等、戦術PlayerRolesBody行区切り等、他画面の第2段
+◎ 戦術・PlayerRolesBody行区切り Phase4 Theme 第2段（最小）（`c9216d0`）
+◎ 戦術・第2段最小・行区切り・最終行後区切りなし・可読性・戻り確認 OK（ユーザー環境 Godot）
+□ 日程・Scroll見出し/advance_hint等、契約RiskRows/PlayerRows行区切り等、他画面の第2段
 □ CardNews 1 行化の表示制御 / DTO 整理判断
 □ Header 資金・成績行の本格移植判断
 □ home DTO / JSON の追加整理
@@ -505,7 +522,7 @@
 □ Theme 全面適用（10 画面一括など）
 ```
 
-関連コミット（Theme 周辺・必要最小限の列）: `26fa722`（preview）→ … → `4b43da5`（財務第1段）→ `6c3dc43`（財務履歴色）→ … → `7fecb99`（日程 upcoming 第2段・後半最小）→ `d2c08d1`（日程 upcoming 後次タスク比較）→ `d57b021`（財務 HistoryBody 行区切り・Body系第2段最小第1号）→ `bb6866d`（財務 Body 後次タスク比較）→ `5a3ae2c`（OM MissionsBody 行区切り・Body系第2段最小第2号）。調査: `cccbc6d` / `8fc2d91` / `20efa29` / `d2c08d1` / `bb6866d`（`reports/`）。到達点の文書化: 各画面 Theme 記録コミットを参照。
+関連コミット（Theme 周辺・必要最小限の列）: `26fa722`（preview）→ … → `4b43da5`（財務第1段）→ `6c3dc43`（財務履歴色）→ … → `7fecb99`（日程 upcoming 第2段・後半最小）→ `d2c08d1`（日程 upcoming 後次タスク比較）→ `d57b021`（財務 HistoryBody 行区切り・Body系第2段最小第1号）→ `bb6866d`（財務 Body 後次タスク比較）→ `5a3ae2c`（OM MissionsBody 行区切り・Body系第2段最小第2号）→ `b73feb7`（OM Body 後次タスク比較）→ `c9216d0`（戦術 PlayerRolesBody 行区切り・Body系第2段最小第3号）。調査: `cccbc6d` / `8fc2d91` / `20efa29` / `d2c08d1` / `bb6866d` / `b73feb7`（`reports/`）。到達点の文書化: 各画面 Theme 記録コミットを参照。
 
 ### 財務サマリー（第7画面）のファイル構成（参照）
 
