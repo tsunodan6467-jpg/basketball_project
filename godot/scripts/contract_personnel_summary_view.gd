@@ -169,7 +169,14 @@ func _fill_risk_rows(rows: Array) -> void:
 		var block := Label.new()
 		block.text = "%s\n  表示: %s\n  重要度: %s\n  %s" % [lab, disp, sev, memo]
 		_style_body_label(block, 12, Color(0.16, 0.2, 0.3, 1))
-		_risk_rows.add_child(block)
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 4)
+		margin.add_theme_constant_override("margin_top", 2)
+		margin.add_theme_constant_override("margin_right", 4)
+		margin.add_theme_constant_override("margin_bottom", 2)
+		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		margin.add_child(block)
+		_risk_rows.add_child(margin)
 		if i < n - 1:
 			_risk_rows.add_child(HSeparator.new())
 
