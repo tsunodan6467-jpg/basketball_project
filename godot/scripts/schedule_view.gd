@@ -166,8 +166,6 @@ func _fill_scroll_body(d: Dictionary) -> void:
 				continue
 			var row: Dictionary = item as Dictionary
 			_add_upcoming_block(row)
-			if i < n - 1:
-				_scroll_content.add_child(HSeparator.new())
 
 	var ah: Dictionary = _dict_or_empty(d.get("advance_hint", null))
 	var block_v: Variant = ah.get("block", "")
