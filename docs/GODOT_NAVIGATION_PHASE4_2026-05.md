@@ -42,7 +42,7 @@
 - **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`）＋**Body本格・最小 HistoryBody 内側余白**（`307e719`・**`_fill_history_rows` のみ** — §2.9a / §2.9b）。**`%HistoryBody` 構造全面整理は別タスク**。
 - **オーナーミッション / クラブ評価閲覧**: **Theme 第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`）＋**Body本格・最小 MissionsBody 内側余白**（`d4c0372`・**`_fill_mission_rows` のみ** — §2.10a / §2.10b）。**`%MissionsBody` 構造全面整理は別タスク**。
 - **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`）＋**Body本格・最小 PlayerRolesBody 内側余白**（`2c637f2`・**`_fill_player_roles` 選手ロール行追加ループのみ** — §2.11a / §2.11b）。**`%PlayerRolesBody` 構造全面整理は別タスク**。
-- **契約 / 人事サマリー閲覧**: **Theme 残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`）＋**Body本格・最小 PlayerRows 内側余白**（`f19ed9b`・**`_fill_player_rows` 主要契約選手行追加ループのみ** — §2.12a / §2.12c）＋**第2段（最小）RiskRows 行区切り**（`97b26a8`・**`_fill_risk_rows` のみ** — §2.12b）。**RiskCard / PlayersCard** の Phase4 化。**契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**（§2.12 / §2.12a / §2.12b）。
+- **契約 / 人事サマリー閲覧**: **Theme 残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows / RiskRows 行区切り**（`6b26fa3` / `97b26a8`）＋**Body本格・最小 PlayerRows / RiskRows 内側余白**（`f19ed9b` / `420f240` — §2.12a / §2.12b / §2.12c / §2.12d）。**RiskCard / PlayersCard** の Phase4 化。**契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（**ナビ構造の完了ではない** — §2.12 / §2.12a〜§2.12d）。
 - **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`）。**`TableCard` + 9列表** の Phase4 化（**Header は既に Phase4 済み**）。**表行 Panel 化・行レイアウト本格調整は未変更**（§2.13 / §2.13a）。
 - **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み** — §2.3）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内の暗色カード問題は解消済み**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
 - **本線 LeftRail**: **`a5e548f` で表示用のみ追加済み**（§2.4）。**クリック・遷移は未実装**。**実操作導線**は引き続き **HeaderNavRow + CardNavMenu**。
@@ -381,6 +381,22 @@
   - **HeaderNavRow**＝上部主要 5 導線（契約・人事サマリーは載せない）。
   - **CardNavMenu**＝実操作用中央画面メニュー（**経営 → 契約・人事サマリー**が主入口）。
   - **LeftRail**＝表示のみの大分類ナビ（**契約・人事サマリーへ直接遷移しない**）。
+
+### 2.12d 契約 / 人事サマリー閲覧・Theme 第2段（Body本格・最小）RiskRows 内側余白と導線確認（`420f240`）
+
+- **到達点**: **`contract_personnel_summary_view.gd` の `_fill_risk_rows` 人事リスク行追加ループ部分のみ**（**ナビ構造の変更ではない**・**Body本格整備の余白横展開第4号（レーン締め）**）。**`contract_personnel_summary_view.tscn`・Theme `.tres`・`project.godot` 未変更**。**`_fill_player_rows` / PlayerRows は `f19ed9b` のまま未変更**。**HeaderCard / 静的5カード・DataSourceLabel 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`CardNavMenu`** — **経営**列の **契約・人事サマリー** ボタン（**#10・主入口**）。
+  - **`HeaderNavRow` には載せない**（§3）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、契約・人事サマリー画面へのショートカットではない**。
+- **契約・人事サマリーからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderTopRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`420f240` 後もユーザー確認済み）。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 契約・人事サマリー遷移 OK**。**契約・人事サマリー画面表示 OK**。**RiskRows 人事リスク行の内側余白 OK**。**HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**人事リスク文言 / 件数 / 順序維持 OK**。**PlayerRows 従来どおり OK**。**HeaderCard / 5静的カードは従来どおり OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **Theme 適用範囲（Body本格・最小）**: **`%RiskRows` 内動的人事リスク行**の **`MarginContainer` 内側余白**（財務 `307e719` / OM `d4c0372` / 戦術 `2c637f2` / 契約 PlayerRows `f19ed9b` と同値。**Panel 化・行カード化・本格レイアウトは別タスク**。**`%PlayerRows` は `f19ed9b` のまま**）。
+- **Body余白横展開レーン**: **5 Body 完了**（**財務 HistoryBody / OM MissionsBody / 戦術 PlayerRolesBody / 契約 PlayerRows / 契約 RiskRows**）。**これはナビ構造の完了を意味しない** — **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）:
+  - **HeaderNavRow**＝上部主要 5 導線（契約・人事サマリーは載せない）。
+  - **CardNavMenu**＝実操作用中央画面メニュー（**経営 → 契約・人事サマリー**が主入口）。
+  - **LeftRail**＝表示のみの大分類ナビ（**契約・人事サマリーへ直接遷移しない**）。
+- **進行方針（`420f240` 確認記録時点）**: **細かい行余白・区切り微調整は一区切り**。**次は中規模以上**（ロスター本格・日程本格・Body中規模整理・ゲーム体験寄り機能 / 画面）。
 
 ### 2.13 ロスター閲覧・Theme 第1段・表 Theme 切替と導線確認（`f866f5b` / `407f014`）
 
