@@ -172,7 +172,14 @@ func _fill_history_rows(raw: Variant) -> void:
 		line.add_theme_font_size_override("font_size", 12)
 		line.autowrap_mode = 2
 		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		_history_body.add_child(line)
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 4)
+		margin.add_theme_constant_override("margin_top", 2)
+		margin.add_theme_constant_override("margin_right", 4)
+		margin.add_theme_constant_override("margin_bottom", 2)
+		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		margin.add_child(line)
+		_history_body.add_child(margin)
 		if i < lim - 1:
 			_history_body.add_child(HSeparator.new())
 
