@@ -196,7 +196,9 @@ func _add_upcoming_block(row: Dictionary) -> void:
 	var round_label_v: Variant = row.get("round_label", null)
 	var comp_label_v: Variant = row.get("competition_label", null)
 	var ha_v: Variant = row.get("home_away", null)
-	var line1: String = "%s ／ %s ／ %s" % [_str_cell(round_label_v), _str_cell(comp_label_v), _str_cell(ha_v)]
+	var round_s: String = _str_cell(round_label_v)
+	var comp_s: String = _str_cell(comp_label_v)
+	var ha_s: String = _str_cell(ha_v)
 
 	var opp_v: Variant = row.get("opponent", null)
 	var line2: String = "対戦: %s" % _str_cell(opp_v)
@@ -216,26 +218,44 @@ func _add_upcoming_block(row: Dictionary) -> void:
 	var panel: PanelContainer = PanelContainer.new()
 	panel.theme_type_variation = &"Phase4SummaryCard"
 	var inner: VBoxContainer = VBoxContainer.new()
-	inner.add_theme_constant_override("separation", 4)
-	var l1: Label = Label.new()
-	l1.text = line1
-	l1.autowrap_mode = 2
-	l1.add_theme_font_size_override("font_size", 13)
-	l1.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
-	l1.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inner.add_child(l1)
+	inner.add_theme_constant_override("separation", 6)
+
+	var meta_row := HBoxContainer.new()
+	meta_row.add_theme_constant_override("separation", 8)
+	meta_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var meta_parts: Array[String] = [round_s, comp_s, ha_s]
+	for i in range(meta_parts.size()):
+		if i > 0:
+			var sep := Label.new()
+			sep.text = " ／ "
+			sep.add_theme_font_size_override("font_size", 12)
+			sep.add_theme_color_override("font_color", Color(0.35, 0.4, 0.5, 1))
+			meta_row.add_child(sep)
+		var meta_lab := Label.new()
+		meta_lab.text = meta_parts[i]
+		meta_lab.autowrap_mode = 0
+		meta_lab.add_theme_font_size_override("font_size", 12)
+		meta_lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
+		if i == 1:
+			meta_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			meta_lab.autowrap_mode = 2
+			meta_lab.clip_text = true
+		meta_row.add_child(meta_lab)
+	inner.add_child(meta_row)
+
 	var l2: Label = Label.new()
 	l2.text = line2
 	l2.autowrap_mode = 2
-	l2.add_theme_font_size_override("font_size", 13)
+	l2.add_theme_font_size_override("font_size", 16)
 	l2.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
 	l2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(l2)
+
 	var l3: Label = Label.new()
 	l3.text = line3
 	l3.autowrap_mode = 2
 	l3.add_theme_font_size_override("font_size", 11)
-	l3.add_theme_color_override("font_color", Color(0.2, 0.25, 0.36, 1))
+	l3.add_theme_color_override("font_color", Color(0.32, 0.36, 0.48, 1))
 	l3.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(l3)
 	panel.add_child(inner)
