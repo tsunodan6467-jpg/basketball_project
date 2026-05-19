@@ -158,7 +158,7 @@ func _fill_scroll_body(d: Dictionary) -> void:
 		_add_empty_message_block(empty_msg)
 
 	if not upcoming.is_empty():
-		_add_scroll_heading("今後の予定（upcoming_games）")
+		_add_upcoming_section_heading()
 		var n: int = upcoming.size()
 		for i in range(n):
 			var item: Variant = upcoming[i]
@@ -176,6 +176,22 @@ func _fill_scroll_body(d: Dictionary) -> void:
 	var one_s: String = str(one_v).strip_edges()
 	if not block_s.is_empty() or not one_s.is_empty():
 		_add_advance_hint_block(block_s, one_s)
+
+
+func _add_upcoming_section_heading() -> void:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.theme_type_variation = &"Phase4SummaryCard"
+	var inner: VBoxContainer = VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	var title: Label = Label.new()
+	title.text = "今後の予定"
+	title.autowrap_mode = 2
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.add_child(title)
+	panel.add_child(inner)
+	_scroll_content.add_child(panel)
 
 
 func _add_upcoming_block(row: Dictionary) -> void:
