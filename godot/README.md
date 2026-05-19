@@ -251,10 +251,17 @@
   - **未変更**: **`schedule_view.tscn`**、**Theme `.tres`**、**`project.godot`**、**`_add_upcoming_block`**、**`_add_scroll_heading`**、**`_add_scroll_paragraph`**、**NextGameCard / SummaryCard / HeaderCard**、試合リスト内容・件数・順序・JSON key、export / mock JSON。
   - **維持**: **HomeNavButton**、**DataSourceLabel**、**from_python / mock**。
 - **pytest**（`a62b3a7`）: schedule 10 / home_dashboard 10 / roster 10 / phase0 smoke 1 — いずれも passed。
-- **ユーザー環境 Godot（ローカル目視）**: **日程画面表示 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**HeaderCard / SummaryCard / NextGameCard は従来どおり OK**。**upcoming 試合ブロックは従来状態を維持 OK**。**既存のお知らせ表示 OK**。**画面全体の崩れなし**。**文字可読性 OK**。**現在の表示データは advance_hint なし**のため **advance_hint 白カードそのものは表示されていない**。**advance_hint なし時に不要な空カードが出ていないことは確認済み**。
-- **`a62b3a7` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。**advance_hint が存在するデータでの白カード実表示目視は未確認**。
+- **ユーザー環境 Godot（ローカル目視・advance_hint なし・`f16450f` 記録）**: **日程画面表示 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**HeaderCard / SummaryCard / NextGameCard は従来どおり OK**。**upcoming 試合ブロックは従来状態を維持 OK**。**既存のお知らせ表示 OK**。**画面全体の崩れなし**。**文字可読性 OK**。**当時の表示データは advance_hint なし**のため **advance_hint 白カードそのものは表示されていない**。**advance_hint なし時に不要な空カードが出ていないことは確認済み**。
 - **到達点**: **日程閲覧 — advance_hint ブロック白カード化**（**日程 Scroll 全体の第2段完了ではない**）。
-- **別タスク（未着手）**: 日程Scroll見出し全体整理、**ScrollContent 全体**整理、試合リスト全体の行レイアウト整理、試合リスト行の余白・区切り・カード化、**advance_hint ありデータでの白カード実表示確認**。
+
+### 日程 advance_hint ありデータでの白カード実表示確認（ユーザー確認・`e819da0` 推奨後）
+
+- **背景**: **`f16450f`** 時点では **advance_hint なし時の空カードなし**のみ記録。**`e819da0`** で **advance_hint ありデータ実表示確認**を次候補に選定。
+- **確認手順（ユーザー環境）**: **`godot/data/schedule_from_python.json` を一時退避**（from_python 優先で hint なし表示になるため）→ **同梱 `schedule_mock.json` を読込**（**`advance_hint.block` / `one_line` あり**）→ Godot 目視 → **確認後 `schedule_from_python.json` を復元済み**（**削除ではない**）。
+- **復元後**: **`Test-Path` で `schedule_from_python.json` 存在 OK**。**`git status --short` は既知の未追跡 handoff のみ**。
+- **ユーザー環境 Godot（ローカル目視・advance_hint あり・mock）**: **DataSourceLabel**＝**同梱モックJSON**。**advance_hint 白カード表示 OK**。**見出し「進行ヒント（advance_hint）」 OK**。**`block` / `one_line` 可読性 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **確認完了**: **`a62b3a7` の advance_hint 白カード化は、なし時・あり時の両方で確認済み**（実装・pytest・`f16450f` なし時・今回あり時）。**`f16450f` 時点の未確認ギャップは解消**。
+- **別タスク（未着手）**: 日程Scroll見出し全体整理、**ScrollContent 全体**整理、試合リスト全体の行レイアウト整理、試合リスト行の余白・区切り・カード化、**お知らせ / empty_message 白カード化**などの最小スライス検討。
 
 ### 財務サマリー閲覧 `Phase4` Theme 限定適用・第1段（`4b43da5`）＋履歴行文字色最小補正（`6c3dc43`）
 
@@ -424,7 +431,7 @@
   - **スクショ上でも**白 TableCard 内に9列表が収まり、ヘッダーと各セルが白背景上で読める状態を確認。
 - **到達点**: **TableCard 白カード化 ＋ 表 Theme 通常 Table 化まで第1段完了**（**画面全体の完全仕上げではない**）。
 - **第2段（未着手）**: **表行の Panel 化**、**余白・区切り・カード化**、**ReadonlyBadge / ModeStrip の暗 chip 整理**、**行レイアウトの本格調整**（**`.gd` 構造変更**）。
-- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`）**。**Body系第2段（最小）**: **財務 HistoryBody（`d57b021`）**＋**OM MissionsBody（`5a3ae2c`）**＋**戦術 PlayerRolesBody（`c9216d0`）**＋**契約・人事 PlayerRows（`6b26fa3`）**＋**契約・人事 RiskRows（`97b26a8`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**次候補**: **日程 Scroll 見出し全体 / ScrollContent 全体**、**ロスター表行 Panel 化**、**契約・人事 Body 本格整備**、**advance_hint ありデータでの実表示確認** — 個別判断。
+- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**。**Body系第2段（最小）**: **財務 HistoryBody（`d57b021`）**＋**OM MissionsBody（`5a3ae2c`）**＋**戦術 PlayerRolesBody（`c9216d0`）**＋**契約・人事 PlayerRows（`6b26fa3`）**＋**契約・人事 RiskRows（`97b26a8`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**次候補**: **日程 Scroll 見出し全体 / ScrollContent 全体**、**お知らせ / empty_message 白カード化**、**ロスター表行 Panel 化**、**契約・人事 Body 本格整備** — 個別判断。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -443,7 +450,7 @@
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
 - **順位表閲覧**（`standings_view.tscn`）: **第1段**（`927e918`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内 8 列表・動的行**は**未着手**（第2段）。詳細は上記「順位表閲覧 `Phase4` Theme」節。
-- **日程閲覧**（`schedule_view.tscn` / `schedule_view.gd`）: **第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`・`.tscn`）＋**第2段・後半（最小）**（`7fecb99`・`_add_upcoming_block`）＋**追加最小 advance_hint**（`a62b3a7`・`_add_advance_hint_block`）— **Header / SummaryCard / NextGameCard / upcoming / advance_hint ブロック**＝`Phase4SummaryCard`（**advance_hint ありデータでの実表示目視は未確認**）。**見出し全体 / ScrollContent 全体整理**は**別タスク**。詳細は上記「日程閲覧 `Phase4` Theme」節。
+- **日程閲覧**（`schedule_view.tscn` / `schedule_view.gd`）: **第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`・`.tscn`）＋**第2段・後半（最小）**（`7fecb99`・`_add_upcoming_block`）＋**追加最小 advance_hint**（`a62b3a7`・`_add_advance_hint_block`・**なし/あり表示確認済み**）— **Header / SummaryCard / NextGameCard / upcoming / advance_hint ブロック**＝`Phase4SummaryCard`。**見出し全体 / ScrollContent 全体整理**は**別タスク**。詳細は上記「日程閲覧 `Phase4` Theme」節。
 - **財務サマリー閲覧**（`finance_summary_view.tscn` / `finance_summary_view.gd`）: **第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`・`_fill_history_rows`）— 詳細は上記「財務サマリー閲覧 `Phase4` Theme」節。
 - **オーナーミッション閲覧**（`owner_mission_view.tscn` / `owner_mission_view.gd`）: **第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`・`_fill_mission_rows`）— 詳細は上記「オーナーミッション / クラブ評価閲覧 `Phase4` Theme」節。
 - **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn` / `tactics_summary_view.gd`）: **第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`・`_fill_player_roles`）— 詳細は上記「戦術 / ローテーションサマリー閲覧 `Phase4` Theme」節。
