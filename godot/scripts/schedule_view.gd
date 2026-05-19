@@ -298,7 +298,7 @@ func _add_empty_message_block(empty_msg: String) -> void:
 	var panel: PanelContainer = PanelContainer.new()
 	panel.theme_type_variation = &"Phase4SummaryCard"
 	var inner: VBoxContainer = VBoxContainer.new()
-	inner.add_theme_constant_override("separation", 4)
+	inner.add_theme_constant_override("separation", 6)
 	var title: Label = Label.new()
 	title.text = "お知らせ"
 	title.autowrap_mode = 2
@@ -309,8 +309,8 @@ func _add_empty_message_block(empty_msg: String) -> void:
 	var body_lab: Label = Label.new()
 	body_lab.text = empty_msg
 	body_lab.autowrap_mode = 2
-	body_lab.add_theme_font_size_override("font_size", 13)
-	body_lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
+	body_lab.add_theme_font_size_override("font_size", 15)
+	body_lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
 	body_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(body_lab)
 	panel.add_child(inner)
