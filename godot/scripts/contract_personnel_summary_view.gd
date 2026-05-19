@@ -154,10 +154,14 @@ func _fill_risk_rows(rows: Array) -> void:
 		_style_body_label(empty_lab, 12, Color(0.16, 0.2, 0.3, 1))
 		_risk_rows.add_child(empty_lab)
 		return
+	var risks: Array = []
 	for it in rows:
 		if typeof(it) != TYPE_DICTIONARY:
 			continue
-		var row: Dictionary = it as Dictionary
+		risks.append(it as Dictionary)
+	var n: int = risks.size()
+	for i in range(n):
+		var row: Dictionary = risks[i]
 		var lab: String = _str_cell(row.get("label", null))
 		var disp: String = _str_cell(row.get("display_value", row.get("value", null)))
 		var sev: String = _str_cell(row.get("severity", null))
@@ -166,6 +170,8 @@ func _fill_risk_rows(rows: Array) -> void:
 		block.text = "%s\n  表示: %s\n  重要度: %s\n  %s" % [lab, disp, sev, memo]
 		_style_body_label(block, 12, Color(0.16, 0.2, 0.3, 1))
 		_risk_rows.add_child(block)
+		if i < n - 1:
+			_risk_rows.add_child(HSeparator.new())
 
 
 func _fill_player_rows(rows: Array) -> void:
