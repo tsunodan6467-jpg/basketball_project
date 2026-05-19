@@ -200,6 +200,8 @@ func _add_player_row(p: Dictionary) -> void:
 		if i == 5:
 			lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		if i == 1:
+			lab.add_theme_font_size_override("font_size", 13)
+			lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
 			# 長い名前が clip されたとき全文を確認できるようにする（autowrap は使わない）
 			var name_raw: Variant = p.get("name", null)
 			if name_s != "-" and name_raw != null:
@@ -207,6 +209,9 @@ func _add_player_row(p: Dictionary) -> void:
 				if not tip.is_empty():
 					lab.tooltip_text = tip
 					lab.mouse_filter = Control.MOUSE_FILTER_PASS
+		elif i == 4:
+			lab.add_theme_font_size_override("font_size", 13)
+			lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
 		if i == 8 and st_s != "-":
 			# 状態列が clip されたとき全文を確認できるようにする（表示文字と同じ）
 			lab.tooltip_text = st_s
