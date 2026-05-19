@@ -316,7 +316,7 @@
 - **ユーザー環境 Godot（ローカル目視）**: **`schedule_from_python.json` 一時退避 → 同梱 mock 読込 → 確認後復元済み**。**DataSourceLabel**＝**同梱モックJSON OK**。**upcoming 上段メタ（round / 大会 / H-A）横並び OK**。**対戦行の読みやすさ OK**。**detail 副情報 OK**。**upcoming 件数 / 順序 / 文言維持 OK**。**「今後の予定」見出し維持 OK**。**advance_hint / empty_message / notes / Footer 維持 OK**。**Header / Summary / NextGame 維持 OK**。**HomeNavButton 戻り OK**。**エラーなし・復元後差分なし**。
 - **`fa36271` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
 - **到達点**: **Body余白横展開後の中規模改善第1手 — 日程 upcoming 試合カード内情報階層整理完了**（**日程 Scroll 全体の本格整備完了ではない**。**試合リスト本格全体の完了でもない**）。
-- **別タスク（未着手）**: **日程 ScrollContent 全体整理**、試合リスト行レイアウトのさらなる本格整理、試合リスト行のカード内構成追加改善、**ロスター本格整備**、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**。
+- **別タスク（未着手）**: **日程 ScrollContent 全体整理**、試合リスト行レイアウトのさらなる本格整理、試合リスト行のカード内構成追加改善、**ロスター本格整備**（**第1手平坦行背景は `9445d0e` で対応 — 下記**）、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**。
 
 ### 財務サマリー閲覧 `Phase4` Theme 限定適用・第1段（`4b43da5`）＋履歴行文字色最小補正（`6c3dc43`）
 
@@ -601,9 +601,23 @@
 - **ユーザー環境 Godot（ローカル目視）**: **RowList 選手行間区切り OK**。**最終行後の不要区切りなし OK**。**ヘッダー下区切り維持 OK**。**9列内容 / 順序 / 幅維持 OK**。**tooltip 維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
 - **`8a95fcf` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
 - **到達点**: **ロスター表第2段（最小）— RowList 選手行間 HSeparator 追加完了**（**ロスター表第2段全体の完了ではない**）。
-- **別タスク（未着手）**: **RowList 行の Panel 化**、**選手行カード化**、**余白・行レイアウト本格調整**、**9列レイアウト本格整理**、**tooltip 再設計が必要な場合の検討**、**Body 本格整備**、**日程 ScrollContent 全体整理**、**日程試合リスト行レイアウト本格整理**。
+- **別タスク（未着手）**: **RowList 行の Panel 化**、**選手行カード化**、**余白・行レイアウト本格調整**、**9列レイアウト本格整理**、**tooltip 再設計が必要な場合の検討**、**Body 本格整備**、**日程 ScrollContent 全体整理**、**日程試合リスト行レイアウト本格整理**（**平坦行背景ラップは `9445d0e` で対応 — 下記**）。
 
-- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**＋**中規模改善第1手 upcoming 試合カード内情報階層整理（`fa36271`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`）**＋**契約・人事 PlayerRows 行区切り（`6b26fa3`）**＋**契約・人事 PlayerRows 内側余白（`f19ed9b`）**＋**契約・人事 RiskRows 行区切り（`97b26a8`）**＋**契約・人事 RiskRows 内側余白（`420f240`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（`420f240` 確認記録時点）。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**次候補（中規模以上）**: **ロスター本格整備**、**日程 ScrollContent / 試合リスト本格整備**、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面** — **細かい行余白・区切り微調整は一区切り**。
+### ロスター閲覧 — ロスター本格整備・第1手 — RowList 選手行の平坦行背景追加（`9445d0e`）
+
+- **日程 upcoming 情報階層整理完了後の中規模改善第2手**（選定調査 `6d9c0a8` → 実装 `9445d0e`）。**細かい行余白 / 区切り微調整（margin / HSeparator 追加）ではない** — **RowList 選手行の視認性を上げる構造改善（平坦な行背景ラップ）**。**`8a95fcf` の行間 HSeparator とは別物**（今回は行背景であり、行区切りの再変更ではない）。
+- **`9445d0e`**: **変更ファイル** **`roster_view.gd` のみ**。**変更関数** **`_add_player_row` のみ**。
+  - 既存の **`HBoxContainer`（9列 Label）** を **`PanelContainer` の子**に配置。**`_row_list.add_child(row)`** を **`panel.add_child(row)` → `_row_list.add_child(panel)`** に変更。
+  - 行背景はスクリプト内 **`StyleBoxFlat`** — **薄い背景色**、**角丸 2px**、**content margin 4px**、**枠線なし**。**`Phase4SummaryCard` は使わず**、**TableCard 内の平坦な行帯**として表示。
+  - **維持**: **9列**、**列順**、**列幅**（`_col_width`）、**表示文言**、**JSON key**、**選手名（列1）・状態（列8）の tooltip と `mouse_filter`**、**`_apply_snapshot` の行間 HSeparator**（**最終行後 HSeparator なし**）、**ヘッダー行**、**ヘッダー下 Separator**、**HeaderCard / TableCard**、**HomeNavButton**、**DataSourceLabel**、**from_python / mock**。
+  - **未変更**: **`roster_view.tscn`**、**Theme `.tres`**、**`project.godot`**、**`_apply_snapshot`**、**players / valid_players**、**export / tests / mock JSON**。
+- **pytest**（`9445d0e`）: roster 10 / home_dashboard 10 / schedule 10 / phase0 smoke 1 — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**: **RowList 各選手行の平坦な行背景 OK**。**9列内容 / 順序 / 幅維持 OK**。**tooltip 維持 OK**。**RowList 行間 HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**Header行 / Header下Separator 維持 OK**。**HeaderCard / TableCard 維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton 戻り OK**。**エラーなし・実行後差分なし**。
+- **`9445d0e` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
+- **到達点**: **ロスター本格整備・第1手 — RowList 選手行の平坦 PanelContainer 行背景ラップ完了**（**ロスター本格整備全体の完了ではない**。**9列本格整理・tooltip再設計・列幅本格調整は未対応**）。
+- **別タスク（未着手）**: **ロスター選手行カード化**、**9列レイアウト本格整理**、**tooltip 再設計検討**、**列幅・表示優先度の本格調整**、**RowList 全体の余白・行レイアウト本格調整**、**日程 ScrollContent / 試合リスト本格整備**、**Body 本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**。
+
+- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**＋**中規模改善第1手 upcoming 試合カード内情報階層整理（`fa36271`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`）**＋**契約・人事 PlayerRows 行区切り（`6b26fa3`）**＋**契約・人事 PlayerRows 内側余白（`f19ed9b`）**＋**契約・人事 RiskRows 行区切り（`97b26a8`）**＋**契約・人事 RiskRows 内側余白（`420f240`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（`420f240` 確認記録時点）。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**ロスター本格整備・第1手**: **RowList 選手行の平坦行背景（`9445d0e`）**。**次候補（中規模以上）**: **ロスター本格整備の続き**（9列本格・選手行カード化等）、**日程 ScrollContent / 試合リスト本格整備**、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面** — **細かい行余白・区切り微調整は一区切り**。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -618,7 +632,7 @@
 
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn` / `contract_personnel_summary_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**契約概要**・**ロスター構成**・**RiskCard**・**PlayersCard**＝`Phase4SummaryCard`。**注意**＝`Phase4WarningCard`。**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**PlayerRows / RiskRows 行区切り（最小）**（`6b26fa3` / `97b26a8`）＋**Body本格・最小 PlayerRows / RiskRows 内側余白**（`f19ed9b` / `420f240`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
-- **ロスター閲覧**（`roster_view.tscn` / `roster_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**`Scroll/TableCard`**＝`Phase4SummaryCard`、**`%RowList`** 内9列表は **`Phase4TableHead` / `Phase4TableCell`**（`407f014`）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`・`_apply_snapshot` players ループ）— 詳細は上記「ロスター閲覧 `Phase4` Theme」節。
+- **ロスター閲覧**（`roster_view.tscn` / `roster_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**`Scroll/TableCard`**＝`Phase4SummaryCard`、**`%RowList`** 内9列表は **`Phase4TableHead` / `Phase4TableCell`**（`407f014`）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`・`_apply_snapshot` players ループ）＋**ロスター本格整備・第1手 平坦行背景**（`9445d0e`・`_add_player_row` のみ）— 詳細は上記「ロスター閲覧 `Phase4` Theme」節。
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
 - **順位表閲覧**（`standings_view.tscn`）: **第1段**（`927e918`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内 8 列表・動的行**は**未着手**（第2段）。詳細は上記「順位表閲覧 `Phase4` Theme」節。
@@ -643,7 +657,8 @@
 ◎ ロスター・TableCard（Phase4SummaryCard・f866f5b）
 ◎ ロスター表・Phase4TableHead / Phase4TableCell（407f014）
 ◎ ロスター・RowList選手行間HSeparator（第2段・最小・8a95fcf）
-□ ロスター・表行Panel化・選手行カード化・余白・行レイアウト本格調整（第2段・本格・.gd）
+◎ ロスター・RowList選手行の平坦行背景（本格整備第1手・9445d0e）
+□ ロスター・選手行カード化・9列本格・列幅本格・RowList余白本格（本格整備続き・.gd）
 ◎ ホーム・Header のみ（HeaderCard に Theme 限定）
 ◎ ホーム・MetricsRow `CardDivision` / `CardRank` / `CardMoney` のみ `Phase4SummaryCard` 限定適用（`f66bcd2`・`2471b67`）
 ◎ ホーム・Scroll 以下 `CardNews` / `CardNext` / `CardTasks` のみ `Phase4SummaryCard` 限定適用（`ed106c8`・`8676095`・`d18bf1f`）
