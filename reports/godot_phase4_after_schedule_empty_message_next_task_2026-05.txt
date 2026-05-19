@@ -1,0 +1,465 @@
+# Godot Phase 4 日程empty_message後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-19
+- **調査時点 HEAD**: `e27e5f6`（Godot日程お知らせブロック第2段の確認を記録）
+- **直近列**: `463e74b`（empty_message 実装）→ `e27e5f6`（確認記録）
+- **実装変更（本調査）**: **なし**
+- **Godot 目視（本調査）**: **未実施**（ユーザー確認は `e27e5f6` / README / docs に記録済み）
+
+### 1.1 主要10画面 Theme 第1段
+
+**一通り完了**（各画面 Header + Summary / TableCard 等の第1段 + 必要最小の動的行色補正）。
+
+### 1.2 日程第2段の到達点
+
+| 段階 | コミット | 内容 |
+|------|----------|------|
+| 前半 | `986c4ab` | NextGameCard 白カード（`.tscn`） |
+| 後半（最小） | `7fecb99` | upcoming 試合ブロック白カード + 試合間 HSeparator |
+| 追加最小 | `a62b3a7` | advance_hint 白カード |
+| 記録 | `f16450f` / `2b0eb79` | advance_hint なし時・あり時の表示確認 |
+| 追加最小 | `463e74b` | empty_message（お知らせ）白カード |
+| 記録 | `e27e5f6` | empty_message 確認結果の README/docs 記録 |
+
+**日程 Scroll 全体の第2段完了ではない。**
+
+### 1.3 Body系第2段（最小）行区切り横展開
+
+**5/5 完了・記録済み**（財務 HistoryBody / OM MissionsBody / 戦術 PlayerRolesBody / 契約 PlayerRows / 契約 RiskRows）。
+
+### 1.4 残っている大きな候補
+
+- **日程 Scroll**: 「今後の予定」見出し（暗地＋明色の1箇所）、ScrollContent 全体、試合リスト行の余白・区切り本格化
+- **ロスター表第2段**（9列 RowList・Panel 化・chip 等）
+- **Body 系本格整備**（4画面の Panel / 行カード / 余白）
+- **施設 / クラブ史 / 順位表 第2段**（Scroll 動的本文・表）
+- **総点検 / ロードマップ整理**（節目の方針同期）
+
+### 1.5 今回の調査目的
+
+日程 Scroll 内の小ブロック（NextGame / upcoming / advance_hint / empty_message）が一区切りした節目で、
+案 A〜G を現物比較し、**次に安全に実装または整理する 1 タスク**を決める。
+
+### 1.6 実装変更なし
+
+本調査は **reports 本ファイルの追加のみ**（コミット対象）。
+
+
+================================================================================
+## 2. 日程Scroll小ブロック対応の到達点
+================================================================================
+
+### 2.1 NextGameCard（`986c4ab`）
+
+- **`schedule_view.tscn`**: 静的 `NextGameCard` → `Phase4SummaryCard` + ラベル濃色化。
+- **Scroll 動的生成とは独立**。
+
+### 2.2 upcoming 試合ブロック（`7fecb99`）
+
+- **`_add_upcoming_block`**: runtime `PanelContainer` + `Phase4SummaryCard`、3行 Label（line1/2/3）濃色化。
+- **`_fill_scroll_body`**: upcoming ループ内、**最終行以外**に `HSeparator`（暗地 Scroll 上の区切り）。
+
+### 2.3 advance_hint（`a62b3a7` + 確認記録）
+
+- **`_add_advance_hint_block`**: 白カード + 見出し「進行ヒント（advance_hint）」+ block / one_line。
+- **なし時・あり時**の表示確認済み（`f16450f` / `2b0eb79`）。
+
+### 2.4 empty_message（`463e74b` + `e27e5f6`）
+
+- **`_add_empty_message_block`**: 白カード + 見出し「お知らせ」+ 本文 `empty_msg`。
+- **表示条件**: `upcoming.is_empty() and not empty_msg.is_empty()` のみ。
+- **通常 mock**: upcoming 8件・`empty_message` 空 → **お知らせカード非表示**（ユーザー確認済み）。
+- **`notes`**: Scroll 外 `_footer_note` / Footer — **本スライス対象外**。
+
+### 2.5 まだ残る日程Scrollタスク（`_fill_scroll_body` 現物）
+
+| 残り | 現状（`schedule_view.gd`） | 規模感 |
+|------|---------------------------|--------|
+| **「今後の予定」見出し** | L161: `_add_scroll_heading("今後の予定（upcoming_games）")` **1箇所のみ** | **小（最小スライス可）** |
+| **試合間 HSeparator** | L169-170: 白カード間の暗地 Separator | 小〜中（本格整理の一部） |
+| **ScrollContent 全体** | ブロック順・余白・暗地背景と白カードの関係 | **中〜大** |
+| **試合リスト本格整理** | `_add_upcoming_block` 構造・3行レイアウト・区切り方針 | **中〜大** |
+| **`_add_scroll_paragraph`** | **呼び出しゼロ**（定義のみ残存） | 整理対象だが **表示影響なし** |
+
+### 2.6 日程Scroll全体の第2段完了ではない
+
+小ブロック白カード化は **主要4種が完了**。Scroll 上の **セクション見出し1箇所**と **全体レイアウト**は未整理。
+
+
+================================================================================
+## 3. 日程Scroll見出し全体整理候補（案A）
+================================================================================
+
+### 3.1 現状
+
+- **`_add_scroll_heading`**: 明色 `Color(0.94, 0.96, 0.99, 1)` / font 17 の `Label` を暗地 Scroll に直置き。
+- **呼び出し**: **`_fill_scroll_body` L161 の1箇所のみ**（`"今後の予定（upcoming_games）"`）。
+- **`_add_scroll_paragraph`**: **未使用**（empty_message は `_add_empty_message_block` へ移行済み）。
+- **視覚ギャップ**: 見出しは **暗地＋明色**、直後の upcoming は **白カード（Phase4SummaryCard）** — **混在が目立つ唯一の Scroll 内要素**。
+
+### 3.2 対象関数
+
+| 関数 | 本タスクでの扱い |
+|------|------------------|
+| `_fill_scroll_body` L161 | **主対象**（1行差し替え） |
+| `_add_scroll_heading` | **触るか、専用ヘルパで置換**（影響は1呼び出しに限定可能） |
+| `_add_scroll_paragraph` | **触らなくてよい**（未使用） |
+| `_add_upcoming_block` 他 | **触らない** |
+
+### 3.3 リスク
+
+| リスク | 評価 |
+|--------|------|
+| advance_hint / empty_message への波及 | **低** — 別ヘルパ・別分岐 |
+| 暗地 Scroll に濃色見出しを置く誤り | **中** — 実装時に **白カード直上のセクションラベル**として設計要 |
+| 文言・件数・JSON key 変更 | **低** — 見出し文字列維持で対応可 |
+
+### 3.4 1コミットで切れるか
+
+**◎ 可** — **`_fill_scroll_body` の upcoming 分岐先頭1箇所** + 必要なら `_add_upcoming_section_heading` 等 **1関数追加**。
+「見出し全体」と言っても **実質は単一見出しの最小スライス**（過去の empty_message / advance_hint と同型）。
+
+### 3.5 今すぐ適するか
+
+**◎ 最適** — 日程小ブロック完了直後の **自然な次手**。他画面へ移る前に **Scroll 内の最後の明色見出し1箇所**を片付けられる。
+
+
+================================================================================
+## 4. ScrollContent全体整理候補（案B）
+================================================================================
+
+### 4.1 現状
+
+- **`%ScrollContent`**: `_scroll_content` に runtime で子を追加（empty_message / 見出し / upcoming×N + HSeparator / advance_hint）。
+- **`.tscn`**: Scroll / ScrollContent の separation・margin は第1段済み。動的側は `.gd` 主導。
+
+### 4.2 既存白カード化済みブロックとの関係
+
+- **触ると連鎖しやすい**: upcoming ループ、HSeparator 方針、ブロック間余白、advance_hint / empty_message の順序。
+- **壊しやすい**: `7fecb99` / `a62b3a7` / `463e74b` で確立した **Panel + Phase4SummaryCard** パターン。
+
+### 4.3 リスク
+
+- **中〜大** — 複数関数・複数ブロック横断。
+- **1コミット不適** — 設計判断（全体を1枚にまとめるか、セクション単位か）が先に必要。
+
+### 4.4 今すぐ適するか
+
+**× 後回し** — 案A（見出し1箇所）または案Cの一部を **分割完了後**に着手。
+
+
+================================================================================
+## 5. 試合リスト行レイアウト候補（案C）
+================================================================================
+
+### 5.1 現状
+
+- **`_add_upcoming_block`**: 1試合 = 1枚の `Phase4SummaryCard`（3 Label: ラウンド行 / 対戦 / detail or ラベル）。
+- **区切り**: 試合間 **`HSeparator`**（暗地 Scroll 上）。白カード **内**の行区切りはなし。
+- **mock**: `upcoming_games` 8件 — 通常表示で **8枚の白カード + 7本の Separator**。
+
+### 5.2 upcoming 完了範囲
+
+- **白カード化・3行テキスト・JSON key 表示**は `7fecb99` 済み。
+- **未着手**: Separator 廃止と VBox separation 統一、行高・padding、全試合を1枚の親カードにまとめる、列レイアウト化など **本格 UI**。
+
+### 5.3 残るリスク
+
+- **`_add_upcoming_block` 改変** → `7fecb99` 回帰リスク **中**。
+- **件数・順序・表示文言**は export テストでガードされているが、**Godot 目視必須**。
+
+### 5.4 今すぐ適するか
+
+**△ 後回し（案Aの次）** — 見出し整理後に **Separator 方針だけ**を切り出すなら小〜中だが、**「行レイアウト・カード化」全体**は中〜大。
+
+
+================================================================================
+## 6. ロスター表第2段候補（案D）
+================================================================================
+
+### 6.1 現状
+
+- **第1段済み**（`f866f5b` / `407f014`）: `TableCard` 白カード + `Phase4TableHead` / `Phase4TableCell`。
+- **`roster_view.gd`**: `%RowList` にヘッダー `HBoxContainer`（9列・`_col_width`）+ **1本 HSeparator** + 各選手行 `HBoxContainer`（9列 Label）。
+- **tooltip**: 選手名（col 1）・状態（col 8）に `tooltip_text` + `mouse_filter`。
+- **行区切り**: 選手行間 **HSeparator なし**（Body 最小テンプレ未適用）。
+
+### 6.2 TableCard / Phase4Table の到達点
+
+- **白 Table 内で9列表示・可読性 OK**（ユーザー確認済み）。
+- **第2段未着手**: 行 Panel 化、行間区切り、chip、行レイアウト本格調整。
+
+### 6.3 RowList / 9列 / tooltip / 列幅のリスク
+
+| 項目 | リスク |
+|------|--------|
+| 9列 `custom_minimum_size.x` | **高** — 1280幅内収まり・clip |
+| tooltip | **中** — 名前・状態列の挙動 |
+| Panel 化 | **中〜大** — HBox → Panel 構造変更 |
+
+### 6.4 1コミットで切れる最小案（参考）
+
+- **Body 最小と同型**: `_add_player_row` ループに **行間 HSeparator のみ**（ヘッダー下 Separator は維持）。
+- **フル第2段（Panel 化）**は **1コミット不適**。
+
+### 6.5 今すぐ適するか
+
+**△ 価値は高いが優先度は日程の次** — ゲーム中心画面だが、**日程 Scroll の未整理1見出し**より **文脈の連続性**で日程を先に片付ける方が安全。
+ロスターへ移るなら **HSeparator 最小**からが Body 実績と整合。
+
+
+================================================================================
+## 7. Body系本格整備候補（案E）
+================================================================================
+
+### 7.1 現状（各 `.gd`）
+
+| 画面 | 関数 | 第2段（最小） | Panel / 行カード |
+|------|------|---------------|------------------|
+| 財務 | `_fill_history_rows` | HSeparator のみ | **未** |
+| OM | `_fill_mission_rows` | 同上 | **未** |
+| 戦術 | `_fill_player_roles` | 同上 | **未** |
+| 契約 | `_fill_player_rows` / `_fill_risk_rows` | 同上 | **未** |
+
+### 7.2 本格整備の内容
+
+- 行 `PanelContainer` 化、行カード化、padding / separation 調整、空表示の見直し。
+- **4画面 × 複数関数** — **1画面1コミットでも中〜大**。
+
+### 7.3 今すぐ適するか
+
+**× 後回し** — 最小横展開直後に **Panel 化へ一気に入ると範囲が膨らむ**。
+日程またはロスターの **1スライス完了後**、財務 HistoryBody から **1画面ずつ**が安全。
+
+
+================================================================================
+## 8. 総点検 / ロードマップ整理候補（案F）
+================================================================================
+
+### 8.1 節目としての価値
+
+- 主要10画面第1段 + Body最小5件 + 日程小ブロック4種 — **milestones が多い**。
+- **方針の言語化**には有用。
+
+### 8.2 既存 docs で足りるか
+
+- **`e27e5f6` 時点の README / GUI_ARCH / NAVIGATION** は empty_message まで **整合**（未着手表現の major な矛盾はなし）。
+- **次候補**は README に「日程 Scroll 見出し全体 / ScrollContent 全体 / ロスター…」と明記済み。
+
+### 8.3 今すぐ適するか
+
+**× 実装停止のための総点検は不要** — **本レポートで比較・推奨1件まで代替可能**。
+docs だけの更新は **次の実装 or 確認記録コミットに含めれば足りる**。
+
+
+================================================================================
+## 9. 施設 / クラブ史 / 順位表 第2段候補（案G）
+================================================================================
+
+### 9.1 施設（`facility_summary_view.gd`）
+
+- Scroll 内: `_add_scroll_heading` / `_add_scroll_paragraph` — **明色 Label 多数**（施設行・sections）。
+- **規模**: **中** — 段落数は可変だが列構造はロスターより単純。
+
+### 9.2 クラブ史（`club_history_view.gd`）
+
+- 段落 + **シーズン表**（`HBoxContainer` 行）。
+- **規模**: **中〜大** — 表行の動的生成あり。
+
+### 9.3 順位表（`standings_view.gd`）
+
+- **8列** standings 表 + divisions ループ。
+- **規模**: **大** — ロスターに近い表リスク。
+
+### 9.4 今すぐ優先する理由
+
+**弱い** — 日程 Scroll の **途中まで進んだ第2段**を完結させる方が、横展開の文脈・テスト・目視の連続性で有利。
+施設は **日程・ロスター後**の横展開候補として妥当（第1段調査 `23a8fcf` / `64abb9c` の流れ）。
+
+
+================================================================================
+## 10. 選択肢比較表
+================================================================================
+
+| 案 | 対象 | 主な変更範囲 | 変更規模 | .gd変更リスク | UI効果 | 回帰リスク | 1コミット安全性 | 推奨度 |
+|----|------|--------------|----------|---------------|--------|------------|-----------------|--------|
+| **A** | 日程「今後の予定」見出し | `schedule_view.gd` L161 + ヘルパ1 | **小** | **低** | **中**（白カード直前の統一） | **低** | **◎** | **◎ 最推奨** |
+| **B** | ScrollContent 全体 | `_fill_scroll_body` 横断・余白・順序 | **大** | **高** | 大 | **高** | **×** | △ |
+| **C** | 試合リスト行本格整理 | `_add_upcoming_block` + ループ + Separator | **中〜大** | **中** | 大 | **中** | **△** | ○（Aの次） |
+| **D** | ロスター表第2段 | `roster_view.gd` RowList 9列 | **中〜大**（最小は小） | **高**（フル時） | 大 | **高** | **△**（HSeparatorのみなら◎） | ○ |
+| **E** | Body 本格整備 | 4画面の Body 関数群 | **大** | **中** | 大 | **中** | **×** | △ |
+| **F** | 総点検 / ロードマップ | docs / reports | **小**（docs時） | **なし** | 間接 | **なし** | **◎** | △（本レポートで代替） |
+| **G** | 施設 / クラブ史 / 順位表 | 各 Scroll `.gd` | **中〜大** | **中〜高** | 中〜大 | **中〜高** | **×** | △ |
+
+**結論**: **案A（狭義: 「今後の予定」セクション見出しの最小整理）** を次の1タスクとする。
+「見出し全体」は **呼び出し1箇所に縮小済み** — 過大な一括リファクタは不要。
+
+
+================================================================================
+## 11. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**日程（スケジュール）閲覧 — Phase4 Theme 第2段・追加最小 — 「今後の予定（upcoming_games）」セクション見出しの表示整理**
+
+（README 上の「日程Scroll見出し全体整理」の **最小スライス第1手**として位置づける。Scroll 全体完了ではない。）
+
+### 対象ファイル
+
+- **変更可**: `godot/scripts/schedule_view.gd` **のみ**
+- **主対象**: `_fill_scroll_body` 内 **L161**（`_add_scroll_heading("今後の予定（upcoming_games）")` の差し替え）
+- **追加想定**: `_add_upcoming_section_heading()` 等 **専用ヘルパ1関数**（`_add_upcoming_block` と同ファイル・同パターン）
+
+### なぜ今それを選ぶのか
+
+1. **日程 Scroll 小ブロック4種が完了** — 残る Scroll 内の **明色テキストはセクション見出し1箇所のみ**（現物確認）。
+2. **1コミット・1ファイル・1呼び出し** — empty_message / advance_hint と **同じ安全パターン**。
+3. **UI効果が明確** — 白 upcoming カード直前の **暗地明色見出し**を解消し、Scroll 第2段の **視覚的な穴を埋める**。
+4. **回帰範囲が狭い** — `_add_upcoming_block` / `_add_advance_hint_block` / `_add_empty_message_block` / NextGame / Footer を **触らない**。
+5. **README の次候補と一致** — 「日程 Scroll 見出し全体」の **先頭スライス**として自然。
+
+### なぜ他案を後回しにするのか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **B ScrollContent 全体** | 複数ブロック横断・**白カード済み領域を壊しやすい** |
+| **C 試合リスト本格** | `_add_upcoming_block` 改変・**7fecb99 回帰** — 見出し後に Separator 等を **分割検討** |
+| **D ロスター第2段** | **9列・tooltip** — 価値は高いが **日程の未整理1見出し**より文脈分断 |
+| **E Body 本格** | **4画面・Panel 化** — 最小横展開直後は範囲が大きい |
+| **F 総点検** | **本レポート + 既存 docs で十分** — 実装停止不要 |
+| **G 施設等** | 日程第2段 **途中** — 優先度が日程・ロスターより低い |
+
+### 変更してはいけないファイル
+
+- `godot/scenes/schedule_view.tscn`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- 他 scene / script
+- `godot/data/*.json`
+- `basketball_sim/export/*`、`basketball_sim/tests/*`（実行のみ可）
+- `godot/README.md`、`docs/GODOT_*.md`
+- 既存 `reports/godot_phase4_*.txt`（本ファイル以外）
+- sandbox scene
+
+### 実装する場合の安全条件
+
+1. **触る範囲**: `_fill_scroll_body` の **upcoming 非空分岐の見出し1箇所** + 新ヘルパ（任意）。
+2. **やること例**: セクションタイトルを **白カード群に馴染むラベル**（濃色・適切 font_size・上下 margin）に差し替え。**文言 `"今後の予定（upcoming_games）"` は維持**。
+3. **やらない**: upcoming 件数・順序・`_add_upcoming_block` の3行内容、HSeparator の有無（**本スライスでは変更しない**）、advance_hint / empty_message、JSON key、HomeNavButton、from_python/mock。
+4. **誤り禁止**: 暗地 Scroll 上に **白カード用濃色を単独で置いて読めなくする**配置（コントラスト確認必須）。
+5. **Theme `.tres` は変更しない**。
+
+### Godot 目視確認ポイント
+
+- ホーム → 日程（HeaderNavRow / CardNavMenu）
+- **通常 mock**: 「今後の予定」見出し + **8枚の upcoming 白カード** + advance_hint
+- 見出しの **可読性**（暗地 Scroll 上で破綻しないこと）
+- upcoming カード内容・件数・順序 **不変**
+- empty_message **通常時非表示**（回帰）
+- advance_hint / notes / Footer / NextGameCard **維持**
+- HomeNavButton 戻り・DataSourceLabel
+- エラーなし・実行後 **godot/ に意図外差分なし**
+
+### pytest
+
+- **必須**: `py -m pytest basketball_sim/tests/test_schedule_readonly_export.py -q`
+- **推奨**: `test_home_dashboard_readonly_export.py`、`test_roster_readonly_export.py`、`test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+
+
+================================================================================
+## 12. 推奨タスクの最小実装案（Cursor 指示骨子）
+================================================================================
+
+### 目的
+
+`schedule_view.gd` の **「今後の予定（upcoming_games）」セクション見出し**を、
+upcoming 白カード群と **視覚的に整合**する形へ整理する（**日程第2段・追加最小**）。
+
+### 変更してよいファイル
+
+- `godot/scripts/schedule_view.gd`（`_fill_scroll_body` L161 + 新ヘルパ）
+
+### 変更してはいけないファイル
+
+- `godot/scenes/schedule_view.tscn`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- 他 scene / script / data JSON / export / tests / mock
+- README / docs / reports（実装コミットでは触らない。確認記録は別コミット）
+
+### 実装方針
+
+1. L161 の `_add_scroll_heading(...)` を **`_add_upcoming_section_heading()`**（仮名）へ差し替え。
+2. 新ヘルパは **専用** — `_add_scroll_heading` の **グローバル変更はしない**（未使用 `_add_scroll_paragraph` も本コミットでは触らない）。
+3. 見出し Label: **暗地 Scroll 上で読める色**（例: 明色系を維持するか、セクション用の中間トーン）— **実装時に目視で決定**。白カード直上であることを意識した **margin / font_size**。
+4. **`_add_upcoming_block`・HSeparator ループ・advance_hint・empty_message は不変**。
+
+### 表示文言・件数・順序・JSON key
+
+- **変更しない**（見出し文字列・upcoming 配列の走査順・各 row のキー参照は現状維持）。
+
+### 確認コマンド
+
+```text
+py -m pytest basketball_sim/tests/test_schedule_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_roster_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+git diff -- godot/scripts/schedule_view.gd
+git diff --stat
+```
+
+### 目視確認ポイント
+
+§11 と同じ。
+
+### テスト方針
+
+- export テストで DTO / JSON 形状を確認。
+- Godot は **ユーザー環境**で目視（通常 mock の upcoming 8件表示）。
+
+### コミット名案
+
+- 実装: `Godot日程upcomingセクション見出しにPhase4Themeを適用`
+- 確認記録（別コミット）: `Godot日程upcomingセクション見出し第2段の確認を記録`
+
+
+================================================================================
+## 13. 後回しにする案と理由
+================================================================================
+
+| 案 | 後回し理由 |
+|----|------------|
+| **B ScrollContent 全体** | 横断設計が必要。白カード4種の後は **部分完了を壊しやすい** |
+| **C 試合リスト本格** | `_add_upcoming_block` 改変。**見出し整理後**に Separator / 余白を **別スライス**で |
+| **D ロスター第2段（フル）** | 9列・tooltip。**HSeparator 最小**なら別途検討可だが **日程の1見出し優先** |
+| **E Body 本格** | 4画面同時に広がる。**1画面1スライス**は日程完了後でよい |
+| **F 総点検** | 本レポートで代替。**実装を止める必要なし** |
+| **G 施設 / クラブ史 / 順位表** | 第1段済み・第2段は中〜大。**日程第2段の途中**では優先度低 |
+
+
+================================================================================
+## 14. 変更していないファイル
+================================================================================
+
+- `godot/scenes/*.tscn`
+- `godot/scripts/*.gd`
+- `godot/themes/phase4_readonly_core.tres`（Theme .tres）
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 `reports/godot_phase4_*.txt`（本ファイル以外）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- sandbox scene（`home_production_wire_preview.tscn` 等）
