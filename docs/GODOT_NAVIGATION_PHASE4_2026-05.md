@@ -38,7 +38,7 @@
 - **施設サマリー閲覧**: **Theme 第1段**（`5987821`・**`facility_summary_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 動的本文は未変更**（§2.5）。
 - **クラブ史閲覧**: **Theme 第1段**（`682a941`・**`club_history_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内段落・シーズン表は未変更**（§2.6）。
 - **順位表閲覧**: **Theme 第1段**（`927e918`・**`standings_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内 8 列表・動的行は未変更**（§2.7）。
-- **日程閲覧**: **Theme 第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`）＋**第2段・後半（最小）**（`7fecb99`）＋**追加最小 advance_hint**（`a62b3a7`・**なし/あり表示確認済み**）＋**追加最小 empty_message**（`463e74b`）＋**追加最小「今後の予定」見出し**（`a24cf6f`）。**導線は HeaderNavRow + CardNavMenu から到達**（§2.8〜2.8f）。**LeftRail からは遷移しない**。
+- **日程閲覧**: **Theme 第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`）＋**第2段・後半（最小）**（`7fecb99`）＋**追加最小 advance_hint**（`a62b3a7`・**なし/あり表示確認済み**）＋**追加最小 empty_message**（`463e74b`）＋**追加最小「今後の予定」見出し**（`a24cf6f`）＋**追加最小 upcoming 試合間 HSeparator 整理**（`a9fa054`）。**導線は HeaderNavRow + CardNavMenu から到達**（§2.8〜2.8g）。**LeftRail からは遷移しない**。
 - **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`・**`_fill_history_rows` のみ** — §2.9a）。**`%HistoryBody` 構造全面整理は別タスク**。
 - **オーナーミッション / クラブ評価閲覧**: **Theme 第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`・**`_fill_mission_rows` のみ** — §2.10a）。**`%MissionsBody` 構造全面整理は別タスク**。
 - **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`・**`_fill_player_roles` のみ** — §2.11a）。**`%PlayerRolesBody` 構造全面整理は別タスク**。
@@ -194,6 +194,15 @@
 - **日程からホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`**。**node 名 / text / tooltip / connection / handler 名は維持**（`a24cf6f` 後もユーザー確認済み）。
 - **ユーザー環境 Godot（ローカル目視・同梱 mock）**: **`schedule_from_python.json` 一時退避 → 同梱 mock 読込 → 確認後復元済み**。**DataSourceLabel**＝**同梱モックJSON**。**ホーム → 日程遷移 OK**。**「今後の予定」見出し白カード表示 OK**。**見出し可読性 OK**。**upcoming 試合カード表示 OK**。**upcoming 内容・順序 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **Theme 適用範囲（第2段・追加最小）**: **`_add_upcoming_section_heading` の runtime `PanelContainer`**＝`Phase4SummaryCard`。**`_add_upcoming_block` / `_add_advance_hint_block` / `_add_empty_message_block` / NextGameCard / SummaryCard / HeaderCard / notes / Footer は今回未変更**。**ScrollContent 全体・試合リスト本格整理は別タスク**。
+- **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
+
+### 2.8g 日程閲覧・upcoming 試合間 HSeparator 整理と導線確認（`a9fa054`）
+
+- **到達点**: **`schedule_view.gd` の `_fill_scroll_body` upcoming ループ内から試合間 HSeparator 追加処理を削除**（**ナビ構造の変更ではない**・**見た目第2段・追加最小**）。**`schedule_view.tscn`・data JSON・Theme `.tres` 未変更**。
+- **ホームからの到達**（**変更なし**）: **`HeaderNavRow`** または **`CardNavMenu`（リーグ列・日程）** から日程へ。**LeftRail からは遷移しない**（§2.4）。
+- **日程からホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`**。**node 名 / text / tooltip / connection / handler 名は維持**（`a9fa054` 後もユーザー確認済み）。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 日程遷移 OK**。**upcoming カード間の暗色 HSeparator 消失 OK**。**カード間余白 OK**。**upcoming 8件 / 内容 / 順序維持 OK**。**「今後の予定」見出し・advance_hint・empty_message・notes / Footer 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **Theme 適用範囲（第2段・追加最小）**: **区切り方針の変更のみ** — 暗色 Separator を廃止し **`ScrollContent` / 親 VBox の `separation=8`** に任せる。**`_add_upcoming_block` 他の白カードブロックは今回未変更**。**ScrollContent 全体・試合リスト本格整理は別タスク**。
 - **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
 
 ### 2.9 財務サマリー閲覧・Theme 第1段・可読性補正と導線確認（`4b43da5` / `6c3dc43`）
