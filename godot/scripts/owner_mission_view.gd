@@ -135,7 +135,14 @@ func _fill_mission_rows(raw: Variant) -> void:
 		lab.add_theme_font_size_override("font_size", 13)
 		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = block
-		_missions_body.add_child(lab)
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 4)
+		margin.add_theme_constant_override("margin_top", 2)
+		margin.add_theme_constant_override("margin_right", 4)
+		margin.add_theme_constant_override("margin_bottom", 2)
+		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		margin.add_child(lab)
+		_missions_body.add_child(margin)
 		if i < n - 1:
 			_missions_body.add_child(HSeparator.new())
 
