@@ -33,7 +33,7 @@
 ### 2.1 共通 Theme（白ベース検証・限定適用）
 
 - **共通 Theme**（`godot/themes/phase4_readonly_core.tres`）と **preview**（`godot/scenes/theme_preview.tscn`）で **見た目を検証中**。**10 画面への一括適用**や **ホームの Scroll 以下の全面 Theme 化**は **していない**（**限定適用の段階**）。
-- **契約 / 人事サマリー**: **Theme 残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`）— §2.12 / §2.12a。
+- **契約 / 人事サマリー**: **Theme 残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`）＋**第2段（最小）RiskRows 行区切り**（`97b26a8`）— §2.12 / §2.12a / §2.12b。
 - **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）。**`Scroll/TableCard`** の Phase4 化 ＋ **`Phase4TableHead` / `Phase4TableCell`**（§2.13）。
 - **施設サマリー閲覧**: **Theme 第1段**（`5987821`・**`facility_summary_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 動的本文は未変更**（§2.5）。
 - **クラブ史閲覧**: **Theme 第1段**（`682a941`・**`club_history_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内段落・シーズン表は未変更**（§2.6）。
@@ -42,7 +42,7 @@
 - **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`・**`_fill_history_rows` のみ** — §2.9a）。**`%HistoryBody` 構造全面整理は別タスク**。
 - **オーナーミッション / クラブ評価閲覧**: **Theme 第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`・**`_fill_mission_rows` のみ** — §2.10a）。**`%MissionsBody` 構造全面整理は別タスク**。
 - **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`・**`_fill_player_roles` のみ** — §2.11a）。**`%PlayerRolesBody` 構造全面整理は別タスク**。
-- **契約 / 人事サマリー閲覧**: **Theme 残り第1段**（`5d1afa2`・**`contract_personnel_summary_view.tscn` のみ**）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`・**`contract_personnel_summary_view.gd` のみ**）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`・**`_fill_player_rows` のみ** — §2.12a）。**RiskCard / PlayersCard** の Phase4 化（**ルート + Header + Contract / Balance / Caution は既に Phase4 済み**）。**`%RiskRows` 構造・行レイアウトは未変更**（§2.12 / §2.12a）。
+- **契約 / 人事サマリー閲覧**: **Theme 残り第1段**（`5d1afa2`・**`contract_personnel_summary_view.tscn` のみ**）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`・**`contract_personnel_summary_view.gd` のみ**）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`・**`_fill_player_rows` のみ** — §2.12a）＋**第2段（最小）RiskRows 行区切り**（`97b26a8`・**`_fill_risk_rows` のみ** — §2.12b）。**RiskCard / PlayersCard** の Phase4 化（**ルート + Header + Contract / Balance / Caution は既に Phase4 済み**）。**契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**（§2.12 / §2.12a / §2.12b）。
 - **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）。**`TableCard` + 9列表** の Phase4 化（**Header は既に Phase4 済み**）。**表行 Panel 化・行レイアウトは未変更**（§2.13）。
 - **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み** — §2.3）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内の暗色カード問題は解消済み**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
 - **本線 LeftRail**: **`a5e548f` で表示用のみ追加済み**（§2.4）。**クリック・遷移は未実装**。**実操作導線**は引き続き **HeaderNavRow + CardNavMenu**。
@@ -247,9 +247,9 @@
   - **`5d1afa2` 後**: **CardNavMenu #10 → 契約・人事サマリー遷移 OK**。**契約・人事サマリー画面表示 OK**。**RiskCard / PlayersCard 白カード化 OK**。**Scroll 内カード白系統一 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし**。**RiskRows / PlayerRows 動的行は薄く読みにくい**ことが判明。
   - **`1df4820` 後**: **人事リスクの動的行テキストの可読性改善 OK**。**主要契約選手の動的行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし**。
 - **Theme 適用範囲（`5d1afa2`）**: **`RiskCard`**・**`PlayersCard`**＝`Phase4SummaryCard`（**Header / Contract / Balance / Caution は既に Phase4 済み**）。
-- **可読性補正（`1df4820`）**: **`%RiskRows`**・**`%PlayerRows`** に追加される動的行 `Label` の色のみ **`Color(0.16, 0.2, 0.3, 1)`** へ。**RiskRows / PlayerRows 構造・行レイアウト本格整理は第2段**（**PlayerRows 行区切りは §2.12a**）。
+- **可読性補正（`1df4820`）**: **`%RiskRows`**・**`%PlayerRows`** に追加される動的行 `Label` の色のみ **`Color(0.16, 0.2, 0.3, 1)`** へ。**RiskRows / PlayerRows 構造・行レイアウト本格整理は第2段**（**PlayerRows / RiskRows 行区切りは §2.12a / §2.12b**）。
 
-### 2.12a 契約 / 人事サマリー閲覧・Theme 第2段（最小）と導線確認（`6b26fa3`）
+### 2.12a 契約 / 人事サマリー閲覧・Theme 第2段（最小）PlayerRows と導線確認（`6b26fa3`）
 
 - **到達点**: **`contract_personnel_summary_view.gd` の `_fill_player_rows` のみ**（**ナビ構造の変更ではない**・**見た目第2段・最小**）。**`contract_personnel_summary_view.tscn`・Theme `.tres` 未変更**。**`_fill_risk_rows` は未変更**（**RiskRows は従来どおり**）。
 - **ホームからの到達**（**変更なし**）:
@@ -259,6 +259,19 @@
 - **契約・人事サマリーからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderTopRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`6b26fa3` 後もユーザー確認済み）。
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → 契約・人事サマリー遷移 OK**。**契約・人事サマリー画面表示 OK**。**HeaderCard / 5静的カードは従来どおり OK**。**PlayerRows 主要契約選手行区切り OK**。**最終行後の不要区切りなし OK**。**主要契約選手行可読性 OK**。**RiskRows 従来どおり OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **Theme 適用範囲（第2段・最小）**: **`%PlayerRows` 内動的主要契約選手行**の**行間 `HSeparator`**（**Panel 化・カード化は別タスク**。**`%RiskRows` は今回未変更**）。
+- **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
+
+### 2.12b 契約 / 人事サマリー閲覧・Theme 第2段（最小）RiskRows と導線確認（`97b26a8`）
+
+- **到達点**: **`contract_personnel_summary_view.gd` の `_fill_risk_rows` のみ**（**ナビ構造の変更ではない**・**見た目第2段・最小**）。**`contract_personnel_summary_view.tscn`・Theme `.tres` 未変更**。**`_fill_player_rows` は未変更**（**PlayerRows は `6b26fa3` の状態を維持**）。
+- **ホームからの到達**（**変更なし**）:
+  - **`CardNavMenu`** — **経営**列の **契約・人事サマリー** ボタン（**#10・主入口**）。
+  - **`HeaderNavRow` には載せない**（§3）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、契約・人事サマリー画面へのショートカットではない**。
+- **契約・人事サマリーからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderTopRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`97b26a8` 後もユーザー確認済み）。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 契約・人事サマリー遷移 OK**。**契約・人事サマリー画面表示 OK**。**HeaderCard / 5静的カードは従来どおり OK**。**RiskRows 人事リスク行区切り OK**。**最終行後の不要区切りなし OK**。**人事リスク行可読性 OK**。**PlayerRows は `6b26fa3` の状態を維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **Theme 適用範囲（第2段・最小）**: **`%RiskRows` 内動的人事リスク行**の**行間 `HSeparator`**（**Panel 化・カード化は別タスク**。**`%PlayerRows` は `6b26fa3` のまま**）。
+- **契約・人事の最小行区切り**: **PlayerRows（`6b26fa3`）と RiskRows（`97b26a8`）の両方をユーザー確認済み**。
 - **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
 
 ### 2.13 ロスター閲覧・Theme 第1段・表 Theme 切替と導線確認（`f866f5b` / `407f014`）
