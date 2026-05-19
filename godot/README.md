@@ -405,7 +405,7 @@
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → オーナーミッション遷移 OK**。**オーナーミッション画面表示 OK**。**MissionsBody ミッション行の内側余白 OK**。**HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**ミッション文言 / 件数 / 順序維持 OK**。**HeaderCard / 4静的カードは従来どおり OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **`d4c0372` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
 - **到達点**: **Body本格整備の余白横展開第1号 — OM MissionsBody ミッション行の内側余白（margin）追加完了**（**OM MissionsBody 全体の第2段完了ではない**。**Body本格整備全体の完了でもない**）。
-- **別タスク（未着手）**: **MissionsBody の Panel 化**、ミッション行カード化、余白・行レイアウト本格調整、**契約 RiskRows / PlayerRows への margin 横展開**（**戦術は `2c637f2` で対応**）、**Body系本格整備の次スライス検討**、**ロスター本格整備**、**日程 ScrollContent / 試合リスト本格整備**。
+- **別タスク（未着手）**: **MissionsBody の Panel 化**、ミッション行カード化、余白・行レイアウト本格調整、**契約 RiskRows への margin 横展開**（**戦術は `2c637f2`・PlayerRows は `f19ed9b` で対応**）、**Body系本格整備の次スライス検討**、**ロスター本格整備**、**日程 ScrollContent / 試合リスト本格整備**。
 
 ### 戦術 / ローテーションサマリー閲覧 `Phase4` Theme 限定適用・第1段（`44b0584`）＋選手ロール動的行文字色最小補正（`7bbbb4e`）
 
@@ -458,7 +458,7 @@
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → 戦術サマリー遷移 OK**。**戦術サマリー画面表示 OK**。**PlayerRolesBody 選手ロール行の内側余白 OK**。**HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**選手ロール文言 / 件数 / 順序維持 OK**。**最大8件制限維持 OK**。**HeaderCard / 6静的カードは従来どおり OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **`2c637f2` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
 - **到達点**: **Body本格整備の余白横展開第2号 — 戦術 PlayerRolesBody 選手ロール行の内側余白（margin）追加完了**。**財務 → OM → 戦術 まで MarginContainer パターンの横展開が完了**（**戦術 PlayerRolesBody 全体の第2段完了ではない**。**Body本格整備全体の完了でもない**）。
-- **別タスク（未着手）**: **PlayerRolesBody の Panel 化**、選手ロール行カード化、余白・行レイアウト本格調整、**契約 RiskRows / PlayerRows への margin 横展開**、**Body系本格整備の次スライス検討**、**ロスター本格整備**、**日程 ScrollContent / 試合リスト本格整備**。
+- **別タスク（未着手）**: **PlayerRolesBody の Panel 化**、選手ロール行カード化、余白・行レイアウト本格調整、**契約 RiskRows への margin 横展開**（**PlayerRows は `f19ed9b` で対応**）、**Body系本格整備の次スライス検討**、**ロスター本格整備**、**日程 ScrollContent / 試合リスト本格整備**。
 
 ### 契約 / 人事サマリー閲覧 `Phase4` Theme 残り第1段（`5d1afa2`）＋RiskRows / PlayerRows 動的行文字色最小補正（`1df4820`）
 
@@ -490,7 +490,7 @@
 - **pytest**（`6b26fa3`）: contract_personnel_summary 16 / home_dashboard 10 / roster 10 / phase0 smoke 1 — いずれも passed。
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → 契約・人事サマリー遷移 OK**。**契約・人事サマリー画面表示 OK**。**PlayerRows 主要契約選手行区切り OK**。**最終行後の不要区切りなし OK**。**主要契約選手行可読性 OK**。**RiskRows 従来どおり OK**。**HeaderCard / 5静的カードは従来どおり OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **到達点**: **Body系第2段（最小）第4号 — 契約・人事 PlayerRows 動的主要契約選手行の行区切り追加完了**（**契約・人事 PlayerRows 全体の第2段完了ではない**。**契約・人事サマリー全体の Body 第2段も完了ではない**）。
-- **別タスク（未着手）**: **RiskRows の人事リスク行区切り**（**第5号 `97b26a8` で完了**）、**PlayerRows の Panel 化**、主要契約選手行カード化、余白・行レイアウト本格調整、**RiskRows / PlayerRows 全体の本格整備**。
+- **別タスク（`6b26fa3` 時点・未着手）**: **RiskRows の人事リスク行区切り**（**第5号 `97b26a8` で完了**）、**PlayerRows の Panel 化**、主要契約選手行カード化、余白・行レイアウト本格調整、**内側余白最小は `f19ed9b` で対応 — 下記**）、**RiskRows / PlayerRows 全体の本格整備**。
 
 ### 契約 / 人事サマリー閲覧 `Phase4` Theme 第2段（最小）— RiskRows 人事リスク行区切り（`97b26a8`）
 
@@ -505,7 +505,26 @@
 - **pytest**（`97b26a8`）: contract_personnel_summary 16 / home_dashboard 10 / roster 10 / phase0 smoke 1 — いずれも passed。
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → 契約・人事サマリー遷移 OK**。**契約・人事サマリー画面表示 OK**。**RiskRows 人事リスク行区切り OK**。**最終行後の不要区切りなし OK**。**人事リスク行可読性 OK**。**PlayerRows は `6b26fa3` の状態を維持 OK**。**HeaderCard / 5静的カードは従来どおり OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **到達点**: **Body系第2段（最小）第5号 — 契約・人事 RiskRows 動的人事リスク行の行区切り追加完了**。**契約・人事は PlayerRows / RiskRows の最小行区切りが両方完了**（**契約・人事 RiskRows / PlayerRows 全体の第2段完了ではない**。**契約・人事サマリー全体の Body 第2段も完了ではない**）。
-- **別タスク（未着手）**: **RiskRows / PlayerRows の Panel 化**、人事リスク行・主要契約選手行カード化、余白・行レイアウト本格調整、**契約・人事 Body 全体の本格整備**。
+- **別タスク（`97b26a8` 時点・未着手）**: **RiskRows / PlayerRows の Panel 化**、人事リスク行・主要契約選手行カード化、余白・行レイアウト本格調整、**契約 PlayerRows への margin 横展開**（**`f19ed9b` で PlayerRows 対応 — 下記**）、**契約 RiskRows への margin 横展開**、**契約・人事 Body 全体の本格整備**。
+
+### 契約 / 人事サマリー閲覧 `Phase4` Theme 第2段（Body本格・最小）— PlayerRows 主要契約選手行の内側余白（margin）追加（`f19ed9b`）
+
+- **Body本格整備の余白横展開第3号**（選定調査 `8034a1d` → 実装 `f19ed9b`）。**戦術 PlayerRolesBody 内側余白（`2c637f2`）成功後**、**Panel 化・行カード化は行わない**。**`_fill_player_rows` の主要契約選手行 Label 追加部分のみ**。**`_fill_risk_rows` / RiskRows は未変更**。
+- **`f19ed9b`**: **変更ファイル** **`contract_personnel_summary_view.gd` のみ**。**変更関数** **`_fill_player_rows` の主要契約選手行追加ループ部分のみ**。
+  - 各主要契約選手行 `Label` を **`MarginContainer` でラップ** — **左 4px / 上 2px / 右 4px / 下 2px**（財務 `307e719` / OM `d4c0372` / 戦術 `2c637f2` と同値）。
+  - **`margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL`** で横幅維持。
+  - **`_player_rows.add_child(line)`** を **`margin.add_child(line)` → `_player_rows.add_child(margin)`** に変更。
+  - **`i < lim - 1` の HSeparator** は維持（位置・条件・最終行後なし）。
+  - **主要契約選手文言**、**`lim = mini(rows.size(), 8)`**、**並び順**、**`_style_body_label`（font_size 12）** は維持。
+  - **空表示** `（選手行がありません）` は **margin ラップなし**（既存どおり）。
+  - **白カード内の二重 Panel 化はしない**。
+  - **未変更**: **`contract_personnel_summary_view.tscn`**、**Theme `.tres`**、**`project.godot`**、**`_fill_risk_rows` / RiskRows**、HeaderCard / 静的5カード、JSON key、export / mock JSON。
+  - **維持**: **HomeNavButton**、**DataSourceLabel**、**from_python / mock**。
+- **pytest**（`f19ed9b`）: contract_personnel_summary 16 / home_dashboard 10 / tactics_summary 15 / phase0 smoke 1 — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 契約・人事サマリー遷移 OK**。**契約・人事サマリー画面表示 OK**。**PlayerRows 主要契約選手行の内側余白 OK**。**HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**主要契約選手文言 / 件数 / 順序維持 OK**。**RiskRows 従来どおり OK**。**HeaderCard / 5静的カードは従来どおり OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **`f19ed9b` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
+- **到達点**: **Body本格整備の余白横展開第3号 — 契約 PlayerRows 主要契約選手行の内側余白（margin）追加完了**。**財務 → OM → 戦術 → 契約 PlayerRows まで MarginContainer パターンの横展開が完了**（**契約 PlayerRows 全体の第2段完了ではない**。**Body本格整備全体の完了でもない**。**契約 RiskRows への margin 横展開は未着手**）。
+- **別タスク（未着手）**: **契約 RiskRows への margin 横展開**、**PlayerRows の Panel 化**、主要契約選手行カード化、余白・行レイアウト本格調整、**Body系本格整備の次スライス検討**、**ロスター本格整備**、**日程 ScrollContent / 試合リスト本格整備**。
 
 ### ロスター閲覧 `Phase4` Theme 第1段（`f866f5b`）＋表 Theme 通常 Table 化（`407f014`）
 
@@ -542,7 +561,7 @@
 - **到達点**: **ロスター表第2段（最小）— RowList 選手行間 HSeparator 追加完了**（**ロスター表第2段全体の完了ではない**）。
 - **別タスク（未着手）**: **RowList 行の Panel 化**、**選手行カード化**、**余白・行レイアウト本格調整**、**9列レイアウト本格整理**、**tooltip 再設計が必要な場合の検討**、**Body 本格整備**、**日程 ScrollContent 全体整理**、**日程試合リスト行レイアウト本格整理**。
 
-- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`・Body本格最小入口）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`・Body本格余白横展開第1号）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`・Body本格余白横展開第2号）**＋**契約・人事 PlayerRows（`6b26fa3`）**＋**契約・人事 RiskRows（`97b26a8`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**次候補**: **契約 RiskRows / PlayerRows への margin 横展開**、**日程 ScrollContent 全体**、**ロスター表行 Panel 化（本格）**、**Body本格整備の次スライス** — 個別判断。
+- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`・Body本格最小入口）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`・Body本格余白横展開第1号）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`・Body本格余白横展開第2号）**＋**契約・人事 PlayerRows 行区切り（`6b26fa3`）**＋**契約・人事 PlayerRows 内側余白（`f19ed9b`・Body本格余白横展開第3号）**＋**契約・人事 RiskRows（`97b26a8`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**次候補**: **契約 RiskRows への margin 横展開**、**日程 ScrollContent 全体**、**ロスター表行 Panel 化（本格）**、**Body本格整備の次スライス** — 個別判断。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -556,7 +575,7 @@
 **位置づけ**: **本番 GUI の完成や Theme の全面適用ではない**。`themes/phase4_readonly_core.tres`（UID `uid://c9phase4rocore01`）による **白ベース検証版** と、`scenes/theme_preview.tscn` による **第 0 段 preview** で、見た目と variation の確認を進めている段階である。**既存 10 画面すべてに一括で当てる予定ではない**。
 
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
-- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn` / `contract_personnel_summary_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**契約概要**・**ロスター構成**・**RiskCard**・**PlayersCard**＝`Phase4SummaryCard`。**注意**＝`Phase4WarningCard`。**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**PlayerRows / RiskRows 行区切り（最小）**（`6b26fa3` / `97b26a8`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
+- **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn` / `contract_personnel_summary_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**契約概要**・**ロスター構成**・**RiskCard**・**PlayersCard**＝`Phase4SummaryCard`。**注意**＝`Phase4WarningCard`。**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**PlayerRows / RiskRows 行区切り（最小）**（`6b26fa3` / `97b26a8`）＋**Body本格・最小 PlayerRows 内側余白**（`f19ed9b`・`_fill_player_rows`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
 - **ロスター閲覧**（`roster_view.tscn` / `roster_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**`Scroll/TableCard`**＝`Phase4SummaryCard`、**`%RowList`** 内9列表は **`Phase4TableHead` / `Phase4TableCell`**（`407f014`）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`・`_apply_snapshot` players ループ）— 詳細は上記「ロスター閲覧 `Phase4` Theme」節。
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
@@ -565,7 +584,7 @@
 - **財務サマリー閲覧**（`finance_summary_view.tscn` / `finance_summary_view.gd`）: **第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`）＋**Body本格・最小 HistoryBody 内側余白**（`307e719`・`_fill_history_rows`）— 詳細は上記「財務サマリー閲覧 `Phase4` Theme」節。
 - **オーナーミッション閲覧**（`owner_mission_view.tscn` / `owner_mission_view.gd`）: **第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`）＋**Body本格・最小 MissionsBody 内側余白**（`d4c0372`・`_fill_mission_rows`）— 詳細は上記「オーナーミッション / クラブ評価閲覧 `Phase4` Theme」節。
 - **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn` / `tactics_summary_view.gd`）: **第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`）＋**Body本格・最小 PlayerRolesBody 内側余白**（`2c637f2`・`_fill_player_roles`）— 詳細は上記「戦術 / ローテーションサマリー閲覧 `Phase4` Theme」節。
-- **契約 / 人事サマリー閲覧**（`contract_personnel_summary_view.tscn` / `contract_personnel_summary_view.gd`）: **Risk/Players 残り第1段**（`5d1afa2`）＋**RiskRows/PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`・`_fill_player_rows`）＋**第2段（最小）RiskRows 行区切り**（`97b26a8`・`_fill_risk_rows`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
+- **契約 / 人事サマリー閲覧**（`contract_personnel_summary_view.tscn` / `contract_personnel_summary_view.gd`）: **Risk/Players 残り第1段**（`5d1afa2`）＋**RiskRows/PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`）＋**Body本格・最小 PlayerRows 内側余白**（`f19ed9b`・`_fill_player_rows`）＋**第2段（最小）RiskRows 行区切り**（`97b26a8`・`_fill_risk_rows`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
 - **ホーム**（`home_dashboard.tscn`）: **ルートには Theme を付けていない**。**`HeaderCard` のみ** `Phase4HeaderCard`（**`83d7fc0` ClubBand 風寄せ**）。**`a5e548f` で表示用 `LeftRail`（200px・クリック不可）**。**MetricsRow** 3 枚 + **Scroll 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み**）。**Scroll 内の暗色カード問題は解消済み**。**`home_dashboard.gd`・Theme `.tres` は不変**。**HeaderNavRow**・**CardNavMenu**＝実操作導線（**LeftRail は表示のみ** — 下記2節）。
 - **読込**: `from_python` 優先・mock フォールバック、**Godot から Python を自動起動しない**方針は **変更なし**。
 - **UID / 実行後の git**: シーン編集後は **UID 参照エラーが出ないか** Godot で確認する。**実行やエディタ保存のあと** `git status --short` で、意図しない `.tscn` 差分や生成 JSON が混ざっていないか確認する（`*_from_python.json` は引き続き **コミットしない**）。**`home_production_wire_preview.tscn`（sandbox）**を触ったあとも同様に `git diff` を確認し、意図しない先頭行（`uid://` / `load_steps`）だけの差分なら `git checkout HEAD -- scenes/home_production_wire_preview.tscn` で戻す運用可（詳細は「本番ホームワイヤー sandbox」節）。
@@ -683,7 +702,9 @@
 ◎ 契約・人事サマリー・第2段最小・PlayerRows行区切り・最終行後区切りなし・可読性・RiskRows従来どおり・戻り確認 OK（ユーザー環境 Godot）
 ◎ 契約・人事サマリー・RiskRows行区切り Phase4 Theme 第2段（最小）（97b26a8）
 ◎ 契約・人事サマリー・第2段最小・RiskRows行区切り・最終行後区切りなし・可読性・PlayerRows維持・戻り確認 OK（ユーザー環境 Godot）
-□ 契約・人事サマリー・RiskRows/PlayerRows Panel化等（第2段本格・.gd）
+◎ 契約・人事サマリー・PlayerRows主要契約選手行内側余白 Phase4 Theme 第2段（Body本格・最小）（f19ed9b）
+◎ 契約・人事サマリー・Body本格余白横展開第3号・PlayerRows内側余白・HSeparator維持・RiskRows従来どおり・戻り確認 OK（ユーザー環境 Godot）
+□ 契約・人事サマリー・RiskRows margin / Panel化等（第2段本格・.gd）
 ◎ ロスター・TableCard（Phase4SummaryCard・f866f5b）
 ◎ ロスター表・Phase4TableHead / Phase4TableCell（407f014）
 ◎ ロスター・RowList選手行間HSeparator（第2段・最小・8a95fcf）
