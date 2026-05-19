@@ -201,6 +201,8 @@ func _fill_player_rows(rows: Array) -> void:
 		) % [str(p.get("order", i + 1)), nm, pos, age_s, ovr, pot, sal, cy, nat, fa, rk, memo]
 		_style_body_label(line, 12, Color(0.16, 0.2, 0.3, 1))
 		_player_rows.add_child(line)
+		if i < lim - 1:
+			_player_rows.add_child(HSeparator.new())
 
 
 func _build_balance_text(items: Array) -> String:
