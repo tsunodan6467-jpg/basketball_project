@@ -402,12 +402,12 @@
   - **第2段（第1段・色補正時点）**: **HistoryBody 行区切り**（**`d57b021` で対応**）・**内側余白**（**`307e719` で対応 — Body本格最小入口**）・構造整理（**Panel 化等は未着手**）。
   - **ユーザー環境 Godot**: **CardNavMenu → 財務サマリー OK**・**表示・Header/5静的カード・DataSourceLabel OK**・**`6c3dc43` 後は財務履歴の可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
   - **横展開テンプレ**: 日程の **Scroll 内カード型**に続き、**Scroll 内複数静的 Panel 型**でも第1段が成功 — **財務で手順を固め、OM 等への判断材料**となる。
-- **オーナーミッション / クラブ評価閲覧**（`owner_mission_view.tscn` / `owner_mission_view.gd`）: **詳細画面 Theme 横展開第6号・第1段**（`e6acce0`）＋**今季ミッション動的行文字色の最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`）。選定: 第1段 **`130137a`**、Body系第2段最小第2号 **`bb6866d`**。詳細は §15.1 OM 節。
+- **オーナーミッション / クラブ評価閲覧**（`owner_mission_view.tscn` / `owner_mission_view.gd`）: **詳細画面 Theme 横展開第6号・第1段**（`e6acce0`）＋**今季ミッション動的行文字色の最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`）＋**Body本格・最小 MissionsBody 内側余白**（`d4c0372`）。選定: 第1段 **`130137a`**、Body系第2段最小第2号 **`bb6866d`**、Body本格余白横展開第1号 **`b7f5bc4`**。詳細は §15.1 OM 節。
   - **`e6acce0` 実装範囲**（**`owner_mission_view.tscn` のみ**）: ルート **`phase4_readonly_core.tres`**。**`HeaderCard`**＝**`Phase4HeaderCard`**。**Scroll/ScrollContent 内** **Trust / Missions / Eval / Caution** の4枚＝**`Phase4SummaryCard`**（panel override 除去・SubResource 残置）。Header・各カード・**`NotesFooterLabel`** のラベル濃色化。**`HomeNavButton` / `%DataSourceLabel` / from_python・mock 読込は維持**。
   - **`e6acce0` 実装境界**: **`.gd`・Theme `.tres`・DTO/export/mock 未変更**。**`%MissionsBody` 内動的ミッション行は未変更**（第2段扱い）。
   - **目視で発見された課題**: **今季ミッションカード内**の MissionsBody 動的行テキストが**白カード上で薄く読みにくい**（暗背景向け明色のまま）。
   - **`2f808e5` 補正範囲**（**`owner_mission_view.gd` のみ・第2段本格整備ではない**）: **`_fill_mission_rows`** のミッション行 `Label` とミッションなし **`lab`** の **`font_color`** を **`Color(0.16, 0.2, 0.3, 1)`**（白カード本文と同系）へ。**MissionsBody 構造・ミッション行の文言・件数・生成順・JSON key・scene・Theme・DTO は未変更**。
-  - **第2段（第1段・色補正時点・未着手）**: **MissionsBody 行区切り**・構造整理（**第2段・最小 `5a3ae2c` で行区切りのみ対応**）。
+  - **第2段（第1段・色補正時点）**: **MissionsBody 行区切り**（**`5a3ae2c` で対応**）・**内側余白**（**`d4c0372` で対応 — Body本格余白横展開第1号**）・構造整理（**Panel 化等は未着手**）。
   - **ユーザー環境 Godot**: **CardNavMenu #8 → オーナーミッション OK**・**表示・Header/4静的カード・DataSourceLabel OK**・**`2f808e5` 後は今季ミッションの可読性改善 OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし**。
   - **横展開テンプレ**: 財務に続き **OM でも Scroll 内複数静的 Panel 型**へ第1段が成功 — **動的行可読性の最小補正も財務 `6c3dc43` と同手順** — **戦術 / 契約人事 / ロスターへ進む判断材料**。
 - **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn` / `tactics_summary_view.gd`）: **詳細画面 Theme 横展開第7号・第1段**（`44b0584`）＋**選手ロール動的行文字色の最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`）。選定: 第1段 **`6afb201`**、Body系第2段最小第3号 **`b73feb7`**。詳細は §15.1 戦術節。
@@ -566,8 +566,17 @@
     - **pytest（`5a3ae2c`）**: owner_mission 13 / home_dashboard 10 / roster 10 / phase0 smoke 1 — いずれも passed。
     - **ユーザー環境 Godot（ローカル目視）**: **ホーム → オーナーミッション遷移 OK**・**MissionsBody 行区切り OK**・**最終行後の不要区切りなし OK**・**ミッション行可読性 OK**・**Header/4静的カード OK**・**HomeNavButton でホーム復帰 OK**・**エラーなし・実行後 git 差分なし**。
     - **到達点**: **Body系第2段（最小）第2号 — OM MissionsBody 動的ミッション行の行区切り追加完了**（**OM MissionsBody 全体の第2段完了ではない**）。
-    - **別タスク（未着手）**: **MissionsBody の Panel 化**、ミッション行カード化、余白・行レイアウト本格調整、**戦術 / 契約人事**への段階的横展開（**1画面1コミット**）。
+    - **別タスク（`5a3ae2c` 時点・未着手）**: **MissionsBody の Panel 化**、ミッション行カード化、余白・行レイアウト本格調整、**戦術 / 契約人事**への段階的横展開（**内側余白最小は `d4c0372` で対応 — 下記**）。
     - **横展開全体の意味**: **財務に続き Body 系第2段（最小）第2号として成功** — **次候補は戦術 PlayerRolesBody → 契約 RiskRows / PlayerRows**。
+  - **オーナーミッション / クラブ評価閲覧・Phase4 Theme 第2段（Body本格・最小）— MissionsBody ミッション行の内側余白（margin）追加（`d4c0372`）** — **Body本格整備の余白横展開第1号**:
+    - **選定（`b7f5bc4`）**: **財務 HistoryBody 内側余白（`307e719`）**が成功。**OM MissionsBody** は**白カード内**・**HSeparator 最小完了（`5a3ae2c`）**・**複数行ミッションブロックで余白効果が大きい**・**`_fill_mission_rows` の1関数**・**財務 margin パターンをそのまま横展開可能**・**Panel 化・行カード化より先に余白のみが安全**。
+    - **実装範囲（`d4c0372`）**: **`owner_mission_view.gd` のみ**。**`_fill_mission_rows` のミッション行追加ループ部分のみ**。各ミッション `Label` を **`MarginContainer` でラップ** — **左 4px / 上 2px / 右 4px / 下 2px**（財務 `307e719` と同値）。**`margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL`**。**`margin.add_child(lab)` → `_missions_body.add_child(margin)`**。
+    - **実装境界**: **`owner_mission_view.tscn`・Theme `.tres`・`project.godot` 未変更**。**`i < n - 1` の HSeparator** 位置・条件未変更。**ミッション文言・`_mission_block_text`・件数・並び順・`font_color` / `font_size` 未変更**。**空表示** `今季ミッションはありません。` は **margin ラップなし**。**HeaderCard / 静的4カード・DataSourceLabel / HomeNavButton 未変更**。**JSON key / DTO / export / tests / mock JSON 未変更**。
+    - **pytest（`d4c0372`）**: owner_mission 13 / home_dashboard 10 / finance_summary 10 / phase0 smoke 1 — いずれも passed。
+    - **ユーザー環境 Godot（ローカル目視）**: **MissionsBody ミッション行の内側余白 OK**。**HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**ミッション文言 / 件数 / 順序維持 OK**。**HeaderCard / 静的4カード維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホーム復帰 OK**。**エラーなし・実行後 git 差分なし**。
+    - **到達点**: **Body本格整備の余白横展開第1号 — OM MissionsBody ミッション行の内側余白（margin）追加完了**（**財務 `307e719` パターンの OM 横展開**。**OM MissionsBody 全体の第2段完了ではない**。**Body本格整備全体の完了でもない**）。
+    - **横展開全体の意味**: **財務 HistoryBody 余白成功後、Body 本格整備の余白レーンへ OM を第1号として適用** — **戦術 / 契約への margin 横展開は未着手**。
+    - **未対応（別タスク）**: **MissionsBody Panel 化**、ミッション行カード化、余白・行レイアウト本格調整、**戦術 PlayerRolesBody / 契約 RiskRows・PlayerRows への margin 横展開**、**Body系本格整備の次スライス検討**。
   - **戦術 / ローテーションサマリー閲覧・Phase4 Theme 第2段（最小）— PlayerRolesBody 選手ロール行区切り（`c9216d0`）** — **Body系第2段テンプレ第3号**:
     - **選定（`b73feb7`）**: **財務 HistoryBody（`d57b021`）**・**OM MissionsBody（`5a3ae2c`）**の行区切りが成功。**戦術 PlayerRolesBody** は**白カード内**・**色補正済み（`7bbbb4e`）**・**`_fill_player_roles` の1関数**・**財務/OMと同型の HSeparator**・**最大8件の選手ロール行に区切り効果**・**契約 RiskRows / PlayerRows より先の第3号として安全**。
     - **実装範囲（`c9216d0`）**: **`tactics_summary_view.gd` のみ**。**`_fill_player_roles` のみ**。有効選手ロールを最大8件まで配列化 → **`for i in range(n)`** で Label 生成 → **`i < n - 1` のとき `HSeparator.new()`**。**選手ロールなし時は HSeparator なし**。
