@@ -266,7 +266,7 @@ func _add_advance_hint_block(block_s: String, one_s: String) -> void:
 	var panel: PanelContainer = PanelContainer.new()
 	panel.theme_type_variation = &"Phase4SummaryCard"
 	var inner: VBoxContainer = VBoxContainer.new()
-	inner.add_theme_constant_override("separation", 4)
+	inner.add_theme_constant_override("separation", 6)
 	var title: Label = Label.new()
 	title.text = "進行ヒント（advance_hint）"
 	title.autowrap_mode = 2
@@ -278,16 +278,16 @@ func _add_advance_hint_block(block_s: String, one_s: String) -> void:
 		var block_lab: Label = Label.new()
 		block_lab.text = block_s
 		block_lab.autowrap_mode = 2
-		block_lab.add_theme_font_size_override("font_size", 12)
-		block_lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
+		block_lab.add_theme_font_size_override("font_size", 15)
+		block_lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
 		block_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		inner.add_child(block_lab)
 	if not one_s.is_empty():
 		var one_lab: Label = Label.new()
 		one_lab.text = one_s
 		one_lab.autowrap_mode = 2
-		one_lab.add_theme_font_size_override("font_size", 12)
-		one_lab.add_theme_color_override("font_color", Color(0.2, 0.25, 0.36, 1))
+		one_lab.add_theme_font_size_override("font_size", 11)
+		one_lab.add_theme_color_override("font_color", Color(0.32, 0.36, 0.48, 1))
 		one_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		inner.add_child(one_lab)
 	panel.add_child(inner)
