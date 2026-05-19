@@ -206,7 +206,14 @@ func _fill_player_rows(rows: Array) -> void:
 			+ "  メモ: %s"
 		) % [str(p.get("order", i + 1)), nm, pos, age_s, ovr, pot, sal, cy, nat, fa, rk, memo]
 		_style_body_label(line, 12, Color(0.16, 0.2, 0.3, 1))
-		_player_rows.add_child(line)
+		var margin := MarginContainer.new()
+		margin.add_theme_constant_override("margin_left", 4)
+		margin.add_theme_constant_override("margin_top", 2)
+		margin.add_theme_constant_override("margin_right", 4)
+		margin.add_theme_constant_override("margin_bottom", 2)
+		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		margin.add_child(line)
+		_player_rows.add_child(margin)
 		if i < lim - 1:
 			_player_rows.add_child(HSeparator.new())
 
