@@ -1,0 +1,470 @@
+# Godot Phase 4 契約PlayerRows余白後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-19
+- **調査時点 HEAD**: `8c8d70b`（Godot契約人事主要契約選手行余白第2段の確認を記録）
+- **直近列**: `f19ed9b`（契約 PlayerRows margin 実装）→ `8c8d70b`（確認記録）
+- **実装変更（本調査）**: **なし**
+- **Godot 目視（本調査）**: **未実施**（ユーザー確認は `8c8d70b` / README / docs に記録済み）
+
+### 1.1 主要10画面 Theme 第1段
+
+**一通り完了**（各画面 Header + Summary / TableCard 等 + 必要最小の動的行色補正）。
+
+### 1.2 Body系第2段（最小）行区切り
+
+**5/5 完了・記録済み**（財務 HistoryBody / OM MissionsBody / 戦術 PlayerRolesBody / 契約 PlayerRows / 契約 RiskRows）。
+
+### 1.3 余白横展開（Body本格・最小）
+
+| # | Body | コミット（実装） | 確認記録 |
+|---|------|------------------|----------|
+| 入口 | 財務 HistoryBody | `307e719` | `46b49b7` |
+| 第1号 | OM MissionsBody | `d4c0372` | `141b316` |
+| 第2号 | 戦術 PlayerRolesBody | `2c637f2` | `a44d5e9` |
+| 第3号 | 契約 PlayerRows | `f19ed9b` | `8c8d70b` |
+| **未着手** | **契約 RiskRows** | — | — |
+
+**財務 → OM → 戦術 → 契約 PlayerRows の margin 横展開は完了。**
+**契約 RiskRows への margin は未着手。**
+**Body本格整備全体・各 Body 全体の第2段完了ではない。**
+
+### 1.4 日程第2段（小粒）・ロスター第2段（最小）
+
+- **日程**: 小ブロック・見出し・区切り整理は**一区切り**（Scroll 全体完了ではない）。
+- **ロスター**: RowList 選手行間 HSeparator 最小完了（`8a95fcf`）。
+
+### 1.5 残っている大きな候補
+
+- **契約 RiskRows への margin 横展開**（本レポートの主論点）
+- **各 Body の Panel 化・行カード化・余白本格**
+- **Body系本格整備の次スライス**
+- **ロスター本格**（9列 / tooltip）
+- **日程 ScrollContent / 試合リスト本格**
+- **施設 / クラブ史 / 順位表 第2段**
+- **総点検 / 中期ロードマップ**（本レポートで一部代替可）
+
+### 1.6 今回の調査目的
+
+契約 PlayerRows 主要契約選手行余白まで一区切りした節目で、案 A〜H を現物比較し、
+**次に安全に実装または整理する 1 タスク**を決める。
+
+### 1.7 README / docs の整合（`8c8d70b`）
+
+- **契約 PlayerRows margin 完了**・**財務→OM→戦術→契約 PlayerRows 横展開完了**が記録済み。
+- **契約 RiskRows margin 未着手**が明記されている。
+- **Body本格整備全体完了**・**契約 PlayerRows 全体第2段完了**とは書かれていない（正しい）。
+- 古い「契約 PlayerRows 余白未着手」は **確認範囲では見当たらない**。
+
+### 1.8 実装変更なし
+
+本調査は **reports 本ファイルの追加のみ**（コミット対象）。
+
+
+================================================================================
+## 2. 財務→OM→戦術→契約 PlayerRows 余白横展開の到達点
+================================================================================
+
+### 2.1 現物（margin パターン共通）
+
+| 画面 | 関数 | margin | 空表示 margin なし | HSeparator |
+|------|------|--------|-------------------|------------|
+| 財務 | `_fill_history_rows` | 4/2/4/2 | `（履歴がありません）` | `i < lim - 1`（lim≤5） |
+| OM | `_fill_mission_rows` | 4/2/4/2 | `今季ミッションはありません。` | `i < n - 1` |
+| 戦術 | `_fill_player_roles` | 4/2/4/2 | `選手ロール情報はありません。` | `i < n - 1`（n≤8） |
+| 契約 PlayerRows | `_fill_player_rows` | 4/2/4/2 | `（選手行がありません）` | `i < lim - 1`（lim≤8） |
+
+- **`MarginContainer` + `Control.SIZE_EXPAND_FILL`**
+- **`margin.add_child(Label)` → Body VBox に `add_child(margin)`**
+- **HSeparator は margin の外**（Body 直下）
+- **文言・件数・順序・色は維持**
+
+### 2.2 契約画面の非対称（現状）
+
+| Body | margin | 行区切り |
+|------|--------|----------|
+| PlayerRows | **済**（`f19ed9b`） | 済（`6b26fa3`） |
+| RiskRows | **未** | 済（`97b26a8`） |
+
+**同一画面内で PlayerRows のみ margin 済み** — **RiskRows が残る唯一の未着手 Body**。
+
+### 2.3 まだ残る Body 本格タスク（全画面共通）
+
+Panel 化 / 行カード化 / 余白・行レイアウト本格 — **margin 横展開は 4/5 Body（RiskRows のみ未）**
+
+### 2.4 Body本格整備全体の完了ではない
+
+**余白レーンを閉じるには契約 RiskRows 1件が残る。** その後も Panel 化等は別タスク。
+
+
+================================================================================
+## 3. 契約 RiskRows 余白横展開候補（案A）
+================================================================================
+
+### 3.1 現状（`contract_personnel_summary_view.gd`）
+
+| 項目 | 状態 |
+|------|------|
+| 関数 | `_fill_risk_rows` |
+| ノード | `%RiskRows`（`RiskCard` 内 VBox、`separation=8`） |
+| 最小完了 | HSeparator のみ（`97b26a8`）— **margin 未** |
+| 行構造 | **1リスク1 Label**（4行相当テキスト1ブロック）— **OM `_mission_block_text` 型** |
+| 収集 | 有効 Dictionary のみ `risks` 配列化 → `for i in range(n)` |
+| Label 直置き | `_risk_rows.add_child(block)` |
+| 空表示 | `（リスク項目がありません）` |
+| font | `_style_body_label` — size **12**、色 `0.16, 0.2, 0.3` 済み（`1df4820`） |
+
+### 3.2 OM型複数行ブロックとの近さ
+
+| 比較 | 評価 |
+|------|------|
+| OM `_fill_mission_rows` | **◎ 最も近い** — 複数行1 Label + 配列化 + `i < n - 1` HSeparator + margin 済み（`d4c0372`） |
+| 財務 / 戦術 / 契約 PlayerRows | △ — 1行主体ではないが margin 手順は流用可 |
+
+### 3.3 PlayerRows を触らない境界
+
+- **変更関数**: **`_fill_risk_rows` のリスク行追加ループ部分のみ**
+- **`_fill_player_rows` は `f19ed9b` の margin 済み状態を維持** — diff が1関数に閉じる
+- **Godot 目視**: PlayerRows は「従来どおり（margin 済みのまま）」で確認可能
+
+### 3.4 HSeparator / 空表示 / 文言 / 順序
+
+- **`i < n - 1` の HSeparator** — 維持（`97b26a8` と同条件）
+- **空表示** — margin ラップなし（他 Body と同型）
+- **リスク文言生成** — `block.text` の4行フォーマット未変更
+- **件数** — 有効 Dictionary のみ収集（上限なし・既存どおり）
+
+### 3.5 1コミット安全性
+
+- **◎ 最高** — **1ファイル・1関数**（`contract_personnel_summary_view.gd` のみ）
+- **`.tscn` 未変更**で済む
+- **OM `d4c0372` と同型** — `block` Label を margin でラップし `_risk_rows.add_child(margin)`
+- **8034a1d の「第2手」**として既に選定済みの流れの自然な継続
+
+### 3.6 今すぐ適するか
+
+**◎ 最推奨** — **Body本格余白横展開第4号**として **契約画面の margin レーンを閉じる**最後の1件。
+**UI効果は OM 型ブロックで大きい**（4行テキスト周囲の余白）。
+
+
+================================================================================
+## 4. 財務 / OM / 戦術 / 契約 PlayerRows 追加整備候補（案B）
+================================================================================
+
+### 4.1 Panel化・行カード化・余白本格
+
+| 画面 | margin 済み | 深掘りで触る範囲 |
+|------|-------------|------------------|
+| 財務 | ○ | HistoryBody Panel 化 |
+| OM | ○ | MissionsBody Panel 化 |
+| 戦術 | ○ | PlayerRolesBody Panel 化 |
+| 契約 PlayerRows | ○ | 選手行カード化 |
+
+### 4.2 リスク
+
+- **白カード内の二重 Panel 化** — 過去方針で回避
+- **RiskRows margin 未完了のうちに深掘り**すると手戻り・優先度が分散
+
+### 4.3 今すぐ適するか
+
+**× 後回し** — **RiskRows margin 1件で余白レーンを閉じてから**。
+
+
+================================================================================
+## 5. Body系本格整備の次スライス候補（案C）
+================================================================================
+
+### 5.1 内容
+
+Body 全体の Panel 化方針・行カード化・本格レイアウトを再整理し、次スライスを選ぶ。
+
+### 5.2 評価
+
+- **方針整理としての価値は中** — ただし **次の1実装は RiskRows margin で明確**
+- **本レポート + README/docs** で現在地は足りる
+- 実装に進むには **まだ大きすぎる**
+
+### 5.3 今すぐ適するか
+
+**△ 後回し** — **案A が方針の実証かつ余白レーン完結**。
+
+
+================================================================================
+## 6. ロスター本格整備候補（案D）
+================================================================================
+
+### 6.1 現状（`roster_view.gd`）
+
+- **TableCard + Phase4TableHead/Cell** 済み（`f866f5b` / `407f014`）。
+- **RowList 行間 HSeparator** 済み（`8a95fcf`）— **margin 未**。
+- **`_add_player_row`**: HBox × **9 Label**、`_col_width` 固定、tooltip — **本格はここ中心**。
+
+### 6.2 リスク
+
+- **1280 幅内 9列崩れ**、tooltip 回帰。
+- **Body margin レーンとは別クラス**の変更。
+
+### 6.3 今すぐ適するか
+
+**× 後回し** — ゲーム中心画面として価値は高いが、**契約 RiskRows margin で Body 余白レーン完結後**が安全。
+`8034a1d` / `a5d9d0e` も **Body margin を先**とした流れと一致。
+
+
+================================================================================
+## 7. 日程ScrollContent / 試合リスト本格候補（案E）
+================================================================================
+
+### 7.1 現状（`schedule_view.gd`）
+
+- **小粒完了**: upcoming 白カード化、試合間 separation、見出し / advance_hint / empty_message 等。
+- **`_add_upcoming_block`**: Panel + 内側 VBox + 3 Label — **改変は1関数に閉じるが白カード回帰注意**。
+- **残り**: ScrollContent 全体 — **中〜大**。
+
+### 7.2 今すぐ適するか
+
+**△ 後回し** — 日程小粒は一区切り。**Body margin レーン完結が先**。
+
+
+================================================================================
+## 8. 施設 / クラブ史 / 順位表 第2段候補（案G）
+================================================================================
+
+| 画面 | 規模 | 優先度 |
+|------|------|--------|
+| 施設 | **中** | 低〜中 |
+| クラブ史 | **中〜大** | 低 |
+| 順位表 | **大**（8列） | 低 |
+
+### 8.1 今すぐ適するか
+
+**× 後回し** — Theme 第1段中心。**Body margin レーン完結後**に優先度を再評価。
+
+
+================================================================================
+## 9. 総点検 / ロードマップ整理候補（案F）
+================================================================================
+
+### 9.1 節目としての価値
+
+**高**（RiskRows margin 成功後は特に）。到達点:
+
+- Theme 第1段 10画面
+- Body 最小行区切り 5/5
+- **margin 横展開 5/5 Body**（RiskRows 成功後）
+- 日程小粒・ロスター最小
+
+### 9.2 既存 docs で足りるか
+
+**おおむね足りる** — `8c8d70b` まで README / GUI設計 / ナビ docs に反映済み。
+**RiskRows margin 未着手**は正しく残っている。
+
+### 9.3 今すぐ適するか
+
+**△ RiskRows 成功後が効率的** — 今は **実装1件（RiskRows margin）** が先。
+本レポートで **次実装の比較**は代替可能。
+
+
+================================================================================
+## 10. 次のゲーム機能・画面追加候補（案H）
+================================================================================
+
+### 10.1 利点
+
+- 新規画面・経営本格等へリソースを寄せられる。
+
+### 10.2 今移るリスク
+
+- **Body margin が RiskRows 未完了** — 契約画面が非対称のまま
+- **第2段 GUI 磨きが途中** — 同型問題の再発リスク
+
+### 10.3 バランス
+
+**× 今は不適** — **RiskRows margin で余白レーンを閉じてから**検討が安全。
+
+
+================================================================================
+## 11. 選択肢比較表
+================================================================================
+
+| 案 | 対象 | 主な変更範囲 | 変更規模 | .gdリスク | UI効果 | 回帰リスク | 1コミット安全性 | 推奨度 |
+|----|------|--------------|----------|-----------|--------|------------|-----------------|--------|
+| **A** | 契約 RiskRows margin | `_fill_risk_rows` | **小** | **低** | **中〜高** | **低** | **◎** | **◎ 最推奨** |
+| **B** | 4 Body 追加整備 | Panel/カード化 | 中〜大 | 中〜高 | 大 | 中〜高 | **×** | △ |
+| **C** | Body次スライス整理 | docs/方針 | 小 | なし | 間接 | なし | ◎ | △（Aと重複） |
+| **D** | ロスター本格 | `_add_player_row` 9列 | **大** | **高** | 大 | **高** | **×** | △ |
+| **E** | 日程本格 | ScrollContent / upcoming | 中〜大 | 中 | 中〜大 | 中 | **△** | ○ |
+| **F** | 総点検 | docs/reports | 小 | なし | 間接 | なし | ◎ | △（RiskRows後） |
+| **G** | 施設等第2段 | 各 Scroll `.gd` | 中〜大 | 中〜高 | 中 | 中〜高 | **×** | △ |
+| **H** | 新機能移行 | 設計 | — | — | — | **高** | **×** | × |
+
+**結論**: **案A — 契約・人事サマリー RiskRows 人事リスク行の内側余白（margin）追加（Body本格・最小・横展開第4号）**
+
+
+================================================================================
+## 12. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**契約 / 人事サマリー閲覧 — Phase4 Theme 第2段（Body本格・最小）— RiskRows 人事リスク行の内側余白（margin）追加**
+
+（財務 `307e719` / OM `d4c0372` / 戦術 `2c637f2` / 契約 PlayerRows `f19ed9b` パターンの **横展開第4号**。白カード内の二重 Panel 化は行わない。）
+
+### 対象ファイル
+
+- **変更可**: `godot/scripts/contract_personnel_summary_view.gd` **のみ**
+- **主対象**: `_fill_risk_rows` **のリスク行追加ループ部分のみ**（空表示分岐は触らない）
+
+### なぜ今それを選ぶのか
+
+1. **`8034a1d` の第2手**として PlayerRows 先行が成功 — **RiskRows が計画どおりの次手**。
+2. **README / `8c8d70b` の次候補**が **契約 RiskRows への margin 横展開**と明記。
+3. **財務→OM→戦術→契約 PlayerRows の margin 成功後**、**契約画面で残る唯一の未着手 Body**。
+4. **OM `d4c0372` と同型** — 複数行1 Label ブロックの margin ラップは **実績あり**。
+5. **1コミット・1ファイル・1関数** — PlayerRows（`f19ed9b`）を触らず回帰切り分けが容易。
+6. **Body 余白横展開レーンの完結** — 5 Body すべて margin 済みとなり、以後 Panel 化等へ移れる。
+7. **pytest** `test_contract_personnel_summary_readonly_export.py` が存在（16件想定・安定）。
+
+### なぜ他案を後回しにするのか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **B 4 Body 深掘り** | RiskRows margin で余白レーンを先に閉じる |
+| **C 方針のみ** | A が方針の実証 |
+| **D ロスター本格** | 9列リスク — margin レーン後 |
+| **E 日程本格** | 別レーン |
+| **F 総点検** | RiskRows 成功後が効率的（5 Body margin 完結時点） |
+| **G 施設等** | 優先度低 |
+| **H 新機能** | 第2段・余白レーン途中 |
+
+### 変更してはいけないファイル
+
+- `contract_personnel_summary_view.tscn`
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- 他 scene / script / data JSON / export / tests / mock
+- README / docs / reports（本ファイル以外）
+- sandbox scene
+
+### 実装する場合の安全条件
+
+1. **触る範囲**: `_fill_risk_rows` の **risks あり分岐ループ内のみ**。
+2. **やること**: 各 `block` Label を **`MarginContainer` でラップ** — **左4 / 上2 / 右4 / 下2**（他 Body と同値）。
+3. **`margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL`**。
+4. **`_risk_rows.add_child(block)`** を **`margin.add_child(block)` → `_risk_rows.add_child(margin)`** に変更。
+5. **維持**: リスク文言生成、**`risks` 配列化ロジック**、**`i < n - 1` の HSeparator**、**`_style_body_label`（font_size 12）**。
+6. **空表示** `（リスク項目がありません）` は **margin ラップなし**。
+7. **`_fill_player_rows` は今回触らない**（`f19ed9b` 維持）。
+8. **白カード内に Phase4SummaryCard の行 Panel は追加しない**。
+
+### Godot 目視確認ポイント
+
+- CardNavMenu **経営** → 契約・人事サマリー（**#10**）
+- **RiskRows** 人事リスク行の **内側余白**
+- HSeparator 維持・最終行後なし
+- リスク文言 / 件数 / 順序維持
+- **PlayerRows は `f19ed9b` の margin 済み状態を維持**
+- Header / 他静的カード維持
+- HomeNavButton 戻り・DataSourceLabel
+- エラーなし・実行後 godot/ 意図外差分なし
+
+### pytest
+
+- **必須**: `py -m pytest basketball_sim/tests/test_contract_personnel_summary_readonly_export.py -q`
+- **推奨**: `test_home_dashboard_readonly_export.py`、`test_tactics_summary_readonly_export.py`、`test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+
+
+================================================================================
+## 13. 推奨タスクの最小実装案（Cursor 指示骨子）
+================================================================================
+
+### 目的
+
+`contract_personnel_summary_view.gd` の **`_fill_risk_rows`** に、人事リスク行 `Label` の
+**内側余白（margin）** を追加し、**Body 本格・最小横展開第4号**とする。**契約画面の margin レーンを完結**させる。
+
+### 変更してよいファイル
+
+- `godot/scripts/contract_personnel_summary_view.gd`（`_fill_risk_rows` のループ内のみ）
+
+### 変更してはいけないファイル
+
+- `contract_personnel_summary_view.tscn`、Theme `.tres`、`project.godot`
+- 他 scene / script / data JSON / export / tests / mock
+- README / docs / reports
+- **`_fill_player_rows`**（今回触らない）
+
+### 実装方針
+
+1. OM `_fill_mission_rows`（`d4c0372`）と **同一 margin 値・同一フラグ**。
+2. HSeparator は **margin の外**（`_risk_rows` 直下）。
+3. **表示文言・JSON key・件数・順序**は変更しない。
+
+### 確認コマンド
+
+- `git diff -- godot/scripts/contract_personnel_summary_view.gd`
+- scene / Theme / project に差分なし確認
+- `_fill_player_rows` に意図しない差分がないこと
+- pytest（上記 §12）
+
+### コミット名案
+
+- 実装: `Godot契約人事人事リスク行に内側余白を追加`
+- 確認記録（別コミット）: `Godot契約人事人事リスク行余白第2段の確認を記録`
+
+
+================================================================================
+## 14. 後回しにする案と理由
+================================================================================
+
+| 案 | 後回し理由 |
+|----|------------|
+| **B 4 Body 深掘り** | RiskRows margin で余白レーン完結後 |
+| **C Body方針のみ** | RiskRows 実装で十分 |
+| **D ロスター本格** | 9列 — margin レーン後 |
+| **E 日程本格** | Body 余白優先 |
+| **F 総点検** | 5 Body margin 完結後（RiskRows 成功直後が最適） |
+| **G 施設等** | 第1段のみ画面 |
+| **H 新機能** | GUI 第2段途中 |
+
+
+================================================================================
+## 15. 変更していないファイル
+================================================================================
+
+- `godot/scenes/*.tscn`（全画面）
+- `godot/scripts/*.gd`（全画面）
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 reports（`godot_phase4_after_tactics_margin_next_task_2026-05.txt` 等）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- sandbox scene
+
+### pytest（本調査）
+
+**未実施** — 調査レポート追加のみのため。
+
+### 次実装時の pytest 候補
+
+- `basketball_sim/tests/test_contract_personnel_summary_readonly_export.py`（必須）
+- `test_home_dashboard_readonly_export.py`
+- `test_tactics_summary_readonly_export.py`
+- `test_finance_summary_readonly_export.py`
+- `test_owner_mission_readonly_export.py`
+- `test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+
+### godot/data（参照のみ）
+
+`contract_personnel_summary.json` 等 — 本調査では未変更。
