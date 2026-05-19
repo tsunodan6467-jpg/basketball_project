@@ -38,7 +38,7 @@
 - **施設サマリー閲覧**: **Theme 第1段**（`5987821`・**`facility_summary_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 動的本文は未変更**（§2.5）。
 - **クラブ史閲覧**: **Theme 第1段**（`682a941`・**`club_history_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内段落・シーズン表は未変更**（§2.6）。
 - **順位表閲覧**: **Theme 第1段**（`927e918`・**`standings_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内 8 列表・動的行は未変更**（§2.7）。
-- **日程閲覧**: **Theme 第1段**（`440c3f6`・**`schedule_view.tscn` のみ**）。**ルート Theme + Header + Scroll 内 SummaryCard** の Phase4 化。**NextGameCard / ScrollContent / 試合リストは未変更**（§2.8）。
+- **日程閲覧**: **Theme 第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`）＋**第2段・後半（最小）**（`7fecb99`）＋**追加最小 advance_hint**（`a62b3a7`）。**導線は HeaderNavRow + CardNavMenu から到達**（§2.8〜2.8c）。**LeftRail からは遷移しない**。
 - **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`・**`_fill_history_rows` のみ** — §2.9a）。**`%HistoryBody` 構造全面整理は別タスク**。
 - **オーナーミッション / クラブ評価閲覧**: **Theme 第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`・**`_fill_mission_rows` のみ** — §2.10a）。**`%MissionsBody` 構造全面整理は別タスク**。
 - **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`・**`_fill_player_roles` のみ** — §2.11a）。**`%PlayerRolesBody` 構造全面整理は別タスク**。
@@ -154,8 +154,20 @@
   - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、日程画面へのショートカットではない**。
 - **日程からホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`7fecb99` 後もユーザー確認済み）。
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → 日程遷移 OK**。**日程画面表示 OK**。**HeaderCard / SummaryCard / NextGameCard は従来どおり OK**。**upcoming 試合ブロック白カード化・3 Label 可読性 OK**。**HSeparator 維持 OK**。**試合リスト内容・件数・順序不変 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
-- **Theme 適用範囲（第2段・後半・最小）**: **`_add_upcoming_block` の runtime `PanelContainer`**＝`Phase4SummaryCard`（内 Label 濃色化）。**見出し / advance_hint / `%ScrollContent` 全体整理は別タスク**（今回未変更）。
+- **Theme 適用範囲（第2段・後半・最小）**: **`_add_upcoming_block` の runtime `PanelContainer`**＝`Phase4SummaryCard`（内 Label 濃色化）。**見出し / advance_hint / `%ScrollContent` 全体整理は別タスク**（**advance_hint は `a62b3a7` で対応 — §2.8c**）。
 - **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4 — HeaderNavRow＝上部主要導線、CardNavMenu＝実操作用中央画面メニュー、LeftRail＝表示のみの大分類ナビ）。
+
+### 2.8c 日程閲覧・Theme 第2段・追加最小と導線確認（`a62b3a7`）
+
+- **到達点**: **`schedule_view.gd` の `_fill_scroll_body` advance_hint 分岐 + `_add_advance_hint_block` 新設**（**ナビ構造の変更ではない**・**見た目第2段・追加最小**）。**`schedule_view.tscn`・Theme `.tres` 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`HeaderNavRow`** — 5 導線のうち **日程閲覧**（第5画面）。
+  - **`CardNavMenu`** — **リーグ**列の **日程** ボタン（**HeaderNavRow と二重導線**）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、日程画面へのショートカットではない**。
+- **日程からホームへ**: **`HomeNavButton`**（**`HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`a62b3a7` 後もユーザー確認済み）。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 日程遷移 OK**（**日程画面表示 OK**）。**HeaderCard / SummaryCard / NextGameCard は従来どおり OK**。**upcoming 試合ブロックは従来状態を維持 OK**。**既存のお知らせ表示 OK**。**画面全体の崩れなし・文字可読性 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。**現在データは advance_hint なし** — **advance_hint 白カードそのものは未表示**。**advance_hint なし時に不要な空カードが出ていないことは確認済み**。
+- **Theme 適用範囲（第2段・追加最小）**: **`_add_advance_hint_block` の runtime `PanelContainer`**＝`Phase4SummaryCard`（見出し / block / one_line を白カード向け濃色化）。**`_add_upcoming_block` / NextGameCard / SummaryCard / HeaderCard は今回未変更**。**見出し全体 / ScrollContent 全体整理は別タスク**。
+- **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。**advance_hint ありデータでの白カード実表示確認は別タスク**。
 
 ### 2.9 財務サマリー閲覧・Theme 第1段・可読性補正と導線確認（`4b43da5` / `6c3dc43`）
 
