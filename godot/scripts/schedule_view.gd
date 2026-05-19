@@ -176,11 +176,7 @@ func _fill_scroll_body(d: Dictionary) -> void:
 	var block_s: String = str(block_v).strip_edges()
 	var one_s: String = str(one_v).strip_edges()
 	if not block_s.is_empty() or not one_s.is_empty():
-		_add_scroll_heading("進行ヒント（advance_hint）")
-		if not block_s.is_empty():
-			_add_scroll_paragraph(block_s, 12, Color(0.72, 0.78, 0.88, 1))
-		if not one_s.is_empty():
-			_add_scroll_paragraph(one_s, 12, Color(0.82, 0.88, 0.96, 1))
+		_add_advance_hint_block(block_s, one_s)
 
 
 func _add_upcoming_block(row: Dictionary) -> void:
@@ -229,6 +225,38 @@ func _add_upcoming_block(row: Dictionary) -> void:
 	l3.add_theme_color_override("font_color", Color(0.2, 0.25, 0.36, 1))
 	l3.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(l3)
+	panel.add_child(inner)
+	_scroll_content.add_child(panel)
+
+
+func _add_advance_hint_block(block_s: String, one_s: String) -> void:
+	var panel: PanelContainer = PanelContainer.new()
+	panel.theme_type_variation = &"Phase4SummaryCard"
+	var inner: VBoxContainer = VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 4)
+	var title: Label = Label.new()
+	title.text = "進行ヒント（advance_hint）"
+	title.autowrap_mode = 2
+	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inner.add_child(title)
+	if not block_s.is_empty():
+		var block_lab: Label = Label.new()
+		block_lab.text = block_s
+		block_lab.autowrap_mode = 2
+		block_lab.add_theme_font_size_override("font_size", 12)
+		block_lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
+		block_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		inner.add_child(block_lab)
+	if not one_s.is_empty():
+		var one_lab: Label = Label.new()
+		one_lab.text = one_s
+		one_lab.autowrap_mode = 2
+		one_lab.add_theme_font_size_override("font_size", 12)
+		one_lab.add_theme_color_override("font_color", Color(0.2, 0.25, 0.36, 1))
+		one_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		inner.add_child(one_lab)
 	panel.add_child(inner)
 	_scroll_content.add_child(panel)
 
