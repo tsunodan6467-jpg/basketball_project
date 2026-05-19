@@ -316,7 +316,23 @@
 - **ユーザー環境 Godot（ローカル目視）**: **`schedule_from_python.json` 一時退避 → 同梱 mock 読込 → 確認後復元済み**。**DataSourceLabel**＝**同梱モックJSON OK**。**upcoming 上段メタ（round / 大会 / H-A）横並び OK**。**対戦行の読みやすさ OK**。**detail 副情報 OK**。**upcoming 件数 / 順序 / 文言維持 OK**。**「今後の予定」見出し維持 OK**。**advance_hint / empty_message / notes / Footer 維持 OK**。**Header / Summary / NextGame 維持 OK**。**HomeNavButton 戻り OK**。**エラーなし・復元後差分なし**。
 - **`fa36271` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
 - **到達点**: **Body余白横展開後の中規模改善第1手 — 日程 upcoming 試合カード内情報階層整理完了**（**日程 Scroll 全体の本格整備完了ではない**。**試合リスト本格全体の完了でもない**）。
-- **別タスク（未着手）**: **日程 ScrollContent 全体整理**、試合リスト行レイアウトのさらなる本格整理、試合リスト行のカード内構成追加改善、**ロスター本格整備**（**第1手平坦行背景は `9445d0e` で対応 — 下記**）、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**。
+- **別タスク（未着手）**: **日程 ScrollContent 全体整理**、試合リスト行レイアウトのさらなる本格整理、試合リスト行のカード内構成追加改善、**ロスター本格整備**（**第1手平坦行背景は `9445d0e` で対応 — 下記**）、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**（**advance_hint 情報階層は `5a98e31` で対応 — 下記**）。
+
+### 日程（スケジュール）閲覧 — 日程本格整備・第2手 — advance_hint ブロック内情報階層整理（`5a98e31`）
+
+- **ロスター平坦行背景完了後の中規模改善第2手**（選定調査 `9aef110` → 実装 `5a98e31`）。**細かい行余白 / 区切り微調整（margin / HSeparator 追加）ではない** — **advance_hint カード内の情報階層整理**（**`fa36271` の upcoming 試合カード内情報階層整理の横展開**）。
+- **`5a98e31`**: **変更ファイル** **`schedule_view.gd` のみ**。**変更関数** **`_add_advance_hint_block` のみ**。
+  - **inner `separation`**: **4 → 6**（upcoming カード系と近い行間）。
+  - **`block`（主役行）**: **font_size 12 → 15**、**`Color(0.08, 0.11, 0.18, 1)`**（濃い本文色）。
+  - **`one_line`（副情報行）**: **font_size 12 → 11**、**`Color(0.32, 0.36, 0.48, 1)`**（upcoming line3 と同系の控えめ色）。
+  - **見出し「進行ヒント（advance_hint）」**: 文言・font 17・色は維持。
+  - **維持**: **`block_s` / `one_s` の文言**、**空時非表示**（`_fill_scroll_body` 側の既存条件）、**Panel + `Phase4SummaryCard` 構造**、**`_fill_scroll_body`**、**upcoming**、**empty_message**、**他 `_add_*`**、Header / Summary / NextGame、notes / Footer、JSON key、**HomeNavButton**、**DataSourceLabel**、**from_python / mock**。
+  - **未変更**: **`schedule_view.tscn`**、**Theme `.tres`**、**`project.godot`**、**data JSON**、export / mock JSON。
+- **pytest**（`5a98e31`）: schedule 10 / home_dashboard 10 / roster 10 / phase0 smoke 1 — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**: **advance_hint 白カード表示 OK**。**見出し「進行ヒント（advance_hint）」維持 OK**。**block 主役化 OK**。**one_line 副情報化 OK**。**block / one_line 文言維持 OK**。**空時非表示維持 OK**。**upcoming 維持 OK**。**empty_message / notes / Footer 維持 OK**。**Header / Summary / NextGame 維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton 戻り OK**。**エラーなし・実行後差分なし**。
+- **`5a98e31` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
+- **到達点**: **日程本格整備・第2手 — advance_hint ブロック内情報階層整理完了**（**日程本格整備全体の完了ではない**。**日程 ScrollContent 全体整理・試合リスト本格全体の完了でもない**）。
+- **別タスク（未着手）**: **日程 ScrollContent 全体整理**、試合リスト行レイアウトのさらなる本格整理、日程画面全体の統一整理、**ロスター本格整備の続き**、**Body 本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**。
 
 ### 財務サマリー閲覧 `Phase4` Theme 限定適用・第1段（`4b43da5`）＋履歴行文字色最小補正（`6c3dc43`）
 
@@ -617,7 +633,7 @@
 - **到達点**: **ロスター本格整備・第1手 — RowList 選手行の平坦 PanelContainer 行背景ラップ完了**（**ロスター本格整備全体の完了ではない**。**9列本格整理・tooltip再設計・列幅本格調整は未対応**）。
 - **別タスク（未着手）**: **ロスター選手行カード化**、**9列レイアウト本格整理**、**tooltip 再設計検討**、**列幅・表示優先度の本格調整**、**RowList 全体の余白・行レイアウト本格調整**、**日程 ScrollContent / 試合リスト本格整備**、**Body 本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**。
 
-- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**＋**中規模改善第1手 upcoming 試合カード内情報階層整理（`fa36271`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`）**＋**契約・人事 PlayerRows 行区切り（`6b26fa3`）**＋**契約・人事 PlayerRows 内側余白（`f19ed9b`）**＋**契約・人事 RiskRows 行区切り（`97b26a8`）**＋**契約・人事 RiskRows 内側余白（`420f240`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（`420f240` 確認記録時点）。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**ロスター本格整備・第1手**: **RowList 選手行の平坦行背景（`9445d0e`）**。**次候補（中規模以上）**: **ロスター本格整備の続き**（9列本格・選手行カード化等）、**日程 ScrollContent / 試合リスト本格整備**、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面** — **細かい行余白・区切り微調整は一区切り**。
+- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**＋**中規模改善第1手 upcoming 試合カード内情報階層整理（`fa36271`）**＋**日程本格整備・第2手 advance_hint 情報階層整理（`5a98e31`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`）**＋**契約・人事 PlayerRows 行区切り（`6b26fa3`）**＋**契約・人事 PlayerRows 内側余白（`f19ed9b`）**＋**契約・人事 RiskRows 行区切り（`97b26a8`）**＋**契約・人事 RiskRows 内側余白（`420f240`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（`420f240` 確認記録時点）。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**ロスター本格整備・第1手**: **RowList 選手行の平坦行背景（`9445d0e`）**。**日程本格整備・第2手**: **advance_hint ブロック内情報階層整理（`5a98e31`）**。**次候補（中規模以上）**: **ロスター本格整備の続き**（9列本格・選手行カード化等）、**日程 ScrollContent / 試合リスト本格整備**、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面** — **細かい行余白・区切り微調整は一区切り**。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -636,7 +652,7 @@
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
 - **順位表閲覧**（`standings_view.tscn`）: **第1段**（`927e918`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内 8 列表・動的行**は**未着手**（第2段）。詳細は上記「順位表閲覧 `Phase4` Theme」節。
-- **日程閲覧**（`schedule_view.tscn` / `schedule_view.gd`）: **第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`・`.tscn`）＋**第2段・後半（最小）**（`7fecb99`・`_add_upcoming_block` 白カード化）＋**追加最小 advance_hint**（`a62b3a7`）＋**追加最小 empty_message**（`463e74b`）＋**追加最小「今後の予定」見出し**（`a24cf6f`）＋**追加最小 upcoming 試合間 HSeparator 整理**（`a9fa054`）＋**中規模改善第1手 upcoming 試合カード内情報階層**（`fa36271`・`_add_upcoming_block`）— **Header / SummaryCard / NextGameCard / upcoming / advance_hint / empty_message / 今後の予定見出し**＝`Phase4SummaryCard`（**`notes` は Footer — 対象外**）。**試合間区切りは親 VBox `separation=8`**。**ScrollContent 全体整理**は**別タスク**。詳細は上記「日程閲覧 `Phase4` Theme」節。
+- **日程閲覧**（`schedule_view.tscn` / `schedule_view.gd`）: **第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`・`.tscn`）＋**第2段・後半（最小）**（`7fecb99`・`_add_upcoming_block` 白カード化）＋**追加最小 advance_hint**（`a62b3a7`）＋**追加最小 empty_message**（`463e74b`）＋**追加最小「今後の予定」見出し**（`a24cf6f`）＋**追加最小 upcoming 試合間 HSeparator 整理**（`a9fa054`）＋**中規模改善第1手 upcoming 試合カード内情報階層**（`fa36271`・`_add_upcoming_block`）＋**日程本格整備・第2手 advance_hint 情報階層**（`5a98e31`・`_add_advance_hint_block`）— **Header / SummaryCard / NextGameCard / upcoming / advance_hint / empty_message / 今後の予定見出し**＝`Phase4SummaryCard`（**`notes` は Footer — 対象外**）。**試合間区切りは親 VBox `separation=8`**。**ScrollContent 全体整理**は**別タスク**。詳細は上記「日程閲覧 `Phase4` Theme」節。
 - **財務サマリー閲覧**（`finance_summary_view.tscn` / `finance_summary_view.gd`）: **第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`）＋**Body本格・最小 HistoryBody 内側余白**（`307e719`・`_fill_history_rows`）— 詳細は上記「財務サマリー閲覧 `Phase4` Theme」節。
 - **オーナーミッション閲覧**（`owner_mission_view.tscn` / `owner_mission_view.gd`）: **第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`）＋**Body本格・最小 MissionsBody 内側余白**（`d4c0372`・`_fill_mission_rows`）— 詳細は上記「オーナーミッション / クラブ評価閲覧 `Phase4` Theme」節。
 - **戦術 / ローテーションサマリー閲覧**（`tactics_summary_view.tscn` / `tactics_summary_view.gd`）: **第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`）＋**Body本格・最小 PlayerRolesBody 内側余白**（`2c637f2`・`_fill_player_roles`）— 詳細は上記「戦術 / ローテーションサマリー閲覧 `Phase4` Theme」節。
