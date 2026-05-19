@@ -161,6 +161,19 @@ func _col_width(idx: int) -> float:
 
 
 func _add_player_row(p: Dictionary) -> void:
+	var panel := PanelContainer.new()
+	var row_bg := StyleBoxFlat.new()
+	row_bg.bg_color = Color(0.965, 0.975, 0.99, 1)
+	row_bg.content_margin_left = 4.0
+	row_bg.content_margin_top = 4.0
+	row_bg.content_margin_right = 4.0
+	row_bg.content_margin_bottom = 4.0
+	row_bg.corner_radius_top_left = 2
+	row_bg.corner_radius_top_right = 2
+	row_bg.corner_radius_bottom_right = 2
+	row_bg.corner_radius_bottom_left = 2
+	panel.add_theme_stylebox_override("panel", row_bg)
+
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 
@@ -199,7 +212,8 @@ func _add_player_row(p: Dictionary) -> void:
 			lab.tooltip_text = st_s
 			lab.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(lab)
-	_row_list.add_child(row)
+	panel.add_child(row)
+	_row_list.add_child(panel)
 
 
 func _dict_or_empty(v: Variant) -> Dictionary:
