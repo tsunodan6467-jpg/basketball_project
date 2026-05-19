@@ -100,11 +100,18 @@ func _apply_snapshot(d: Dictionary) -> void:
 	if typeof(players_raw) == TYPE_ARRAY:
 		rows = players_raw as Array
 
-	_add_table_header_row()
+	var valid_players: Array = []
 	for item in rows:
 		if typeof(item) != TYPE_DICTIONARY:
 			continue
-		_add_player_row(item as Dictionary)
+		valid_players.append(item as Dictionary)
+
+	_add_table_header_row()
+	var n := valid_players.size()
+	for i in range(n):
+		_add_player_row(valid_players[i] as Dictionary)
+		if i < n - 1:
+			_row_list.add_child(HSeparator.new())
 
 
 func _clear_rows() -> void:
