@@ -1,0 +1,444 @@
+# Godot Phase 4 Body系第2段 戦術後の次タスク比較（2026-05）
+
+本ファイルは調査・方針選定のみ。実装・シーン・スクリプト・Theme・README/docs・
+既存 reports（本ファイル以外）の編集は行っていない。
+
+
+================================================================================
+## 1. 現在地
+================================================================================
+
+- **調査日時**: 2026-05-19
+- **調査時点 HEAD**: `e9ec2f6`（Godot戦術サマリー行区切り第2段の確認を記録）
+- **直近実装**: `c9216d0`（戦術 PlayerRolesBody HSeparator） / 記録 `e9ec2f6`
+- **実装変更**: **なし**（ソース・docs・既存 reports の読取のみ）
+- **Godot 目視確認（本調査）**: **未実施**（ユーザー確認は README / `e9ec2f6` docs に記録済み）
+
+### 1.1 主要10画面 Theme 第1段
+
+**主要10画面の Theme 第1段（＋必要最小の動的行色補正）は一通り完了。**
+
+### 1.2 日程第2段の到達点
+
+| 段階 | コミット | 内容 |
+|------|----------|------|
+| **第2段・前半** | `986c4ab` | **NextGameCard** → `Phase4SummaryCard` |
+| **第2段・後半（最小）** | `7fecb99` | **`_add_upcoming_block`** — runtime Panel + 3 Label 濃色化 |
+
+**残り**: Scroll 見出し / advance_hint / 全体統一 — **中〜大**（暗地 Scroll 設計が絡む）。
+
+### 1.3 財務 HistoryBody 行区切り（Body系第2段・最小 第1号）
+
+| 項目 | 内容 |
+|------|------|
+| **実装** | `d57b021` — **`finance_summary_view.gd` の `_fill_history_rows` のみ** |
+| **記録** | `9f894aa` |
+| **パターン** | `lim = mini(rows.size(), 5)`、`for i in range(lim)`、**`i < lim - 1` で HSeparator** |
+| **未完了** | HistoryBody Panel 化・カード化・レイアウト本格調整 |
+
+### 1.4 OM MissionsBody 行区切り（Body系第2段・最小 第2号）
+
+| 項目 | 内容 |
+|------|------|
+| **実装** | `5a3ae2c` — **`owner_mission_view.gd` の `_fill_mission_rows` のみ** |
+| **記録** | `633d104` |
+| **パターン** | 有効ミッションを **`missions` 配列化** → **`for i in range(n)`** → **`i < n - 1` で HSeparator** |
+| **未完了** | MissionsBody Panel 化・カード化・レイアウト本格調整 |
+
+### 1.5 戦術 PlayerRolesBody 行区切り（Body系第2段・最小 第3号）
+
+| 項目 | 内容 |
+|------|------|
+| **実装** | `c9216d0` — **`tactics_summary_view.gd` の `_fill_player_roles` のみ** |
+| **記録** | `e9ec2f6` |
+| **パターン** | 有効ロールを最大8件 **`roles` 配列化** → **`for i in range(n)`** → **`i < n - 1` で HSeparator** |
+| **未完了** | PlayerRolesBody Panel 化・カード化・レイアウト本格調整 |
+
+### 1.6 残っている Body 系候補
+
+| 画面 | 動的 Body | 色補正 | 行区切り |
+|------|-----------|--------|----------|
+| **契約・人事** | **`%RiskRows`** / **`%PlayerRows`** | **`1df4820` 済** | **未着手** |
+| 財務 / OM / 戦術 | 各 Body | 済 | **最小（HSeparator）済** |
+
+**README 到達点（`e9ec2f6` 同期）**: Body系第2段（最小）第1〜3号完了。**次候補**として **契約 RiskRows / PlayerRows 行区切り** が明示（`godot/README.md` ロードマップ節）。古い「戦術未着手」「OM未着手」「財務未着手」表現は、各画面節と整合しており **現在地と矛盾しない**。
+
+### 1.7 今回の調査目的
+
+**Body系第2段（最小）第4号**として、契約・人事 **RiskRows / PlayerRows** へ進むべきか、進むなら **PlayerRows 単体 / RiskRows 単体 / 同時 / 他画面へ戻る** のどれが最も安全かを現物確認で比較し、**次に実装する1タスク**を1つに絞る。
+
+
+================================================================================
+## 2. 財務 / OM / 戦術 の現在地
+================================================================================
+
+### 2.1 財務（`d57b021`）
+
+- **`_fill_history_rows`**: 空時は `（履歴がありません）` の `Label` のみで **return**（HSeparator なし）。
+- **通常時**: `lim = mini(rows.size(), 5)`、`for i in range(lim)`、各履歴 `Label` 追加後 **`if i < lim - 1: HSeparator`**。
+- **色**: `Color(0.16, 0.2, 0.3, 1)` 維持。
+- **注意**: `continue` で不正 Dictionary を飛ばす場合、**インデックス `i` 基準の区切り**（実際に add した行数基準ではない）。現状は **許容済みパターン**。
+
+### 2.2 OM（`5a3ae2c`）
+
+- **`_fill_mission_rows`**: 有効ミッションを配列化して **`for i in range(n)`**、**`i < n - 1` で HSeparator**。
+- **1行**: `_mission_block_text` による **3〜4行ブロック** `Label`（変更なし）。
+
+### 2.3 戦術（`c9216d0`）
+
+- **`_fill_player_roles`**: 有効ロール最大8件を **`roles` 配列化** → **`for i in range(n)`** → **`i < n - 1` で HSeparator**。
+- **`_player_role_line` 不変**、空表示 early return 不変。
+
+### 2.4 まだ残る課題（3画面共通）
+
+- 各 Body の **Panel 化・行カード化・余白・行レイアウト本格調整**。
+- これらは **Body系第2段（最小）の範囲外**（README 各画面節の「別タスク」）。
+
+### 2.5 追加整備へ戻るべきか（案D）
+
+| 判断 | 内容 |
+|------|------|
+| **結論** | **× 今は戻らない** |
+| **理由** | 財務→OM→戦術で **HSeparator 最小テンプレが3連続成功**。契約で **4画面目**に伸ばす方が、コミット単位・目視・pytest の蓄積が一貫する。Panel 化は **横展開完了後**が安全。 |
+
+
+================================================================================
+## 3. 契約・人事 PlayerRows候補（案A）
+================================================================================
+
+### 3.1 現状（現物）
+
+**script**: `contract_personnel_summary_view.gd` — **`_fill_player_rows`**（171–203 行）  
+**scene**: `contract_personnel_summary_view.tscn` — **PlayersCard**（`Phase4SummaryCard`）→ **`%PlayerRows`**（VBox、`unique_name_in_owner`）
+
+| 項目 | 内容 |
+|------|------|
+| **白カード内** | **◎** — `PlayersCard` は Phase4 白カード（`5d1afa2`） |
+| **ループ** | **`for i in range(lim)`** — **`lim = mini(rows.size(), 8)`**（財務と同型） |
+| **1行の形** | 1選手1 `Label`、**4行テキスト**（インライン `line.text = ...`） |
+| **空表示** | `（選手行がありません）` → **return**（HSeparator 不要） |
+| **色** | **`_style_body_label(..., Color(0.16, 0.2, 0.3, 1))`** — **`1df4820` 済** |
+| **mock** | **`player_contract_rows` 8件**（上限ぴったり） |
+
+### 3.2 HSeparator 追加のしやすさ
+
+| 観点 | 評価 |
+|------|------|
+| **財務テンプレとの近さ** | **◎ 最も近い** — `range(lim)` + 最大件数 + 1 Label/行 |
+| **戦術テンプレとの近さ** | **◎** — 最大8件・複数行 `Label`・色補正済み |
+| **推奨実装** | **`c9216d0` と同様**、有効 Dictionary を最大8件 **`players` 配列に集約** → **`for i in range(n)`** → **`i < n - 1` で HSeparator**（`continue` 時の区切りズレを避ける） |
+| **変更関数** | **`_fill_player_rows` のみ** |
+| **変更ファイル** | **`contract_personnel_summary_view.gd` のみ**（想定） |
+| **表示不変** | 文言テンプレ・`order` / JSON key・最大8件・並び順は **現行ロジック維持** |
+
+### 3.3 単体実装に適するか
+
+| 判断 | 内容 |
+|------|------|
+| **結論** | **◎ Body系第2段（最小）第4号の第一候補** |
+| **1コミット** | **高** — 1関数・1 VBox |
+| **UI半端** | **PlayersCard のみ区切り**、RiskCard は未区切り — **1コミット方針では許容**（財務→OM→戦術と同じ「1 Body ずつ」） |
+
+
+================================================================================
+## 4. 契約・人事 RiskRows候補（案B）
+================================================================================
+
+### 4.1 現状（現物）
+
+**script**: `contract_personnel_summary_view.gd` — **`_fill_risk_rows`**（150–168 行）  
+**scene**: **RiskCard**（`Phase4SummaryCard`）→ **`%RiskRows`**
+
+| 項目 | 内容 |
+|------|------|
+| **白カード内** | **◎** |
+| **ループ** | **`for it in rows:`** — **インデックスなし**（OM 実装前と同型） |
+| **件数上限** | **コード上なし**（mock **`risk_items` 7件**） |
+| **1行の形** | 1リスク1 `Label`、**4行ブロック**（label / display / severity / memo） |
+| **空表示** | `（リスク項目がありません）` → **return** |
+| **色** | **`1df4820` 済**（`_style_body_label`） |
+
+### 4.2 HSeparator 追加のしやすさ
+
+| 観点 | 評価 |
+|------|------|
+| **財務テンプレとの近さ** | **△** — ループ形が異なる |
+| **OMテンプレとの近さ** | **◎** — 複数行ブロック + 配列化が必要 |
+| **実装** | 有効リスクを **`risks` 配列化** → **`for i in range(n)`** → **`i < n - 1` で HSeparator** |
+| **PlayerRowsより先の理由** | **弱い** — 技術的には同等だが、**`range(lim)` が既にある PlayerRows の方がコピー容易** |
+
+### 4.3 単体実装に適するか
+
+| 判断 | 内容 |
+|------|------|
+| **結論** | **○ 第4号の第二候補（PlayerRows の次コミット）** |
+| **1コミット** | **高**（単体なら） |
+| **先にやる優先度** | **PlayerRows より後** — `bb6866d` / `b73feb7` / `8fc2d91` 系の予定順 **「PlayerRows のみ → Risk のみ」** と整合 |
+
+
+================================================================================
+## 5. RiskRows / PlayerRows同時実装案（案C）
+================================================================================
+
+### 5.1 同時実装のメリット
+
+- 契約画面の **2枚の動的カードが一度に揃う** — 目視で「契約 Body 最小完了」に見える。
+
+### 5.2 同時実装のリスク
+
+| 観点 | 評価 |
+|------|------|
+| **変更関数** | **2関数**（`_fill_risk_rows` + `_fill_player_rows`） |
+| **変更 VBox** | **2箇所**（`%RiskRows` + `%PlayerRows`） |
+| **差分・目視** | 財務1コミットの **約2倍** |
+| **ロールバック** | 不具合時に **どちらの Body か切り分けにくい** |
+| **方針一致** | 財務・OM・戦術の **「1関数・1コミット」** と **ずれる** |
+
+### 5.3 1コミット安全性・分割
+
+| 判断 | 内容 |
+|------|------|
+| **結論** | **△ 可能だが推奨しない** |
+| **分割** | **PlayerRows 単体 → RiskRows 単体** の **2コミット**が、安全性・テンプレ一貫性で優位 |
+
+
+================================================================================
+## 6. 日程 / ロスターへ戻る案（案E）
+================================================================================
+
+### 6.1 日程残タスク
+
+| 項目 | 内容 |
+|------|------|
+| **関数** | `_add_scroll_heading` / `_add_scroll_paragraph` / `_fill_scroll_body` |
+| **背景** | **ScrollContent は暗地** — 見出し濃色化だけでは設計と矛盾 |
+| **規模** | **中〜大** |
+| **Body系より先か** | **×** — HSeparator 横展開 **4画面目**の勢いが劣る |
+
+### 6.2 ロスター表第2段
+
+| 項目 | 内容 |
+|------|------|
+| **現状** | `%RowList` — **HBox 9列** × `Label.new()` |
+| **第2段** | 表行 Panel 化・9列整理 — **大・高リスク** |
+| **Body系より先か** | **×** — HSeparator テンプレとは **別系統** |
+
+### 6.3 Body系より先に戻る必要があるか
+
+**現時点ではない。** 日程は NextGame + upcoming で一区切り。Body系 **契約で4画面目**を完了してから、日程 Scroll・ロスター表本格化に戻る方がバランスが良い。
+
+
+================================================================================
+## 7. 選択肢比較表
+================================================================================
+
+| 案 | 対象 | 主な変更範囲 | 財務/OM/戦術テンプレとの近さ | .gd変更リスク | UI効果 | 横展開しやすさ | 1コミット安全性 | 推奨度 |
+|----|------|--------------|------------------------------|--------------|--------|---------------|----------------|--------|
+| **A** | **PlayerRows 単体** | `contract_personnel_summary_view.gd` **`_fill_player_rows` のみ** | **◎**（`range`+上限8） | **低** | **高**（主要契約選手） | **◎** 第4号第一 | **高** | **◎** |
+| **B** | **RiskRows 単体** | 同上 **`_fill_risk_rows` のみ** | **○**（OM型配列化） | **低〜中** | **高**（7ブロック） | **○** 第4号第二 | **高** | **○**（Aの次） |
+| **C** | **Risk + Player 同時** | 同上 **2関数** | **○** | **中** | **最高** | **△** 2 VBox | **中** | **△** |
+| **D** | **財務/OM/戦術 追加整備** | 各 Body Panel/カード化 | — | **中〜高** | **高** | **低**（途中で本格化） | **低** | **×** |
+| **E** | **日程 Scroll / ロスター表** | `schedule_view.gd` / `roster_view.gd` | **△** | **中〜高** | **中〜最高** | **低** | **低〜中** | **△**（後回し） |
+
+**比較結論**:
+- **契約・人事へ進むべき** — README 次候補・3画面連続成功・`b73feb7` 予定順と一致。
+- **第4号の第一実装は案A（PlayerRows 単体）** — 財務・戦術に最も近く、1関数1コミットで閉じやすい。
+- **案B（RiskRows）は第5号相当の次コミット** — OM と同型の配列化が必要だが、単体でも安全。
+- **案C・D・E は後回し**。
+
+
+================================================================================
+## 8. 推奨する次タスク
+================================================================================
+
+### 推奨タスク名
+
+**契約 / 人事サマリー閲覧 — Phase4 Theme 第2段（最小）— PlayerRows 動的主要契約選手行の行区切り（HSeparator 追加）**
+
+### 対象
+
+| 種別 | パス |
+|------|------|
+| **scene** | `godot/scenes/contract_personnel_summary_view.tscn`（**本タスクでは変更しない**） |
+| **script** | `godot/scripts/contract_personnel_summary_view.gd`（**`_fill_player_rows` のみ**） |
+
+### なぜ今それを選ぶのか
+
+1. **Body系第2段（最小）第4号** — 財務→OM→戦術の直後、README **次候補「契約 RiskRows / PlayerRows」** のうち **技術的に最も軽い PlayerRows** から着手。
+2. **`for i in range(lim)` + 最大8件** — 財務 `_fill_history_rows`・戦術 `_fill_player_roles` と同型。**`c9216d0` の配列化+`i < n-1` パターンをそのまま適用可能**。
+3. **1関数・1ファイル・1コミット** — 3画面連続で確立した安全手順を維持。
+4. **色補正済み**（`1df4820`）— 区切り追加のみで可読性がさらに上がる。
+5. **mock 8件** — 目視で区切り効果を確認しやすい。
+
+### なぜ他案を後回しにするのか
+
+| 案 | 後回し理由 |
+|----|------------|
+| **B RiskRows** | OM 型の **配列化が必要**。PlayerRows 成功後の **第2コミット**が自然。 |
+| **C 同時** | 2関数・2 VBox・ロールバック困難。1コミット方針と不一致。 |
+| **D 財務/OM/戦術本格化** | 横展開 **4画面目の途中でテンプレ分断**。 |
+| **E 日程/ロスター** | 規模・リスクが大きく、HSeparator 連鎖とは別系統。 |
+
+### 変更対象ファイルの想定
+
+- **変更**: `godot/scripts/contract_personnel_summary_view.gd`（**`_fill_player_rows` のみ**）
+- **記録（別コミット）**: `godot/README.md`、`docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`、`docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+
+### 変更してはいけないファイル
+
+- `godot/scenes/contract_personnel_summary_view.tscn`
+- `contract_personnel_summary_view.gd` の **`_fill_risk_rows` 他関数**
+- `godot/themes/phase4_readonly_core.tres`
+- `godot/project.godot`
+- export / mock JSON / 他画面 scene・gd
+- 既存 reports（本ファイル以外）
+
+### 実装する場合の安全条件
+
+- **空表示**（`（選手行がありません）`）は **Label のみで return** — HSeparator なし。
+- **有効行のみ**を最大8件集めて **`n` 件ループ** — 最終行後に区切りなし（**`i < n - 1`**）。
+- **`_style_body_label` の `Color(0.16, 0.2, 0.3, 1)` 維持**。
+- **4行テキストのフォーマット・`order`・JSON key・件数上限・並び順は不変**。
+- **`.tscn` / Theme / unique 名 / HomeNavButton / DataSourceLabel 不変**。
+
+### Godot 目視確認ポイント
+
+- **CardNavMenu #10** → 契約・人事サマリー
+- **PlayersCard 内 PlayerRows** — 選手行間に区切り、**最終行後に不要な区切りなし**
+- **RiskRows** — **今回触らない**（区切りなしのまま）
+- **Header / 静的カード / RiskCard 見た目** — 従来どおり
+- **HomeNavButton** でホームへ戻る
+- **実行後 git 差分** — 意図した `.gd` のみ
+
+### pytest が必要か
+
+**実装コミット後は必要。** 最低限:
+- `basketball_sim/tests/test_contract_personnel_summary_readonly_export.py`
+- `test_home_dashboard_readonly_export.py`
+- `test_roster_readonly_export.py`
+- `test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+
+
+================================================================================
+## 9. 推奨タスクの最小実装案（Cursor 実装指示の骨子）
+================================================================================
+
+### 目的
+
+`%PlayerRows` 内の動的主要契約選手行の間に **HSeparator** を追加し、白カード上の可読性を第2段（最小）で改善する。
+
+### 変更してよいファイル
+
+- `godot/scripts/contract_personnel_summary_view.gd`（**`_fill_player_rows` のみ**）
+
+### 変更してはいけないファイル
+
+- 上記 §8 と同様（`.tscn`、Theme、`_fill_risk_rows`、export、mock、他画面）
+
+### 実装方針
+
+1. `rows.is_empty()` 時は現行どおり空 `Label` → **return**。
+2. 有効な `Dictionary` 行を **先頭から最大8件** `players` 配列に集約（順序維持、`typeof` チェック）。
+3. `for i in range(n)` で既存の **4行 `line.text` 生成ロジックを維持**（`order` は `p.get("order", i + 1)` のまま）。
+4. 各 `line` を `_style_body_label` して `_player_rows.add_child`。
+5. **`if i < n - 1:`** のときだけ `_player_rows.add_child(HSeparator.new())`。
+
+### HSeparator 追加方針
+
+- **ノード名付与不要**（`HSeparator.new()` のまま、他 Body と同型）。
+- **最終有効行の後には追加しない**。
+
+### 空表示時の扱い
+
+- 変更なし（HSeparator なし）。
+
+### ノード名・unique_name 維持方針
+
+- **`%PlayerRows` / `%RiskRows` 等の unique 名は .tscn 側で維持**（本タスクで .tscn を触らない）。
+
+### 表示文言・件数・並び順・JSON key
+
+- **一切変更しない**（export テストが担保）。
+
+### 確認コマンド
+
+```
+py -m pytest basketball_sim/tests/test_contract_personnel_summary_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_roster_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+git diff -- godot/scripts/contract_personnel_summary_view.gd
+```
+
+### 目視確認ポイント
+
+§8 と同様。
+
+### テスト方針
+
+上記 pytest 4本。**contract 16件**想定。
+
+### コミット名案
+
+- 実装: `Godot契約人事主要契約選手行に行区切りを追加`
+- 記録（別コミット）: `Godot契約人事主要契約選手行区切り第2段の確認を記録`
+
+**その次のタスク（本調査の第5号候補）**: **`_fill_risk_rows` のみ** — コミット名案 `Godot契約人事人事リスク行に行区切りを追加`
+
+
+================================================================================
+## 10. 後回しにする案と理由
+================================================================================
+
+| 案 | 理由 |
+|----|------|
+| **B RiskRows 先** | 配列化コストは小さいが、**PlayerRows の方がテンプレ一致度が高い**。Risk は **PlayerRows 成功直後**が安全。 |
+| **C 同時** | 2関数同時は **切り分け・1コミット方針**に不利。 |
+| **D 財務/OM/戦術本格化** | 最小横展開の **勢いと一貫性**を優先。 |
+| **E 日程/ロスター** | **中〜大・高リスク**。Body HSeparator 4画面目の後が妥当。 |
+
+
+================================================================================
+## 11. 変更していないファイル
+================================================================================
+
+- `godot/scenes/*.tscn`
+- `godot/scripts/*.gd`
+- Theme `.tres`（`godot/themes/phase4_readonly_core.tres`）
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 reports（`godot_phase4_body_second_stage_after_finance_next_task_2026-05.txt` 等）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- sandbox scene
+
+
+================================================================================
+## 12. 調査メモ（参照コミット・pytest候補）
+================================================================================
+
+### 12.1 git 作業前確認
+
+- `git status --short`: 未追跡 `docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md` のみ（想定どおり）
+- `git log` 直近: `e9ec2f6` → `c9216d0` → `b73feb7` → `633d104` → `5a3ae2c` → `bb6866d` → `9f894aa` → `d57b021` … 確認済み
+
+### 12.2 契約人事 Theme 第1段・色補正
+
+- `5d1afa2` — RiskCard / PlayersCard Phase4（`.tscn` のみ）
+- `1df4820` — RiskRows / PlayerRows 動的行 `font_color`（`.gd`）
+- `092a0b1` — 上記の確認記録（履歴に存在）
+
+### 12.3 pytest 候補（次実装時）
+
+- `test_contract_personnel_summary_readonly_export.py`（**必須**）
+- `test_home_dashboard_readonly_export.py`
+- `test_roster_readonly_export.py`
+- `test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+- （任意）他画面 export は回帰用
+
+### 12.4 本調査での pytest
+
+**未実施** — 調査レポート追加のみのため。
