@@ -121,10 +121,14 @@ func _fill_mission_rows(raw: Variant) -> void:
 		lab.text = "今季ミッションはありません。"
 		_missions_body.add_child(lab)
 		return
+	var missions: Array = []
 	for item in arr:
 		if typeof(item) != TYPE_DICTIONARY:
 			continue
-		var m: Dictionary = item as Dictionary
+		missions.append(item as Dictionary)
+	var n: int = missions.size()
+	for i in range(n):
+		var m: Dictionary = missions[i]
 		var block := _mission_block_text(m)
 		var lab := Label.new()
 		lab.autowrap_mode = 2
@@ -132,6 +136,8 @@ func _fill_mission_rows(raw: Variant) -> void:
 		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = block
 		_missions_body.add_child(lab)
+		if i < n - 1:
+			_missions_body.add_child(HSeparator.new())
 
 
 func _mission_block_text(m: Dictionary) -> String:
