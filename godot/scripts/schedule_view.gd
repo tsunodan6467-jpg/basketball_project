@@ -11,6 +11,9 @@ const _LOAD_FAILED_MESSAGE := "日程データ読込に失敗しました"
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _last_loaded_uri: String = ""
+var _game_detail_panel: PanelContainer = null
+var _game_detail_style_normal: StyleBoxFlat = null
+var _game_detail_style_error: StyleBoxFlat = null
 
 @onready var _status_label: Label = %StatusLabel
 @onready var _data_source_label: Label = %DataSourceLabel
@@ -30,6 +33,7 @@ var _last_loaded_uri: String = ""
 
 
 func _ready() -> void:
+	_setup_upcoming_game_detail_style()
 	_apply_snapshot(_load_schedule_snapshot())
 
 
@@ -69,8 +73,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 	_clear_scroll()
 	if d.has("_error"):
 		_status_label.text = str(d["_error"])
-		_status_label.visible = true
-		_status_label.add_theme_color_override("font_color", Color(1, 0.52, 0.48, 1))
+		_set_upcoming_game_detail_visible(true, true)
 		_data_source_label.text = ""
 		_screen_title.text = ""
 		_team_name.text = ""
@@ -81,8 +84,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 		_reset_next_game_card("—")
 		return
 
-	_status_label.visible = false
-	_status_label.remove_theme_color_override("font_color")
+	_set_upcoming_game_detail_visible(false)
 	_data_source_label.text = _data_source_caption(_last_loaded_uri)
 
 	_screen_title.text = _txt(d, "screen_title", "日程（閲覧）")
@@ -252,6 +254,15 @@ func _add_upcoming_block(row: Dictionary) -> void:
 			meta_lab.autowrap_mode = 2
 			meta_lab.clip_text = true
 		meta_row.add_child(meta_lab)
+
+	var detail_btn := Button.new()
+	detail_btn.text = "詳細"
+	detail_btn.flat = true
+	detail_btn.custom_minimum_size = Vector2(36, 0)
+	detail_btn.add_theme_font_size_override("font_size", 11)
+	detail_btn.pressed.connect(_show_upcoming_game_detail.bind(row))
+	meta_row.add_child(detail_btn)
+
 	inner.add_child(meta_row)
 
 	var l2: Label = Label.new()
@@ -445,6 +456,91 @@ func _int_display_cell(v: Variant) -> String:
 		if t.is_valid_float():
 			return str(int(float(t)))
 	return "-"
+
+
+func _make_game_detail_panel_style(bg: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 10.0
+	style.content_margin_top = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 10.0
+	return style
+
+
+func _setup_upcoming_game_detail_style() -> void:
+	if _game_detail_panel != null:
+		return
+
+	_game_detail_style_normal = _make_game_detail_panel_style(
+		Color(0.92, 0.96, 1.0, 1),
+		Color(0.48, 0.64, 0.86, 1),
+	)
+	_game_detail_style_error = _make_game_detail_panel_style(
+		Color(1.0, 0.94, 0.94, 1),
+		Color(0.86, 0.48, 0.48, 1),
+	)
+
+	var parent := _status_label.get_parent()
+	var idx := _status_label.get_index()
+
+	_game_detail_panel = PanelContainer.new()
+	_game_detail_panel.add_theme_stylebox_override("panel", _game_detail_style_normal)
+	_game_detail_panel.visible = false
+	_game_detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var margin := MarginContainer.new()
+	parent.remove_child(_status_label)
+	margin.add_child(_status_label)
+	_game_detail_panel.add_child(margin)
+	parent.add_child(_game_detail_panel)
+	parent.move_child(_game_detail_panel, idx)
+
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_status_label.add_theme_font_size_override("font_size", 14)
+	_status_label.add_theme_constant_override("line_spacing", 4)
+	_status_label.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	_status_label.visible = true
+
+
+func _set_upcoming_game_detail_visible(visible: bool, is_error: bool = false) -> void:
+	if _game_detail_panel == null:
+		_status_label.visible = visible
+		if not visible:
+			_status_label.text = ""
+		return
+
+	if not visible:
+		_game_detail_panel.visible = false
+		_status_label.text = ""
+		return
+
+	_game_detail_panel.add_theme_stylebox_override(
+		"panel",
+		_game_detail_style_error if is_error else _game_detail_style_normal,
+	)
+	_status_label.add_theme_color_override(
+		"font_color",
+		Color(1, 0.52, 0.48, 1) if is_error else Color(0.08, 0.11, 0.18, 1),
+	)
+	_game_detail_panel.visible = true
+	_status_label.visible = true
+
+
+func _show_upcoming_game_detail(game: Dictionary) -> void:
+	var body: String = ""
+	var detail_v: Variant = game.get("detail", null)
+	if detail_v != null:
+		body = str(detail_v).strip_edges()
+	if body.is_empty():
+		body = "詳細情報はありません。"
+
+	_status_label.text = "試合詳細\n%s" % body
+	_set_upcoming_game_detail_visible(true, false)
 
 
 func _on_home_nav_button_pressed() -> void:
