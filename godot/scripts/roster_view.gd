@@ -11,6 +11,9 @@ const _LOAD_FAILED_MESSAGE := "ロスターデータ読込に失敗しました"
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _last_loaded_uri: String = ""
+var _summary_panel: PanelContainer = null
+var _summary_style_normal: StyleBoxFlat = null
+var _summary_style_error: StyleBoxFlat = null
 
 @onready var _title_label: Label = %TitleLabel
 @onready var _team_label: Label = %TeamNameLabel
@@ -22,6 +25,7 @@ var _last_loaded_uri: String = ""
 
 
 func _ready() -> void:
+	_setup_selected_player_summary_style()
 	_apply_snapshot(_load_roster_snapshot())
 
 
@@ -61,15 +65,14 @@ func _apply_snapshot(d: Dictionary) -> void:
 	_clear_rows()
 	if d.has("_error"):
 		_status_label.text = str(d["_error"])
-		_status_label.visible = true
+		_set_selected_player_summary_visible(true, true)
 		_data_source_label.text = ""
 		_title_label.text = ""
 		_team_label.text = ""
 		_meta_label.text = ""
 		return
 
-	_status_label.visible = false
-	_status_label.text = ""
+	_set_selected_player_summary_visible(false)
 	_data_source_label.text = _data_source_caption(_last_loaded_uri)
 
 	_title_label.text = _txt(d, "screen_title", "ロスター（閲覧）")
@@ -370,6 +373,79 @@ func _contract_cell(p: Dictionary) -> String:
 	return display
 
 
+func _make_summary_panel_style(bg: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 10.0
+	style.content_margin_top = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 10.0
+	return style
+
+
+func _setup_selected_player_summary_style() -> void:
+	if _summary_panel != null:
+		return
+
+	_summary_style_normal = _make_summary_panel_style(
+		Color(0.92, 0.96, 1.0, 1),
+		Color(0.48, 0.64, 0.86, 1),
+	)
+	_summary_style_error = _make_summary_panel_style(
+		Color(1.0, 0.94, 0.94, 1),
+		Color(0.86, 0.48, 0.48, 1),
+	)
+
+	var parent := _status_label.get_parent()
+	var idx := _status_label.get_index()
+
+	_summary_panel = PanelContainer.new()
+	_summary_panel.add_theme_stylebox_override("panel", _summary_style_normal)
+	_summary_panel.visible = false
+	_summary_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var margin := MarginContainer.new()
+	parent.remove_child(_status_label)
+	margin.add_child(_status_label)
+	_summary_panel.add_child(margin)
+	parent.add_child(_summary_panel)
+	parent.move_child(_summary_panel, idx)
+
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_status_label.add_theme_font_size_override("font_size", 14)
+	_status_label.add_theme_constant_override("line_spacing", 4)
+	_status_label.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	_status_label.visible = true
+
+
+func _set_selected_player_summary_visible(visible: bool, is_error: bool = false) -> void:
+	if _summary_panel == null:
+		_status_label.visible = visible
+		if not visible:
+			_status_label.text = ""
+		return
+
+	if not visible:
+		_summary_panel.visible = false
+		_status_label.text = ""
+		return
+
+	_summary_panel.add_theme_stylebox_override(
+		"panel",
+		_summary_style_error if is_error else _summary_style_normal,
+	)
+	_status_label.add_theme_color_override(
+		"font_color",
+		Color(1, 0.52, 0.48, 1) if is_error else Color(0.08, 0.11, 0.18, 1),
+	)
+	_summary_panel.visible = true
+	_status_label.visible = true
+
+
 func _show_selected_player_summary(p: Dictionary) -> void:
 	var name_s := _str_cell(p.get("name", null))
 	var pos_s := _str_cell(p.get("position", null))
@@ -404,8 +480,7 @@ func _show_selected_player_summary(p: Dictionary) -> void:
 	_status_label.text = "%s\n%s / %s\nOVR %s\n契約: %s\n状態: %s" % [
 		name_s, pos_s, age_s, ovr_s, con_s, st_s,
 	]
-	_status_label.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
-	_status_label.visible = true
+	_set_selected_player_summary_visible(true, false)
 
 
 func _on_home_nav_button_pressed() -> void:
