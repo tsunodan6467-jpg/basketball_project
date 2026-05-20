@@ -660,9 +660,22 @@
 - **ユーザー環境 Godot（ローカル目視）**: **氏名列の読みやすさ OK**。**OVR列の読みやすさ OK**。**9列内容 / 順序 / 幅維持 OK**。**tooltip 維持 OK**。**RowList 行背景維持 OK**。**RowList 選手行間 HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**Header行 / HeaderCard / TableCard 維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
 - **`6c1e25f` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
 - **到達点**: **ロスター本格整備・第2手 — RowList 選手行の主要列強調（氏名列・OVR列）完了**（**ロスター本格整備全体の完了ではない**。**9列本格整理・tooltip再設計・列幅本格調整は未対応**）。
-- **別タスク（未着手）**: **ロスター選手行カード化**、**9列レイアウト本格整理**、**tooltip 再設計検討**、**列幅・表示優先度の本格調整**、**RowList 全体の余白・行レイアウト本格調整**、**日程 ScrollContent / 試合リスト本格整備**、**Body 本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**、**Python本体 / ゲームロジック側への復帰検討**。
+- **別タスク（未着手）**: **ロスター選手行カード化**、**9列レイアウト本格整理**、**tooltip 再設計検討**、**列幅・表示優先度の本格調整**、**RowList 全体の余白・行レイアウト本格調整**、**ソート / フィルタ / 選手詳細導線の前段整理**、**日程 ScrollContent / 試合リスト本格整備**、**Body 本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**、**Python本体 / ゲームロジック側への復帰検討**（**状態列視認補助は `746e861` で対応 — 下記**）。
 
-- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**＋**中規模改善第1手 upcoming 試合カード内情報階層整理（`fa36271`）**＋**日程本格整備・第2手 advance_hint 情報階層整理（`5a98e31`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`）**＋**契約・人事 PlayerRows 行区切り（`6b26fa3`）**＋**契約・人事 PlayerRows 内側余白（`f19ed9b`）**＋**契約・人事 RiskRows 行区切り（`97b26a8`）**＋**契約・人事 RiskRows 内側余白（`420f240`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（`420f240` 確認記録時点）。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**ロスター本格整備・第1手**: **RowList 選手行の平坦行背景（`9445d0e`）**。**ロスター本格整備・第2手**: **RowList 選手行の主要列強調（氏名列・OVR列）（`6c1e25f`）**。**日程本格整備・第2手**: **advance_hint ブロック内情報階層整理（`5a98e31`）**。**日程本格整備・第3手**: **empty_message（お知らせ）本文の情報階層整理（`065197b`）**。**次候補（中規模以上）**: **日程 ScrollContent / 試合リスト本格整備**、**ロスター本格整備の続き**（選手行カード化・9列本格等）、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面** — **細かい行余白・区切り微調整は一区切り**。
+### ロスター閲覧 — ロスター本格整備・第3手 — RowList 選手行の状態列（i==8）視認補助（`746e861`）
+
+- **日程 empty_message 情報階層整理完了後の中規模改善**（選定調査 `df10b8e` → 実装 `746e861`）。**細かい行余白 / 区切り微調整（margin / HSeparator 追加）ではない** — **RowList 選手行の状態列（`i == 8`）の typography 最小視認補助**（**`9445d0e` の平坦行背景・`6c1e25f` の氏名/OVR 強調を壊さない**）。**状態別の色分け・状態文言変更ではない**。
+- **`746e861`**: **変更ファイル** **`roster_view.gd` のみ**。**変更関数** **`_add_player_row` のみ**。
+  - **`elif i == 8:` ブロックを 3 行追加** — **状態列**に **`font_size` 13**（既定セル 12 から +1・**氏名列 / OVR列と同サイズ**）、**`font_color` `Color(0.08, 0.11, 0.18, 1)`**（**氏名列 / OVR列と同系の濃色**）。
+  - **維持**: **氏名列（`i == 1`）・OVR列（`i == 4`）の既存強調**、**9列**、**列順**、**列幅**（`_col_width`）、**表示文言**、**JSON key**、**状態列 tooltip（`st_s != "-"` 時）と `mouse_filter`**、**`9445d0e` の PanelContainer 行背景と StyleBoxFlat**、**`_apply_snapshot` の行間 HSeparator**（**最終行後 HSeparator なし**）、**ヘッダー行**、**ヘッダー下 Separator**、**HeaderCard / TableCard**、**HomeNavButton**、**DataSourceLabel**、**from_python / mock**。
+  - **未変更**: **`roster_view.tscn`**、**Theme `.tres`**、**`project.godot`**、**`_apply_snapshot`**、**players / valid_players**、**export / tests / mock JSON**、**他画面 `.gd`**。
+- **pytest**（`746e861`）: roster 10 / home_dashboard 10 / schedule 10 / phase0 smoke 1 — いずれも passed。
+- **ユーザー環境 Godot（ローカル目視）**: **状態列の拾いやすさ OK**。**氏名列 / OVR列維持 OK**。**9列内容 / 順序 / 幅維持 OK**。**tooltip 維持 OK**。**mouse_filter 維持 OK**。**RowList 行背景維持 OK**。**RowList 選手行間 HSeparator 維持 OK**。**最終行後の不要 HSeparator なし OK**。**Header行 / HeaderCard / TableCard 維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton 戻り OK**。**エラーなし・実行後 git 差分なし**。
+- **`746e861` は合格扱い**（実装・pytest・Godot目視・導線・差分確認込み）。
+- **到達点**: **ロスター本格整備・第3手 — RowList 選手行の状態列（i==8）視認補助完了**（**氏名・OVR・状態の 3 読み取りポイントが拾いやすくなり、「誰が・どの能力で・どんな状態か」を RowList 上で追いやすい方向へ進んだ**。**ロスター本格整備全体の完了ではない**。**9列本格整理・tooltip再設計・列幅本格調整・選手行カード化は未対応**）。
+- **別タスク（未着手）**: **ロスター選手行カード化**、**9列レイアウト本格整理**、**tooltip 再設計検討**、**列幅・表示優先度の本格調整**、**RowList 全体の余白・行レイアウト本格調整**、**ソート / フィルタ / 選手詳細導線の前段整理**、**日程 ScrollContent / 試合リスト本格整備**、**Body 本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面検討**、**Python本体 / ゲームロジック側への復帰検討**。
+
+- **詳細画面 Theme 横展開の現在地**: **主要10画面の Theme 第1段（＋必要最小補正）完了**。**日程第2段**: **前半 NextGameCard（`986c4ab`）**＋**後半（最小）upcoming（`7fecb99`）**＋**追加最小 advance_hint（`a62b3a7`・なし/あり表示確認済み）**＋**追加最小 empty_message（`463e74b`）**＋**追加最小「今後の予定」見出し（`a24cf6f`）**＋**追加最小 upcoming 試合間 HSeparator 整理（`a9fa054`）**＋**中規模改善第1手 upcoming 試合カード内情報階層整理（`fa36271`）**＋**日程本格整備・第2手 advance_hint 情報階層整理（`5a98e31`）**。**Body系第2段（最小）**: **財務 HistoryBody 行区切り（`d57b021`）**＋**財務 HistoryBody 内側余白（`307e719`）**＋**OM MissionsBody 行区切り（`5a3ae2c`）**＋**OM MissionsBody 内側余白（`d4c0372`）**＋**戦術 PlayerRolesBody 行区切り（`c9216d0`）**＋**戦術 PlayerRolesBody 内側余白（`2c637f2`）**＋**契約・人事 PlayerRows 行区切り（`6b26fa3`）**＋**契約・人事 PlayerRows 内側余白（`f19ed9b`）**＋**契約・人事 RiskRows 行区切り（`97b26a8`）**＋**契約・人事 RiskRows 内側余白（`420f240`）** — **契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（`420f240` 確認記録時点）。**ロスター第2段（最小）**: **RowList 選手行間 HSeparator（`8a95fcf`）**。**ロスター本格整備・第1手**: **RowList 選手行の平坦行背景（`9445d0e`）**。**ロスター本格整備・第2手**: **RowList 選手行の主要列強調（氏名列・OVR列）（`6c1e25f`）**。**ロスター本格整備・第3手**: **RowList 選手行の状態列視認補助（`746e861`）**。**日程本格整備・第2手**: **advance_hint ブロック内情報階層整理（`5a98e31`）**。**日程本格整備・第3手**: **empty_message（お知らせ）本文の情報階層整理（`065197b`）**。**次候補（中規模以上）**: **日程 ScrollContent / 試合リスト本格整備**、**ロスター本格整備の続き**（選手行カード化・9列本格等）、**Body系本格整備の中規模整理**、**ゲーム体験に近い機能 / 画面** — **細かい行余白・区切り微調整は一区切り**。
 
 **sandbox（`home_production_wire_preview.tscn`）の確認運用:**
 
@@ -677,7 +690,7 @@
 
 - **preview**: `theme_preview.tscn` は **既存 10 画面には未適用**。暗背景上のラベルには `Phase4OnDarkTitle` 等の variation を preview 側で使用し、可読性を確認している。
 - **契約 / 人事サマリー**（`contract_personnel_summary_view.tscn` / `contract_personnel_summary_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**契約概要**・**ロスター構成**・**RiskCard**・**PlayersCard**＝`Phase4SummaryCard`。**注意**＝`Phase4WarningCard`。**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**PlayerRows / RiskRows 行区切り（最小）**（`6b26fa3` / `97b26a8`）＋**Body本格・最小 PlayerRows / RiskRows 内側余白**（`f19ed9b` / `420f240`）— 詳細は上記「契約 / 人事サマリー閲覧 `Phase4` Theme」節。
-- **ロスター閲覧**（`roster_view.tscn` / `roster_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**`Scroll/TableCard`**＝`Phase4SummaryCard`、**`%RowList`** 内9列表は **`Phase4TableHead` / `Phase4TableCell`**（`407f014`）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`・`_apply_snapshot` players ループ）＋**ロスター本格整備・第1手 平坦行背景**（`9445d0e`・`_add_player_row` のみ）＋**ロスター本格整備・第2手 主要列強調**（`6c1e25f`・`_add_player_row` のみ）— 詳細は上記「ロスター閲覧 `Phase4` Theme」節。
+- **ロスター閲覧**（`roster_view.tscn` / `roster_view.gd`）: ルート Theme。**Header**＝`Phase4HeaderCard`。**`Scroll/TableCard`**＝`Phase4SummaryCard`、**`%RowList`** 内9列表は **`Phase4TableHead` / `Phase4TableCell`**（`407f014`）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`・`_apply_snapshot` players ループ）＋**ロスター本格整備・第1手 平坦行背景**（`9445d0e`・`_add_player_row` のみ）＋**ロスター本格整備・第2手 主要列強調**（`6c1e25f`・`_add_player_row` のみ）＋**ロスター本格整備・第3手 状態列視認補助**（`746e861`・`_add_player_row` のみ）— 詳細は上記「ロスター閲覧 `Phase4` Theme」節。
 - **施設サマリー閲覧**（`facility_summary_view.tscn`）: **第1段**（`5987821`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内動的 Label**は**未着手**（第2段）。詳細は上記「施設サマリー閲覧 `Phase4` Theme」節。
 - **クラブ史閲覧**（`club_history_view.tscn`）: **第1段**（`682a941`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内段落・シーズン表**は**未着手**（第2段）。詳細は上記「クラブ史閲覧 `Phase4` Theme」節。
 - **順位表閲覧**（`standings_view.tscn`）: **第1段**（`927e918`）— ルート Theme。**`HeaderCard`**＝`Phase4HeaderCard`、**`SummaryCard`**＝`Phase4SummaryCard`。**Scroll 内 8 列表・動的行**は**未着手**（第2段）。詳細は上記「順位表閲覧 `Phase4` Theme」節。
@@ -704,6 +717,7 @@
 ◎ ロスター・RowList選手行間HSeparator（第2段・最小・8a95fcf）
 ◎ ロスター・RowList選手行の平坦行背景（本格整備第1手・9445d0e）
 ◎ ロスター・RowList選手行の主要列強調（本格整備第2手・氏名/OVR・6c1e25f）
+◎ ロスター・RowList選手行の状態列視認補助（本格整備第3手・i==8・746e861）
 □ ロスター・選手行カード化・9列本格・列幅本格・RowList余白本格（本格整備続き・.gd）
 ◎ ホーム・Header のみ（HeaderCard に Theme 限定）
 ◎ ホーム・MetricsRow `CardDivision` / `CardRank` / `CardMoney` のみ `Phase4SummaryCard` 限定適用（`f66bcd2`・`2471b67`）
@@ -820,6 +834,7 @@
 ◎ ロスター・RowList選手行間HSeparator（第2段・最小・8a95fcf）
 ◎ ロスター・RowList選手行の平坦行背景（本格整備第1手・9445d0e）
 ◎ ロスター・RowList選手行の主要列強調（本格整備第2手・氏名/OVR・6c1e25f）
+◎ ロスター・RowList選手行の状態列視認補助（本格整備第3手・i==8・746e861）
 □ ロスター・選手行カード化・9列本格・列幅本格・RowList余白本格（本格整備続き・.gd）
 □ 完了済み10画面のScroll/表第2段（個別判断）
 □ ホーム全体への Theme 拡大（ルート一括など）

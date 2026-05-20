@@ -34,7 +34,7 @@
 
 - **共通 Theme**（`godot/themes/phase4_readonly_core.tres`）と **preview**（`godot/scenes/theme_preview.tscn`）で **見た目を検証中**。**10 画面への一括適用**や **ホームの Scroll 以下の全面 Theme 化**は **していない**（**限定適用の段階**）。
 - **契約 / 人事サマリー**: **Theme 残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows 行区切り**（`6b26fa3`）＋**第2段（最小）RiskRows 行区切り**（`97b26a8`）— §2.12 / §2.12a / §2.12b。
-- **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`・**`_apply_snapshot` players ループのみ**）＋**ロスター本格整備・第1手 平坦行背景**（`9445d0e`・**`_add_player_row` のみ** — §2.13b）＋**ロスター本格整備・第2手 主要列強調**（`6c1e25f`・**`_add_player_row` のみ** — §2.13c）。**`Scroll/TableCard`** の Phase4 化 ＋ **`Phase4TableHead` / `Phase4TableCell`**（§2.13 / §2.13a / §2.13b / §2.13c）。
+- **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`・**`_apply_snapshot` players ループのみ**）＋**ロスター本格整備・第1手 平坦行背景**（`9445d0e`・**`_add_player_row` のみ** — §2.13b）＋**ロスター本格整備・第2手 主要列強調**（`6c1e25f`・**`_add_player_row` のみ** — §2.13c）＋**ロスター本格整備・第3手 状態列視認補助**（`746e861`・**`_add_player_row` のみ** — §2.13d）。**`Scroll/TableCard`** の Phase4 化 ＋ **`Phase4TableHead` / `Phase4TableCell`**（§2.13 / §2.13a / §2.13b / §2.13c / §2.13d）。
 - **施設サマリー閲覧**: **Theme 第1段**（`5987821`・**`facility_summary_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 動的本文は未変更**（§2.5）。
 - **クラブ史閲覧**: **Theme 第1段**（`682a941`・**`club_history_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内段落・シーズン表は未変更**（§2.6）。
 - **順位表閲覧**: **Theme 第1段**（`927e918`・**`standings_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内 8 列表・動的行は未変更**（§2.7）。
@@ -43,7 +43,7 @@
 - **オーナーミッション / クラブ評価閲覧**: **Theme 第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`）＋**Body本格・最小 MissionsBody 内側余白**（`d4c0372`・**`_fill_mission_rows` のみ** — §2.10a / §2.10b）。**`%MissionsBody` 構造全面整理は別タスク**。
 - **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`）＋**Body本格・最小 PlayerRolesBody 内側余白**（`2c637f2`・**`_fill_player_roles` 選手ロール行追加ループのみ** — §2.11a / §2.11b）。**`%PlayerRolesBody` 構造全面整理は別タスク**。
 - **契約 / 人事サマリー閲覧**: **Theme 残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows / RiskRows 行区切り**（`6b26fa3` / `97b26a8`）＋**Body本格・最小 PlayerRows / RiskRows 内側余白**（`f19ed9b` / `420f240` — §2.12a / §2.12b / §2.12c / §2.12d）。**RiskCard / PlayersCard** の Phase4 化。**契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（**ナビ構造の完了ではない** — §2.12 / §2.12a〜§2.12d）。
-- **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`）＋**ロスター本格整備・第1手 平坦行背景**（`9445d0e`）＋**ロスター本格整備・第2手 主要列強調**（`6c1e25f`）。**`TableCard` + 9列表** の Phase4 化（**Header は既に Phase4 済み**）。**選手行カード化・9列本格整理は未変更**（§2.13 / §2.13a / §2.13b / §2.13c）。
+- **ロスター閲覧**: **Theme 第1段**（`f866f5b`・**`roster_view.tscn` のみ**）＋**表 Theme 通常 Table 化**（`407f014`・**`roster_view.gd` のみ**）＋**第2段（最小）RowList 選手行間 HSeparator**（`8a95fcf`）＋**ロスター本格整備・第1手 平坦行背景**（`9445d0e`）＋**ロスター本格整備・第2手 主要列強調**（`6c1e25f`）＋**ロスター本格整備・第3手 状態列視認補助**（`746e861`）。**`TableCard` + 9列表** の Phase4 化（**Header は既に Phase4 済み**）。**選手行カード化・9列本格整理は未変更**（§2.13 / §2.13a / §2.13b / §2.13c / §2.13d）。
 - **ホーム**: **`HeaderCard` のみ**に Theme（**ルート `HomeDashboard` には付けない**）。**MetricsRow** 3 枚 + **`Scroll` 以下**（**`CardNavMenu` 含む**）**`Phase4SummaryCard` / `Phase4WarningCard`**（**`d9bd713` で `CardNavMenu` も Summary 化済み** — §2.3）。**`club_summary` は `91cfaed` で状況メモ化済み**（export/mock）。**Scroll 内の暗色カード問題は解消済み**。**HeaderNavRow** は **ボタン数・接続・遷移先不変**。
 - **本線 LeftRail**: **`a5e548f` で表示用のみ追加済み**（§2.4）。**クリック・遷移は未実装**。**実操作導線**は引き続き **HeaderNavRow + CardNavMenu**。
 - **本格ナビの全面実装**（LeftRail クリック化・CardNavMenu 整理等）は **未着手**（§10）。**第 11 画面を急いで増やすより**、いまは **本番 GUI 化の足場**（Theme 限定適用・読み取り導線の安定）を優先する段階、という整理でよい（優先度の最終判断はチーム）。
@@ -486,6 +486,18 @@
 - **ロスターからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`6c1e25f` 後もユーザー確認済み）。
 - **ユーザー環境 Godot（ローカル目視）**: **ホーム → ロスター遷移 OK**。**氏名列の読みやすさ OK**。**OVR列の読みやすさ OK**。**9列内容 / 順序 / 幅維持 OK**。**tooltip 維持 OK**。**RowList 行背景維持 OK**（**`9445d0e` の状態を維持**）。**RowList 行間 HSeparator 維持 OK**（**`8a95fcf` の状態を維持**）。**最終行後の不要 HSeparator なし OK**。**Header行 / Header下Separator 維持 OK**。**HeaderCard / TableCard 維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
 - **Theme 適用範囲（本格整備・第2手）**: **`_add_player_row` 内** — **氏名列（`i == 1`）** と **OVR列（`i == 4`）** の **`font_size` 13** / **`font_color` `Color(0.08, 0.11, 0.18, 1)`** のみ上書き。**9列・列幅・tooltip・文言・JSON key・行背景は不変**。**選手行カード化・9列本格整理は別タスク**。**ロスター本格整備全体の完了を意味しない**。
+- **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
+
+### 2.13d ロスター閲覧・ロスター本格整備・第3手（状態列視認補助）と導線確認（`746e861`）
+
+- **到達点**: **`roster_view.gd` の `_add_player_row` のみ**（**ナビ構造の変更ではない**・**ロスター本格整備の中規模第3手**・**RowList 選手行の状態列（`i == 8`）視認補助**）。**`roster_view.tscn`・Theme `.tres`・project.godot 未変更**。**`_apply_snapshot` 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`HeaderNavRow`** — **5 導線の先頭**（**ロスター**）。
+  - **`CardNavMenu`** — **チーム**列の **ロスター** ボタン（**#1・併用入口**）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、ロスター画面へのショートカットではない**。
+- **ロスターからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderNavRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`746e861` 後もユーザー確認済み）。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → ロスター遷移 OK**。**状態列の拾いやすさ OK**。**氏名列 / OVR列維持 OK**。**9列内容 / 順序 / 幅維持 OK**。**tooltip 維持 OK**。**mouse_filter 維持 OK**。**RowList 行背景維持 OK**（**`9445d0e` の状態を維持**）。**RowList 行間 HSeparator 維持 OK**（**`8a95fcf` の状態を維持**）。**最終行後の不要 HSeparator なし OK**。**Header行 / Header下Separator 維持 OK**。**HeaderCard / TableCard 維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **Theme 適用範囲（本格整備・第3手）**: **`_add_player_row` 内** — **状態列（`i == 8`）** の **`font_size` 13** / **`font_color` `Color(0.08, 0.11, 0.18, 1)`** のみ上書き（**氏名列 / OVR列の既存強調は維持**）。**9列・列幅・tooltip・文言・JSON key・行背景は不変**。**選手行カード化・9列本格整理は別タスク**。**ロスター本格整備全体の完了を意味しない**。
 - **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
 
 ## 3. 現行ナビ構造
