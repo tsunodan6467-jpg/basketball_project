@@ -15,6 +15,8 @@ const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 var _last_loaded_uri: String = ""
 var _risk_detail_style_normal: StyleBoxFlat = null
 var _risk_inline_detail_panels: Array = []
+var _player_contract_detail_style_normal: StyleBoxFlat = null
+var _player_contract_detail_panels: Array = []
 
 @onready var _status_label: Label = %StatusLabel
 @onready var _data_source_label: Label = %DataSourceLabel
@@ -31,6 +33,7 @@ var _risk_inline_detail_panels: Array = []
 
 func _ready() -> void:
 	_ensure_risk_inline_detail_styles()
+	_ensure_player_contract_inline_detail_styles()
 	_apply_snapshot(_load_snapshot())
 
 
@@ -225,6 +228,7 @@ func _fill_risk_rows(rows: Array) -> void:
 
 
 func _fill_player_rows(rows: Array) -> void:
+	_player_contract_detail_panels.clear()
 	if rows.is_empty():
 		var empty_lab := Label.new()
 		empty_lab.text = "（選手行がありません）"
@@ -256,13 +260,31 @@ func _fill_player_rows(rows: Array) -> void:
 			+ "  メモ: %s"
 		) % [str(p.get("order", i + 1)), nm, pos, age_s, ovr, pot, sal, cy, nat, fa, rk, memo]
 		_style_body_label(line, 12, Color(0.16, 0.2, 0.3, 1))
+		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var detail_btn := Button.new()
+		detail_btn.text = "詳細"
+		detail_btn.flat = true
+		detail_btn.custom_minimum_size = Vector2(36, 0)
+		detail_btn.add_theme_font_size_override("font_size", 11)
+		var detail_parts: Dictionary = _create_player_contract_inline_detail_panel()
+		var detail_panel: PanelContainer = detail_parts["panel"] as PanelContainer
+		var detail_lab: Label = detail_parts["label"] as Label
+		detail_btn.pressed.connect(_on_player_contract_detail_button_pressed.bind(detail_panel, detail_lab, p))
+
+		var row_inner := HBoxContainer.new()
+		row_inner.add_theme_constant_override("separation", 4)
+		row_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row_inner.add_child(line)
+		row_inner.add_child(detail_btn)
+
 		var margin := MarginContainer.new()
 		margin.add_theme_constant_override("margin_left", 4)
 		margin.add_theme_constant_override("margin_top", 2)
 		margin.add_theme_constant_override("margin_right", 4)
 		margin.add_theme_constant_override("margin_bottom", 2)
 		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		margin.add_child(line)
+		margin.add_child(row_inner)
 		var panel := PanelContainer.new()
 		var row_bg := StyleBoxFlat.new()
 		row_bg.bg_color = Color(0.965, 0.975, 0.99, 1)
@@ -277,7 +299,14 @@ func _fill_player_rows(rows: Array) -> void:
 		panel.add_theme_stylebox_override("panel", row_bg)
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.add_child(margin)
-		_player_rows.add_child(panel)
+
+		var item_vbox := VBoxContainer.new()
+		item_vbox.add_theme_constant_override("separation", 4)
+		item_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_vbox.add_child(panel)
+		item_vbox.add_child(detail_panel)
+		_player_rows.add_child(item_vbox)
+		_player_contract_detail_panels.append(detail_panel)
 		if i < lim - 1:
 			_player_rows.add_child(HSeparator.new())
 
@@ -415,6 +444,76 @@ func _format_contract_risk_detail_text(risk: Dictionary) -> String:
 	var sev: String = _str_cell(risk.get("severity", null))
 	var memo: String = _str_cell(risk.get("memo", null))
 	return "人事リスク詳細\n%s\n値: %s\n重要度: %s\nメモ: %s" % [lab, disp, sev, memo]
+
+
+func _ensure_player_contract_inline_detail_styles() -> void:
+	if _player_contract_detail_style_normal != null:
+		return
+	_player_contract_detail_style_normal = _make_contract_risk_detail_panel_style(
+		Color(0.92, 0.96, 1.0, 1),
+		Color(0.48, 0.64, 0.86, 1),
+	)
+
+
+func _create_player_contract_inline_detail_panel() -> Dictionary:
+	_ensure_player_contract_inline_detail_styles()
+	var detail_panel := PanelContainer.new()
+	detail_panel.visible = false
+	detail_panel.add_theme_stylebox_override("panel", _player_contract_detail_style_normal)
+	detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var detail_lab := Label.new()
+	detail_lab.autowrap_mode = 2
+	detail_lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	detail_lab.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	detail_lab.add_theme_font_size_override("font_size", 14)
+	detail_lab.add_theme_constant_override("line_spacing", 4)
+	detail_lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	detail_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(detail_lab)
+	detail_panel.add_child(margin)
+	return {"panel": detail_panel, "label": detail_lab}
+
+
+func _format_player_contract_detail_text(p: Dictionary) -> String:
+	var nm: String = _str_cell(p.get("player_name", null))
+	var pos: String = _str_cell(p.get("position", null))
+	var age_s: String = _str_cell(p.get("age", null))
+	var ovr: String = _str_cell(p.get("overall", null))
+	var pot: String = _str_cell(p.get("potential", null))
+	var sal: String = _str_cell(p.get("salary_label", p.get("salary", null)))
+	var cy: String = _str_cell(p.get("contract_years_label", p.get("contract_years", null)))
+	var cst: String = _str_cell(p.get("contract_status_label", p.get("contract_status", null)))
+	var nat: String = _str_cell(p.get("nationality_slot_label", p.get("nationality_slot", null)))
+	var fa: String = _str_cell(p.get("fa_flag_label", null))
+	var rk: String = _str_cell(p.get("risk_label", null))
+	var memo: String = _str_cell(p.get("memo", null))
+	return (
+		"主要契約選手詳細\n"
+		+ "%s\n"
+		+ "ポジション: %s  年齢: %s\n"
+		+ "OVR: %s  POT: %s\n"
+		+ "年俸: %s\n"
+		+ "契約: %s（%s）\n"
+		+ "国籍枠: %s\n"
+		+ "FA目安: %s  リスク: %s\n"
+		+ "メモ: %s"
+	) % [nm, pos, age_s, ovr, pot, sal, cy, cst, nat, fa, rk, memo]
+
+
+func _on_player_contract_detail_button_pressed(
+	detail_panel: PanelContainer, detail_lab: Label, p: Dictionary
+) -> void:
+	if detail_panel.visible:
+		detail_panel.visible = false
+		return
+	for panel in _player_contract_detail_panels:
+		var other: PanelContainer = panel as PanelContainer
+		if other != detail_panel:
+			other.visible = false
+	detail_lab.text = _format_player_contract_detail_text(p)
+	detail_panel.visible = true
 
 
 func _set_status_error_visible(visible: bool) -> void:
