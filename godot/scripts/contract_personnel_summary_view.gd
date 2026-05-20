@@ -220,7 +220,21 @@ func _fill_player_rows(rows: Array) -> void:
 		margin.add_theme_constant_override("margin_bottom", 2)
 		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		margin.add_child(line)
-		_player_rows.add_child(margin)
+		var panel := PanelContainer.new()
+		var row_bg := StyleBoxFlat.new()
+		row_bg.bg_color = Color(0.965, 0.975, 0.99, 1)
+		row_bg.content_margin_left = 4.0
+		row_bg.content_margin_top = 4.0
+		row_bg.content_margin_right = 4.0
+		row_bg.content_margin_bottom = 4.0
+		row_bg.corner_radius_top_left = 2
+		row_bg.corner_radius_top_right = 2
+		row_bg.corner_radius_bottom_right = 2
+		row_bg.corner_radius_bottom_left = 2
+		panel.add_theme_stylebox_override("panel", row_bg)
+		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		panel.add_child(margin)
+		_player_rows.add_child(panel)
 		if i < lim - 1:
 			_player_rows.add_child(HSeparator.new())
 
