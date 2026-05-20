@@ -69,6 +69,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 		return
 
 	_status_label.visible = false
+	_status_label.text = ""
 	_data_source_label.text = _data_source_caption(_last_loaded_uri)
 
 	_title_label.text = _txt(d, "screen_title", "ロスター（閲覧）")
@@ -192,6 +193,37 @@ func _add_player_row(p: Dictionary) -> void:
 	var cells: Array[String] = [order_s, name_s, pos_s, age_s, ovr_s, sal_s, con_s, nat_s, st_s]
 	for i in range(cells.size()):
 		var s: String = cells[i]
+		if i == 1:
+			var name_cell := HBoxContainer.new()
+			name_cell.add_theme_constant_override("separation", 4)
+			name_cell.custom_minimum_size.x = _col_width(1)
+
+			var lab := Label.new()
+			lab.text = s
+			_style_ondark_table_cell_label(lab)
+			lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			lab.clip_text = true
+			lab.add_theme_font_size_override("font_size", 13)
+			lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+			var name_raw: Variant = p.get("name", null)
+			if name_s != "-" and name_raw != null:
+				var tip: String = str(name_raw).strip_edges()
+				if not tip.is_empty():
+					lab.tooltip_text = tip
+					lab.mouse_filter = Control.MOUSE_FILTER_PASS
+
+			var detail_btn := Button.new()
+			detail_btn.text = "詳細"
+			detail_btn.flat = true
+			detail_btn.custom_minimum_size = Vector2(36, 0)
+			detail_btn.add_theme_font_size_override("font_size", 11)
+			detail_btn.pressed.connect(_show_selected_player_summary.bind(p))
+
+			name_cell.add_child(lab)
+			name_cell.add_child(detail_btn)
+			row.add_child(name_cell)
+			continue
+
 		var lab := Label.new()
 		lab.text = s
 		_style_ondark_table_cell_label(lab)
@@ -199,17 +231,7 @@ func _add_player_row(p: Dictionary) -> void:
 		lab.clip_text = true
 		if i == 5:
 			lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		if i == 1:
-			lab.add_theme_font_size_override("font_size", 13)
-			lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
-			# 長い名前が clip されたとき全文を確認できるようにする（autowrap は使わない）
-			var name_raw: Variant = p.get("name", null)
-			if name_s != "-" and name_raw != null:
-				var tip: String = str(name_raw).strip_edges()
-				if not tip.is_empty():
-					lab.tooltip_text = tip
-					lab.mouse_filter = Control.MOUSE_FILTER_PASS
-		elif i == 4:
+		if i == 4:
 			lab.add_theme_font_size_override("font_size", 13)
 			lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
 		elif i == 8:
@@ -346,6 +368,44 @@ func _contract_cell(p: Dictionary) -> String:
 	if display.is_empty():
 		return "-"
 	return display
+
+
+func _show_selected_player_summary(p: Dictionary) -> void:
+	var name_s := _str_cell(p.get("name", null))
+	var pos_s := _str_cell(p.get("position", null))
+	var age_s := _age_cell(p.get("age", null))
+	var ovr_s := _ovr_cell(p.get("ovr", null))
+	var st_s := _str_cell(p.get("status", null))
+
+	var con_s := "-"
+	var cl_raw: Variant = p.get("contract_label", null)
+	if cl_raw != null:
+		var cl_tip: String = str(cl_raw).strip_edges()
+		if not cl_tip.is_empty():
+			con_s = cl_tip
+	if con_s == "-":
+		var cy_raw: Variant = p.get("contract_years_left", null)
+		if cy_raw != null:
+			if typeof(cy_raw) in [TYPE_INT, TYPE_FLOAT]:
+				var cn: int = int(cy_raw)
+				if cn >= 0:
+					con_s = "残り%d年" % cn
+			elif typeof(cy_raw) == TYPE_STRING:
+				var cys: String = str(cy_raw).strip_edges()
+				if cys.is_valid_int():
+					var cni: int = cys.to_int()
+					if cni >= 0:
+						con_s = "残り%d年" % cni
+	if con_s == "-":
+		var cell_con := _contract_cell(p)
+		if cell_con != "-":
+			con_s = cell_con
+
+	_status_label.text = "%s\n%s / %s\nOVR %s\n契約: %s\n状態: %s" % [
+		name_s, pos_s, age_s, ovr_s, con_s, st_s,
+	]
+	_status_label.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	_status_label.visible = true
 
 
 func _on_home_nav_button_pressed() -> void:
