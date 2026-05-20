@@ -9,6 +9,8 @@ var _roster_json_paths: Array[String] = [
 const _LOAD_FAILED_MESSAGE := "ロスターデータ読込に失敗しました"
 
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
+const _PLAYER_DETAIL_VIEW_SCENE_PATH := "res://scenes/player_detail_view.tscn"
+const _ROSTER_VIEW_SCENE_PATH := "res://scenes/roster_view.tscn"
 
 var _last_loaded_uri: String = ""
 var _summary_panel: PanelContainer = null
@@ -27,6 +29,10 @@ var _summary_style_error: StyleBoxFlat = null
 func _ready() -> void:
 	_setup_selected_player_summary_style()
 	_apply_snapshot(_load_roster_snapshot())
+
+
+func _selection_context() -> Node:
+	return get_node_or_null("/root/ReadonlySelectionContext")
 
 
 func _load_roster_snapshot() -> Dictionary:
@@ -222,8 +228,16 @@ func _add_player_row(p: Dictionary) -> void:
 			detail_btn.add_theme_font_size_override("font_size", 11)
 			detail_btn.pressed.connect(_show_selected_player_summary.bind(p))
 
+			var screen_btn := Button.new()
+			screen_btn.text = "画面"
+			screen_btn.flat = true
+			screen_btn.custom_minimum_size = Vector2(32, 0)
+			screen_btn.add_theme_font_size_override("font_size", 11)
+			screen_btn.pressed.connect(_open_player_detail_view.bind(p))
+
 			name_cell.add_child(lab)
 			name_cell.add_child(detail_btn)
+			name_cell.add_child(screen_btn)
 			row.add_child(name_cell)
 			continue
 
@@ -481,6 +495,50 @@ func _show_selected_player_summary(p: Dictionary) -> void:
 		name_s, pos_s, age_s, ovr_s, con_s, st_s,
 	]
 	_set_selected_player_summary_visible(true, false)
+
+
+func _player_id_from_row(player_row: Dictionary) -> int:
+	var raw: Variant = player_row.get("player_id", -1)
+	if raw == null:
+		return -1
+	if typeof(raw) in [TYPE_INT, TYPE_FLOAT]:
+		return int(raw)
+	if typeof(raw) == TYPE_STRING:
+		var s := str(raw).strip_edges()
+		if s.is_valid_int():
+			return s.to_int()
+	return -1
+
+
+func _show_roster_status_message(message: String, is_error: bool = true) -> void:
+	_status_label.text = message
+	_set_selected_player_summary_visible(true, is_error)
+
+
+func _open_player_detail_view(player_row: Dictionary) -> void:
+	var player_id := _player_id_from_row(player_row)
+	if player_id <= 0:
+		_show_roster_status_message("選手詳細画面を開けません: player_id がありません", true)
+		return
+
+	var ctx := _selection_context()
+	if ctx == null:
+		_show_roster_status_message("選択状態を保存できません", true)
+		return
+
+	var payload := player_row.duplicate()
+	if not payload.has("player_id"):
+		payload["player_id"] = player_id
+
+	ctx.call("set_player", player_id, payload, _ROSTER_VIEW_SCENE_PATH, "ロスター")
+
+	var err := get_tree().change_scene_to_file(_PLAYER_DETAIL_VIEW_SCENE_PATH)
+	if err != OK:
+		_show_roster_status_message("選手詳細画面を開けませんでした", true)
+		push_warning(
+			"[roster_view] change_scene_to_file failed: %s err=%s"
+			% [_PLAYER_DETAIL_VIEW_SCENE_PATH, err]
+		)
 
 
 func _on_home_nav_button_pressed() -> void:
