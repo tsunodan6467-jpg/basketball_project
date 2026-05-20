@@ -1,0 +1,305 @@
+# Godot Phase 4 ロスター状態列視認補助後の次タスク比較（2026-05）
+
+## 1. 現在地
+
+- **最新コミット**: `5545064` — Godotロスター状態列視認補助第2段の確認を記録（実装 `746e861` の docs 記録）
+- **主要10画面 Theme 第1段**: 完了（README / docs 記載どおり）
+- **Body余白横展開レーン 5 Body**: 完了（`b71a183` 確認記録時点）。財務 HistoryBody / OM MissionsBody / 戦術 PlayerRolesBody / 契約 PlayerRows / 契約 RiskRows
+- **日程本格整備**:
+  - **第1手**: upcoming 試合カード内情報階層 — `fa36271` / `d951777`（`_add_upcoming_block`）
+  - **第2手**: advance_hint ブロック内情報階層 — `5a98e31` / `470da16`（`_add_advance_hint_block`）
+  - **第3手**: empty_message（お知らせ）本文情報階層 — `065197b` / `08c15f3`（`_add_empty_message_block`）
+- **ロスター本格整備**:
+  - **第1手**: RowList 選手行の平坦行背景 — `9445d0e` / `834a975`（`_add_player_row`）
+  - **第2手**: 氏名列・OVR列の主要列強調 — `6c1e25f` / `50caa49`（`_add_player_row`）
+  - **第3手**: 状態列（i==8）視認補助 — `746e861` / `5545064`（`_add_player_row`）
+- **細かい余白/区切り微調整**: `b71a183` で一区切り。margin / HSeparator の追加微調整レーンは継続しない方針
+- **残っている大きな候補**: 日程 ScrollContent 全体・試合リスト本格、ロスター本格続き（9列・カード化・tooltip・列幅等）、Body 中規模整理（Panel 行ラップ等）、ゲーム体験寄り画面、施設/クラブ史/順位表第2段、Python本体、総点検
+- **今回の調査目的**: ロスター状態列視認補助完了後、案A〜Gを比較し、次に安全かつ前進感のある **1タスク** を決定する
+- **実装変更**: なし（本ファイルの追加のみ）
+- **Composer 2.5 指定時の方針**: 指示範囲外の変更・README/docs の勝手更新・大改修は行わない。調査レポート1ファイルのみ追加
+
+## 2. ロスター状態列視認補助の完了評価
+
+### `746e861` / `5545064`
+
+- **対象**: `roster_view.gd` の `_add_player_row` のみ
+- **状態列の到達点**:
+  - `elif i == 8:` で `font_size` 13、`font_color` `Color(0.08, 0.11, 0.18, 1)`（氏名/OVR と同系）
+  - 既定セル 12 から +1 の最小 typography 補助
+  - 状態列 tooltip（`st_s != "-"` 時）と `mouse_filter` は維持
+- **3読み取りポイント強化の意味**:
+  - **氏名（i==1）**: 誰か
+  - **OVR（i==4）**: どの能力か
+  - **状態（i==8）**: 今どういうコンディションか
+  - RowList 上で「誰が・どの能力で・どんな状態か」を追いやすい方向へ進んだ
+- **改善されたこと**: 状態列が埋もれにくい。3列の視認優先度が揃った
+- **維持したこと**: 9列・列順・列幅・文言・JSON key、行背景 Panel、HSeparator、Header、HomeNavButton、DataSourceLabel
+- **まだ残るロスター本格タスク**:
+  - 選手行カード化、9列レイアウト本格、tooltip 再設計、列幅・表示優先度本格、RowList 余白本格、ソート/フィルタ/詳細導線
+- **注意**: **ロスター本格整備全体は未完了**。**9列本格・tooltip再設計・列幅本格の完了でもない**
+
+## 3. ロスター本格継続候補（案A）
+
+### 現状
+
+- `_add_player_row`: 平坦 Panel 行背景 + 氏名/OVR/状態の typography 強調済み（i==1 / 4 / 8）
+- 9列 HBox、tooltip は列1・列8、`_col_width` 固定配列
+- `_apply_snapshot`: 行間 HSeparator
+
+### 価値
+
+- ゲーム中心画面としての価値は引き続き高い
+- 契約残り列（i==6）の軽い強調など、1コミット候補は理論上ある
+
+### リスク
+
+- **typography レーンは一区切り** — 列を増やすと「小さな強調の積み上げ」になり、前進感が弱い
+- 9列本格・カード化・tooltip・列幅は **回帰リスク高**
+- 残り契約列強調は判断価値が状態列より低い
+
+### 1コミットで切れる候補
+
+| 候補 | 関数 | 規模 | 安全性 | 評価 |
+|------|------|------|--------|------|
+| 契約残り列（i==6）軽い強調 | `_add_player_row` | 極小 | 中 | 効果小・typography 継続 |
+| 9列本格 / カード化 | `_add_player_row` + `_col_width` | 大 | 低 | 今は不適 |
+| RowList 余白本格 | 複数 | 大 | 低 | 微調整寄り |
+
+### 今すぐ適するか
+
+- **不適**。第1〜3手で読み取りポイント強化は完了。**次は別レーンへ移るのが自然**
+
+## 4. 日程本格継続候補（案B）
+
+### 現状
+
+- upcoming / advance_hint / empty_message の3系統ブロック内情報階層は完了
+- `_fill_scroll_body`: empty_message（条件付き）→ upcoming 見出し+試合カード → advance_hint
+- `.tscn` ScrollContent VBox `separation=8` が試合カード間余白を担う
+- `_add_upcoming_section_heading` は見出しのみ・inner separation 4（他ブロック 6 より弱い）
+
+### 価値
+
+- README **次候補（中規模以上）の先頭**は日程 ScrollContent / 試合リスト本格
+- 試合・進行画面としての完成度・ゲーム体験への近さは高い
+
+### リスク
+
+- **1関数・中規模で安全に閉じるタスクがほぼ枯渇**（`df10b8e` 調査と同型）
+- ScrollContent 全体・試合リスト本格は **複数関数 + scene** が絡み、1コミット安全性が低い
+- 見出し separation 6化のみは **中規模以上に届かない**（微調整寄り）
+- ロスター3手完了直後に日程へ戻ると、レーン偏りが再発しやすい
+
+### 1コミットで切れる候補
+
+| 候補 | 関数/範囲 | 規模 | 安全性 |
+|------|-----------|------|--------|
+| 「今後の予定」見出し separation 6化 | `_add_upcoming_section_heading` | 極小 | 高（効果小） |
+| ScrollContent 全体 | `_fill_scroll_body` 他 | 大 | 低 |
+| 試合リスト本格 | `_add_upcoming_block` 再設計 | 大 | 低 |
+
+### 今すぐ適するか
+
+- **README 優先度は高いが、即実装には不向き**。ScrollContent / 試合リスト本格は **サブスライス設計後**が安全
+
+## 5. Body本格整備の中規模整理候補（案C）
+
+### 現状
+
+- 5 Body に margin + HSeparator + 文字色補正済み
+- 財務 `_fill_history_rows`: Label → MarginContainer → HistoryBody 直置き（Panel 行ラップなし）
+- ロスター `9445d0e` で平坦 Panel 行背景パターンが実績あり
+
+### 価値
+
+- Body余白横展開完了後の **中規模第1手**として自然
+- **財務 HistoryBody 履歴行の平坦 Panel 行ラップ**は `9445d0e` の横展開で、1画面・1関数（`_fill_history_rows`）に絞れる
+- ロスター typography レーン完了後、**別レーンの構造改善**に移れる
+- `df10b8e` でも Body Panel パイロットは第2候補として整理済み（当時はロスター第3手を優先）
+
+### リスク
+
+- 経営サブ画面寄りで、日程・ロスターよりゲーム体験への近さは弱い
+- Panel 化は UI 磨きに見えやすいが、**行背景ラップは中規模の構造改善**として妥当
+- 履歴行は autowrap あり — 行高さ変化に注意（ロスターと異なる）
+
+### 今すぐ適するか
+
+- **最適**。ロスター3手完了・日程1関数枯渇の状況で、**安全に1コミットで閉じられる中規模タスク**
+
+## 6. ゲーム体験に近い機能 / 画面追加候補（案D）
+
+### 候補
+
+- 試合詳細 / 結果詳細、週次進行、契約/FA 判断画面など
+
+### 価値
+
+- 長期的に Steam 向けの面白さに最も直結
+
+### リスク
+
+- export / mock / scene / nav / tests 追加が絡み **1コミットで閉じない**
+- readonly 10画面の中規模磨きが途中
+
+### 事前調査
+
+- **必須**
+
+### 今すぐ適するか
+
+- **不適**
+
+## 7. 施設 / クラブ史 / 順位表 第2段候補（案F）
+
+| 画面 | 重さ | 今すぐ |
+|------|------|--------|
+| 施設 | 中 | 後回し |
+| クラブ史 | 中〜大 | 後回し |
+| 順位表 | 大（8列級） | 後回し |
+
+- 中心導線（ホーム / ロスター / 日程）より優先度が低い
+
+## 8. 総点検 / ロードマップ整理候補（案E）
+
+- **節目**: 日程3系統 + ロスター3手 + Body 5本余白は記録上の節目
+- **既存docs**: `5545064` / README 現在地で到達点は記載済み
+- **本レポートで案A〜G比較を代替可能**
+- **今すぐ実装停止の必要は低い**
+
+## 9. Python本体 / ゲームロジック側へ戻る候補（案G）
+
+- **価値**: ゲームの芯
+- **リスク**: 戻る領域が広い。GUI でロスター3読み取りポイント・日程3系統は一段落したが、**日程 ScrollContent 未着手**のため完全撤退は早い
+- **今すぐ**: **いいえ**
+- **事前整理**: Python テーマ1つ選定 + export 影響調査
+
+## 10. 選択肢比較表
+
+| 案 | 対象 | 主な変更範囲 | 変更規模 | UI効果 | ゲーム体験への近さ | 回帰リスク | 1コミット安全性 | 推奨度 |
+|----|------|--------------|----------|--------|-------------------|------------|-----------------|--------|
+| A | ロスター本格継続 | 契約列強調 / 9列本格等 | 極小〜大 | 低〜中 | 高 | 中〜高 | 低〜中 | ★☆☆ |
+| B | 日程本格継続 | ScrollContent / 試合リスト本格 | 大 | 中〜高 | **最高** | 中〜高 | 低 | ★★☆（設計後） |
+| C | Body中規模 | **財務 HistoryBody Panel行ラップ** | 中 | 中 | 低〜中 | **低〜中** | **高** | **★★★** |
+| D | ゲーム体験新規 | scene/nav/export 追加 | 大 | 高 | 最高 | 大 | 低 | ★☆☆ |
+| E | 総点検 | docs/report | 小 | なし | なし | なし | 高 | ★★☆（本件で代替） |
+| F | 施設/史/順位 | 各 view.gd 複数 | 中〜大 | 中 | 低 | 中〜高 | 低〜中 | ★☆☆ |
+| G | Python本体 | basketball_sim | 大 | なし | 最高（長期） | 中 | 低 | ★☆☆ |
+
+## 11. 推奨する次タスク
+
+**推奨タスク名**: Body本格整備・中規模第1手 — 財務 HistoryBody 履歴行の平坦 Panel 行ラップ
+
+- **対象ファイル**: `godot/scripts/finance_summary_view.gd`
+- **対象関数**: `_fill_history_rows` の履歴行追加ループ部分のみ
+- **なぜ今それを選ぶのか**:
+  - ロスター本格整備・第3手（状態列視認補助）まで完了し、**RowList の typography 強調レーン（氏名・OVR・状態）は一区切り**
+  - README 次候補の先頭は日程 ScrollContent だが、**1関数・中規模で安全に閉じられる日程タスクが枯渇**（3系統ブロック内階層完了済み）
+  - Body余白横展開 5 Body 完了後、**Panel 行ラップは `df10b8e` 時点から第2候補として整理済み**の中規模スライス
+  - ロスター `9445d0e` の平坦 Panel 行背景パターンを **財務履歴行へ横展開**でき、構造改善として前進感がある
+  - 1画面・1関数に限定でき、回帰リスクを抑えられる
+- **なぜ他案を後回しにするのか**:
+  - **案A ロスター**: typography 3点完了。契約列強調は効果小。9列本格は危険
+  - **案B 日程**: README 優先度高いが ScrollContent 本格はスコープ大。**実装前にサブスライス設計が必要**
+  - **案D/G**: 範囲・調査が大きい
+  - **案E**: 本レポートで代替
+  - **案F**: 中心導線外
+- **変更対象ファイルの想定**: `godot/scripts/finance_summary_view.gd`（実装）、続けて README + 2 docs（確認記録）
+- **変更してはいけないファイル**: `finance_summary_view.tscn`、他画面 `.gd`、Theme、project.godot、data JSON、export/tests、sandbox、handoff md
+- **実装する場合の安全条件**:
+  - `_fill_history_rows` の履歴行追加ループのみ（空表示分岐は最小差分で維持）
+  - 既存 Label の文言・件数上限（lim=5）・HSeparator ロジックを維持
+  - ロスター `9445d0e` と同系の **薄い StyleBoxFlat + 角丸2 + content margin 4** の平坦 Panel（`Phase4SummaryCard` は使わない）
+  - 履歴行の font_color / font_size / autowrap は維持（Panel はラップのみ）
+  - MarginContainer は Panel 内側または既存構造を壊さない形で整理（**margin 微調整レーンには戻らない**）
+- **Godot目視確認ポイント**:
+  - ホーム → 財務サマリー → 履歴カード内の各行に平坦な行背景
+  - 履歴文言・件数・HSeparator・空表示
+  - HeaderCard / 静的カード群 / DataSourceLabel / HomeNavButton
+- **pytest**: 実装後 — `test_finance_summary_readonly_export.py`、`test_home_dashboard_readonly_export.py`、`test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+
+## 12. 推奨タスクの最小実装案（Cursor指示骨子）
+
+### 目的
+
+財務 HistoryBody の動的履歴行を、ロスター `9445d0e` と同型の **平坦 Panel 行ラップ**で視認性を上げる。**Body本格整備全体の完了ではない**。
+
+### 変更してよいファイル
+
+- `godot/scripts/finance_summary_view.gd`（`_fill_history_rows` の履歴行追加ループのみ）
+
+### 変更してはいけないファイル
+
+- `finance_summary_view.tscn`、他画面 scene/script、Theme、project.godot、data JSON、export/tests、sandbox、handoff md
+
+### 実装方針
+
+- 各行: 既存 `line` Label を `PanelContainer` + `StyleBoxFlat` でラップしてから `_history_body.add_child`
+- ロスター行背景と同系の薄色・角丸2・margin 4（値は `9445d0e` を参考に目視調整可）
+- 既存 `margin` MarginContainer との関係は **構造を壊さない最小差分**で（Panel 内に margin+line、または margin を Panel 内へ移す等 — 実装時に既存パターンに合わせる）
+- 行間 `HSeparator` は現行どおり
+
+### 表示文言・件数・順序・JSON key
+
+- **変更しない**
+
+### 確認コマンド
+
+```
+py -m pytest basketball_sim/tests/test_finance_summary_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+git diff -- godot/scripts/finance_summary_view.gd
+```
+
+### 目視確認ポイント
+
+- 上記 §11
+
+### テスト方針
+
+- 上記3本
+
+### コミット名案
+
+- 実装: `Godot財務履歴行に平坦行背景を追加`
+- 確認記録: `Godot財務履歴行背景第2段の確認を記録`
+
+## 13. 後回しにする案と理由
+
+| 案 | 理由 |
+|----|------|
+| A ロスター継続 | 氏名/OVR/状態の typography レーン完了。契約列強調は効果小。9列本格は危険 |
+| B 日程継続 | README 先頭だが1コミット不可。ScrollContent 本格はサブスライス設計後 |
+| D ゲーム体験新規 | 重い |
+| E 総点検のみ | 本レポートで代替 |
+| F 施設/史/順位 | 中心導線外 |
+| G Python本体 | テーマ選定・GUI一段落後でも日程 ScrollContent 計画が残る |
+
+**日程内で後回し**: ScrollContent全体、試合リスト本格、画面統一、「今後の予定」見出しのみの微調整
+
+**ロスター内で後回し**: 9列本格、カード化、tooltip再設計、列幅本格、契約列の追加 typography
+
+**Body内で後回し**: OM/戦術/契約への Panel 横展開（財務パイロット成功後）
+
+## 14. 変更していないファイル
+
+- `godot/scenes/*.tscn`
+- `godot/scripts/*.gd`
+- Theme `.tres`（`godot/themes/phase4_readonly_core.tres`）
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 `reports/*.txt`（本ファイルの新規追加のみ）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- sandbox scene（`home_production_wire_preview.tscn` 等）
+- handoff 系未追跡 md
+
+---
+
+**調査実施**: 2026-05（ロスター状態列視認補助 `746e861` / `5545064` 完了後）  
+**pytest**: 調査レポート追加のみのため未実施
