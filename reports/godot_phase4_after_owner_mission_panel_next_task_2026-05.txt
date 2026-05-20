@@ -1,0 +1,306 @@
+# Godot Phase 4 OM MissionsBody平坦Panel行ラップ後の次タスク比較（2026-05）
+
+## 1. 現在地
+
+- **最新コミット**: `6f2237a` — Godotオーナーミッション行Panel整理第2段の確認を記録（実装 `1316a16`）
+- **主要画面 Theme 第1段**: 10画面完了（README 現在地）
+- **Body余白横展開レーン 5 Body**: `b71a183` まで完了・記録済み（財務 HistoryBody / OM MissionsBody / 戦術 PlayerRolesBody / 契約 PlayerRows / 契約 RiskRows）
+- **日程本格整備**: 第1手 upcoming（`fa36271`）、第2手 advance_hint（`5a98e31`）、第3手 empty_message（`065197b`）— 実装・確認・記録済み
+- **ロスター本格整備**: 第1手 平坦行背景（`9445d0e`）、第2手 氏名・OVR列（`6c1e25f`）、第3手 状態列（`746e861`）— 3読み取りポイント強化完了
+- **Body本格整備・中規模**: 第1手 財務 HistoryBody Panel（`c762d88` / `c74df97`）、第2手 OM MissionsBody Panel（`1316a16` / `6f2237a`）— **2画面で平坦 Panel 行パターン確認済み**
+- **細かい余白/区切り微調整**: `b71a183` で一区切り（継続しない）
+- **残っている大きな候補**: Body本格全体・5 Body への Panel 横展開（戦術/契約未）、日程 ScrollContent / 試合リスト本格、ロスター9列・tooltip・カード化、ゲーム体験寄り画面、Python本体復帰、施設/クラブ史/順位表第2段
+- **今回の調査目的**: `6f2237a` 後に次の安全な1タスクを案A〜Gで比較し1件に絞る
+- **実装変更**: なし（本ファイル追加のみ）
+
+## 2. OM MissionsBody平坦Panel行ラップの完了評価
+
+- **`1316a16` / `6f2237a`**: 選定調査 `4b9e7c3` → 実装 → docs 記録まで完了
+- **到達点**: `_fill_mission_rows` ミッション行ループのみ。**PanelContainer → MarginContainer → Label**。StyleBoxFlat は財務 `c762d88` 同系
+- **第2検証の意味**: 財務と構造が近い OM で同型 Panel 行化が問題なく通り、Body 系「行単位の情報カード化」が2画面で確認できた
+- **改善**: ミッション1件を平坦な情報単位として視認しやすくした
+- **維持**: 文言・件数・順序・JSON key・空表示（Label 直置き）・margin 4/2/4/2・HSeparator（`i < n - 1`）・Summary/notes・導線
+- **まだ残る Body 本格タスク**: 戦術/契約への Panel 横展開、各 Body のさらなる本格化、Body 共通方針整理
+- **Body本格整備全体・5 Body Panel 横展開の完了ではない**
+
+## 3. Body横展開 / Body中規模整理候補（案A）
+
+### 現状
+
+- Panel 済み: 財務 `_fill_history_rows`、OM `_fill_mission_rows`
+- Panel 未済み: 戦術 `_fill_player_roles`、契約 `_fill_player_rows`、契約 `_fill_risk_rows` — いずれも **MarginContainer 直置き + HSeparator**（余白横展開済み）
+
+### 価値
+
+- `1316a16` の直続として自然。**3画面目**でパターンをさらに固定できる
+- 財務→OM→**戦術**は Body 余白横展開の歴史順（`307e719` → `d4c0372` → `2c637f2`）と一致
+- 1画面・1関数・1コミットで閉じられる中規模第3手
+
+### リスク
+
+- 経営/チームサブ画面寄りでゲーム体験への近さは日程・ロスターより弱い
+- UI 磨きに見えやすいが、構造改善として README 上も中規模レーンと整合
+- 連続3画面 Panel は「磨き続け」に見えるが、**契約2 Body 完了前の段階的横展開**として妥当
+
+### 次に選ぶならどのBodyか
+
+| 優先 | Body | 関数 | 理由 |
+|------|------|------|------|
+| **1** | 戦術 PlayerRolesBody | `_fill_player_roles` | 財務/OMと**同一ループ構造**（Label→margin→body、空表示直置き、最大8件、HSeparator） |
+| 2 | 契約 RiskRows | `_fill_risk_rows` | 1関数だが複数行ブロック・件数上限なし（ループは全件） |
+| 3 | 契約 PlayerRows | `_fill_player_rows` | `lim=8` だが**多行契約テキスト**・`_style_body_label` でやや重い |
+
+### 1コミットで切れる候補
+
+- **Body本格整備・中規模第3手 — 戦術 PlayerRolesBody 選手ロール行の平坦 Panel 行ラップ**（`tactics_summary_view.gd` / `_fill_player_roles` ループのみ）
+
+### 今すぐ適するか
+
+- **最適**。2画面検証後、**最も同型の第3号**として低リスク
+
+## 4. 日程ScrollContent / 試合リスト本格候補（案B）
+
+### 現状
+
+- upcoming / advance_hint / empty_message の3系統は情報階層整理済み
+- `_fill_scroll_body` は複数ブロック追加・親 VBox separation 等が絡む
+
+### 価値
+
+- ゲーム体験への近さは**最高**（README 次候補の筆頭の一つ）
+
+### リスク
+
+- 1関数・1コミットで閉じにくい。**ScrollContent 全体**は中〜大改修寄り
+- 残りの単発改善（見出し separation 等）は中規模未満で方針と矛盾しやすい
+
+### 1コミットで切れる候補
+
+- **現時点では安全な単一実装スライスが未確定**
+
+### 今すぐ適するか
+
+- **実装には不向き**（サブスライス設計先行）。優先度は高いが次の1コミットとしては後回し
+
+### 先にサブスライス設計が必要か
+
+- **はい**（ScrollContent 縦リズム / 試合行カード化 / 画面全体統一のいずれか1つに限定）
+
+## 5. ロスター本格整備候補（案C）
+
+### 現状
+
+- `_add_player_row`: Panel 行背景 + 氏名/OVR/状態の3点強化済み。9列・tooltip・列幅は維持
+
+### 価値
+
+- GM 中心画面。長期価値は高い
+
+### リスク
+
+- typography レーン完了後は9列・tooltip・カード化で**回帰リスク大**
+- 中規模以上で安全な単一手が不明確
+
+### 1コミットで切れる候補
+
+- 現状、推奨できる中規模単手なし
+
+### 今すぐ適するか
+
+- **不適**（Body 第3手または日程設計の後）
+
+## 6. ゲーム体験に近い機能 / 画面追加候補（案D）
+
+### 候補
+
+- 試合詳細/結果、週次進行、契約/FA 判断画面など
+
+### 価値
+
+- Steam 向け面白さに最も直結（長期）
+
+### リスク
+
+- scene/nav/export/mock/tests が絡み1コミット不可
+- Body Panel 3/5・日程 ScrollContent 未着手
+
+### 事前調査
+
+- **必須**
+
+### 今すぐ適するか
+
+- **不適**
+
+## 7. Python本体 / ゲームロジック側へ戻る候補（案E）
+
+### 価値
+
+- ゲームの芯（長期最重要）
+
+### リスク
+
+- 戻る領域が広い。GUI は Body Panel 横展開・日程本格が途中
+
+### 今すぐ戻るべきか
+
+- **いいえ**
+
+### 事前整理すべきこと
+
+- Python テーマ1件選定、export 影響、GUI 中規模レーンの区切り定義
+
+## 8. 施設 / クラブ史 / 順位表 第2段候補（案G）
+
+### 施設
+
+- Scroll + 動的 Label。中規模。中心導線外
+
+### クラブ史
+
+- 段落・表が絡み中〜大
+
+### 順位表
+
+- 8列級。ロスターに近い複雑さ
+
+### 今すぐ適するか
+
+- **不適**（ホーム/ロスター/日程/Body 本格が先）
+
+## 9. 総点検 / ロードマップ整理候補（案F）
+
+### 節目としての価値
+
+- 財務+OM Panel、日程3系統、ロスター3手は記録上の節目
+
+### 既存docsで足りるか
+
+- `6f2237a` / README 現在地で到達点は記載済み。本レポートで案A〜G比較を補完可能
+
+### 今すぐ適するか
+
+- **低**（実装停止の必要は低い）
+
+## 10. 選択肢比較表
+
+| 案 | 対象 | 主な変更範囲 | 変更規模 | UI効果 | ゲーム体験への近さ | 回帰リスク | 1コミット安全性 | 推奨度 |
+|----|------|--------------|----------|--------|-------------------|------------|-----------------|--------|
+| A | Body横展開継続 | 戦術 `_fill_player_roles` Panel行ラップ | 中 | 中 | 低〜中 | **低〜中** | **高** | **★★★** |
+| B | 日程本格 | ScrollContent / 試合リスト | 大 | 中〜高 | **最高** | 中〜高 | 低（設計前） | ★★☆ |
+| C | ロスター本格 | 9列/tooltip/カード化 | 中〜大 | 中〜高 | 高 | 中〜高 | 低〜中 | ★☆☆ |
+| D | ゲーム体験新規 | scene/nav/export | 大 | 高 | 最高 | 大 | 低 | ★☆☆ |
+| E | Python本体 | basketball_sim | 大 | なし | 最高（長期） | 中 | 低 | ★☆☆ |
+| F | 総点検 | docs/report | 小 | なし | なし | なし | 高 | ★★☆（本件で代替） |
+| G | 施設/史/順位 | 各 view.gd | 中〜大 | 中 | 低 | 中〜高 | 低〜中 | ★☆☆ |
+
+## 11. 推奨する次タスク
+
+- **推奨タスク名**: Body本格整備・中規模第3手 — 戦術 PlayerRolesBody 選手ロール行の平坦 Panel 行ラップ
+- **対象ファイル**: `godot/scripts/tactics_summary_view.gd`
+- **対象関数**: `_fill_player_roles`（選手ロール行追加ループのみ。空表示分岐は変更しない）
+- **なぜ今それを選ぶか**:
+  - 財務・OM で確認済みの Panel パターンの**第3検証**として構造が最も一致（同一ループ・max8件・空Label直置き）
+  - Body 余白横展開の歴史順（財務→OM→戦術）と整合
+  - 1画面・1関数で中規模以上の前進感を維持できる
+  - 契約 PlayerRows よりテキスト構造が軽く、RiskRows より件数制御が明確
+- **なぜ他案を後回しにするか**:
+  - **B**: 安全な1スライス未確定・設計先行
+  - **C**: 9列回帰リスク
+  - **D/E**: 範囲・調査不足
+  - **F**: 本レポートで代替
+  - **G**: 中心導線より後
+- **変更対象ファイルの想定**: `tactics_summary_view.gd` のみ（実装時）。確認記録は README/docs（第2段コミット）
+- **変更してはいけないファイル**: 他 `.gd` / `.tscn` / Theme / project.godot / data JSON / export / tests / 既存 reports / handoff md
+- **実装する場合の安全条件**:
+  - `_fill_player_roles` の `for i in range(n):` ループのみ Panel 化
+  - 空「選手ロール情報はありません。」は Label 直置きのまま
+  - 最大8件・`_player_role_line` 出力・順序・JSON key を変えない
+  - StyleBoxFlat は財務 `c762d88` / OM `1316a16` と同系
+  - HSeparator は `i < n - 1`、最終行後なし
+- **Godot目視確認ポイント**: PlayerRolesBody 各行 Panel、背景が派手すぎない、ロール文言・件数（最大8）・順序、空表示、HSeparator、他カード・DataSourceLabel、HomeNavButton 戻り、エラーなし・実行後差分なし
+- **pytest**: 実装時は `test_tactics_summary_readonly_export.py` を最低限。併せて home / owner_mission または phase0 smoke を推奨
+
+## 12. 推奨タスクの最小実装案
+
+### 目的
+
+財務・OM と同型の平坦 Panel 行ラップを戦術 PlayerRolesBody に横展開し、Body本格・中規模第3手を1コミットで完了する。
+
+### 変更してよいファイル
+
+- `godot/scripts/tactics_summary_view.gd`（実装コミット）
+- `godot/README.md`、`docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`、`docs/GODOT_NAVIGATION_PHASE4_2026-05.md`（ユーザー Godot 確認後の第2段のみ）
+
+### 変更してはいけないファイル
+
+- 他画面 `.gd` / `.tscn`、Theme、project.godot、data JSON、export、tests、既存 reports、handoff md、sandbox
+
+### 実装方針
+
+- `_fill_player_roles` ループ内: 既存 `margin` を `PanelContainer` + `StyleBoxFlat`（bg 0.965/0.975/0.99、content margin 4、radius 2）で包む
+- `panel.add_child(margin)` → `_player_roles_body.add_child(panel)`
+- 行間 HSeparator は維持
+
+### 表示文言・件数・順序・JSON key
+
+- 変更しない（`player_role_items`、max 8、`_player_role_line`）
+
+### 確認コマンド
+
+```
+py -m pytest basketball_sim/tests/test_tactics_summary_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_owner_mission_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+git diff -- godot/scripts/tactics_summary_view.gd
+git status --short
+```
+
+### 目視確認ポイント
+
+§11 と同様
+
+### テスト方針
+
+上記 pytest
+
+### コミット名案
+
+- 実装: `Godot戦術選手ロール行を平坦Panelで整理`
+- 確認記録: `Godot戦術選手ロール行Panel整理第2段の確認を記録`
+
+## 13. 後回しにする案と理由
+
+| 案 | 理由 |
+|----|------|
+| B 日程 | ScrollContent は複数関数・設計先行。次の1コミット実装としては未確定 |
+| C ロスター | 9列・tooltip リスク。中規模単手不明 |
+| D ゲーム体験 | export/nav 追加が必要 |
+| E Python | 戻る領域が広く GUI Body/日程未完了 |
+| F 総点検 | 本レポートと README で足りる |
+| G 施設/史/順位 | 中心導線より後 |
+
+**補足**: 戦術 Panel 第3手の次は、(1) 契約 RiskRows または PlayerRows への Panel 第4手、(2) 日程 ScrollContent サブスライス設計→1ブロック実装、のどちらかを**その時点で再比較**するのが望ましい（ゲーム体験優先度と Body 5本完了度のバランス）。
+
+## 14. 変更していないファイル
+
+- godot/scenes/*.tscn
+- godot/scripts/*.gd（調査のみ。本コミットでは未変更）
+- godot/themes/phase4_readonly_core.tres
+- godot/project.godot
+- godot/README.md
+- docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md
+- docs/GODOT_NAVIGATION_PHASE4_2026-05.md
+- 既存 reports/*.txt（本ファイルは新規追加）
+- basketball_sim/export/*.py
+- basketball_sim/tests/*.py
+- godot/data/*.json
+- sandbox scene
+- docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md（未追跡のまま触らない）
+
+---
+
+調査日: 2026-05
+調査コミット基準: 6f2237a
+pytest: 調査レポート追加のみのため未実施
