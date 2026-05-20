@@ -1,0 +1,224 @@
+# Godot Phase 4 ロスター本格整備（9列・詳細導線）前 — 次サブスライス比較（2026-05）
+
+## 1. 調査目的
+
+Body Panel 横展開完了、日程 ScrollContent 主要3ブロック外装統一（`aa33902` / `3eb9d3a` / `e7ddcad`）後、**「余白や小UI調整の延々続けを避け、ゲーム体験に近づく」**方針のもと、ロスター本格（9列・詳細導線）に入る前に **1コミットで閉じられる安全な切り出し単位**を比較し、次に実装すべき **1件** を決定する。
+
+## 2. 現在の最新コミット
+
+- **`e7ddcad`** — Godot日程empty_message外装を平坦Panelで整理
+- 直前: **`3eb9d3a`** advance_hint、**`aa33902`** upcoming 外装 Panel 化
+- **`230897e`** 契約 RiskRows Panel — **5 Body Panel 横展開レーン完了**
+- ロスター到達点（実装済み・docs 記録済み）:
+  - 第1手 平坦行背景 `9445d0e`
+  - 第2手 氏名・OVR 列強調 `6c1e25f`
+  - 第3手 状態列視認補助 `746e861`（tooltip 維持）
+
+## 3. 現在のロスター画面構造
+
+| 領域 | 実装 | 備考 |
+|------|------|------|
+| 静的（`.tscn`） | HeaderCard、Summary、**TableCard / %RowList** | Theme: Phase4TableHead / Phase4TableCell |
+| `_apply_snapshot` | JSON 読込、メタ・Footer、**ヘッダ行 + 選手行ループ** | 件数・順序は `players` 配列順 |
+| 表ヘッダ | `_add_table_header_row` | 9列固定見出し（`#`〜`状態`） |
+| 選手行 | `_add_player_row` | **Panel（平坦行背景）→ HBox → 9×Label** |
+| 行間 | `_apply_snapshot` ループ | `HSeparator`（最終行後なし） |
+
+**9列（index 0〜8）:**
+
+| i | 見出し | 幅（`_col_width`） | 現状の特別処理 |
+|---|--------|-------------------|----------------|
+| 0 | # | 32 | なし |
+| 1 | 選手名 | 176 | font 13・濃色・**tooltip（name）**・mouse_filter PASS |
+| 2 | Pos | 36 | なし |
+| 3 | 年齢 | 44 | なし |
+| 4 | OVR | 52 | font 13・濃色 |
+| 5 | 年俸 | 106 | **右寄せ** |
+| 6 | 残り契約 | 80 | `_contract_cell` 表示のみ |
+| 7 | 区分 | 100 | なし |
+| 8 | 状態 | 136 | font 13・濃色・**tooltip（status）**・mouse_filter PASS |
+
+**既に「選手行カード化」に近いもの:** 行単位 `PanelContainer` + 平坦 `StyleBoxFlat` は導入済み（HBox 9列は維持）。
+
+## 4. 既に完了済み改善
+
+| 区分 | 内容 | コミット目安 |
+|------|------|--------------|
+| Theme 第1段 | roster_view.tscn Phase4 化 | `f866f5b` / `407f014` |
+| 行区切り | RowList 選手行間 HSeparator | `8a95fcf` |
+| 本格第1手 | 平坦行背景（Panel 行ラップ） | `9445d0e` |
+| 本格第2手 | 氏名列・OVR列強調 | `6c1e25f` |
+| 本格第3手 | 状態列視認補助 + tooltip | `746e861` |
+
+**到達点:** 「誰が・どの能力で・どんな状態か」の **3読み取りポイント**は強化済み。**9列本格・列幅本格・ソート・選手詳細画面は未着手**。
+
+## 5. roster_view.gd 主要関数一覧
+
+| 関数 | 役割 |
+|------|------|
+| `_load_roster_snapshot` / `_apply_snapshot` | JSON 読込・画面反映・選手行ループ |
+| `_clear_rows` | RowList クリア |
+| `_add_table_header_row` | 9列表ヘッダ + 下 HSeparator |
+| **`_add_player_row`** | **選手1行（Panel + HBox + 9 Label）— 本格化の主戦場** |
+| `_col_width` | 列幅固定配列（ヘッダ・セル共通） |
+| `_contract_cell` / `_ovr_cell` / `_age_cell` 等 | セル文言生成（表示のみ） |
+| `_on_home_nav_button_pressed` | ホーム戻り |
+
+## 6. roster JSON 主要 key
+
+（`roster_mock.json` / export 同型想定）
+
+| key | 用途 |
+|-----|------|
+| `screen_title`, `team_name`, `league_level` | ヘッダー |
+| `summary` | roster_count, domestic_count, foreign_count, asia_or_naturalized_count |
+| `columns` | 列名配列（表示ロジックは GDScript 固定ヘッダが正） |
+| **`players[]`** | **選手行配列（順序・件数の正本）** |
+| 各 player | `order`, `name`, `position`, `age`, `ovr`, `salary_yen`, `salary_label`, `contract_years_left`, `contract_label`, `nationality_slot`, `status` |
+
+**選手詳細・能力内訳・ソート用 key は現行 DTO にない** — 詳細画面・ソートは **新規設計が必要**。
+
+## 7. 各候補 A〜G の比較
+
+### 案A — 9列の列幅・視認性整理
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 1280 幅内での視認性向上 |
+| 安全性 | **低〜中** — `_col_width` 変更は **ヘッダ9列 + 全選手行**に一括影響。clip ・はみ出し回帰しやすい |
+| 変更範囲 | `_col_width` + 間接的に全 `_add_player_row` |
+| 1コミット | 可能だが **回帰リスク高** |
+| 目視 | 全列・全行の確認が必要 |
+
+### 案B — Tooltip 導線改善
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | **高（GM判断）** — 契約・年俸は roster 運用の核心。氏名・状態は **既に tooltip あり** |
+| 安全性 | **高** — **列6（契約）または列5（年俸）のみ**、`_add_player_row` 内 `elif` 追加で氏名/状態と同パターン |
+| 変更範囲 | `_add_player_row` のみ（tooltip 文言は JSON から組み立て、**セル表示文字列は不変**） |
+| 1コミット | **可** |
+| 目視 | 契約/年俸列 hover で確認可能 |
+
+### 案C — 選手行カード化
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 見た目の塊感 |
+| 安全性 | **低** — 既に Panel 行背景あり。9列 HBox を縦カード化すると **構造大改修** |
+| 1コミット | **不可** |
+
+### 案D — ソート導線追加
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 運用性向上 |
+| 安全性 | **低** — `_apply_snapshot` 順序変更・UI ボタン・状態保持が必要 |
+| 1コミット | **不可** |
+
+### 案E — 選手詳細導線（詳細ボタン・選択）
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ゲーム体験への直結は最大 |
+| 安全性 | **低** — 新規 scene / nav / export / mock が必要 |
+| 1コミット | **不可** |
+
+### 案F — 既存9列の読み取り優先度改善（typography）
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 氏名/OVR/状態は **完了**。残り列の font 強調は **前進感が小さい** |
+| 安全性 | 中（typography のみなら安全） |
+| 1コミット | 可能だが **方針「typography レーン一区切り」に反する** |
+| 推奨 | **契約列の tooltip（案B）の方が情報導線として本格に繋がる** |
+
+### 案G — ロスターではなくゲーム体験画面へ切替
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 長期では重要 |
+| 安全性 | 新規画面は範囲大 |
+| 推奨 | **ロスターは GM 中心画面** — 本格入り口として **情報導線1列（tooltip）から着手する方が一貫**。全面切替は早い |
+
+## 8. 最も推奨する次タスク（1件）
+
+**ロスター本格整備・第1手（情報導線）— 残り契約列（i==6）の tooltip 導線補助**
+
+- **意図:** 表示は `_contract_cell(p)` のまま（`con_s` 不変）。clip 時や hover 時に **`contract_label` / `contract_years_left` 等から組み立てた補足全文**を tooltip で見られるようにする（氏名列 `i==1`・状態列 `i==8` と同型）
+- **ゲーム体験への近さ:** 契約残・満了目安は roster 運用判断の中核。詳細画面の前段として **読み取り導線**を足す
+- **typography レーンの繰り返しを避けつつ**、ロスター本格の安全な入口になる
+
+## 9. 対象ファイル
+
+- `godot/scripts/roster_view.gd` **のみ**
+
+## 10. 対象関数
+
+- **`_add_player_row` のみ**（ループ内 `i == 6` 分岐の追加・既存 `i==1` / `i==8` パターン踏襲）
+
+## 11. 絶対に変えないもの
+
+- セル表示文言（`cells` 配列・`_contract_cell` 出力・他列の `_str_cell` 系）
+- `players` の **件数・順序**
+- JSON key 名・mock/from_python 読込
+- `_col_width` / 9列構造 / clip_text 方針
+- 氏名・OVR・状態列の既存強調と tooltip
+- Header / Summary / Footer / DataSourceLabel / HomeNavButton
+- `roster_view.tscn` / Theme / project.godot / data JSON
+- export / tests
+
+## 12. 想定 pytest
+
+```
+py -m pytest basketball_sim/tests/test_roster_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+```
+
+（調査時: `test_roster_readonly_export.py` ほか roster 系テストファイル存在を確認。実装後に上記実行）
+
+## 13. Godot 目視確認項目
+
+- ホーム → ロスター遷移 OK
+- 9列・件数・順序・表示文言が従来どおり
+- **残り契約列** hover で tooltip が出る（`contract_label` / 年数情報が確認できる）
+- 氏名列・状態列 tooltip が従来どおり
+- OVR・行背景・HSeparator 維持
+- HomeNavButton 戻り OK、エラーなし、実行後 git 差分なし
+
+## 14. 後回しにする候補
+
+| 候補 | 理由 |
+|------|------|
+| A 列幅本格 | `_col_width` 一括変更は回帰リスク大。tooltip 導線の後 |
+| C 選手行カード化 | Panel 行背景済み。構造大改修 |
+| D ソート | ロジック・UI 追加が必要 |
+| E 選手詳細画面 | scene/nav/export 必須 |
+| F 他列 typography | 3点強化済み。前進感小 |
+| 年俸列 tooltip | 第2手候補（契約列成功後に同パターンで `i==5`） |
+| Pos/区分列強調 | 判断価値は契約・年俸より低 |
+| G 新規ゲーム画面 | ロスター情報導線の土台を先に |
+
+**日程の続き:** 「今後の予定」見出し `_add_upcoming_section_heading` の外装 Panel 統一は **ロスター第1手の後**に再比較可（Scroll 3ブロックは統一済み、見出しのみ Phase4SummaryCard 残存）。
+
+## 15. リスクと注意点
+
+1. **tooltip 文言は表示文字列と別に組み立てる** — `_contract_cell` の返り値を変えない
+2. **`mouse_filter = MOUSE_FILTER_PASS`** は氏名列と同様に維持・新規列でも設定
+3. **複数列 tooltip を1コミットに盛りすぎない** — まず **i==6 のみ**
+4. **列幅変更と混ぜない** — clip 対策を tooltip で行い、`_col_width` は触らない
+5. **選手詳細画面と混同しない** — 今回は遷移なし・hover 補足のみ
+
+## 16. 結論
+
+- 日程・Body の直近レーン完了後、**ゲーム体験に近づく次の安全手はロスター画面**で妥当
+- 9列本格・ソート・詳細画面に入る前に、**既存パターン（氏名 tooltip）を契約列へ拡張する情報導線1手**が最も安全
+- **次に実装する1件:** `roster_view.gd` の `_add_player_row` — **残り契約列（i==6）tooltip 導線補助**
+- 成功後の第2手候補: 年俸列（i==5）tooltip → 列幅微調整の再比較 → 選手詳細の設計調査
+
+---
+
+調査日: 2026-05  
+調査コミット基準: e7ddcad  
+pytest: 調査のみのため未実施
