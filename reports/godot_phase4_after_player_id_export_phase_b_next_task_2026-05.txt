@@ -1,0 +1,335 @@
+================================================================================
+Godot Phase 4 — player_id export 完了後の Phase B 方針比較レポート
+================================================================================
+
+1. 調査目的
+--------------------------------------------------------------------------------
+Phase A（9467112）で roster / contract / tactics の export・mock・tests に
+player_id を追加した直後、Godot 側で player_id をどう扱い始めるべきか
+（Phase B）を候補 A〜H で比較し、次の 1 タスクを推奨する。
+
+本レポートは調査のみ。実装・scene・project.godot・export・tests の変更は
+行っていない。
+
+
+2. 現在の最新コミット
+--------------------------------------------------------------------------------
+9467112 — Godot詳細画面に向けてplayer_idをexportに追加
+
+関連:
+  6950695 — Godot詳細画面に向けたIDとナビ設計を調査
+  7311506 — Godot契約主要選手詳細後の次タスクを比較
+
+
+3. Phase A 完了内容
+--------------------------------------------------------------------------------
+- roster_readonly._player_row: player_id（Player.player_id / int）
+- contract _build_player_contract_rows: player_id 追加（無し行はスキップ）
+- tactics append_row: player_id（内部 pid）
+- mock: roster 1001〜1012 / contract 762,701,... / tactics 416〜420
+- tests: player_id 存在・int・ROSTER_COLUMNS 非含有を assert
+- 未変更: Godot .gd / .tscn / save / ROSTER_COLUMNS / project.godot
+- ユーザー Godot 目視: 表示列・文言・既存詳細導線に問題なし（報告済み）
+
+
+4. 現在の player_id / event_id 状況
+--------------------------------------------------------------------------------
+
+| レイヤ | roster | contract rows | tactics roles | schedule |
+|--------|--------|---------------|---------------|----------|
+| export | player_id あり | player_id あり | player_id あり | event_id あり |
+| mock JSON | あり | あり | あり | event_id あり |
+| from_python | gitignore・手元生成想定 | 同上 | 同上 | 同上 |
+| Godot .gd 参照 | **なし** | **なし** | **なし** | event_id **なし** |
+
+補足:
+- JSON パース後、bind(p) / bind(row) の Dictionary には player_id キーが
+  **既に含まれる**（.gd が読んでいないだけ）。
+- schedule は event_id も detail も Dictionary に存在するが .gd 未参照。
+
+
+5. Godot側の player_id 読み取り状況
+--------------------------------------------------------------------------------
+
+5.1 roster（roster_view.gd）
+- players[] を Dictionary として行生成・bind(p)
+- _show_selected_player_summary(p): name, position, age, ovr, status, contract のみ
+- player_id 参照コード: **0 件**
+- 9 列表・ROSTER_COLUMNS 連動: 変更なし
+
+5.2 contract（contract_personnel_summary_view.gd）
+- _fill_player_rows: bind(p) で player_contract_rows 行を保持
+- _format_player_contract_detail_text: player_name, salary, contract 等のみ
+- player_id 参照: **0 件**
+- RiskRows: risk_items[].key のみ（player_id 無関係）
+
+5.3 tactics（tactics_summary_view.gd）
+- _fill_player_roles: bind(row)
+- _format_player_role_detail_text: player_name, order, role_label 等のみ
+- player_id 参照: **0 件**
+
+
+6. 現在の event_id 読み取り状況
+--------------------------------------------------------------------------------
+- schedule_view.gd: _show_upcoming_game_detail(game) は game.get("detail") のみ
+- event_id 参照: **0 件**
+- upcoming 行 Dictionary 全体は bind で保持済み
+
+
+7. 現在の詳細導線の到達点
+--------------------------------------------------------------------------------
+
+| 導線 | パターン | データ受け渡し | ID 利用 |
+|------|----------|----------------|---------|
+| ロスター | 上部 StatusLabel サマリー | bind(p) | 未使用 |
+| 日程 | 上部試合カード | bind(row) | event_id 未使用 |
+| 契約 PlayerRows | 行直下インライン | bind(p) | 未使用 |
+| 契約 RiskRows | 行直下インライン | bind(row) + key | key のみ |
+| 戦術 PlayerRoles | 行直下インライン | bind(row) | 未使用 |
+
+
+8. 現在の nav / scene / 状態管理
+--------------------------------------------------------------------------------
+- change_scene_to_file のみ（引数なし）
+- Autoload: project.godot にエントリなし
+- 選択状態: 各詳細ハンドラの bind Dictionary のみ（シーン跨ぎ不可）
+- 詳細専用 scene: 未存在（10 本線 + sandbox のみ）
+- docs/README: Phase 4 初期は Python 自動起動・操作 UI 未接続方針維持
+
+
+9. 候補 A〜H の比較
+--------------------------------------------------------------------------------
+
+--- A. Phase B-1: Godot で player_id を読むだけ（表示変更なし） ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | △ bind Dictionary に既に player_id あり。追加コードはヘルパー定義程度 |
+| 安全性 | ◎ |
+| 変更範囲 | 3 .gd または共通ヘルパー |
+| 1コミット | △ 3 画面まとめると広い |
+| Godot目視 | × 変化なしで確認不可 |
+| export/project | 不要 |
+| UI微調整 | ◎ 触らない |
+| 結論 | **実質スキップ可**。DTO 到達は Phase A + JSON パースで完了 |
+
+--- B. Phase B-1: 既存詳細カード内に player_id 表示 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ○ Phase A 端到端確認・Autoload 前の目視材料 |
+| 安全性 | ○ 1 ファイル 1 関数で可能 |
+| 変更 | _format_*_detail_text または _show_selected_player_summary |
+| 1コミット | ◎ contract のみなら可 |
+| Godot目視 | ◎ 詳細カードを開けば確認 |
+| リスク | △ 製品 UI に内部 ID 露出。将来削除 or 非表示化の可能性 |
+| UI微調整 | △ 詳細文言 1 行増 |
+| 結論 | **任意の短期確認手段**。本線 Phase B として必須ではない |
+
+--- C. tooltip / debug caption のみ ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | △ B より目立たないが確認しづらい |
+| リスク | △ デバッグ要素残留・tooltip 回帰 |
+| 結論 | **非推奨**（B より劣る） |
+
+--- D. Autoload 設計レポートを挟む ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ◎ Phase C 前の必須ゲート。6950695 の具体化 |
+| 安全性 | ◎ reports のみ |
+| 1コミット | ◎ レポート 1 本 |
+| 次段 | player_detail + Autoload API 確定 |
+| 結論 | **推奨（次タスク）** |
+
+--- E. Phase C: Autoload 最小実装 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ◎ 詳細 scene の前提 |
+| 安全性 | △ project.godot 変更必須 |
+| 1コミット | △ 設計未確定だと危険 |
+| 結論 | **D の直後**。いま単独では早い |
+
+--- F. player_detail_view 設計調査 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ◎ 中期的必須 |
+| 前提 | Autoload または同等の受け渡し方針 |
+| 結論 | **D と統合**して 1 本の設計レポートが効率的 |
+
+--- G. game_detail_view 先行 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ○ event_id あり |
+| player_id 流れ | × 一度外れる |
+| 結論 | **後回し**（player 軸 Autoload 確定後でも可） |
+
+--- H. Python 本体復帰準備 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ◎ 面白さの本丸 |
+| タイミング | player_id DTO 済みで export 再生成は可能 |
+| 結論 | **Autoload/player_detail 設計後 + ユーザー相談**が自然 |
+
+候補まとめ:
+  D+F統合設計 >> 任意B(1ファイル) > E > A(スキップ) > C > G > H
+
+
+10. 最も推奨する次タスク 1 件
+--------------------------------------------------------------------------------
+【推奨】D + F 統合 — ReadonlySelectionContext / player_detail_view 最小版の
+設計調査レポートを 1 本作成する
+
+成果物案:
+  reports/godot_phase4_readonly_selection_autoload_design_2026-05.txt
+
+（本レポートが Phase B 方針比較。次は設計専門レポートへ）
+
+
+11. 推奨理由
+--------------------------------------------------------------------------------
+1) Phase A 完了時点で、Godot は JSON パース経由で player_id を Dictionary に
+   **既に保持**している。Phase B「読むだけ」実装（A）はコード追加に対し
+   目視・機能価値がほぼない。
+
+2) 詳細カードへ ID 1 行（B）は端到端確認には有効だが、Steam 向け製品 UI として
+   内部 ID 常時表示は望ましくない。Phase B 本線として必須ではない。
+
+3) player_detail_view / Autoload（Phase C〜D）に進む前に、
+   - Autoload API（set_player / clear / peek）
+   - 戻る導線
+   - 第1接続画面（ロスター推奨）
+   - payload 最小項目（player_id + source + row snapshot）
+   を 1 本に固定しないと project.godot 変更の後戻りが大きい。
+
+4) project.godot 変更（E）は設計レポート後が安全。
+
+5) Python 本体（H）はユーザー相談論点が多く、Godot 詳細導線の「選択→遷移」
+   設計を先に閉じた方が二重手間が少ない。
+
+
+12. 対象ファイル（次タスク＝設計レポート）
+--------------------------------------------------------------------------------
+新規のみ:
+  reports/godot_phase4_readonly_selection_autoload_design_2026-05.txt
+
+参照（変更しない）:
+  godot/scripts/roster_view.gd
+  godot/scripts/contract_personnel_summary_view.gd
+  godot/scripts/tactics_summary_view.gd
+  godot/scripts/home_dashboard.gd
+  docs/GODOT_NAVIGATION_PHASE4_2026-05.md
+  docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md
+  reports/godot_phase4_player_event_id_nav_design_2026-05.txt
+
+
+13. 対象関数または対象範囲（設計レポートに含める論点）
+--------------------------------------------------------------------------------
+- ReadonlySelectionContext 案: シングルトン Autoload vs 静的 Node
+- 保持フィールド: kind, player_id:int, payload:Dictionary, source_scene_path
+- ロスター接続案: _show_selected_player_summary または詳細ボタン pressed 前に set
+- player_detail_view 最小表示項目（既存 JSON key のみ）
+- 第1コミット分割: (1) Autoload のみ (2) player_detail scene (3) roster 接続
+- game_detail との API 共通化（event_id 用 set_game）
+- 6950695 Phase C/D/E との対応表
+
+
+14. 絶対に変えないもの（設計フェーズ）
+--------------------------------------------------------------------------------
+- 既存 5 詳細導線の挙動（設計完了まで）
+- save format / export スキーマ（player_id 追加済みを維持）
+- ROSTER_COLUMNS / 9 列表
+- change_scene_to_file のみ方針（Autoload は追加、既存 nav は維持）
+
+
+15. 想定 pytest
+--------------------------------------------------------------------------------
+設計レポートフェーズ: 未実施で可。
+
+Autoload / player_detail 実装フェーズ以降:
+
+必須（export 回帰）:
+  py -m pytest basketball_sim/tests/test_roster_readonly_export.py
+  py -m pytest basketball_sim/tests/test_contract_personnel_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_tactics_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_schedule_readonly_export.py
+  py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py
+  py -m pytest basketball_sim/tests/test_phase0_smoke.py
+
+Godot 変更後:
+  godot_readonly_bundle 手動実行 → from_python で player_id 確認
+  Godot 目視: ロスター→player_detail→戻る
+
+
+16. Godot目視確認項目
+--------------------------------------------------------------------------------
+（設計レポートのみ → 目視不要）
+
+任意 fast-path（B を先に1ファイルだけ実施する場合）:
+  - 契約 PlayerRows「詳細」→ カード末尾に player_id 表示
+  - 9 列表・RiskRows・件数・文言が不変
+
+Autoload 実装後:
+  - ロスター「詳細」→ player_detail → HomeNav 戻る
+  - player_id が詳細 scene と一致
+
+
+17. 後回し候補
+--------------------------------------------------------------------------------
+- Phase B 純粋「読むだけ」3 画面一括（A）
+- tooltip のみ ID（C）
+- game_detail_view 先行（G）
+- 詳細カードへの ID 常時表示を本番仕様に固定（B を本線化）
+- Python 本体大着手（H）
+- project.godot Autoload いきなり実装（E を設計前に）
+
+
+18. リスクと注意点
+--------------------------------------------------------------------------------
+- Phase B を「表示なし読取」だけで長引かせると進捗が見えない
+- ID を製品 UI に出す（B）はデバッグ向けに限定し、本番では非表示検討
+- Autoload 未設計のまま player_detail scene 追加は payload 受け渡しが暫定化
+- bind Dictionary はシーン reload で消える → 詳細 scene 遷移には Autoload 必須
+- from_python 未コミット環境では mock の player_id で Godot 確認可能
+
+
+19. 次にユーザー相談すべき論点
+--------------------------------------------------------------------------------
+1) player_detail 第1版に載せる情報量（サマリーのみ vs 能力値拡張は Python/export 待ち）
+2) 製品 UI に player_id を見せるか（開発中のみ vs 永続非表示）
+3) player_detail 第1接続画面: ロスター vs 契約 vs 戦術
+4) game_detail と player_detail の優先順（試合体験 vs 選手軸）
+5) Python 本体復帰タイミング（Autoload+最小 scene 後 vs 前）
+6) 週次進行 / 試合ログ / 契約 FA / 戦術操作の Python 優先順位
+
+
+20. 結論
+--------------------------------------------------------------------------------
+Phase A により player_id は export・mock・tests まで到達済み。
+Godot .gd は未参照だが、JSON パース後の bind Dictionary には **既に載っている**。
+
+Phase B 本線として「読むだけ」（A）は **スキップしてよい**。
+任意確認として詳細カード 1 行（B・contract 1 ファイル）を挟むことは可能。
+
+次にやるべき 1 件:
+  **ReadonlySelectionContext + player_detail_view 最小版の設計調査レポート（D+F）**
+
+その次の実装順（推奨）:
+  1) Autoload 最小（project.godot + 1 .gd）
+  2) player_detail_view 最小 scene + .gd
+  3) roster_view からの接続 1 本
+  4) contract / tactics 横展開
+  5) game_detail（event_id）
+  6) Python 本体（ユーザー相談後）
+
+================================================================================
+調査実施: 2026-05-20
+参照 HEAD: 9467112
+pytest: 本調査では未実施
+================================================================================
