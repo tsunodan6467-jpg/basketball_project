@@ -19,6 +19,10 @@ config/description="Phase 4 UI prototype: mock home dashboard only. No Python / 
 run/main_scene="res://scenes/home_dashboard.tscn"
 config/features=PackedStringArray("4.6")
 
+[autoload]
+
+ReadonlySelectionContext="*res://scripts/readonly_selection_context.gd"
+
 [display]
 
 window/size/viewport_width=1280
