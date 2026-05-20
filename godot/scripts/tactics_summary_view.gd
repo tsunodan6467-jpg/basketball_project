@@ -13,6 +13,8 @@ const _LOAD_FAILED_MESSAGE := "戦術・ローテーション情報を読み込�
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _last_loaded_uri: String = ""
+var _player_role_detail_style_normal: StyleBoxFlat = null
+var _player_role_inline_detail_panels: Array = []
 
 @onready var _status_label: Label = %StatusLabel
 @onready var _data_source_label: Label = %DataSourceLabel
@@ -29,6 +31,7 @@ var _last_loaded_uri: String = ""
 
 
 func _ready() -> void:
+	_ensure_player_role_inline_detail_styles()
 	_apply_snapshot(_load_tactics_summary_snapshot())
 
 
@@ -68,7 +71,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 	_clear_player_roles()
 	if d.has("_error"):
 		_status_label.text = str(d["_error"])
-		_status_label.visible = true
+		_set_status_error_visible(true)
 		_data_source_label.text = ""
 		_screen_title.text = ""
 		_team_name.text = ""
@@ -81,7 +84,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 		_card_notes_body.text = ""
 		return
 
-	_status_label.visible = false
+	_set_status_error_visible(false)
 	_data_source_label.text = _data_source_caption(_last_loaded_uri)
 
 	_screen_title.text = _txt(d, "screen_title", "戦術・ローテーションサマリー（閲覧）")
@@ -115,6 +118,7 @@ func _clear_player_roles() -> void:
 
 
 func _fill_player_roles(raw: Array) -> void:
+	_player_role_inline_detail_panels.clear()
 	if raw.is_empty():
 		var lab := Label.new()
 		lab.autowrap_mode = 2
@@ -139,13 +143,31 @@ func _fill_player_roles(raw: Array) -> void:
 		lab.add_theme_font_size_override("font_size", 13)
 		lab.add_theme_color_override("font_color", Color(0.16, 0.2, 0.3, 1))
 		lab.text = line
+		lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var detail_btn := Button.new()
+		detail_btn.text = "詳細"
+		detail_btn.flat = true
+		detail_btn.custom_minimum_size = Vector2(36, 0)
+		detail_btn.add_theme_font_size_override("font_size", 11)
+		var detail_parts: Dictionary = _create_player_role_inline_detail_panel()
+		var detail_panel: PanelContainer = detail_parts["panel"] as PanelContainer
+		var detail_lab: Label = detail_parts["label"] as Label
+		detail_btn.pressed.connect(_on_player_role_detail_button_pressed.bind(detail_panel, detail_lab, row))
+
+		var row_inner := HBoxContainer.new()
+		row_inner.add_theme_constant_override("separation", 4)
+		row_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row_inner.add_child(lab)
+		row_inner.add_child(detail_btn)
+
 		var margin := MarginContainer.new()
 		margin.add_theme_constant_override("margin_left", 4)
 		margin.add_theme_constant_override("margin_top", 2)
 		margin.add_theme_constant_override("margin_right", 4)
 		margin.add_theme_constant_override("margin_bottom", 2)
 		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		margin.add_child(lab)
+		margin.add_child(row_inner)
 		var panel := PanelContainer.new()
 		var row_bg := StyleBoxFlat.new()
 		row_bg.bg_color = Color(0.965, 0.975, 0.99, 1)
@@ -160,7 +182,14 @@ func _fill_player_roles(raw: Array) -> void:
 		panel.add_theme_stylebox_override("panel", row_bg)
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.add_child(margin)
-		_player_roles_body.add_child(panel)
+
+		var item_vbox := VBoxContainer.new()
+		item_vbox.add_theme_constant_override("separation", 4)
+		item_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_vbox.add_child(panel)
+		item_vbox.add_child(detail_panel)
+		_player_roles_body.add_child(item_vbox)
+		_player_role_inline_detail_panels.append(detail_panel)
 		if i < n - 1:
 			_player_roles_body.add_child(HSeparator.new())
 
@@ -261,6 +290,99 @@ func _txt(d: Dictionary, key: String, default_s: String) -> String:
 		return default_s
 	var s: String = str(v).strip_edges()
 	return s if s != "" else default_s
+
+
+func _str_cell(v: Variant) -> String:
+	if v == null:
+		return "—"
+	var s: String = str(v).strip_edges()
+	return s if not s.is_empty() else "—"
+
+
+func _make_player_role_detail_panel_style(bg: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 10.0
+	style.content_margin_top = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 10.0
+	return style
+
+
+func _ensure_player_role_inline_detail_styles() -> void:
+	if _player_role_detail_style_normal != null:
+		return
+	_player_role_detail_style_normal = _make_player_role_detail_panel_style(
+		Color(0.92, 0.96, 1.0, 1),
+		Color(0.48, 0.64, 0.86, 1),
+	)
+
+
+func _create_player_role_inline_detail_panel() -> Dictionary:
+	_ensure_player_role_inline_detail_styles()
+	var detail_panel := PanelContainer.new()
+	detail_panel.visible = false
+	detail_panel.add_theme_stylebox_override("panel", _player_role_detail_style_normal)
+	detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var detail_lab := Label.new()
+	detail_lab.autowrap_mode = 2
+	detail_lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	detail_lab.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	detail_lab.add_theme_font_size_override("font_size", 14)
+	detail_lab.add_theme_constant_override("line_spacing", 4)
+	detail_lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	detail_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(detail_lab)
+	detail_panel.add_child(margin)
+	return {"panel": detail_panel, "label": detail_lab}
+
+
+func _format_player_role_detail_text(row: Dictionary) -> String:
+	var nm: String = _str_cell(row.get("player_name", null))
+	var pos: String = _str_cell(row.get("position", null))
+	var st: String = _str_cell(row.get("starter_label", null))
+	var rl: String = _str_cell(row.get("role_label", null))
+	var tm: String = _str_cell(row.get("target_minutes_label", null))
+	var ord_s: String = _str_cell(row.get("order", null))
+	var memo: String = _str_cell(row.get("memo", null))
+	return (
+		"選手ロール詳細\n"
+		+ "%s\n"
+		+ "ポジション: %s\n"
+		+ "起用: %s\n"
+		+ "役割: %s\n"
+		+ "目標分数: %s\n"
+		+ "順序: %s\n"
+		+ "メモ: %s"
+	) % [nm, pos, st, rl, tm, ord_s, memo]
+
+
+func _set_status_error_visible(visible: bool) -> void:
+	if not visible:
+		_status_label.visible = false
+		_status_label.text = ""
+		return
+	_status_label.add_theme_color_override("font_color", Color(1, 0.52, 0.48, 1))
+	_status_label.visible = true
+
+
+func _on_player_role_detail_button_pressed(
+	detail_panel: PanelContainer, detail_lab: Label, row: Dictionary
+) -> void:
+	if detail_panel.visible:
+		detail_panel.visible = false
+		return
+	for p in _player_role_inline_detail_panels:
+		var other: PanelContainer = p as PanelContainer
+		if other != detail_panel:
+			other.visible = false
+	detail_lab.text = _format_player_role_detail_text(row)
+	detail_panel.visible = true
 
 
 func _on_home_nav_button_pressed() -> void:
