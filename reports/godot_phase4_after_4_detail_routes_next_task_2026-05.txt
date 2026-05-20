@@ -1,0 +1,359 @@
+================================================================================
+Godot Phase 4 — 主要4導線完了後の次タスク比較レポート
+================================================================================
+
+1. 調査目的
+--------------------------------------------------------------------------------
+Phase 4 / Godot 本番 GUI 準備において、ロスター・日程・契約人事・戦術の
+「詳細導線（第1手）」が揃った時点で、次に進むべき方向を候補 A〜H で比較し、
+実装・設計・Python 本体のいずれを優先すべきか 1 件に絞る。
+
+本レポートは調査のみ。godot/scripts/*.gd・scene・data・export・tests・docs の
+変更は行っていない。
+
+
+2. 現在の最新コミット
+--------------------------------------------------------------------------------
+8ca0736 — Godot戦術ロール詳細を行直下に表示
+
+直近の詳細導線関連:
+  a898cff — Godot契約リスク詳細を行直下に表示
+  811659b — Godot日程upcoming詳細導線を追加
+  d2a8c1e / 127839a — Godotロスター詳細導線・サマリー可読化
+  7133602 — Godot契約リスク詳細後の次タスクを比較（戦術横展開を推奨 → 実施済み）
+
+
+3. 現在の Phase 4 到達点
+--------------------------------------------------------------------------------
+- Godot 10 画面の読み取り専用足場: 成立（home / roster / club_history / standings /
+  schedule / facility / finance / owner_mission / tactics_summary /
+  contract_personnel_summary）
+- ナビ: change_scene_to_file のみ。Autoload・scene 引数・Python 自動起動なし
+  （docs/GODOT_NAVIGATION_PHASE4_2026-05.md・godot/README.md と整合）
+- JSON: 各画面 *_from_python.json 優先 + *_mock.json フォールバック
+- export: basketball_sim/export/*_readonly.py + godot_readonly_bundle.py
+- Theme / 平坦 Panel 行: 主要 Body の第1〜2段は多数完了。本格左ナビ・進行 UI は未着手
+- ゲーム操作（進行・保存・契約・戦術変更等）: すべて未接続（閲覧専用のまま）
+
+マイルストーン: 「一覧を読む」から「気になる行を押して詳しく読む」第1段が
+主要4画面で成立した。
+
+
+4. 主要4導線の完了内容
+--------------------------------------------------------------------------------
+
+4.1 ロスター（roster_view.gd）
+- 入口: 9列表の氏名列（i==1）右端「詳細」ボタン
+- 表示: 画面上部 %StatusLabel を Panel でラップしたサマリーカード
+  （_show_selected_player_summary / _set_selected_player_summary_visible）
+- データ: players[] — name, position, age, ovr, salary_label, contract_*,
+  nationality_slot, status（player_id なし）
+- パターン: 上部カード型（契約 RiskRows・戦術 PlayerRoles とは異なる）
+
+4.2 日程（schedule_view.gd）
+- 入口: upcoming 各ブロック meta_row 右端「詳細」
+- 表示: 画面上部 StatusLabel + _game_detail_panel（試合詳細\n{detail}）
+- データ: upcoming_games[] — detail, round_label, opponent, event_id 等
+- パターン: 上部カード型（ロスターと同系）
+
+4.3 契約人事（contract_personnel_summary_view.gd）
+- 入口: RiskRows 各行「詳細」（PlayerRows には未実装）
+- 表示: 押下行直下インライン Panel（a898cff 型）
+- データ: risk_items[] — label, display_value, severity, memo
+- StatusLabel: 読込エラーのみ（_set_status_error_visible）
+
+4.4 戦術（tactics_summary_view.gd · 8ca0736）
+- 入口: PlayerRolesBody 各行「詳細」
+- 表示: 押下行直下インライン Panel（契約 RiskRows と同型）
+- データ: player_role_items[] — player_name, position, starter_label,
+  role_label, target_minutes_label, order, memo（player_id は JSON に未出力）
+- StatusLabel: 読込エラーのみ
+
+
+5. 現在の主要画面の到達点
+--------------------------------------------------------------------------------
+
+| 画面 | 閲覧足場 | 詳細導線第1手 | 備考 |
+|------|----------|---------------|------|
+| ロスター | 9列表・平坦 Panel 行 | 氏名「詳細」→ 上部サマリー | player_id なし |
+| 日程 | upcoming カード・advance_hint 等 | upcoming「詳細」→ 上部試合カード | event_id は JSON にあり |
+| 契約人事 | Risk / Player 平坦行 | RiskRows のみ行直下詳細 | PlayerRows 未着手 |
+| 戦術 | 静的4カード + PlayerRoles 行 | PlayerRoles 行直下詳細 | 操作 UI 未接続 |
+| 財務 | HistoryBody 平坦行 | なし | StatusLabel はエラー等 |
+| OM | MissionsBody 平坦行 | なし | 同上 |
+| 施設 | Scroll 動的 | なし | Theme 第1段のみ等 |
+| 順位表 | 8列表 | なし | |
+| クラブ史 | 段落・シーズン表 | なし | |
+| ホーム | ダッシュボード + 10画面遷移 | なし（各画面へ送るのみ） |
+
+
+6. 現在の主な未完了候補
+--------------------------------------------------------------------------------
+- 契約 PlayerRows「詳細」（同一画面・第2リスト）
+- ロスター/日程の詳細表示位置の統一（上部 vs 行直下）— 任意・設計判断
+- player_id の export/Godot DTO 未整備（roster / contract / tactics の行特定）
+- game_detail_view / player_detail_view 等の専用 scene（未存在）
+- Autoload / scene 遷移時の選択 ID 受け渡し（方針未決）
+- 10画面の Scroll Body Theme 第2段・左ナビ本線化（docs 上は別タスク）
+- Python 本体: 週次進行・契約/FA・戦術ローテ・試合結果/ログ・長期シーズン等
+- Godot からの進行・保存・操作接続（Phase 4 初期方針では未実装）
+
+
+7. 候補 A〜H の比較
+--------------------------------------------------------------------------------
+
+凡例: ◎=高 ○=中 △=低 · 1コミット=その候補の「最小完了単位」が1コミットで閉じるか
+
+--- A. Phase 4 ロードマップ / 総点検を挟む ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ◎ 完了済み・残課題・Python 復帰条件・ID 前提を一覧化。迷走防止 |
+| 安全性 | ◎ 実装なし（reports のみ） |
+| 変更範囲 | reports 1件（＋任意で docs は別承認） |
+| 1コミットで閉じるか | ◎ 本レポートで比較は完了。追補なら checkpoint レポート 1 本 |
+| Godot 目視 | △ コード変更なし |
+| scene/data/export 変更 | 不要 |
+| Python 接続度 | 間接（優先順位整理） |
+| ゲーム体験への近さ | △ 直接は増えない。次の実装の精度が上がる |
+| 仕様相談 | 低（整理中心。B/G の論点は表に載せる） |
+| UI 微調整に戻りすぎないか | ◎ 意図的に実装を止めて方向を固定できる |
+
+リスク: 実装が一時停止する（ただし 4 導線完了は明確な区切り）。
+docs 更新はルール上別タスク。
+
+--- B. Python 本体ロジックへ戻る ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ◎ Steam 品質・面白さの本丸 |
+| 安全性 | △ 仕様判断が大きい。テストはあるが影響範囲広い |
+| 変更範囲 | basketball_sim/ 本体（GUI ルール外） |
+| 1コミットで閉じるか | △ 週次1ステップ等の小切れは可能。全体は不可 |
+| Godot 目視 | 不要 |
+| scene/data/export | ロジック次第で export 拡張あり得る |
+| Python 接続度 | ◎ |
+| ゲーム体験への近さ | ◎ |
+| 仕様相談 | ◎ 高（戦術プリセット・進行ペース・契約 UI 方針） |
+| UI 微調整に戻りすぎないか | ◎ |
+
+リスク: Phase 4 Godot の連続改善レーンが切れる。
+「いま戻るなら何からか」が未整理だと優先度がぶれる。
+推奨: 週次進行の最小ステップ or 契約/FA の既存テスト拡張から。
+（IMPLEMENTATION_PLAN / IDEAL_GAME_DESIGN 参照）
+
+--- C. 新規詳細画面 / ナビ設計の事前調査 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ◎ 中期的に必須。今は前提不足の整理が先 |
+| 安全性 | ◎ 調査のみなら安全 |
+| 変更範囲 | 調査 reports → 将来 scene/script/data/export 一式 |
+| 1コミットで閉じるか | 調査レポート 1 本なら ◎。実装は × |
+| Godot 目視 | ワイヤー検討時のみ |
+| scene/data/export | 実装時はすべて要 |
+| Python 接続度 | 中（DTO・ID の設計が先） |
+| ゲーム体験への近さ | 中〜高（専用画面ができてから） |
+| 仕様相談 | ◎ Autoload 可否・ID・遷移パラメータ |
+| UI 微調整に戻りすぎないか | ◎ |
+
+現状整理:
+- change_scene_to_file のみ → 選択行の Dictionary は bind で渡せるが、
+  別 scene へは Autoload またはファイル経由の受け渡しが必要
+- event_id: schedule_mock / schedule_readonly に存在
+- player_id: roster_mock・contract player_contract_rows・tactics player_role_items には
+  現状なし（tactics export 内部では player_id を参照するが JSON 未出力）
+
+リスク: いきなり scene 追加すると 1 コミット 1 ファイル規律から外れやすい。
+
+--- D. 契約 PlayerRows 詳細導線 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ○ 契約画面の「第2リスト」完成。人事判断の読み取りが一段深い |
+| 安全性 | ◎ contract_personnel_summary_view.gd 1 ファイル・RiskRows 踏襲 |
+| 変更範囲 | _fill_player_rows 周辺のみ想定 |
+| 1コミットで閉じるか | ◎ |
+| Godot 目視 | ◎ 契約画面で即確認 |
+| scene/data/export | 不要（既存 player_contract_rows の key のみ） |
+| Python 接続度 | 低（表示のみ） |
+| ゲーム体験への近さ | 低〜中（閲覧深化。操作はなし） |
+| 仕様相談 | 低 |
+| UI 微調整に戻りすぎないか | △ 横展開の延長線。ただし「契約画面の穴埋め」として意味は明確 |
+
+player_contract_rows 利用可能 key（mock 実測）:
+  order, player_name, position, age, overall, potential,
+  salary, salary_label, contract_years, contract_years_label,
+  contract_status, contract_status_label, nationality_slot,
+  nationality_slot_label, fa_flag, fa_flag_label, risk_label, memo
+
+--- E. ロスター詳細 第2段 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | △ サマリー拡充・行ハイライトは局所改善 |
+| 安全性 | ○ roster_view.gd のみなら可 |
+| 1コミット | △ 内容次第 |
+| player_id / 専用画面 | player_id なしのままでは player_detail 前提が弱い |
+| ゲーム体験 | 低〜中 |
+| UI 微調整 | △ ロスター寄り続けやすい |
+
+--- F. 日程 / 試合体験 第2段 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ○〜◎ 試合は体験の中心だが範囲大 |
+| event_id | JSON にあり。専用画面設計の材料は足りる |
+| 1コミット | schedule_view 内インライン化なら ○。game_detail_view は × |
+| Python | 試合結果・ログと接続時は本体必須 |
+| UI 微調整 | 上部カードの延長なら △。新 scene は ◎ |
+
+--- G. 戦術 / ローテ 第2段 ---
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 将来は ◎ だが今は仕様リスク大 |
+| 安全性 | △ プリセット・コンディション方針はユーザー相談必須 |
+| Python | team_tactics / rotation 正本と接続が必要 |
+| UI 微調整 | カード文言整理だけなら △。操作 UI は早すぎる |
+
+--- H. もう1本だけ小さな GUI 横展開 ---
+
+| 観点 | 評価 |
+|------|------|
+| 代表例 | D（契約 PlayerRows）> 財務/施設の詳細補助 |
+| 1コミット | D は ◎ |
+| ゲーム体験 | 閲覧の深化に留まる |
+| UI 微調整 | △ 連続すると表面 UI レーン化。区切りとセットで |
+
+候補横並び（推奨度・実装即応性）:
+  A(本比較完了) ≈ 追補 checkpoint > D > C(調査) > F(調査→実装) > H(財務等) > E > G > B(優先度確定後)
+
+
+8. 最も推奨する次タスク 1 件
+--------------------------------------------------------------------------------
+【推奨】D. 契約人事画面 — PlayerRows「詳細」ボタン → 行直下インライン詳細カード
+
+（本レポートが A の比較役割を果たしたうえでの「実装再開第1手」）
+
+
+9. 推奨理由
+--------------------------------------------------------------------------------
+1) 主要4導線は「4画面」で揃ったが、契約画面だけ PlayerRows が未着手で
+   同一画面内の導線が半分のまま。D で契約閲覧の第1段が完了する。
+
+2) a898cff（RiskRows）・8ca0736（戦術 PlayerRoles）と同型の
+   実装パターンが確立済み。contract_personnel_summary_view.gd 1 ファイル、
+   _fill_player_rows のみで閉じ、scene/data/export/tests を触らない安全枠に収まる。
+
+3) player_contract_rows に詳細表示に足る key が既に揃っており、
+   新規 JSON キーや捏造なしで 5〜7 行の詳細カードが組める。
+
+4) ロスター/日程の「上部 StatusLabel 型」との統一は、専用 scene（C）や
+   player_id 整備の後でもよい。いま統一だけを先にやると E/F 寄りの
+   局所 UI になりやすい。
+
+5) Python 本体（B）へ戻る前に、Phase 4 閲覧足場の「契約サマリー画面として
+   読める塊」を閉じてからの方が、Godot 側の負債が残らない。
+   B はユーザー相談付きの優先ロジック確定後（週次進行の最小単位推奨）。
+
+6) 戦術第2段（G）・game_detail_view（F 実装）は仕様・範囲が大きく、
+   先に C の設計レポートを挟む方が安全。
+
+
+10. 対象ファイル
+--------------------------------------------------------------------------------
+godot/scripts/contract_personnel_summary_view.gd
+
+
+11. 対象関数または対象範囲
+--------------------------------------------------------------------------------
+主: _fill_player_rows
+追加想定（RiskRows 踏襲）:
+  - var _player_inline_detail_panels（または既存配列の別名）
+  - _ensure_*_inline_detail_styles（Risk と共通化または別 Style 変数）
+  - _create_player_contract_inline_detail_panel
+  - _format_player_contract_detail_text
+  - _on_player_contract_detail_button_pressed
+  - _fill_player_rows 先頭で panels clear
+
+触らない:
+  - _fill_risk_rows（既存 Risk 詳細）
+  - _apply_snapshot の Header / Summary / contract_items / balance / caution
+  - player_contract_rows の件数・順序・最大8件・既存 block 文言
+
+
+12. 絶対に変えないもの
+--------------------------------------------------------------------------------
+- .tscn / Theme / project.godot
+- godot/data/*.json
+- basketball_sim/export/* · tests（今回コミットでは）
+- README / docs / 他 .gd
+- risk_items / RiskRows の詳細挙動
+- player_contract_rows のフィルタ・順序・空表示「（選手行がありません）」
+- HomeNavButton / change_scene_to_file のみのナビ
+
+
+13. 想定 pytest（次タスク実装後）
+--------------------------------------------------------------------------------
+必須:
+  py -m pytest basketball_sim/tests/test_contract_personnel_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py
+  py -m pytest basketball_sim/tests/test_phase0_smoke.py
+
+回帰:
+  py -m pytest basketball_sim/tests/test_tactics_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_roster_readonly_export.py
+  py -m pytest basketball_sim/tests/test_schedule_readonly_export.py
+
+（本調査では pytest 未実施）
+
+
+14. Godot 目視確認項目（D 実装後）
+--------------------------------------------------------------------------------
+- 契約・人事画面 → PlayerRows 各行に「詳細」
+- 押下でその行直下に青系インラインカード（RiskRows と同系）
+- 他行押下で表示位置が切り替わる / 同じ行再押下で toggle 非表示
+- RiskRows 詳細が壊れていない
+- 画面上部 StatusLabel は読込エラー時のみ
+- player_contract_rows の内容が読める（存在 key のみ）
+- HomeNavButton でホーム復帰
+
+
+15. 後回し候補
+--------------------------------------------------------------------------------
+- C: player_detail / game_detail / Autoload 設計レポート（player_id export 方針含む）
+- ロスター・日程の詳細を行直下へ揃える（任意・E/F の一部）
+- B: Python 本体（優先: 週次進行の最小ステップ — ユーザー相談後）
+- G: 戦術操作 UI・プリセット（ユーザー相談必須）
+- 10画面 Scroll Body Theme 第2段・LeftRail クリック化（docs §10）
+- 財務/OM/施設の詳細補助（H。契約・戦術より優先度低）
+
+
+16. リスクと注意点
+--------------------------------------------------------------------------------
+- D を続けて H を乱発すると「閲覧だけ増える」レーンになる。
+  D 完了後は C（設計）または B（本体）へ切ることを推奨。
+- player_id を export しない限り、ロスター⇔契約⇔戦術の横断詳細 scene は
+  名前一致頼みになり不安定。C で export 追加を先に決める。
+- 上部カード型（ロスター・日程）と行直下线型（契約・戦術）の混在は
+  ユーザー体験として許容可能だが、専用 scene 化時に再整理が必要。
+- Python 復帰時は Godot 閲覧足場を壊さないこと（§13 GODOT_GUI IA）。
+
+
+17. 結論
+--------------------------------------------------------------------------------
+主要4導線完了は Phase 4 閲覧 GUI の明確な区切りである。本レポートで
+候補 A（比較・整理）は実施済みとみなし、次の実装 1 件は
+【D. 契約 PlayerRows 行直下インライン詳細】を推奨する。
+
+その次の分岐:
+  (1) 契約画面が閉じたら → C の設計調査（player_id / event_id / 遷移）
+  (2) 設計とユーザー相談後 → B Python 本体（週次進行など）
+  (3) 細かい Theme/HSeparator だけのコミットは避ける
+
+================================================================================
+調査実施: 2026-05-19
+参照: git log / godot/scripts 4本 / mock JSON 4本 / export 一覧 / NAVIGATION・IA docs
+pytest: 本調査では未実施
+================================================================================
