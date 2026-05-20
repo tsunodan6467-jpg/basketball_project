@@ -13,6 +13,9 @@ const _LOAD_FAILED_MESSAGE := "契約・人事情報を読み込めませんで�
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _last_loaded_uri: String = ""
+var _risk_detail_panel: PanelContainer = null
+var _risk_detail_style_normal: StyleBoxFlat = null
+var _risk_detail_style_error: StyleBoxFlat = null
 
 @onready var _status_label: Label = %StatusLabel
 @onready var _data_source_label: Label = %DataSourceLabel
@@ -28,6 +31,7 @@ var _last_loaded_uri: String = ""
 
 
 func _ready() -> void:
+	_setup_contract_risk_detail_style()
 	_apply_snapshot(_load_snapshot())
 
 
@@ -69,7 +73,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 
 	if d.has("_error"):
 		_status_label.text = str(d["_error"])
-		_status_label.visible = true
+		_set_contract_risk_detail_visible(true, true)
 		_data_source_label.text = ""
 		_screen_title.text = ""
 		_team_name.text = ""
@@ -80,7 +84,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 		_caution_body.text = ""
 		return
 
-	_status_label.visible = false
+	_set_contract_risk_detail_visible(false)
 	_data_source_label.text = _data_source_caption(_last_loaded_uri)
 
 	_screen_title.text = _txt(d, "screen_title", "契約・人事サマリー（閲覧）")
@@ -169,13 +173,28 @@ func _fill_risk_rows(rows: Array) -> void:
 		var block := Label.new()
 		block.text = "%s\n  表示: %s\n  重要度: %s\n  %s" % [lab, disp, sev, memo]
 		_style_body_label(block, 12, Color(0.16, 0.2, 0.3, 1))
+		block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+		var detail_btn := Button.new()
+		detail_btn.text = "詳細"
+		detail_btn.flat = true
+		detail_btn.custom_minimum_size = Vector2(36, 0)
+		detail_btn.add_theme_font_size_override("font_size", 11)
+		detail_btn.pressed.connect(_show_contract_risk_detail.bind(row))
+
+		var row_inner := HBoxContainer.new()
+		row_inner.add_theme_constant_override("separation", 4)
+		row_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row_inner.add_child(block)
+		row_inner.add_child(detail_btn)
+
 		var margin := MarginContainer.new()
 		margin.add_theme_constant_override("margin_left", 4)
 		margin.add_theme_constant_override("margin_top", 2)
 		margin.add_theme_constant_override("margin_right", 4)
 		margin.add_theme_constant_override("margin_bottom", 2)
 		margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		margin.add_child(block)
+		margin.add_child(row_inner)
 		var panel := PanelContainer.new()
 		var row_bg := StyleBoxFlat.new()
 		row_bg.bg_color = Color(0.965, 0.975, 0.99, 1)
@@ -335,6 +354,89 @@ func _str_cell(v: Variant) -> String:
 		return "—"
 	var s: String = str(v).strip_edges()
 	return s if not s.is_empty() else "—"
+
+
+func _make_contract_risk_detail_panel_style(bg: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 10.0
+	style.content_margin_top = 10.0
+	style.content_margin_right = 10.0
+	style.content_margin_bottom = 10.0
+	return style
+
+
+func _setup_contract_risk_detail_style() -> void:
+	if _risk_detail_panel != null:
+		return
+
+	_risk_detail_style_normal = _make_contract_risk_detail_panel_style(
+		Color(0.92, 0.96, 1.0, 1),
+		Color(0.48, 0.64, 0.86, 1),
+	)
+	_risk_detail_style_error = _make_contract_risk_detail_panel_style(
+		Color(1.0, 0.94, 0.94, 1),
+		Color(0.86, 0.48, 0.48, 1),
+	)
+
+	var parent := _status_label.get_parent()
+	var idx := _status_label.get_index()
+
+	_risk_detail_panel = PanelContainer.new()
+	_risk_detail_panel.add_theme_stylebox_override("panel", _risk_detail_style_normal)
+	_risk_detail_panel.visible = false
+	_risk_detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var margin := MarginContainer.new()
+	parent.remove_child(_status_label)
+	margin.add_child(_status_label)
+	_risk_detail_panel.add_child(margin)
+	parent.add_child(_risk_detail_panel)
+	parent.move_child(_risk_detail_panel, idx)
+
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_status_label.add_theme_font_size_override("font_size", 14)
+	_status_label.add_theme_constant_override("line_spacing", 4)
+	_status_label.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	_status_label.visible = true
+
+
+func _set_contract_risk_detail_visible(visible: bool, is_error: bool = false) -> void:
+	if _risk_detail_panel == null:
+		_status_label.visible = visible
+		if not visible:
+			_status_label.text = ""
+		return
+
+	if not visible:
+		_risk_detail_panel.visible = false
+		_status_label.text = ""
+		return
+
+	_risk_detail_panel.add_theme_stylebox_override(
+		"panel",
+		_risk_detail_style_error if is_error else _risk_detail_style_normal,
+	)
+	_status_label.add_theme_color_override(
+		"font_color",
+		Color(1, 0.52, 0.48, 1) if is_error else Color(0.08, 0.11, 0.18, 1),
+	)
+	_risk_detail_panel.visible = true
+	_status_label.visible = true
+
+
+func _show_contract_risk_detail(risk: Dictionary) -> void:
+	var lab: String = _str_cell(risk.get("label", null))
+	var disp: String = _str_cell(risk.get("display_value", risk.get("value", null)))
+	var sev: String = _str_cell(risk.get("severity", null))
+	var memo: String = _str_cell(risk.get("memo", null))
+
+	_status_label.text = "人事リスク詳細\n%s\n値: %s\n重要度: %s\nメモ: %s" % [lab, disp, sev, memo]
+	_set_contract_risk_detail_visible(true, false)
 
 
 func _on_home_nav_button_pressed() -> void:
