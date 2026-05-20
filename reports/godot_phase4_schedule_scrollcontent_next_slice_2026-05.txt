@@ -1,0 +1,227 @@
+# Godot Phase 4 日程 ScrollContent / 試合リスト本格化 — 次サブスライス比較（2026-05）
+
+## 1. 調査目的
+
+5 Body の平坦 Panel 行ラップ（`230897e` 完了）後、日程画面の **ScrollContent / 試合リスト本格整備** に着手する前に、**1コミットで閉じられる安全な切り出し単位**を比較し、次に実装すべき **1件** を決定する。
+
+## 2. 現在の最新コミット
+
+- **`230897e`** — Godot契約リスク行を平坦Panelで整理
+- 直前: **`4a13872`** 契約 PlayerRows Panel、**`d39bef8`** 戦術 PlayerRolesBody Panel
+- Body Panel 横展開レーン（財務 / OM / 戦術 / 契約 PlayerRows / 契約 RiskRows）は **実装コミット上は一区切り**
+
+## 3. 現在の日程画面の構造
+
+| 領域 | 実装 | 備考 |
+|------|------|------|
+| 静的（`.tscn`） | HeaderCard、SummaryCard、**NextGameCard**、Scroll/ScrollContent | ScrollContent は空 VBox、`separation=8` |
+| `_apply_snapshot` | JSON 読込、Summary、Footer notes、NextGameCard、**`_fill_scroll_body`** 呼び出し | `.gd` の中心 |
+| ScrollContent 動的 | `_fill_scroll_body` がブロックを順に追加 | **過去試合リストはなし**。試合列は **`upcoming_games` のみ** |
+| 未使用レガシー | `_add_scroll_heading` / `_add_scroll_paragraph` | 暗色向け色。**現行 `_fill_scroll_body` からは呼ばれない** |
+
+**ScrollContent への追加順（`_fill_scroll_body`）:**
+
+1. `upcoming` が空かつ `empty_message` あり → `_add_empty_message_block`
+2. `upcoming` 非空 → `_add_upcoming_section_heading` → 各件 `_add_upcoming_block`
+3. `advance_hint` に block / one_line あり → `_add_advance_hint_block`
+
+**試合間区切り:** `a9fa054` でループ内 **HSeparator は削除済み**。カード間余白は **`ScrollContent` の `separation=8`（.tscn）** に依存。
+
+## 4. 既に完了している日程改善
+
+| 手 | コミット目安 | 対象 | 内容 |
+|----|--------------|------|------|
+| 第2段・後半最小 | `7fecb99` | `_add_upcoming_block` | upcoming 白カード（Phase4SummaryCard）化 |
+| advance_hint 最小 | `a62b3a7` | `_fill_scroll_body` 分岐 | `_add_advance_hint_block` |
+| empty_message 最小 | `463e74b` | `_fill_scroll_body` 分岐 | `_add_empty_message_block` |
+| 見出し最小 | `a24cf6f` | `_fill_scroll_body` | `_add_upcoming_section_heading` |
+| 試合間 HSeparator | `a9fa054` | `_fill_scroll_body` ループ | HSeparator 削除、separation=8 に統一 |
+| 中規模第1手 | `fa36271` | `_add_upcoming_block` | line1 HBox / line2 主役 / line3 副情報 |
+| 本格第2手 | `5a98e31` | `_add_advance_hint_block` | block 主役 / one_line 副 |
+| 本格第3手 | `065197b` | `_add_empty_message_block` | 本文主役 / separation 6 |
+
+**到達点:** Scroll 内の **3系統（upcoming / advance_hint / empty_message）の情報階層は整理済み**。ただし **ScrollContent 全体の統一外装・試合リストの Body 型平坦 Panel 化は未着手**。
+
+## 5. schedule_view.gd の主要関数一覧
+
+| 関数 | 役割 |
+|------|------|
+| `_load_schedule_snapshot` | JSON 読込 |
+| `_apply_snapshot` | 画面全体反映 + `_fill_scroll_body` |
+| `_apply_next_game_card` / `_reset_next_game_card` | NextGameCard（Scroll 外） |
+| `_clear_scroll` | ScrollContent 子削除 |
+| **`_fill_scroll_body`** | **ScrollContent 組み立て（オーケストレータ）** |
+| **`_add_upcoming_section_heading`** | 「今後の予定」見出しカード |
+| **`_add_upcoming_block`** | **1試合分 upcoming カード（試合リストの本体）** |
+| `_add_advance_hint_block` | 進行ヒントカード |
+| `_add_empty_message_block` | お知らせカード |
+| `_add_scroll_heading` / `_add_scroll_paragraph` | **未使用（レガシー）** |
+| `_on_home_nav_button_pressed` | ホーム戻り |
+
+## 6. schedule JSON の主要 key
+
+（`schedule_mock.json` / export 同型想定）
+
+| key | 用途 |
+|-----|------|
+| `screen_title`, `team_name`, `season_label` | ヘッダー系 |
+| `summary` | has_season, current_round, total_rounds, upcoming_count |
+| `next_game` | NextGameCard（Scroll 外） |
+| **`upcoming_games`** | **Scroll 内試合リスト（配列・件数可変・mock は8件）** |
+| 各 upcoming 行 | `round`, `round_label`, `competition_label`, `opponent`, `home_away`, `detail`, `label`, `event_id`, … |
+| `advance_hint` | `block`, `one_line` |
+| `empty_message` | upcoming 空時のお知らせ本文 |
+| `notes` | Footer |
+
+**過去試合・結果一覧の key は現行 DTO にない** — 「試合リスト」＝ **`upcoming_games` の動的行** と読むのが正確。
+
+## 7. ScrollContent / 試合リスト本格化で触りそうな関数
+
+| 関数 | 触ると何が変わるか | 広がり |
+|------|-------------------|--------|
+| `_fill_scroll_body` | ブロック順・条件・セクション全体 | **大**（empty / upcoming / hint の順序・共存） |
+| `_add_upcoming_block` | **各試合カードの外装・内側レイアウト** | **中（1関数・試合リスト本体）** |
+| `_add_upcoming_section_heading` | 見出しのみ | 小（前進感弱） |
+| `_add_advance_hint_block` | ヒントカード | 中（整理済み・優先度低） |
+| `_add_empty_message_block` | お知らせカード | 中（整理済み・優先度低） |
+| `.tscn` ScrollContent separation | 全カード間隔 | **scene 変更（今回方針外）** |
+
+## 8. 各候補 A〜F の比較
+
+### 案A — ScrollContent 全体のコンテナ整理
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | セクション間リズム・一覧感の向上 |
+| 安全性 | **低** — `_fill_scroll_body` と複数 `_add_*` の親子関係変更が必要になりやすい |
+| 変更範囲 | `_fill_scroll_body` + 複数 helper のシグネチャ変更の可能性 |
+| 1コミット | **難** |
+| 目視 | 全体確認が必要で漏れやすい |
+
+### 案B — 試合リスト行の Panel 化 / カード化
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | **高** — 試合を1単位として読む本格化の芯 |
+| 安全性 | **中〜高** — 既に Phase4SummaryCard 化済み。**外装を Body 同系平坦 Panel に揃える**なら **`_add_upcoming_block` のみ**で可能 |
+| 変更範囲 | **`_add_upcoming_block` 1関数**（文言・JSON 不変） |
+| 1コミット | **可** |
+| 目視 | Scroll 内 upcoming 列だけ見ればよい |
+
+**注:** 「過去試合」データは無い。B は実質 **upcoming 試合行** の外装統一。
+
+### 案C — upcoming ブロック第2段
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | fa36271 済みの **内側階層**を再触ると差分が小さく前進感が弱い |
+| 安全性 | 触りすぎると回帰 |
+| 1コミット | 内側 typography のみなら中規模未満になりやすい |
+| 推奨 | **外装（平坦 Panel）を先に**、内側は維持 |
+
+### 案D — advance_hint / empty_message は後回し
+
+| 観点 | 評価 |
+|------|------|
+| 結論 | **妥当**。5a98e31 / 065197b 済み。次は **試合リスト（upcoming）優先** |
+| 後続 | upcoming 外装統一後、hint / empty を同系 Panel に揃えるのは **第2・第3サブスライス** |
+
+### 案E — サブスライス設計のみ（docs/reports）
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 本レポートで **実質代替** |
+| 1コミット | 設計のみでは実装前進感が弱い |
+| 推奨 | **本件で E は完了扱い → 次コミットから実装** |
+
+### 案F — ロスター本格へ切り替え
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | GM 中心画面として長期では重要 |
+| 安全性 | 9列・tooltip で **回帰リスク高**、単手不明 |
+| 代替として | Body Panel 完了直後は **README 次候補の日程本格** を優先する方が一貫 |
+
+## 9. 最も推奨する次タスク（1件）
+
+**日程本格整備・ScrollContent 第1手 — upcoming 試合ブロックの外装を Body 同系平坦 Panel に統一**
+
+- **意図:** `_add_upcoming_block` の **外側** `Phase4SummaryCard` を、財務/OM/戦術/契約で実績のある **StyleBoxFlat 平坦 Panel**（`Color(0.965, 0.975, 0.99, 1)`、content margin 4、radius 2、枠線なし）に差し替える
+- **内側は fa36271 のまま維持:** meta_row（round / competition / H-A）、line2（対戦主役）、line3（detail / label 副情報）
+- **試合リスト本格化の入口**として、1関数・1ファイルで閉じる
+
+## 10. その次タスクの実装対象ファイル
+
+- `godot/scripts/schedule_view.gd` **のみ**
+
+## 11. その次タスクの対象関数
+
+- **`_add_upcoming_block` のみ**
+- **`_fill_scroll_body` / `_add_upcoming_section_heading` / advance_hint / empty_message / NextGameCard は触らない**
+
+## 12. その次タスクで絶対に変えないもの
+
+- 表示文言（`line2` / `line3` / meta 各 Label の text 生成ロジック）
+- `upcoming_games` の **件数・順序・スキップ条件**（`_fill_scroll_body` 側）
+- JSON key 名・mock/from_python 読込
+- `empty_message` / `advance_hint` の表示条件と文言
+- `next_game` / Summary / Header / Footer notes
+- **HomeNavButton** / **DataSourceLabel** / scene / Theme / project.godot / data JSON
+- export / tests
+- `a9fa054` の方針（試合間 HSeparator なし・ScrollContent separation=8 維持）
+
+## 13. 想定 pytest
+
+```
+py -m pytest basketball_sim/tests/test_schedule_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+```
+
+（調査時点: `test_schedule_readonly_export.py` 存在確認済み。実装後に上記実行）
+
+## 14. Godot 目視確認項目
+
+- ホーム → 日程遷移 OK
+- ScrollContent 内 **各 upcoming 試合**が薄い平坦 Panel 行として見える（派手すぎない）
+- **line2 対戦 / line3 副情報 / meta 行**の文言・強弱が fa36271 と同等
+- upcoming **件数・順序**が mock 通り（8件想定）
+- 「今後の予定」見出し・advance_hint・empty_message（該当データ時）が **今回未変更で従来どおり**
+- NextGameCard / Summary / Header 維持
+- 試合カード間余白（separation=8）が不自然でない
+- HomeNavButton 戻り OK、エラーなし、実行後 git 差分なし
+
+## 15. 後回しにする候補
+
+| 候補 | 理由 |
+|------|------|
+| A ScrollContent 全体 | 複数関数・親子変更。upcoming 外装統一後に検討 |
+| advance_hint / empty_message 外装統一 | 整理済み。upcoming 第1手の後（第2・第3手） |
+| `_add_upcoming_section_heading` のみ | 前進感が小さい |
+| `_fill_scroll_body` ブロック順変更 | 表示条件・順序リスク |
+| scene の ScrollContent separation 変更 | .tscn 禁止方針 |
+| ロスター本格 | 9列リスク。日程第1手の後に再比較 |
+| Python 本体 | GUI 日程入口未完了 |
+| 施設/クラブ史/順位表 | 中心導線外 |
+| `_add_scroll_heading` / `_add_scroll_paragraph` 削除 | 本格化の芯ではない（別整理） |
+
+## 16. リスクと注意点
+
+1. **外装のみの変更に留める** — line2 font 16 / line3 font 11 等の階層をいじると「第2段の再触り」になり、回帰しやすい
+2. **Phase4SummaryCard → 平坦 Panel** で Scroll 内の見た目は白カード列から薄灰行に変わる — advance_hint 等は当面白カードのまま **混在する**（意図した段階的導入）
+3. **過去試合リストは存在しない** — 「試合リスト」改善＝**upcoming_games 行**と誤解しない
+4. **HSeparator を戻さない** — `a9fa054` 方針と矛盾
+5. **NextGameCard は Scroll 外** — 今回スコープ外（別サブスライス候補）
+
+## 17. 結論
+
+- Body Panel 横展開完了後、日程本格化に入るなら **いきなり `_fill_scroll_body` 全体改修は避ける**
+- **advance_hint / empty_message は後回しで正しい**（整理済み）
+- **最も安全で前進感がある第1手は、`schedule_view.gd` の `_add_upcoming_block` だけを対象に、試合行の外装を Body 同系平坦 StyleBoxFlat Panel に統一すること**
+- 完了後の第2手候補: `_add_advance_hint_block` / `_add_empty_message_block` の外装統一、または `_fill_scroll_body` によるセクション間ラップ（別比較）
+
+---
+
+調査日: 2026-05  
+調査コミット基準: 230897e  
+pytest: 調査のみのため未実施（`test_schedule_readonly_export.py` 等の存在は確認済み）
