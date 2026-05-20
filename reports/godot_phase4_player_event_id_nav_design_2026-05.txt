@@ -1,0 +1,426 @@
+================================================================================
+Godot Phase 4 — player_id / event_id / nav 設計 事前調査レポート
+================================================================================
+
+1. 調査目的
+--------------------------------------------------------------------------------
+Phase 4「押して詳しく読む」第1段完了後、player_detail_view / game_detail_view 等の
+本格詳細画面へ進むための前提（ID・選択状態・scene 遷移・export/mock）を事実ベースで
+整理し、player_id 追加方針・event_id 活用・nav 3案・詳細 scene 優先順・
+実装フェーズ分割・次タスク 1 件を推奨する。
+
+本レポートは調査のみ。実装・scene・data（コミット対象）・export・tests・docs の
+変更は行っていない。
+
+
+2. 現在の最新コミット
+--------------------------------------------------------------------------------
+7311506 — Godot契約主要選手詳細後の次タスクを比較
+
+直近の詳細導線:
+  9b9a1c7 — 契約 PlayerRows 行直下詳細
+  8ca0736 — 戦術 PlayerRoles 行直下詳細
+  a898cff — 契約 RiskRows 行直下詳細
+  811659b — 日程 upcoming 上部試合カード
+  d2a8c1e / 127839a — ロスター上部サマリー
+
+
+3. 現在の Phase 4 到達点
+--------------------------------------------------------------------------------
+- 10 画面読み取り専用足場: 成立
+- 詳細導線第1段: 5 ルート成立（§4）
+- ナビ: change_scene_to_file のみ、引数なし、Autoload なし（project.godot 確認）
+- 詳細専用 scene: 未存在（godot/scenes/ に 10 本線 + 3 sandbox/preview のみ）
+- *_from_python.json: リポジトリ内には存在しない（godot/.gitignore 対象・手動生成）
+- Python Player 正本: player_id: int あり（basketball_sim/models/player.py L19）
+- readonly export: player_id は tactics 内部参照のみ。JSON 出力は全画面未実装
+
+
+4. 主要詳細導線の現在地
+--------------------------------------------------------------------------------
+
+4.1 ロスター
+- 氏名「詳細」→ 上部 StatusLabel サマリー（_show_selected_player_summary）
+- 選択データ: bind(p) で players[] の Dictionary を保持
+- player_id: JSON/mock/export いずれもなし
+
+4.2 日程
+- upcoming「詳細」→ 上部 _game_detail_panel + StatusLabel
+- 選択データ: bind(row) で upcoming_games[] 全体
+- event_id: あり。detail は export 時に生成された複数行文字列
+
+4.3 契約 RiskRows
+- 行直下インライン（_on_risk_detail_button_pressed）
+- risk_items[].key が安定識別子（例 expiring_contract_risk）
+
+4.4 契約 PlayerRows
+- 行直下インライン（_on_player_contract_detail_button_pressed）
+- player_name 等のみ。player_id なし
+
+4.5 戦術 PlayerRoles
+- 行直下インライン（_on_player_role_detail_button_pressed）
+- export 内部は player_id で roles/target_minutes を解決するが JSON 未出力
+
+
+5. ID有無の監査結果
+--------------------------------------------------------------------------------
+
+| 対象 | player_id | event_id | risk_id 相当 | role_id | order/key |
+|------|-----------|----------|--------------|---------|-----------|
+| roster players[] | なし | — | — | — | order のみ（表示順・1始まり） |
+| contract player_contract_rows[] | なし | — | — | — | order（年俸順テーブル内） |
+| contract risk_items[] | — | — | **key** あり | — | key 文字列 |
+| tactics player_role_items[] | なし | — | — | なし | order（起用序列） |
+| schedule upcoming_games[] | — | **event_id** あり | — | — | round 等 |
+
+5.1 player_id
+- Python 正本: Player.player_id: int（save 内の安定 ID）
+- export JSON: roster / contract / tactics いずれも **未出力**
+- tactics_summary_readonly.py: _valid_player_ids / _player_by_id / append_row(pid=...)
+  で内部利用。rows.append 時に player_id キーを付けていない
+- Godot .gd: player_id を参照するコードなし
+
+5.2 event_id
+- schedule_readonly._normalize_upcoming_row: event_id を str 化（空なら "-"）
+- schedule_display.py: SeasonEvent.event_id または合成 ID
+  （emperor_cup_week_r*, easl_week_r*, national_window_r*, all_star_week_r*）
+- is_schedule_row_display_supplement: 合成 ID の表示補完行を識別可能
+- mock JSON: 全 upcoming 行に event_id あり
+
+5.3 risk_id
+- risk_items[].key（例 high_salary_skew）— 画面内・export 内で一意
+
+5.4 role_id
+- 専用フィールドなし。player_role_items は order + player_name + memo(slot_label)
+
+5.5 order / key の仮 ID としての限界
+- roster order: ソート後表示順（POS→OVR→name）。契約表の order（年俸順）と不一致
+- contract order: 年俸降順テーブル内の行番号
+- tactics order: 先発5 + ベンチ順の序列
+→ **order を跨画面 ID に使うと同一選手を結べない**
+
+
+6. Python export ごとの ID 出力状況
+--------------------------------------------------------------------------------
+
+6.1 roster_readonly.py
+- _player_row 出力: order, name, position, age, ovr, salary_*, contract_*, nationality_slot, status
+- ROSTER_COLUMNS（Godot 表ヘッダ）: player_id 非含有
+- getattr(player, "player_id") 参照なし
+
+6.2 schedule_readonly.py
+- upcoming 行: round, round_label, month_label, competition_*, opponent, home_away,
+  detail, **event_id**, label, is_user_team_game
+- event_id ソース: schedule_display upcoming 行の event_id フィールド
+
+6.3 contract_personnel_summary_readonly.py
+- _build_player_contract_rows: order, player_name, position, age, overall, potential,
+  salary*, contract_*, nationality_*, fa_flag*, risk_label, memo
+- _risk_item: **key**, label, value, display_value, severity, memo
+- Player から name 等は読むが player_id は未出力
+
+6.4 tactics_summary_readonly.py
+- _build_player_role_items: order, player_name, role, role_label, position,
+  target_minutes*, starter*, memo
+- 内部 pid: int で by_id 参照。JSON 行に pid を載せていない
+
+
+7. Godot mock / from_python JSON の ID 状況
+--------------------------------------------------------------------------------
+
+| ファイル | player_id | event_id | risk key | 備考 |
+|----------|-----------|----------|----------|------|
+| roster_mock.json | なし | — | — | players[].order のみ |
+| schedule_mock.json | — | 全行あり | — | mock_r31_league_a 等 |
+| contract_personnel_summary_mock.json | なし | — | risk_items[].key あり | player_contract_rows[].order |
+| tactics_summary_mock.json | なし | — | — | player_role_items[].order |
+| *_from_python.json | リポジトリ内なし | 同上想定 | 同上想定 | 手動 export・gitignore |
+
+mock と export の整合:
+- schedule: export 正本。mock は export 形状に合わせた fixture
+- roster/contract/tactics: export が player_id を出していないため mock もなし（整合）
+- from_python 生成後も player_id は現状出ない（export 変更前）
+
+差分リスク:
+- export に player_id 追加後、mock を同期しないと Godot 単体（mock のみ）と
+  from_python 優先時でキー有無がズレる → **mock 同期が Phase A で必須**
+
+
+8. 現在の nav / scene 遷移 / 状態管理
+--------------------------------------------------------------------------------
+
+8.1 home_dashboard.gd
+- 10 scene パス定数 + change_scene_to_file（引数なし）
+- 選択状態・ID の受け渡しなし
+
+8.2 各サブ画面共通
+- ホーム戻り: HomeNavButton → change_scene_to_file(home_dashboard.tscn)
+- JSON: 各 view が *_from_python → mock を自力読込
+- 詳細表示:
+  - ロスター/日程: StatusLabel（上部カード）
+  - 契約/戦術: pressed.bind(Dictionary) → 同一 scene 内 Panel toggle
+- Autoload: project.godot にエントリなし
+
+8.3 docs / README 方針（参照）
+- GODOT_NAVIGATION: change_scene_to_file のみ。LeftRail クリック化は未着手
+- GODOT_GUI IA §14: Godot から Python 自動起動は Phase 4 初期範囲外
+- 詳細 scene 追加は docs 上「本番 GUI 第2段」相当（未確定）
+
+
+9. player_id 追加方針の比較
+--------------------------------------------------------------------------------
+
+| 案 | 内容 | 安全性 | save 互換 | テスト修正 | 横断リンク | 推奨 |
+|----|------|--------|-----------|------------|------------|------|
+| 1 | export + mock に player_id 追加 | ◎ | ◎ save 不変・DTO のみ | 小〜中 | ◎ | **推奨** |
+| 2 | Godot で order/index を仮 ID | △ | ◎ | なし | × 画面間不一致 | 非推奨 |
+| 3 | ID 追加せず同一 scene 内のみ | ◎ | ◎ | なし | × 詳細 scene 不可 | 現状維持のみ |
+
+案1 詳細:
+- 追加フィールド: "player_id": int（Player.player_id をそのまま）
+- roster: _player_row に追加。ROSTER_COLUMNS には載せない（9列表は維持）
+- contract: _build_player_contract_rows に追加
+- tactics: append_row の rows.append に player_id: pid 追加
+- mock JSON: 各 players/rows にダミー int（例 101, 102…）を付与
+- Godot .gd: Phase A では**読まなくてよい**（既存表示を壊さない）
+
+save format 変更: **不要**（readonly DTO の追加キーのみ）
+
+今すぐやるべきか: **はい**。詳細 scene / Autoload より先。
+
+
+10. event_id 活用方針
+--------------------------------------------------------------------------------
+
+10.1 一貫性
+- export → JSON → Godot schedule_view: event_id キーは一貫
+- mock と export 形状一致。テストは detail 存在を検証、event_id 値の assert は弱い
+- 合成 ID（杯週・代表ウィンドウ等）も schedule_display と export で同規則
+
+10.2 game_detail_view 前提として足りるか
+- **最小 readonly 詳細 scene** としては足りる:
+  - upcoming 行 Dictionary 全体（detail + event_id + opponent + round_label 等）を
+    詳細 scene に渡せば、現状 JSON だけで表示可能
+- **event_id だけで再取得** は不可:
+  - event_id → 行 lookup 用の単体 export / 辞書 API がない
+  - 詳細 scene は「渡された payload」か「schedule JSON 全件再読込 + 線形検索」が必要
+
+10.3 detail 文字列だけで足りるか
+- Phase 4 閲覧専用の第1版 game_detail では **足りる**
+  （schedule_view の _show_upcoming_game_detail と同内容を専用 scene に移す程度）
+- 試合結果・box score・試合ログ・プレビューには **不足**
+  → Python 本体（試合 sim / ログ export）とユーザー相談が必要
+
+10.4 player_id 整備 vs game_detail 先行
+- game_detail は event_id + 行 payload で **player_id なしでも先行可能**
+- ただしロスター⇔契約⇔戦術の選手軸 UX を先に固めるなら **player_id export が先**
+- 推奨順: **player_id export（Phase A）→ game_detail 最小 scene（Phase C〜D）**
+
+
+11. nav 設計 3 案比較
+--------------------------------------------------------------------------------
+
+| 観点 | 案1 現状維持 | 案2 Autoload | 案3 一時 JSON |
+|------|-------------|--------------|---------------|
+| 実装安全性 | ◎ | ○ | △ |
+| Godot らしさ | ○ | ◎ | △ |
+| テストしやすさ | ◎（現状） | ○（要単体方針） | △ |
+| バグりにくさ | ◎ | ○（初期化順・残留） | △（書込・古データ） |
+| 戻る導線 | ◎ | ○（要クリア規約） | ○ |
+| 詳細 scene 展開 | × | ◎ | ○ |
+| Python 連携 | ○ | ◎ | ○（将来 from_python 再読込と混同注意） |
+| 今すぐ採用 | 第1段は維持 | **詳細 scene 時に推奨** | 非推奨 |
+
+案1 — 現状維持
+- 同一 scene 内カード/インライン。第1段完了状態を維持
+- player_detail / game_detail には不向き（scene 跨ぎ不可）
+
+案2 — Autoload（例 ReadonlySelectionContext）
+- 保持例: kind ("player"|"game"), player_id, event_id, payload: Dictionary, source_scene
+- 遷移: 一覧 scene で ID/payload セット → change_scene_to_file(detail.tscn)
+- 詳細 scene: Autoload から読んで表示 → 戻るで clear + change_scene_to_file
+- pytest: Autoload は対象外。export/tests は従来どおり
+- **Phase C で最小 1 Autoload + 1 詳細 scene が安全**
+
+案3 — 一時 JSON（godot/data/selected_detail.json 等）
+- res:// 書込不可（export 配布時問題）。user:// なら可だが readonly プロトタイプに
+  書込キャッシュを混ぜるとデバッグが難化
+- Python 手動 JSON 運用とファイル競合のリスク
+- **採用非推奨**（Autoload の方が単純）
+
+推奨 nav 方針:
+- **短期**: 案1 維持 + Phase A（ID のみ）
+- **詳細 scene 着手時**: 案2 Autoload を最小 1 本
+
+
+12. 詳細 scene 優先順
+--------------------------------------------------------------------------------
+
+| 順 | scene | ID 充足 | 体験価値 | 実装範囲 | export 変更 | 相談 | 第1詳細 scene として |
+|----|-------|---------|----------|----------|-------------|------|---------------------|
+| 1 | player_detail_view | △→◎（Phase A 後） | ◎ | 中 | player_id 追加 | 低 | ◎ 推奨（A 後） |
+| 2 | game_detail_view | ◎（event_id+payload） | ◎ | 中 | 不要（最小版） | 中（結果/log） | ○ A 前も可能だが後推奨 |
+| 3 | contract_detail_view | △ | △ | 小 | player_id | 低 | × インラインで足りる |
+| 4 | tactics_role_detail_view | △ | ○ | 中 | player_id | 高 | × 操作仕様と混同 |
+
+Steam 品質への寄与:
+- player_detail / game_detail が最優先
+- contract/tactics 専用 scene はサマリー画面内詳細で当面十分
+
+最初の 1 画面（Phase D）推奨:
+- **player_detail_view 最小版**（Phase A 完了後）
+- 表示: roster/contract/tactics 既存キー + player_id 表示行
+- 遷移: ロスター「詳細」から Autoload セット → player_detail → 戻る
+
+
+13. 推奨する次タスク 1 件
+--------------------------------------------------------------------------------
+【推奨】Phase A — player_id を readonly export / mock JSON / tests に追加する
+（Godot .gd / .tscn は変更しない）
+
+対象 export（1 コミットまたは export 3 ファイル + mock 3 + tests 3 の小分割）:
+  1. basketball_sim/export/roster_readonly.py — _player_row
+  2. basketball_sim/export/contract_personnel_summary_readonly.py — _build_player_contract_rows
+  3. basketball_sim/export/tactics_summary_readonly.py — append_row rows.append
+  4. godot/data/roster_mock.json / contract_personnel_summary_mock.json / tactics_summary_mock.json
+  5. basketball_sim/tests/test_*_readonly_export.py（各 1〜2 ケース追加）
+
+
+14. 推奨理由
+--------------------------------------------------------------------------------
+1) いきなり scene / Autoload に入ると、選手特定が player_name 頼みで後戻り大
+2) Player.player_id は save 正本に既存。DTO 追加のみで save format 不変
+3) tactics export は内部で pid を既に持つ。出力漏れの修正に近く安全
+4) order 仮 ID は画面間でソート規則が異なり結合不可（§5.5）
+5) event_id は game_detail 用に足りるが、選手軸 IA（ロスター/契約/戦術）を先に
+   ID 化する方が Steam 品質の土台として自然
+6) Godot 表示は Phase A では触らないため、既存 5 詳細導線を壊さない
+7) Phase B（Godot が player_id を読むが遷移しない）は任意。Phase C 前の確認用
+
+
+15. 実装フェーズ分割案
+--------------------------------------------------------------------------------
+
+Phase A — export / mock / tests（**次タスク・推奨**）
+  - player_id を roster / contract / tactics の JSON 行に追加
+  - mock 同期
+  - tests: player_id 存在・型 int・既存選手と一致
+  - Godot .gd / .tscn: 不変
+
+Phase B — Godot 読取確認のみ（任意・小）
+  - 各 view で player_id をログ/debug/tooltip に出す等（表示ロジック不変）
+  - または DataSourceLabel 下に debug 行（本番では削除）
+
+Phase C — Autoload 最小導入
+  - 例 godot/autoload/readonly_selection_context.gd（新規）
+  - project.godot Autoload 登録（**scene 変更に含む・要最小 diff**）
+  - set_player(player_id, payload) / clear() / take_*()
+
+Phase D — 詳細 scene 1 本
+  - player_detail_view.tscn + .gd（最小: payload 表示 + HomeNav/戻る）
+  - roster_view「詳細」から Autoload セット → player_detail へ遷移
+  - 契約/戦術からの遷移は Phase E
+
+Phase E — 横展開
+  - game_detail_view（schedule + event_id）
+  - 契約/戦術から player_detail へ
+  - export 拡張（試合 log 等）は Python 本体と連動
+
+Phase F — Python 本体（ユーザー相談後）
+  - 週次進行 / 試合結果 / 契約 FA / 戦術操作 等
+
+
+16. 想定 pytest
+--------------------------------------------------------------------------------
+Phase A 実装後（必須）:
+
+  py -m pytest basketball_sim/tests/test_roster_readonly_export.py
+  py -m pytest basketball_sim/tests/test_contract_personnel_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_tactics_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_schedule_readonly_export.py
+  py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py
+  py -m pytest basketball_sim/tests/test_phase0_smoke.py
+
+追加 assert 例:
+  - players[0]["player_id"] == 期待 pid
+  - player_contract_rows[0]["player_id"] 存在
+  - player_role_items[0]["player_id"] 存在
+  - REQUIRED_TOP_KEYS / 既存 columns 配列は不変（player_id は行 dict の追加キー）
+
+Phase C/D 以降:
+  - 上記回帰 + Godot 手動目視
+  - godot_readonly_bundle 手動実行で from_python 整合確認
+
+本調査: pytest 未実施
+
+
+17. Godot 目視確認項目
+--------------------------------------------------------------------------------
+Phase A: コード変更なし → 目視不要（pytest のみ）
+
+Phase C/D 以降:
+  - ロスター「詳細」→ player_detail scene → 戻る
+  - player_id が詳細 scene に表示される
+  - 既存 5 詳細導線・HomeNavButton が壊れていない
+  - schedule game_detail 時 event_id 表示
+
+
+18. 後回し候補
+--------------------------------------------------------------------------------
+- contract_detail_view / tactics_role_detail_view 専用 scene
+- 一時 JSON nav（案3）
+- order を ID 代替にする案
+- 財務/施設/順位表への詳細ボタン横展開
+- LeftRail クリック化
+- save format / Player モデル変更
+- Godot から Python 自動起動
+
+
+19. リスクと注意点
+--------------------------------------------------------------------------------
+- export に player_id を足すだけなら save リスク低。format_version 変更不要
+- ROSTER_COLUMNS に player_id を入れると Godot 9 列表が崩れる → **行 dict のみ追加**
+- mock 未同期だと from_python と mock でキー差異 → bundle 運用前に mock 更新必須
+- Autoload 導入時 project.godot 変更は避けられない → Phase C は 1 Autoload に限定
+- game_detail を player_id 前に作ると schedule のみ独立。選手リンクは後付け
+- 合成 event_id 行は「表示補完」であり実試合 sim 行と異なる場合あり（schedule_display 注記）
+
+
+20. Python本体へ戻る前にユーザー相談すべき論点
+--------------------------------------------------------------------------------
+（ID/nav 調査後・Phase F 前）
+
+1. Python 復帰の最優先: 週次進行 vs 試合ログ/結果 vs 契約/FA vs 戦術/ローテ
+2. game_detail の第2段: detail 文字列のみ vs box score / 試合ログ export
+3. 戦術: 閲覧専用のまま vs 操作 UI 着手タイミング（起用プリセット等）
+4. Steam 品質: 選手詳細の深さ（能力値全項目 vs サマリー）
+5. Godot-Python ランタイム: 当面手動 JSON 継続 vs 開発限定自動 export
+6. player_detail 第1版: ロスターのみから遷移 vs 契約/戦術からも同一 scene
+
+
+21. 結論
+--------------------------------------------------------------------------------
+- player_id: 正本（Player）にはあるが export/Godot JSON にはない。**最大の前提不足**
+- event_id: schedule のみ揃っている。game_detail 最小版の材料はある
+- risk_id: risk_items[].key で足りる
+- role_id: なし。player_id + order で代替
+- nav: 現状 change_scene_to_file + bind のみ。詳細 scene には Autoload（案2）が妥当
+
+次にやるべき 1 件:
+  **Phase A — player_id を roster / contract / tactics の export + mock + tests に追加
+  （Godot 表示は変更しない）**
+
+その次:
+  Phase C — Autoload 最小
+  Phase D — player_detail_view 最小
+  Phase E — game_detail_view / 横展開
+  Phase F — Python 本体（ユーザー相談後）
+
+game_detail を player_id より先に作ることは技術的には可能だが、
+IA・Steam 品質・横断リンクの観点では **player_id export を先**にすべき。
+
+================================================================================
+調査実施: 2026-05-20
+参照 HEAD: 7311506
+pytest: 本調査では未実施
+================================================================================
