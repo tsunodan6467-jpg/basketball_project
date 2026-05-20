@@ -13,9 +13,8 @@ const _LOAD_FAILED_MESSAGE := "契約・人事情報を読み込めませんで�
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _last_loaded_uri: String = ""
-var _risk_detail_panel: PanelContainer = null
 var _risk_detail_style_normal: StyleBoxFlat = null
-var _risk_detail_style_error: StyleBoxFlat = null
+var _risk_inline_detail_panels: Array = []
 
 @onready var _status_label: Label = %StatusLabel
 @onready var _data_source_label: Label = %DataSourceLabel
@@ -31,7 +30,7 @@ var _risk_detail_style_error: StyleBoxFlat = null
 
 
 func _ready() -> void:
-	_setup_contract_risk_detail_style()
+	_ensure_risk_inline_detail_styles()
 	_apply_snapshot(_load_snapshot())
 
 
@@ -73,7 +72,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 
 	if d.has("_error"):
 		_status_label.text = str(d["_error"])
-		_set_contract_risk_detail_visible(true, true)
+		_set_status_error_visible(true)
 		_data_source_label.text = ""
 		_screen_title.text = ""
 		_team_name.text = ""
@@ -84,7 +83,7 @@ func _apply_snapshot(d: Dictionary) -> void:
 		_caution_body.text = ""
 		return
 
-	_set_contract_risk_detail_visible(false)
+	_set_status_error_visible(false)
 	_data_source_label.text = _data_source_caption(_last_loaded_uri)
 
 	_screen_title.text = _txt(d, "screen_title", "契約・人事サマリー（閲覧）")
@@ -152,6 +151,7 @@ func _label_or_raw(summary: Dictionary, label_key: String, raw_key: String) -> S
 
 
 func _fill_risk_rows(rows: Array) -> void:
+	_risk_inline_detail_panels.clear()
 	if rows.is_empty():
 		var empty_lab := Label.new()
 		empty_lab.text = "（リスク項目がありません）"
@@ -180,7 +180,10 @@ func _fill_risk_rows(rows: Array) -> void:
 		detail_btn.flat = true
 		detail_btn.custom_minimum_size = Vector2(36, 0)
 		detail_btn.add_theme_font_size_override("font_size", 11)
-		detail_btn.pressed.connect(_show_contract_risk_detail.bind(row))
+		var detail_parts: Dictionary = _create_risk_inline_detail_panel()
+		var detail_panel: PanelContainer = detail_parts["panel"] as PanelContainer
+		var detail_lab: Label = detail_parts["label"] as Label
+		detail_btn.pressed.connect(_on_risk_detail_button_pressed.bind(detail_panel, detail_lab, row))
 
 		var row_inner := HBoxContainer.new()
 		row_inner.add_theme_constant_override("separation", 4)
@@ -209,7 +212,14 @@ func _fill_risk_rows(rows: Array) -> void:
 		panel.add_theme_stylebox_override("panel", row_bg)
 		panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		panel.add_child(margin)
-		_risk_rows.add_child(panel)
+
+		var item_vbox := VBoxContainer.new()
+		item_vbox.add_theme_constant_override("separation", 4)
+		item_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_vbox.add_child(panel)
+		item_vbox.add_child(detail_panel)
+		_risk_rows.add_child(item_vbox)
+		_risk_inline_detail_panels.append(detail_panel)
 		if i < n - 1:
 			_risk_rows.add_child(HSeparator.new())
 
@@ -369,74 +379,65 @@ func _make_contract_risk_detail_panel_style(bg: Color, border: Color) -> StyleBo
 	return style
 
 
-func _setup_contract_risk_detail_style() -> void:
-	if _risk_detail_panel != null:
+func _ensure_risk_inline_detail_styles() -> void:
+	if _risk_detail_style_normal != null:
 		return
-
 	_risk_detail_style_normal = _make_contract_risk_detail_panel_style(
 		Color(0.92, 0.96, 1.0, 1),
 		Color(0.48, 0.64, 0.86, 1),
 	)
-	_risk_detail_style_error = _make_contract_risk_detail_panel_style(
-		Color(1.0, 0.94, 0.94, 1),
-		Color(0.86, 0.48, 0.48, 1),
-	)
 
-	var parent := _status_label.get_parent()
-	var idx := _status_label.get_index()
 
-	_risk_detail_panel = PanelContainer.new()
-	_risk_detail_panel.add_theme_stylebox_override("panel", _risk_detail_style_normal)
-	_risk_detail_panel.visible = false
-	_risk_detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
+func _create_risk_inline_detail_panel() -> Dictionary:
+	_ensure_risk_inline_detail_styles()
+	var detail_panel := PanelContainer.new()
+	detail_panel.visible = false
+	detail_panel.add_theme_stylebox_override("panel", _risk_detail_style_normal)
+	detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var margin := MarginContainer.new()
-	parent.remove_child(_status_label)
-	margin.add_child(_status_label)
-	_risk_detail_panel.add_child(margin)
-	parent.add_child(_risk_detail_panel)
-	parent.move_child(_risk_detail_panel, idx)
-
-	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	_status_label.add_theme_font_size_override("font_size", 14)
-	_status_label.add_theme_constant_override("line_spacing", 4)
-	_status_label.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
-	_status_label.visible = true
-
-
-func _set_contract_risk_detail_visible(visible: bool, is_error: bool = false) -> void:
-	if _risk_detail_panel == null:
-		_status_label.visible = visible
-		if not visible:
-			_status_label.text = ""
-		return
-
-	if not visible:
-		_risk_detail_panel.visible = false
-		_status_label.text = ""
-		return
-
-	_risk_detail_panel.add_theme_stylebox_override(
-		"panel",
-		_risk_detail_style_error if is_error else _risk_detail_style_normal,
-	)
-	_status_label.add_theme_color_override(
-		"font_color",
-		Color(1, 0.52, 0.48, 1) if is_error else Color(0.08, 0.11, 0.18, 1),
-	)
-	_risk_detail_panel.visible = true
-	_status_label.visible = true
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var detail_lab := Label.new()
+	detail_lab.autowrap_mode = 2
+	detail_lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	detail_lab.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	detail_lab.add_theme_font_size_override("font_size", 14)
+	detail_lab.add_theme_constant_override("line_spacing", 4)
+	detail_lab.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
+	detail_lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(detail_lab)
+	detail_panel.add_child(margin)
+	return {"panel": detail_panel, "label": detail_lab}
 
 
-func _show_contract_risk_detail(risk: Dictionary) -> void:
+func _format_contract_risk_detail_text(risk: Dictionary) -> String:
 	var lab: String = _str_cell(risk.get("label", null))
 	var disp: String = _str_cell(risk.get("display_value", risk.get("value", null)))
 	var sev: String = _str_cell(risk.get("severity", null))
 	var memo: String = _str_cell(risk.get("memo", null))
+	return "人事リスク詳細\n%s\n値: %s\n重要度: %s\nメモ: %s" % [lab, disp, sev, memo]
 
-	_status_label.text = "人事リスク詳細\n%s\n値: %s\n重要度: %s\nメモ: %s" % [lab, disp, sev, memo]
-	_set_contract_risk_detail_visible(true, false)
+
+func _set_status_error_visible(visible: bool) -> void:
+	if not visible:
+		_status_label.visible = false
+		_status_label.text = ""
+		return
+	_status_label.add_theme_color_override("font_color", Color(1, 0.52, 0.48, 1))
+	_status_label.visible = true
+
+
+func _on_risk_detail_button_pressed(
+	detail_panel: PanelContainer, detail_lab: Label, risk: Dictionary
+) -> void:
+	if detail_panel.visible:
+		detail_panel.visible = false
+		return
+	for p in _risk_inline_detail_panels:
+		var other: PanelContainer = p as PanelContainer
+		if other != detail_panel:
+			other.visible = false
+	detail_lab.text = _format_contract_risk_detail_text(risk)
+	detail_panel.visible = true
 
 
 func _on_home_nav_button_pressed() -> void:
