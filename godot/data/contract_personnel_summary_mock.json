@@ -160,6 +160,7 @@
   ],
   "player_contract_rows": [
     {
+      "player_id": 762,
       "order": 1,
       "player_name": "Fictional_762",
       "position": "PF",
@@ -180,6 +181,7 @@
       "memo": "-"
     },
     {
+      "player_id": 701,
       "order": 2,
       "player_name": "Fictional_701",
       "position": "C",
@@ -200,6 +202,7 @@
       "memo": "-"
     },
     {
+      "player_id": 655,
       "order": 3,
       "player_name": "Fictional_655",
       "position": "SF",
@@ -220,6 +223,7 @@
       "memo": "-"
     },
     {
+      "player_id": 612,
       "order": 4,
       "player_name": "Fictional_612",
       "position": "SG",
@@ -240,6 +244,7 @@
       "memo": "-"
     },
     {
+      "player_id": 588,
       "order": 5,
       "player_name": "Fictional_588",
       "position": "PG",
@@ -260,6 +265,7 @@
       "memo": "-"
     },
     {
+      "player_id": 540,
       "order": 6,
       "player_name": "Fictional_540",
       "position": "PF",
@@ -280,6 +286,7 @@
       "memo": "-"
     },
     {
+      "player_id": 503,
       "order": 7,
       "player_name": "Fictional_503",
       "position": "SF",
@@ -300,6 +307,7 @@
       "memo": "-"
     },
     {
+      "player_id": 477,
       "order": 8,
       "player_name": "Fictional_477",
       "position": "C",

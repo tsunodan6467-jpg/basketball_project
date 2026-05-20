@@ -24,7 +24,11 @@ from basketball_sim.export.finance_summary_readonly import (
     _soft_salary_cap,
     _team_display_name,
 )
-from basketball_sim.export.roster_readonly import _contract_label, _sort_rosters_for_readonly_display
+from basketball_sim.export.roster_readonly import (
+    _contract_label,
+    _player_id_int,
+    _sort_rosters_for_readonly_display,
+)
 from basketball_sim.systems.japan_regulation_display import get_player_nationality_bucket_label
 
 SCREEN_TITLE = "契約・人事サマリー（閲覧）"
@@ -226,7 +230,11 @@ def _build_player_contract_rows(players: List[Any], *, max_players: int) -> List
     ordered = _ordered_players_for_table(players)
     lim = max(1, int(max_players))
     rows: List[Dict[str, Any]] = []
-    for i, p in enumerate(ordered[:lim], start=1):
+    row_order = 0
+    for p in ordered[:lim]:
+        if _safe_get(p, "player_id", None) is None:
+            continue
+        row_order += 1
         name = str(_safe_get(p, "name", None) or "").strip() or "無名選手"
         pos = _position_str(p)
         age = _age_optional(p)
@@ -256,7 +264,8 @@ def _build_player_contract_rows(players: List[Any], *, max_players: int) -> List
 
         rows.append(
             {
-                "order": i,
+                "player_id": _player_id_int(p),
+                "order": row_order,
                 "player_name": name,
                 "position": pos,
                 "age": age,

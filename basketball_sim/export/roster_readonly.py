@@ -153,6 +153,13 @@ def _nationality_slot_label(player: Any) -> str:
         return _safe_str(getattr(player, "nationality", None), "不明")
 
 
+def _player_id_int(player: Any) -> int:
+    raw = getattr(player, "player_id", None)
+    if raw is None:
+        raise ValueError("player_id is required for roster readonly export")
+    return int(raw)
+
+
 def _player_row(order: int, player: Any) -> Dict[str, Any]:
     name = _safe_str(getattr(player, "name", None), "無名選手")
     position = _safe_str(getattr(player, "position", None), "-")
@@ -173,6 +180,7 @@ def _player_row(order: int, player: Any) -> Dict[str, Any]:
         contract_years_left_int = None
 
     return {
+        "player_id": _player_id_int(player),
         "order": int(order),
         "name": name,
         "position": position,

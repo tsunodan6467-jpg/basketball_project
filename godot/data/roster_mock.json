@@ -21,6 +21,7 @@
   ],
   "players": [
     {
+      "player_id": 1001,
       "order": 1,
       "name": "テスト山 一郎",
       "position": "PG",
@@ -34,6 +35,7 @@
       "status": "良好"
     },
     {
+      "player_id": 1002,
       "order": 2,
       "name": "Player_Kappa_02",
       "position": "PG",
@@ -47,6 +49,7 @@
       "status": "疲労あり"
     },
     {
+      "player_id": 1003,
       "order": 3,
       "name": "MockGuard_03",
       "position": "SG",
@@ -60,6 +63,7 @@
       "status": "良好"
     },
     {
+      "player_id": 1004,
       "order": 4,
       "name": "SampleWing_04",
       "position": "SG",
@@ -73,6 +77,7 @@
       "status": "疲労高"
     },
     {
+      "player_id": 1005,
       "order": 5,
       "name": "ProtoForward_05",
       "position": "SF",
@@ -86,6 +91,7 @@
       "status": "良好"
     },
     {
+      "player_id": 1006,
       "order": 6,
       "name": "BenchSF_06",
       "position": "SF",
@@ -99,6 +105,7 @@
       "status": "良好"
     },
     {
+      "player_id": 1007,
       "order": 7,
       "name": "DevBig_07",
       "position": "PF",
@@ -112,6 +119,7 @@
       "status": "負傷中（残り3試合）"
     },
     {
+      "player_id": 1008,
       "order": 8,
       "name": "ReservePF_08",
       "position": "PF",
@@ -125,6 +133,7 @@
       "status": "良好"
     },
     {
+      "player_id": 1009,
       "order": 9,
       "name": "TowerCenter_09",
       "position": "C",
@@ -138,6 +147,7 @@
       "status": "良好"
     },
     {
+      "player_id": 1010,
       "order": 10,
       "name": "BackupC_10",
       "position": "C",
@@ -151,6 +161,7 @@
       "status": "疲労あり"
     },
     {
+      "player_id": 1011,
       "order": 11,
       "name": "FlexWing_11",
       "position": "SF",
@@ -164,6 +175,7 @@
       "status": "良好"
     },
     {
+      "player_id": 1012,
       "order": 12,
       "name": "DeepBench_12",
       "position": "SG",

@@ -74,6 +74,27 @@ def test_reads_dict_team_tactics() -> None:
     assert d["summary"]["target_minutes_count"] >= 2
     assert len(d["player_role_items"]) >= 5
     assert d["player_role_items"][0]["starter"] is True
+    assert d["player_role_items"][0]["player_id"] == 1
+    assert isinstance(d["player_role_items"][0]["player_id"], int)
+    assert "order" in d["player_role_items"][0]
+
+
+def test_player_role_items_include_player_id() -> None:
+    starters = {pos: i + 10 for i, pos in enumerate(["PG", "SG", "SF", "PF", "C"])}
+    tt = get_default_team_tactics()
+    tt["rotation"]["starters"] = starters
+    players = [
+        SimpleNamespace(player_id=i + 10, name=f"P{i}", position=pos)
+        for i, pos in enumerate(["PG", "SG", "SF", "PF", "C"])
+    ]
+    team = SimpleNamespace(name="ID", league_level=1, strategy="balanced", players=players, team_tactics=tt)
+    d = build_tactics_summary_readonly_dict(team, max_players=8)
+    ids = {row["player_id"] for row in d["player_role_items"]}
+    assert ids == {10, 11, 12, 13, 14}
+    for row in d["player_role_items"]:
+        assert isinstance(row["player_id"], int)
+        assert isinstance(row["order"], int)
+        assert row["player_id"] != row["order"]
 
 
 def test_team_tactics_unchanged_after_build() -> None:

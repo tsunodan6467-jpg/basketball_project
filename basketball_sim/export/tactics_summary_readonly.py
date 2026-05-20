@@ -429,6 +429,7 @@ def _build_player_role_items(
         tm_label = f"{tm_float:.1f} 分/試合" if tm_float is not None else "-"
         rows.append(
             {
+                "player_id": int(pid),
                 "order": order,
                 "player_name": name,
                 "role": main_role,

@@ -96,12 +96,26 @@ def test_reads_player_salary_and_contract_years() -> None:
     assert d["summary"]["has_salary_data"] is True
     assert d["summary"]["has_contract_data"] is True
     row = d["player_contract_rows"][0]
+    assert row["player_id"] == 1
+    assert isinstance(row["player_id"], int)
     assert row["salary"] == 12_000_000
     assert row["contract_years"] == 3
 
 
+def test_player_contract_rows_include_player_id() -> None:
+    p = _player(99, name="契約ID", position="C", ovr=60, salary=5_000_000)
+    team = Team(team_id=1, name="T", league_level=1, players=[p])
+    d = build_contract_personnel_summary_readonly_dict(team, max_players=8)
+    assert len(d["player_contract_rows"]) == 1
+    assert d["player_contract_rows"][0]["player_id"] == 99
+    first_risk = d["risk_items"][0]
+    assert "key" in first_risk
+    assert "player_id" not in first_risk
+
+
 def test_missing_salary_does_not_crash() -> None:
     p = SimpleNamespace(
+        player_id=2001,
         name="安い",
         position="SG",
         age=25,
@@ -120,6 +134,7 @@ def test_missing_salary_does_not_crash() -> None:
 
 def test_missing_contract_years_does_not_crash() -> None:
     p = SimpleNamespace(
+        player_id=2002,
         name="無期限風",
         position="PF",
         age=28,
@@ -271,11 +286,13 @@ def test_malformed_player_list_does_not_crash() -> None:
     d = build_contract_personnel_summary_readonly_dict(team)
     assert len(d["player_contract_rows"]) >= 1
     assert any(r["player_name"] == "正常" for r in d["player_contract_rows"])
+    assert any(r["player_id"] == 9 for r in d["player_contract_rows"])
 
 
 def test_nationality_slot_unknown_shows_disconnected_aggregate() -> None:
     # nationality が規則ラベルに載らない値だと bucket は domestic でも表示ラベルは「不明」になり、集計は未接続分岐へ。
     p1 = SimpleNamespace(
+        player_id=3001,
         name="U1",
         position="PG",
         age=22,
@@ -287,6 +304,7 @@ def test_nationality_slot_unknown_shows_disconnected_aggregate() -> None:
         injury_games_left=0,
     )
     p2 = SimpleNamespace(
+        player_id=3002,
         name="U2",
         position="SG",
         age=23,

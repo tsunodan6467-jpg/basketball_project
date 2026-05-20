@@ -139,8 +139,20 @@ def test_sort_position_ovr_name() -> None:
     assert names == ["Alpha", "Zebra", "Mido"]
 
 
+def test_players_include_player_id_not_in_roster_columns() -> None:
+    p = _player(42, name="ID選手", position="PG", ovr=55)
+    team = Team(team_id=1, name="T", league_level=1, players=[p])
+    d = build_roster_readonly_dict(team)
+    row = d["players"][0]
+    assert row["player_id"] == 42
+    assert isinstance(row["player_id"], int)
+    assert "player_id" not in d["columns"]
+    assert "player_id" not in ROSTER_COLUMNS
+
+
 def test_minimal_player_like_objects_do_not_crash() -> None:
     p = SimpleNamespace(
+        player_id=9001,
         name=None,
         position=None,
         age=None,
