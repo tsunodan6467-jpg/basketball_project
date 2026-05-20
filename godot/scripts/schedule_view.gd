@@ -215,8 +215,19 @@ func _add_upcoming_block(row: Dictionary) -> void:
 	else:
 		line3 = "ラベル: %s" % label_s
 
-	var panel: PanelContainer = PanelContainer.new()
-	panel.theme_type_variation = &"Phase4SummaryCard"
+	var panel := PanelContainer.new()
+	var row_bg := StyleBoxFlat.new()
+	row_bg.bg_color = Color(0.965, 0.975, 0.99, 1)
+	row_bg.content_margin_left = 4.0
+	row_bg.content_margin_top = 4.0
+	row_bg.content_margin_right = 4.0
+	row_bg.content_margin_bottom = 4.0
+	row_bg.corner_radius_top_left = 2
+	row_bg.corner_radius_top_right = 2
+	row_bg.corner_radius_bottom_right = 2
+	row_bg.corner_radius_bottom_left = 2
+	panel.add_theme_stylebox_override("panel", row_bg)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var inner: VBoxContainer = VBoxContainer.new()
 	inner.add_theme_constant_override("separation", 6)
 
@@ -258,7 +269,14 @@ func _add_upcoming_block(row: Dictionary) -> void:
 	l3.add_theme_color_override("font_color", Color(0.32, 0.36, 0.48, 1))
 	l3.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(l3)
-	panel.add_child(inner)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 4)
+	margin.add_theme_constant_override("margin_top", 2)
+	margin.add_theme_constant_override("margin_right", 4)
+	margin.add_theme_constant_override("margin_bottom", 2)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.add_child(inner)
+	panel.add_child(margin)
 	_scroll_content.add_child(panel)
 
 
