@@ -1,0 +1,300 @@
+# Godot Phase 4 ロスター詳細カード完了後 — 次タスク比較（2026-05）
+
+## 1. 調査目的
+
+ロスター詳細導線 **第1段**（tooltip → 「詳細」ボタン → StatusLabel 5行サマリー → 明るいカード視認性）完了後、**細かい見た目調整の継続を避け**、次に進むべき方向を **1件** に絞る。候補は **ロスター第2段 / 新規選手詳細画面 / ゲーム体験画面 / 日程試合 / 契約人事 / Python本体 / ロードマップ** の7系統。
+
+## 2. 現在の最新コミット
+
+- **`127839a`** — Godotロスター詳細サマリーを読みやすく整理
+- **`d2a8c1e`** — Godotロスター詳細導線の入口を追加
+- **`9bb619b`** — Godotロスター契約列tooltipを追加
+- **Body Panel 横展開レーン完了**（財務 `c762d88` / OM `1316a16` / 戦術 `d39bef8` / 契約 `4a13872`・`230897e`）
+- **日程 ScrollContent 主要3ブロック外装**（`aa33902` upcoming / `3eb9d3a` advance_hint / `e7ddcad` empty_message）
+
+## 3. 現在の Phase 4 到達点
+
+| 区分 | 状態 |
+|------|------|
+| 閲覧画面数 | **10画面**（`home_dashboard` + 9詳細）。`player_detail_view` **なし** |
+| Theme 第1段 | 主要10画面の Header / 静的カード Phase4 化 **完了**（`godot/README.md` 記録） |
+| Body 平坦 Panel 行 | 財務履歴・OMミッション・戦術ロール・契約 Player/Risk・**ロスター選手行** **完了** |
+| 情報導線（hover） | ロスター 氏名/契約/状態 tooltip **完了** |
+| 情報導線（詳細入口） | ロスター 氏名列「詳細」→ カードサマリー **完了** |
+| nav | 全画面 **`change_scene_to_file` のみ**。Autoload・選択状態受け渡し **なし** |
+| export | `basketball_sim/export/*_readonly.py` ×10 + `godot_readonly_bundle.py`。手動配置 JSON 優先読込 |
+| 未完了（README 反復記載） | 各画面 Scroll 内動的本文の第2段、日程 Scroll 全体本格、ソート/フィルタ、**選手詳細画面**、Python本体復帰 |
+
+## 4. ロスター詳細導線 第1段の完了内容
+
+| 項目 | 実装 |
+|------|------|
+| 行背景 | Panel 平坦行（`9445d0e`） |
+| 視認補助 | 氏名/OVR/状態 強調（`6c1e25f` / `746e861`） |
+| tooltip | 氏名・契約・状態（`746e861` / `9bb619b`） |
+| 詳細入口 | 氏名列内「詳細」ボタン（`d2a8c1e`） |
+| サマリー | 5行（名前 / Pos・年齢 / OVR / 契約 / 状態） |
+| 視認性 | runtime `PanelContainer` カード + 濃色文字（`127839a`） |
+
+**第1段の定義:** 「一覧で気になる選手を選び、**同一画面内**で主要属性を読める」まで到達。**別画面詳細・player_id 受け渡しは未着手。**
+
+## 5. 現在の主要画面の到達点
+
+### ロスター（`roster_view.gd`）
+
+- 9列 HBox + 行 Panel + tooltip + 氏名「詳細」+ サマリーカード
+- JSON: `players[]` に `order`〜`status`（**`player_id` なし**）
+- 関数: `_add_player_row` / `_show_selected_player_summary` / `_setup_selected_player_summary_style` 等
+
+### 日程（`schedule_view.gd`）
+
+- **静的** `NextGameCard`（`.tscn`）に `next_game` 反映（`_apply_next_game_card`）
+- **Scroll** `_fill_scroll_body`: `empty_message` → `今後の予定` 見出し → `upcoming_games[]` → `advance_hint`
+- **外装統一済み:** `_add_upcoming_block` / `_add_advance_hint_block` / `_add_empty_message_block` は平坦 Panel
+- **未統一:** `_add_upcoming_section_heading` は **`Phase4SummaryCard`** のまま（見出しのみ）
+- JSON `upcoming_games[]` 各行に **`detail`（複数行テキスト）**・`event_id`・`opponent` 等 **十分**
+
+### 契約人事（`contract_personnel_summary_view.gd`）
+
+- RiskRows / PlayerRows 平坦 Panel 行（`230897e` / `4a13872`）
+- 静的カード + 動的行テキスト。ロスターへの nav **なし**
+
+### 戦術（`tactics_summary_view.gd`）
+
+- PlayerRolesBody 平坦 Panel 行（`d39bef8`）
+- 選手ロール行テキストのみ。詳細導線 **なし**
+
+### 財務（`finance_summary_view.gd`）
+
+- HistoryBody 平坦 Panel 行（`c762d88`）
+- 履歴行ループ `_fill_history_rows`
+
+### OM（`owner_mission_view.gd`）
+
+- MissionsBody 平坦 Panel 行（`1316a16`）
+- ミッション行 `_fill_mission_rows`
+
+## 6. 現在の主な未完了候補
+
+| 領域 | 代表タスク |
+|------|------------|
+| ロスター | 第2段（サマリー拡張・行選択ハイライト）、新規選手詳細画面、ソート、9列幅本格 |
+| 日程 | 見出し外装統一、upcoming「詳細」導線、試合リスト本格、Scroll 全体整理 |
+| 契約/戦術 | 画面間導線、判断支援 UI |
+| ゲーム体験 | 試合結果・週次進行・試合後ログ（**Godot 画面未存在**） |
+| Python | 週次進行・FA・戦術ロジック等（仕様相談多） |
+| 横断 | Phase 4 完了定義の再整理、Godot↔Python 接続優先度 |
+
+## 7. 候補 A〜G の比較
+
+### 案A — ロスター詳細導線 第2段
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | サマリーに年俸・区分を足す、行ハイライト等は **実用性はある** |
+| 安全性 | **高**（`_show_selected_player_summary` / `_add_player_row` のみで可能なもの多い） |
+| 変更範囲 | `roster_view.gd` のみ想定可 |
+| 1コミット | **可**（1行追加・選択色など） |
+| scene/data/export | **不要**（既存 key のみ） |
+| ゲーム体験 | **中** — 同一画面内の深化 |
+| 仕様相談 | **低** |
+| 注意 | **ロスター上の微調整が続く**印象になりやすい。第1段直後は **他画面への体験拡張**の方がバランス良い |
+
+**結論:** 第2手候補として有効だが、**最優先の「次1件」にはしない**。
+
+---
+
+### 案B — 新規選手詳細画面
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | **最高**（最終形） |
+| 安全性 | **低** — scene/gd/project/nav/export/tests に波及 |
+| 1コミット | **不可** |
+| scene/data/export | **すべて必要になり得る** |
+| ゲーム体験 | **高** |
+| 仕様相談 | **高**（`player_id` export 追加、戻る導線、能力表示範囲） |
+| 現状 | JSON に **`player_id` なし**。受け渡しは `order` 暫定か export 拡張が必要 |
+
+**結論:** **ロスター第1段の直後に一気実装は大きすぎる**。事前に **設計調査レポート1本** を推奨。
+
+---
+
+### 案C — ゲーム体験寄り画面（試合結果・週次進行等）
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 長期では **Steam 品質に直結** |
+| 安全性 | **低〜中** — 新規画面・新規 export・mock 設計が必要 |
+| 1コミット | 調査のみなら可、実装は **不可** |
+| scene/data/export | **新規が典型** |
+| ゲーム体験 | **最高** |
+| 仕様相談 | **高** |
+| 現状 | 既存10画面は **閲覧サマリー型**。試合結果専用 DTO/export **なし** |
+
+**結論:** 方向性は正しいが、**いきなり新画面実装は Phase 4 の安全進行から外れやすい**。まず **既存日程 JSON の `detail` を活かす試合詳細入口**が現実的（案Dと統合）。
+
+---
+
+### 案D — 日程/試合体験を続ける
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | **高** — シーズン進行の中心 UI。`next_game` + `upcoming_games` は既に mock 充実 |
+| 安全性 | **高〜中** — 関数単位で切れる |
+| 1コミット | **可**（下記推奨タスク） |
+| scene/data/export | **不要**（推奨手） |
+| ゲーム体験 | **高**（次戦・予定の「読む」体験） |
+| 仕様相談 | **低** |
+
+**サブ候補比較（日程内）:**
+
+| サブ | 内容 | 1コミット | 体験前進 | 備考 |
+|------|------|-----------|----------|------|
+| D1 | `_add_upcoming_section_heading` 平坦 Panel 化 | ○ | 低（見た目統一） | upcoming 3ブロックと揃えるだけ |
+| **D2** | **`_add_upcoming_block` に「詳細」→ `detail` 全文カード表示** | **○** | **高** | **ロスター第1段と同型**。JSON `detail` 既存 |
+| D3 | NextGameCard に詳細ボタン | △ | 中 | **`.tscn` 変更が必要になりやすい** — 今回条件に不合 |
+| D4 | Scroll 全体本格 | × | 高 | 範囲大 |
+
+**結論:** **日程内では D2 が最適**（ゲーム体験 + 安全 + 1ファイル）。
+
+---
+
+### 案E — 契約/人事判断支援
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | GM 判断に近い |
+| 安全性 | **中** — PlayerRows からロスターへ飛ぶには nav 設計が必要 |
+| 1コミット | 判断補助テキストのみなら可、**画面連携は不可** |
+| scene/data/export | 連携時は **複数ファイル** |
+| ゲーム体験 | **中〜高** |
+| 仕様相談 | **中〜高** |
+
+**結論:** ロスター詳細入口ができた今、**契約→ロスター導線**は第2波でよい。単体では仕様が広がりやすい。
+
+---
+
+### 案F — Python本体ロジックへ復帰
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | ゲーム本体として **必須** |
+| 安全性 | 領域による（テストは豊富） |
+| Phase4 流れ | **Godot 本番 GUI 準備の連続性が切れる** |
+| 仕様相談 | **高**（週次・FA・戦術の優先順位） |
+
+**結論:** **今すぐ全面復帰は推奨しない**。Phase 4 で「閲覧10画面の導線」をもう1本（日程）固めてから区切る方がよい。
+
+---
+
+### 案G — ロードマップ/総点検
+
+| 観点 | 評価 |
+|------|------|
+| 価値 | 大きな判断前に **有効** |
+| 実装前進 | **止まる** |
+| タイミング | 選手詳細画面（案B）や新規ゲーム画面（案C）の **直前**向き |
+
+**結論:** 現時点では **実装1手挟んでから** の方が勢いを保てる。案B着手前の調査としては推奨。
+
+---
+
+### 比較サマリー
+
+| 案 | 価値 | 安全性 | 1コミット | scene/data 不要 | 体験前進 | 推奨度 |
+|----|------|--------|-----------|-----------------|----------|--------|
+| A ロスター第2段 | 中 | 高 | ○ | ○ | 中 | 第2手 |
+| B 選手詳細画面 | 最高 | 低 | × | × | 最高 | 設計後 |
+| C 新ゲーム画面 | 最高 | 低 | × | × | 最高 | 設計後 |
+| **D 日程試合詳細** | **高** | **高** | **○** | **○** | **高** | **★** |
+| E 契約判断 | 中 | 中 | △ | △ | 中 | 後回し |
+| F Python | 高 | — | — | — | 高 | 区切り後 |
+| G ロードマップ | 中 | — | 調査のみ | — | — | B/C前 |
+
+## 8. 最も推奨する次タスク（1件）
+
+**日程・試合体験 第1手 — `_add_upcoming_block` に「詳細」ボタンを追加し、JSON の `detail` 全文を StatusLabel カード（ロスター同型）で表示**
+
+## 9. 推奨理由
+
+1. **ゲーム体験への近さ:** シーズン進行で最も触る **「次の試合・予定」** に、ロスターで実証済みの **「詳細を読む」** パターンを横展開できる。
+2. **データは既にある:** `schedule_mock.json` の `upcoming_games[].detail` は **複数行の試合説明**が既に入っており、export 変更不要。
+3. **安全に閉じられる:** `schedule_view.gd` のみ。主変更は **`_add_upcoming_block`**。カード化はロスター `127839a` の **`_setup_*` / `_set_*_visible`** を **小さく移植**（補助関数1〜2個まで許容）。
+4. **微調整ループ回避:** ロスター第2段（サマリー行追加・行色）より **画面横断の体験前進**が大きい。
+5. **第1段との対称:** GM フローが「**ロスターで選手を詳しく見る**」「**日程で試合を詳しく見る**」の2本になる。
+6. **大改修の前段:** 新規 `match_detail_view` や Python 週次進行の前に、**同一画面内詳細入口**の型を固める。
+
+## 10. 対象ファイル
+
+- `godot/scripts/schedule_view.gd` **のみ**
+
+## 11. 対象関数または対象範囲
+
+| 優先 | 関数 | 内容 |
+|------|------|------|
+| 主 | **`_add_upcoming_block`** | 対戦行（line2）付近に小さな「詳細」`Button`。`row` を bind |
+| 副 | **`_show_upcoming_game_detail(row: Dictionary)`**（新規） | `detail` → StatusLabel テキスト。空なら `opponent` / `round_label` 等で最小フォールバック |
+| 副 | **`_setup_schedule_detail_card_style` / `_set_schedule_detail_visible`**（新規・ロスター流用可） | `%StatusLabel` の明るい Panel ラップ・表示切替 |
+| 触らない | `_fill_scroll_body` の件数・順序、`_apply_next_game_card`、advance_hint / empty_message ブロック、見出し文言 |
+
+## 12. 絶対に変えないもの
+
+- `upcoming_games` の件数・順序・スキップ条件
+- 各 upcoming ブロックの **meta / line2 / line3 表示文言**（ボタン追加のみ）
+- `next_game` / Summary / Header / Footer / HomeNavButton
+- `empty_message` / `advance_hint` ブロック
+- `roster_view.gd` / 他画面 / scene / Theme / data JSON / export / tests
+
+## 13. 想定 pytest
+
+```
+py -m pytest basketball_sim/tests/test_schedule_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+py -m pytest basketball_sim/tests/test_roster_readonly_export.py -q
+```
+
+（日程主・回帰で home/roster/phase0 を併走）
+
+## 14. Godot 目視確認項目
+
+- ホーム → 日程 → 「今後の予定」各試合に「詳細」ボタン
+- 押下で **明るいカード**に `detail` 全文（またはフォールバック）が読める
+- Scroll 内 upcoming 表示・件数・順序が従来どおり
+- NextGameCard・advance_hint・empty_message が従来どおり
+- ロスター画面の詳細サマリーが退行していない（別画面だが回帰確認推奨）
+- HomeNavButton 戻り OK
+
+## 15. 後回し候補
+
+| 候補 | 理由 |
+|------|------|
+| A ロスター第2段（サマリー拡張・行ハイライト） | 日程試合詳細の成功後 |
+| B `player_detail_view` 新規 | export/nav 設計調査を先に |
+| C 試合結果・週次進行の新画面 | 新規 DTO/export 設計が必要 |
+| D1 見出し `_add_upcoming_section_heading` 平坦化 | 体験前進は小。D2 の後で可 |
+| E 契約→ロスター導線 | 2画面 nav が必要 |
+| F Python 本体 | Phase4 導線をもう1本後に区切り推奨 |
+| G ロードマップ総点検 | 案B/C 着手直前に実施 |
+| ロスター 年俸列 tooltip | 情報導線として独立小タスク |
+
+## 16. リスクと注意点
+
+1. **`detail` が空の行** — mock では充実しているが、フォールバック必須（`opponent` + `round_label` 等）。
+2. **StatusLabel のエラー表示** — 読込失敗時の赤表示と詳細カードの **表示モード切替**をロスター同様に分離する。
+3. **長文 `detail`** — `autowrap` 済み Label + カード余白で対応。Scroll 高さは変えない。
+4. **ロスター実装のコピペ** — 関数名・変数名を schedule 用に揃え、二重メンテは **第2手で共通化検討**（今回は共通化必須ではない）。
+5. **見出しだけ平坦化（D1）と混同しない** — 今回推奨は **試合ブロックの詳細入口**であり、見た目統一のみではない。
+
+## 17. 結論
+
+- ロスター詳細導線 **第1段は完了**。次は **同じ「詳細入口」パターンを日程の試合ブロックへ横展開**するのが、Phase 4 の安全進行・ゲーム体験・1コミット条件のバランスが最良。
+- **次に実装する1件:** `schedule_view.gd` — **`_add_upcoming_block` + upcoming 試合「詳細」→ StatusLabel カード（`detail` 表示）**
+- **ロスター第2段・選手詳細画面・Python復帰・ロードマップ**は、上記成功後または大改修前の **第2波**として再比較する。
+
+---
+
+調査日: 2026-05  
+調査コミット基準: 127839a  
+pytest: 調査のみのため未実施
