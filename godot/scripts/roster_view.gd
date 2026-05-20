@@ -219,6 +219,34 @@ func _add_player_row(p: Dictionary) -> void:
 			# 状態列が clip されたとき全文を確認できるようにする（表示文字と同じ）
 			lab.tooltip_text = st_s
 			lab.mouse_filter = Control.MOUSE_FILTER_PASS
+		if i == 6 and con_s != "-":
+			# 残り契約列が clip されたとき contract_label 等の補足全文を確認できる（表示は _contract_cell のまま）
+			var con_tip: String = ""
+			var cl_raw: Variant = p.get("contract_label", null)
+			if cl_raw != null:
+				con_tip = str(cl_raw).strip_edges()
+			if con_tip.is_empty():
+				var cy_raw: Variant = p.get("contract_years_left", null)
+				if cy_raw != null:
+					if typeof(cy_raw) in [TYPE_INT, TYPE_FLOAT]:
+						var cn: int = int(cy_raw)
+						if cn >= 0:
+							con_tip = "残り%d年" % cn
+					elif typeof(cy_raw) == TYPE_STRING:
+						var cys: String = str(cy_raw).strip_edges()
+						if cys.is_valid_int():
+							var cni: int = cys.to_int()
+							if cni >= 0:
+								con_tip = "残り%d年" % cni
+			if con_tip.is_empty():
+				var co_raw: Variant = p.get("contract", null)
+				if co_raw != null:
+					var co_tip: String = str(co_raw).strip_edges()
+					if not co_tip.is_empty():
+						con_tip = co_tip
+			if not con_tip.is_empty():
+				lab.tooltip_text = con_tip
+				lab.mouse_filter = Control.MOUSE_FILTER_PASS
 		row.add_child(lab)
 	panel.add_child(row)
 	_row_list.add_child(panel)
