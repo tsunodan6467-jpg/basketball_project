@@ -1,0 +1,297 @@
+# Godot Phase 4 日程お知らせ本文階層整理後の次タスク比較（2026-05）
+
+## 1. 現在地
+
+- **最新コミット**: `08c15f3` — Godot日程お知らせ本文階層整理第2段の確認を記録（実装 `065197b` の docs 記録）
+- **主要10画面 Theme 第1段**: 完了（README / docs 記載どおり）
+- **Body余白横展開レーン 5 Body**: 完了（`b71a183` 確認記録時点）。財務 HistoryBody / OM MissionsBody / 戦術 PlayerRolesBody / 契約 PlayerRows / 契約 RiskRows
+- **日程本格整備**:
+  - **第1手**: upcoming 試合カード内情報階層 — `fa36271` / `d951777`（`_add_upcoming_block`）
+  - **第2手**: advance_hint ブロック内情報階層 — `5a98e31` / `470da16`（`_add_advance_hint_block`）
+  - **第3手**: empty_message（お知らせ）本文情報階層 — `065197b` / `08c15f3`（`_add_empty_message_block`）
+- **ロスター本格整備**:
+  - **第1手**: RowList 選手行の平坦行背景 — `9445d0e` / `834a975`（`_add_player_row`）
+  - **第2手**: 氏名列・OVR列の主要列強調 — `6c1e25f` / `50caa49`（`_add_player_row`）
+- **細かい余白/区切り微調整**: `b71a183` で一区切り。margin / HSeparator の追加微調整レーンは継続しない方針
+- **残っている大きな候補**: 日程 ScrollContent 全体・試合リスト本格、日程画面統一、ロスター本格続き（9列・カード化等）、Body 中規模整理、ゲーム体験寄り画面、施設/クラブ史/順位表第2段、Python本体、総点検
+- **今回の調査目的**: empty_message 階層整理完了後、案A〜Gを比較し、次に安全かつ前進感のある **1タスク** を決定する
+- **実装変更**: なし（本ファイルの追加のみ）
+
+## 2. 日程empty_message階層整理の完了評価
+
+### `065197b` / `08c15f3`
+
+- **対象**: `schedule_view.gd` の `_add_empty_message_block` のみ
+- **empty_message 本文の到達点**:
+  - inner `separation`: 4 → 6
+  - 本文: font_size 13 → 15、`font_color` `Color(0.08, 0.11, 0.18, 1)`（advance_hint block 主役と同系）
+  - 見出し「お知らせ」: font 17・色・文言は維持
+- **3系統整理の意味**:
+  - **upcoming**（試合カード）: meta / 対戦主役 / detail 副情報
+  - **advance_hint**: block 主役 / one_line 副情報
+  - **empty_message**: 見出し + 本文主役
+  - ScrollContent 内の **動的カード3種**について、ブロック内情報階層の横展開が一通り完了
+- **改善されたこと**: 試合予定なし・補足お知らせ時に本文が埋もれにくい。3系統の視認優先度が揃った
+- **維持したこと**: 本文文言、JSON key、表示/非表示条件、`_fill_scroll_body`、upcoming / advance_hint、notes / Footer、Header / Summary / NextGame、Panel `Phase4SummaryCard`
+- **まだ残る日程本格タスク**:
+  - **ScrollContent 全体**整理（`_fill_scroll_body` + 複数 `_add_*` + `.tscn` separation）
+  - 試合リスト行レイアウトのさらなる本格整理
+  - 日程画面全体の統一整理
+  - `_add_upcoming_section_heading` の見出しのみカード（separation 4 のまま — 優先度低）
+- **注意**: **日程本格整備全体は未完了**。**ScrollContent 全体・試合リスト本格全体の完了でもない**
+
+## 3. 日程本格継続候補（案A）
+
+### 現状
+
+- 動的ブロック3種の情報階層は完了
+- `_fill_scroll_body` 順序: empty_message（条件付き）→ upcoming 見出し+試合カード → advance_hint
+- `.tscn` ScrollContent VBox `separation=8` が試合カード間余白を担う
+
+### 価値
+
+- 試合・進行画面としての完成度は ScrollContent / 試合リスト本格でさらに上がる
+
+### リスク
+
+- **1関数で切れる中規模タスクがほぼ枯渇**（見出しカードの separation 微調整のみ — 効果小）
+- ScrollContent 全体・試合リスト本格は **複数関数 + scene** が絡み、1コミット安全性が低い
+- **日程に3連続中規模**（advance_hint → ロスター1手 → empty_message）の直後 — さらに日程へ入ると偏りが強い
+
+### 1コミットで切れる候補
+
+| 候補 | 関数 | 規模 | 安全性 |
+|------|------|------|--------|
+| 「今後の予定」見出し separation 6化 | `_add_upcoming_section_heading` | 極小 | 高（効果小） |
+| ScrollContent 全体 | `_fill_scroll_body` 他 | 大 | 低 |
+| 試合リスト本格 | `_add_upcoming_block` 再触 | 大 | 低 |
+
+### 今すぐ適するか
+
+- **ブロック内階層の続きとしては不適**（3系統完了の節目）
+- ScrollContent / 試合リスト本格は **別途スコープ設計後**が安全
+
+## 4. ロスター本格継続候補（案B）
+
+### 現状
+
+- `_add_player_row`: 平坦 Panel 行背景 + 氏名/OVR 強調済み
+- 9列 HBox、tooltip は列1（名前）・列8（状態）
+- `_apply_snapshot`: 行間 HSeparator
+
+### 価値
+
+- **ゲーム判断の中心画面**（HeaderNavRow 先頭）
+- 氏名・OVR の次に読む **状態列（i==8）** の視認補助は、傷病・FA・出場制限など判断に直結
+- `9445d0e` / `6c1e25f` の自然な第3手
+
+### リスク
+
+- 9列本格・列幅・tooltip 再設計は引き続き高リスク
+- 状態列強調は tooltip 既存のため **比較的安全**
+
+### 1コミットで切れる候補
+
+| 候補 | 関数 | 規模 | 安全性 |
+|------|------|------|--------|
+| **状態列（i==8）視認補助** | `_add_player_row` | 小〜中 | **高** |
+| 契約残り列（i==6）軽い強調 | `_add_player_row` | 小 | 中 |
+| 9列本格 / カード化 | `_add_player_row` + `_col_width` | 大 | 低 |
+
+### 今すぐ適するか
+
+- **最適**。日程ブロック階層レーン完了後、**ゲーム中心画面へバランスを戻す**安全な1コミットがある
+
+## 5. Body本格整備の中規模整理候補（案C）
+
+### 現状
+
+- 5 Body に margin + HSeparator + 文字色補正済み
+- 動的行は Label（+ MarginContainer）直置き。Panel 行ラップは未着手
+
+### 価値
+
+- 財務 HistoryBody 等への **平坦 Panel 行ラップパイロット**（`9445d0e` 横展開）は横断価値が高い
+- 1画面・1関数（`_fill_history_rows`）に絞れる
+
+### リスク
+
+- 日程・ロスターより **経営サブ画面寄り**で前進感が弱い場合がある
+- Panel 化は UI 磨き寄りに見えやすい（ただし中規模第1手としては妥当）
+
+### 今すぐ適するか
+
+- **有力だが第2候補**。README 次候補順では ScrollContent の次がロスター。Body はその次
+
+## 6. ゲーム体験に近い機能 / 画面追加候補（案D）
+
+### 候補
+
+- 試合詳細 / 結果詳細、週次進行、契約/FA 判断画面など
+
+### 価値
+
+- 長期的に Steam 向けの面白さに最も直結
+
+### リスク
+
+- export / mock / scene / nav / tests の追加が絡み **1コミットで閉じない**
+- 現状は readonly 10画面の **中規模磨きが途中**
+
+### 事前調査
+
+- **必須**
+
+### 今すぐ適するか
+
+- **不適**
+
+## 7. 施設 / クラブ史 / 順位表 第2段候補（案F）
+
+| 画面 | 重さ | 今すぐ |
+|------|------|--------|
+| 施設 | 中 | 後回し |
+| クラブ史 | 中〜大 | 後回し |
+| 順位表 | 大（8列級） | 後回し |
+
+- 中心導線（ホーム / ロスター / 日程）より優先度が低い
+
+## 8. 総点検 / ロードマップ整理候補（案E）
+
+- **節目**: 日程3系統 + ロスター2手 + Body 5本は記録上の節目
+- **既存docs**: `08c15f3` / README 現在地で到達点は記載済み
+- **本レポートで案A〜G比較を代替可能**
+- **今すぐ実装停止の必要は低い**
+
+## 9. Python本体 / ゲームロジック側へ戻る候補（案G）
+
+- **価値**: ゲームの芯
+- **リスク**: 戻る領域が広い。GUI で日程カード階層・ロスター中規模が一段落した今が区切りだが、**ScrollContent 未着手**のため完全撤退は早い
+- **今すぐ**: **いいえ**
+- **事前整理**: Python テーマ1つ選定 + export 影響調査
+
+## 10. 選択肢比較表
+
+| 案 | 対象 | 主な変更範囲 | 変更規模 | UI効果 | ゲーム体験への近さ | 回帰リスク | 1コミット安全性 | 推奨度 |
+|----|------|--------------|----------|--------|-------------------|------------|-----------------|--------|
+| A | 日程本格継続 | ScrollContent / 試合リスト本格 | 大 | 中〜高 | 高 | 中〜高 | 低 | ★☆☆ |
+| B | ロスター本格継続 | **状態列（i==8）視認補助** | 小〜中 | 中 | **最高** | **低** | **高** | **★★★** |
+| C | Body中規模 | HistoryBody Panel行ラップ等 | 中 | 中 | 低〜中 | 中 | 中 | ★★☆ |
+| D | ゲーム体験新規 | scene/nav/export 追加 | 大 | 高 | 最高 | 大 | 低 | ★☆☆ |
+| E | 総点検 | docs/report | 小 | なし | なし | なし | 高 | ★★☆（本件で代替） |
+| F | 施設/史/順位 | 各 view.gd 複数 | 中〜大 | 中 | 低 | 中〜高 | 低〜中 | ★☆☆ |
+| G | Python本体 | basketball_sim | 大 | なし | 最高（長期） | 中 | 低 | ★☆☆ |
+
+## 11. 推奨する次タスク
+
+**推奨タスク名**: ロスター本格整備・第3手 — RowList 選手行の状態列（i==8）視認補助
+
+- **対象ファイル**: `godot/scripts/roster_view.gd`
+- **対象関数**: `_add_player_row` のみ
+- **なぜ今それを選ぶのか**:
+  - 日程 ScrollContent 内 **upcoming / advance_hint / empty_message の3系統ブロック内階層整理が完了**し、日程の「1関数・中規模」レーンは一区切り
+  - README **次候補（中規模以上）**は ScrollContent 本格が先頭だが、**1コミットで安全に閉じられない** — 次に実行可能なのは **ロスター本格続き**
+  - `9445d0e`（行背景）+ `6c1e25f`（氏名・OVR）の続きとして、**状態列**はロスター判断で自然な第3読み取りポイント
+  - 列8には既に tooltip があり、**font_size / font_color のみ**の変更で回帰リスクが低い
+  - ゲーム中心画面への前進感が高い
+- **なぜ他案を後回しにするのか**:
+  - **案A**: ブロック階層は完了。ScrollContent 本格はスコープ大
+  - **案C**: Body Panel パイロットは有力だが、README 順・ゲーム中心画面優先の方が前進感が高い
+  - **案D/G**: 範囲・調査が大きい
+  - **案E**: 本レポートで代替
+  - **案F**: 中心導線外
+- **変更対象ファイルの想定**: `godot/scripts/roster_view.gd`（実装）、続けて README + 2 docs（確認記録）
+- **変更してはいけないファイル**: `roster_view.tscn`、他画面 `.gd`、Theme、project.godot、data JSON、export/tests、sandbox、handoff md
+- **実装する場合の安全条件**:
+  - `_add_player_row` のみ
+  - **列 i==8（状態）** にのみ `font_size` / `font_color` 上書き（例: font 13、副情報系 `Color(0.32, 0.36, 0.48, 1)` または氏名より一段控えめな濃色 — **氏名/OVR より目立ちすぎない**補助レベル）
+  - 既存 tooltip（`st_s`）と `mouse_filter` は維持
+  - 9列・列幅・行背景・HSeparator・`_apply_snapshot` は不変
+- **Godot目視確認ポイント**:
+  - ホーム → ロスター。状態列が読みやすく、氏名/OVR とバランスが取れていること
+  - tooltip（長い状態文字）が従来どおり
+  - 9列・行背景・区切り・HomeNavButton
+- **pytest**: 実装後 — `test_roster_readonly_export.py`、`test_home_dashboard_readonly_export.py`、`test_schedule_readonly_export.py`、`test_phase0_smoke.py::test_save_load_roundtrip_minimal_team`
+
+## 12. 推奨タスクの最小実装案（Cursor指示骨子）
+
+### 目的
+
+ロスター RowList で **状態列**を補助的に強調し、「誰・能力・コンディション」が一行で追いやすくする。**ロスター本格整備全体の完了ではない**。
+
+### 変更してよいファイル
+
+- `godot/scripts/roster_view.gd`（`_add_player_row` のみ）
+
+### 変更してはいけないファイル
+
+- `roster_view.tscn`、他画面 scene/script、Theme、project.godot、data JSON、export/tests、sandbox、handoff md
+
+### 実装方針
+
+- ループ内、既存 `if i == 8 and st_s != "-":` tooltip ブロックの前後で、**状態列 Label** に `font_size` 13 程度と `font_color` を上書き
+- 氏名/OVR より主役にしない（例: 状態は `Color(0.32, 0.36, 0.48, 1)` で副情報寄り、または `Color(0.16, 0.2, 0.3, 1)` で本文補助 — **実装時に目視で氏名/OVR とのバランスを調整**）
+- `st_s == "-"` のときは tooltip 付与ロジックどおり（変更なし）
+
+### 表示文言・件数・順序・JSON key
+
+- **変更しない**
+
+### 確認コマンド
+
+```
+py -m pytest basketball_sim/tests/test_roster_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_schedule_readonly_export.py -q
+py -m pytest basketball_sim/tests/test_phase0_smoke.py::test_save_load_roundtrip_minimal_team -q
+git diff -- godot/scripts/roster_view.gd
+```
+
+### 目視確認ポイント
+
+- 上記 §11
+
+### テスト方針
+
+- 上記4本。問題なければ docs 第2段
+
+### コミット名案
+
+- 実装: `Godotロスター選手行の状態列を強調`
+- 確認記録: `Godotロスター状態列強調第2段の確認を記録`
+
+## 13. 後回しにする案と理由
+
+| 案 | 理由 |
+|----|------|
+| A 日程継続 | 3系統ブロック階層完了。ScrollContent/試合リスト本格は1コミット不可 |
+| C Body中規模 | 有力だがロスター第3手の方がゲーム中心・README順序的に先 |
+| D ゲーム体験新規 | 重い |
+| E 総点検のみ | 本レポートで代替 |
+| F 施設/史/順位 | 中心導線外 |
+| G Python本体 | テーマ選定・GUI一段落後でも ScrollContent 計画が残る |
+
+**ロスター内で後回し**: 9列本格、カード化、列幅本格、tooltip再設計
+
+**日程内で後回し**: ScrollContent全体、試合リスト本格、画面統一、「今後の予定」見出しのみの微調整
+
+## 14. 変更していないファイル
+
+- `godot/scenes/*.tscn`
+- `godot/scripts/*.gd`
+- Theme `.tres`（`godot/themes/phase4_readonly_core.tres`）
+- `godot/project.godot`
+- `godot/README.md`
+- `docs/GODOT_GUI_INFORMATION_ARCHITECTURE_2026-05.md`
+- `docs/GODOT_NAVIGATION_PHASE4_2026-05.md`
+- 既存 `reports/*.txt`（本ファイルの新規追加のみ）
+- `basketball_sim/export/*.py`
+- `basketball_sim/tests/*.py`
+- `godot/data/*.json`
+- sandbox scene（`home_production_wire_preview.tscn` 等）
+- handoff 系未追跡 md
+
+---
+
+**調査実施**: 2026-05（日程 empty_message 階層整理 `065197b` / `08c15f3` 完了後）  
+**pytest**: 調査レポート追加のみのため未実施
