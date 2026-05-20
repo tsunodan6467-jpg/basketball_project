@@ -2,6 +2,7 @@ extends Control
 
 ## 選手詳細（閲覧）— ReadonlySelectionContext の payload のみ表示。JSON / save / Python なし。
 
+const KIND_PLAYER := "player"
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 
 var _return_scene: String = ""
@@ -22,28 +23,37 @@ func _ready() -> void:
 	_apply_from_selection_context()
 
 
+func _selection_context() -> Node:
+	return get_node_or_null("/root/ReadonlySelectionContext")
+
+
 func _apply_from_selection_context() -> void:
 	_return_scene = ""
-	if not _context_available():
-		_show_unselected("Autoload が利用できません")
+	var ctx := _selection_context()
+	if ctx == null:
+		_show_unselected("選択状態: ReadonlySelectionContext が見つかりません")
 		return
 
-	var ctx := ReadonlySelectionContext
-	if not ctx.has_selection() or ctx.get_kind() != ctx.KIND_PLAYER:
+	if not bool(ctx.call("has_selection")):
 		_show_unselected("")
 		return
 
-	var payload: Dictionary = ctx.get_payload()
+	var kind := str(ctx.call("get_kind"))
+	if kind != KIND_PLAYER:
+		_show_unselected("")
+		return
+
+	var payload_v: Variant = ctx.call("get_payload")
+	if typeof(payload_v) != TYPE_DICTIONARY:
+		_show_unselected("")
+		return
+	var payload: Dictionary = payload_v as Dictionary
 	if payload.is_empty():
 		_show_unselected("")
 		return
 
-	_return_scene = ctx.get_return_scene()
-	_show_player(payload, ctx.get_source_label())
-
-
-func _context_available() -> bool:
-	return get_node_or_null("/root/ReadonlySelectionContext") != null
+	_return_scene = str(ctx.call("get_return_scene"))
+	_show_player(payload, str(ctx.call("get_source_label")), ctx)
 
 
 func _show_unselected(extra: String) -> void:
@@ -58,7 +68,7 @@ func _show_unselected(extra: String) -> void:
 	_data_source_label.text = "選択状態: 未選択"
 
 
-func _show_player(payload: Dictionary, source_label: String) -> void:
+func _show_player(payload: Dictionary, source_label: String, ctx: Node) -> void:
 	var name_s := _first_str(payload, ["name", "player_name"], "—")
 	var pos_s := _first_str(payload, ["position", "pos"], "—")
 	var age_s := _format_age(payload.get("age", null))
@@ -95,8 +105,11 @@ func _show_player(payload: Dictionary, source_label: String) -> void:
 	_add_detail_row("国籍枠: %s" % nat_s)
 	_add_detail_row("参照元: %s" % source_s)
 
-	if OS.is_debug_build():
-		var pid := ReadonlySelectionContext.get_player_id()
+	if OS.is_debug_build() and ctx != null:
+		var pid_v: Variant = ctx.call("get_player_id")
+		var pid := -1
+		if typeof(pid_v) in [TYPE_INT, TYPE_FLOAT]:
+			pid = int(pid_v)
 		if pid >= 0:
 			var dbg := Label.new()
 			dbg.text = "debug player_id: %d" % pid
@@ -174,8 +187,9 @@ func _on_back_button_pressed() -> void:
 	if _return_scene.is_empty():
 		_data_source_label.text = "戻り先がありません"
 		return
-	if _context_available():
-		ReadonlySelectionContext.clear()
+	var ctx := _selection_context()
+	if ctx != null:
+		ctx.call("clear")
 	var err := get_tree().change_scene_to_file(_return_scene)
 	if err != OK:
 		push_warning(
@@ -185,8 +199,9 @@ func _on_back_button_pressed() -> void:
 
 
 func _on_home_nav_button_pressed() -> void:
-	if _context_available():
-		ReadonlySelectionContext.clear()
+	var ctx := _selection_context()
+	if ctx != null:
+		ctx.call("clear")
 	var err := get_tree().change_scene_to_file(_HOME_DASHBOARD_SCENE_PATH)
 	if err != OK:
 		push_warning(
