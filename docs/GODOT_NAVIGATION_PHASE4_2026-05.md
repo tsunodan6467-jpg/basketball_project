@@ -39,7 +39,7 @@
 - **クラブ史閲覧**: **Theme 第1段**（`682a941`・**`club_history_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内段落・シーズン表は未変更**（§2.6）。
 - **順位表閲覧**: **Theme 第1段**（`927e918`・**`standings_view.tscn` のみ**）。**Header + Summary** の Phase4 化。**Scroll 内 8 列表・動的行は未変更**（§2.7）。
 - **日程閲覧**: **Theme 第1段**（`440c3f6`）＋**第2段・前半**（`986c4ab`）＋**第2段・後半（最小）**（`7fecb99`）＋**追加最小 advance_hint**（`a62b3a7`・**なし/あり表示確認済み**）＋**追加最小 empty_message**（`463e74b`）＋**追加最小「今後の予定」見出し**（`a24cf6f`）＋**追加最小 upcoming 試合間 HSeparator 整理**（`a9fa054`）＋**中規模改善第1手 upcoming 試合カード内情報階層**（`fa36271` — §2.8h）＋**日程本格整備・第2手 advance_hint 情報階層**（`5a98e31` — §2.8i）＋**日程本格整備・第3手 empty_message 本文情報階層**（`065197b` — §2.8j）。**導線は HeaderNavRow + CardNavMenu から到達**（§2.8〜2.8j）。**LeftRail からは遷移しない**。
-- **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`）＋**Body本格・最小 HistoryBody 内側余白**（`307e719`・**`_fill_history_rows` のみ** — §2.9a / §2.9b）。**`%HistoryBody` 構造全面整理は別タスク**。
+- **財務サマリー閲覧**: **Theme 第1段**（`4b43da5`）＋**履歴行文字色最小補正**（`6c3dc43`）＋**第2段（最小）HistoryBody 行区切り**（`d57b021`）＋**Body本格・最小 HistoryBody 内側余白**（`307e719`）＋**Body本格整備・中規模第1手 平坦 Panel 行ラップ**（`c762d88`・**`_fill_history_rows` 履歴行ループのみ** — §2.9c）。**`%HistoryBody` 構造全面整理は別タスク**（§2.9a / §2.9b / §2.9c）。
 - **オーナーミッション / クラブ評価閲覧**: **Theme 第1段**（`e6acce0`）＋**今季ミッション動的行文字色最小補正**（`2f808e5`）＋**第2段（最小）MissionsBody 行区切り**（`5a3ae2c`）＋**Body本格・最小 MissionsBody 内側余白**（`d4c0372`・**`_fill_mission_rows` のみ** — §2.10a / §2.10b）。**`%MissionsBody` 構造全面整理は別タスク**。
 - **戦術 / ローテーションサマリー閲覧**: **Theme 第1段**（`44b0584`）＋**選手ロール動的行文字色最小補正**（`7bbbb4e`）＋**第2段（最小）PlayerRolesBody 行区切り**（`c9216d0`）＋**Body本格・最小 PlayerRolesBody 内側余白**（`2c637f2`・**`_fill_player_roles` 選手ロール行追加ループのみ** — §2.11a / §2.11b）。**`%PlayerRolesBody` 構造全面整理は別タスク**。
 - **契約 / 人事サマリー閲覧**: **Theme 残り第1段**（`5d1afa2`）＋**RiskRows / PlayerRows 動的行文字色最小補正**（`1df4820`）＋**第2段（最小）PlayerRows / RiskRows 行区切り**（`6b26fa3` / `97b26a8`）＋**Body本格・最小 PlayerRows / RiskRows 内側余白**（`f19ed9b` / `420f240` — §2.12a / §2.12b / §2.12c / §2.12d）。**RiskCard / PlayersCard** の Phase4 化。**契約・人事の PlayerRows / RiskRows 最小行区切りは両方完了**。**Body余白横展開レーン 5 Body 完了**（**ナビ構造の完了ではない** — §2.12 / §2.12a〜§2.12d）。
@@ -256,7 +256,7 @@
   - **`4b43da5` 後**: **CardNavMenu → 財務サマリー遷移 OK**。**財務画面表示 OK**。**HeaderCard Phase4 系・Scroll 内5静的カード白系 OK**。**DataSourceLabel OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし**。**財務履歴の動的履歴行は薄く読みにくい**ことが判明。
   - **`6c3dc43` 後**: **財務履歴の動的履歴行テキストの可読性改善 OK**。**その他の動作・HomeNavButton 戻り OK**。**エラーなし**。
 - **Theme 適用範囲（`4b43da5`）**: **`HeaderCard`**＝`Phase4HeaderCard`、**Scroll/ScrollContent 内5枚静的カード**＝`Phase4SummaryCard`（Finance / Prior / Salary / History / Caution）。
-- **可読性補正（`6c3dc43`）**: **`%HistoryBody`** に追加される動的履歴行 `Label` の色のみ **`Color(0.16, 0.2, 0.3)`** へ。**HistoryBody 構造・履歴行レイアウト本格整理は第2段**（**第2段・最小 `d57b021` で行区切り**、**Body本格・最小 `307e719` で内側余白** — §2.9a / §2.9b）。
+- **可読性補正（`6c3dc43`）**: **`%HistoryBody`** に追加される動的履歴行 `Label` の色のみ **`Color(0.16, 0.2, 0.3)`** へ。**HistoryBody 構造・履歴行レイアウト本格整理は第2段**（**第2段・最小 `d57b021` で行区切り**、**Body本格・最小 `307e719` で内側余白**、**Body本格整備・中規模第1手 `c762d88` で平坦 Panel 行ラップ** — §2.9a / §2.9b / §2.9c）。
 
 ### 2.9a 財務サマリー閲覧・Theme 第2段（最小）と導線確認（`d57b021`）
 
@@ -284,6 +284,19 @@
   - **HeaderNavRow**＝上部主要 5 導線（財務は載せない）。
   - **CardNavMenu**＝実操作用中央画面メニュー（**経営 → 財務サマリー**が主入口）。
   - **LeftRail**＝表示のみの大分類ナビ（**財務サマリーへ直接遷移しない**）。
+
+### 2.9c 財務サマリー閲覧・Body本格整備・中規模第1手（平坦 Panel 行ラップ）と導線確認（`c762d88`）
+
+- **到達点**: **`finance_summary_view.gd` の `_fill_history_rows` 履歴行追加ループのみ**（**ナビ構造の変更ではない**・**Body本格整備・中規模第1手**・**HistoryBody 履歴行の平坦 Panel 行ラップ**）。**`finance_summary_view.tscn`・Theme `.tres`・project.godot 未変更**。**Summary / finance_items / notes 未変更**。
+- **ホームからの到達**（**変更なし**）:
+  - **`CardNavMenu`** — **経営**列の **財務サマリー** ボタン（**#7・主入口**）。
+  - **`HeaderNavRow` には載せない**（§3）。
+  - **LeftRail からは遷移しない**（表示のみ — §2.4）。**LeftRail は大分類表示であり、財務サマリー画面へのショートカットではない**。
+- **財務サマリーからホームへ**: **`HomeNavButton`**（**`HeaderCard/HeaderInner/HeaderTopRow` 内**）→ **`_on_home_nav_button_pressed`** → **`home_dashboard.tscn`**。**node 名 / text / tooltip / connection / handler 名は維持**（`c762d88` 後もユーザー確認済み）。
+- **ユーザー環境 Godot（ローカル目視）**: **ホーム → 財務サマリー遷移 OK**。**HistoryBody 履歴行 Panel 表示 OK**。**行背景が派手すぎない OK**。**履歴文言 / 件数 / 順序 / 空表示維持 OK**。**HSeparator 維持 OK**。**Summary / finance_items / notes 維持 OK**。**HeaderCard / 5静的カード維持 OK**。**DataSourceLabel 維持 OK**。**HomeNavButton でホームへ戻る OK**。**エラーなし・実行後 git 差分なし**。
+- **Theme 適用範囲（Body本格整備・中規模第1手）**: **`_fill_history_rows` 内** — **PanelContainer → MarginContainer → Label**、**StyleBoxFlat** 平坦行背景（**`9445d0e` 同系**）。**履歴文言・件数・順序・JSON key・HSeparator は不変**。**5 Body 横展開・Body本格整備全体の完了を意味しない**。
+- **Composer 2.5 指定**: **ナビ・導線への不要変更なし**（実装報告ベース）。
+- **HeaderNavRow / CardNavMenu / LeftRail の役割分担は維持**（§2.4）。
 
 ### 2.10 オーナーミッション / クラブ評価閲覧・Theme 第1段・可読性補正と導線確認（`e6acce0` / `2f808e5`）
 
