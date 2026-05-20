@@ -1,0 +1,476 @@
+================================================================================
+Godot Phase 4 — ReadonlySelectionContext / player_detail_view 最小版 設計調査
+================================================================================
+
+1. 調査目的
+--------------------------------------------------------------------------------
+Phase A（9467112）で player_id が export/mock/tests に到達した後、
+scene 跨ぎの選手詳細（player_detail_view）を安全に導入するため、
+ReadonlySelectionContext（Autoload）の API・payload・戻り導線・表示項目・
+実装コミット分割を設計レベルで固定する。
+
+本レポートは調査・設計のみ。実装・project.godot 変更・scene 追加は行っていない。
+
+
+2. 現在の最新コミット
+--------------------------------------------------------------------------------
+4394a12 — Godot player_id export後の次タスクを比較
+
+関連:
+  9467112 — Godot詳細画面に向けてplayer_idをexportに追加
+  6950695 — Godot詳細画面に向けたIDとナビ設計を調査
+  4394a12 — Phase B 方針（Autoload 設計を次タスクと推奨）
+
+
+3. 現在の Phase 4 到達点
+--------------------------------------------------------------------------------
+- 10 画面読み取り専用足場 + home_dashboard ハブ
+- 詳細導線第1段: ロスター上部カード / 日程上部カード / 契約・戦術行直下インライン
+- player_id: export + mock + tests 済み。Godot .gd は未参照
+- Autoload: **なし**（project.godot に autoload セクションなし）
+- player_detail_view / game_detail_view scene: **未存在**（scenes 13 本 = 10 本線 + 3 sandbox）
+- nav: change_scene_to_file のみ、引数なし
+- main_scene: res://scenes/home_dashboard.tscn（変更禁止方針）
+
+
+4. player_id / event_id の現在地
+--------------------------------------------------------------------------------
+
+| ソース | player_id | event_id | Godot .gd |
+|--------|-----------|----------|-----------|
+| roster players[] | あり（int） | — | 未参照 |
+| contract player_contract_rows[] | あり | — | 未参照 |
+| tactics player_role_items[] | あり | — | 未参照 |
+| schedule upcoming_games[] | — | あり（str） | 未参照 |
+
+JSON パース後、bind の Dictionary にはキーが載るが、シーン reload で消える。
+scene 跨ぎには **Autoload またはファイル書込** が必要（書込は非推奨）。
+
+
+5. 現在の詳細導線の到達点
+--------------------------------------------------------------------------------
+
+| 画面 | 入口 | 表示 | シーン跨ぎ |
+|------|------|------|------------|
+| ロスター | 氏名「詳細」 | 上部 StatusLabel サマリー | 不可 |
+| 日程 | upcoming「詳細」 | 上部試合カード | 不可 |
+| 契約 PlayerRows | 行「詳細」 | 行直下インライン | 不可 |
+| 契約 RiskRows | 行「詳細」 | 行直下（key ベース） | 不可 |
+| 戦術 PlayerRoles | 行「詳細」 | 行直下インライン | 不可 |
+
+共通: pressed.bind(Dictionary) は **同一 scene 内のみ有効**。
+
+
+6. ReadonlySelectionContext が必要になる理由
+--------------------------------------------------------------------------------
+
+6.1 現状の同一 scene 内カードでできること
+- 選択行の Dictionary をそのまま表示（名前・契約・役割等）
+- toggle / 他行非表示など UI 状態管理
+- 読込エラーは各画面 StatusLabel
+
+6.2 player_detail_view で必要になること
+- change_scene_to_file 後も「どの選手か」を保持
+- 専用 scene で複数 Label に整理表示
+- 呼び出し元（ロスター等）へ戻る
+- 将来: 契約・戦術から同一 player_detail へ合流
+
+6.3 change_scene_to_file だけでは不足する点
+- **引数を渡せない**（Godot 4 でも scene パス文字列のみ）
+- 遷移先 scene は _ready で JSON を再読込するが、**どの行を見せるか**が分からない
+- bind は遷移元ノードと共に破棄される
+
+6.4 Autoload を入れる価値
+- シーン木の外で選択状態を保持（readonly プロトタイプに適合）
+- player / game を kind で分岐可能
+- return_scene を保持して「戻る」を実装可能
+- Python 自動起動なしのまま DTO payload を運べる
+
+6.5 まだ Autoload 実装を急がない理由（設計先行の意味）
+- project.godot 変更は全 scene に影響しうる → API を先に固定
+- player_detail の表示項目・正規化方針を先に決めないと API が二度手間
+- いきなり roster 接続まで一気にやるとデバッグが難しい
+
+6.6 最小 Autoload で足りる範囲
+- kind: "" | "player" | "game"（将来）
+- player_id: int（player 時必須）
+- payload: Dictionary（表示用スナップショット）
+- return_scene: String（res:// パス）
+- source_label: String（任意・「ロスター」等の表示用）
+- clear() on 戻る / 遷移完了
+
+
+7. Autoload API案の比較
+--------------------------------------------------------------------------------
+
+| 観点 | 案1 player専用 | 案2 kind+selection | 案3 player/game API分離 |
+|------|----------------|-------------------|-------------------------|
+| player_detail 最小版 | ◎ | ◎ | ◎ |
+| game_detail 横展開 | △ 別途追加 | ◎ | ◎ |
+| 契約/戦術 | ◎ set_player | ◎ 同 API | ◎ |
+| 過剰さ | 低 | 中（許容） | 高 |
+| バグりにくさ | ○ | ◎ 単一状態機 | △ 二重状態 |
+| 理解しやすさ | ◎ | ○ | △ |
+
+【推奨】案2（kind + selection 統一）— 名称は ReadonlySelectionContext
+
+最小 API（第1実装）:
+
+```gdscript
+# 定数
+const KIND_NONE := ""
+const KIND_PLAYER := "player"
+const KIND_GAME := "game"   # 将来
+
+# メソッド
+func clear() -> void
+func has_selection() -> bool
+func get_kind() -> String
+
+func set_player(player_id: int, payload: Dictionary, return_scene: String, source_label: String = "") -> void
+func get_player_id() -> int          # kind!=player なら 0 または -1
+func get_payload() -> Dictionary     # 防御的コピー推奨
+
+# 将来
+func set_game(event_id: String, payload: Dictionary, return_scene: String) -> void
+```
+
+案1 は game 追加時に Autoload 肥大化。案3 は set_player/set_game で状態不整合リスク。
+案2 は set_player が内部で kind="player" をセットする薄いラッパでもよい。
+
+【非推奨】payload だけ set して kind 無し — 誤遷移の温床。
+
+
+8. payload項目案
+--------------------------------------------------------------------------------
+
+8.1 方針（推奨）
+- **呼び出し元の行 Dictionary をほぼそのまま payload にコピー**（shallow duplicate）
+- player_detail_view 側で **_normalize_player_display(payload)** して表示 key を統一
+- **player_id だけ渡して詳細 scene で全 JSON 再検索は v1 非推奨**
+  - 理由: roster/contract/tactics で行形状・ソートが異なり、3 JSON 走査は重い・曖昧
+  - 将来 v2: player_id 索引付き merged cache Autoload（別タスク）
+
+8.2 正規化後の表示 key（detail 側で生成）
+
+| 表示ラベル | 参照順（payload 内） |
+|------------|----------------------|
+| name | name → player_name |
+| position | position |
+| age | age |
+| ovr | ovr → overall |
+| potential | potential（契約/戦術のみ・無ければ —） |
+| contract | contract_label → contract_years_label → contract |
+| status | status（ロスターのみ・無ければ —） |
+| nationality | nationality_slot → nationality_slot_label |
+| salary | salary_label（契約のみ） |
+| role / starter | role_label, starter_label（戦術のみ） |
+| source | Autoload.source_label（context 側） |
+
+8.3 必須（最小版）
+- player_id（context + payload 両方保持可）
+- name 系 1 つ
+- position
+- source_label（どの画面から来たか）
+
+8.4 あればよい（第1版でも表示推奨）
+- age, ovr/overall, contract 系, status（ロスター）, salary_label（契約）
+
+8.5 なくてよい（第1版）
+- order（表示しない。ID 代替に使わない）
+- risk_items 全体、memo 長文（任意1行まで可）
+
+8.6 key 名ゆれ
+- 呼び出し元は **生 payload のまま保存**
+- 表示は **detail 側正規化のみ** — export は変更不要
+
+
+9. 戻る導線案
+--------------------------------------------------------------------------------
+
+| 案 | 内容 | 最小安全 | 横展開 | 推奨 |
+|----|------|----------|--------|------|
+| 1 | ロスター固定「戻る」 | ○ | × | 第1接続のみなら可 |
+| 2 | return_scene で呼び出し元へ | ◎ | ◎ | **推奨** |
+| 3 | HomeNav のみ（ホーム） | ◎ | △ | 併用 |
+
+【推奨】案2 + HomeNavButton 併用（既存全画面パターン維持）
+
+- HeaderNavRow に **BackButton「一覧へ戻る」** を player_detail のみ追加、または
+  HomeNavButton 左に「戻る」を追加（scene 新規のため影響は player_detail のみ）
+- 戻る: `change_scene_to_file(return_scene)` → `clear()`
+- ホーム: 既存 `_on_home_nav_button_pressed` 同型 → home_dashboard → `clear()`
+
+return_scene 定数例（呼び出し元で設定）:
+- roster: res://scenes/roster_view.tscn
+- contract: res://scenes/contract_personnel_summary_view.tscn
+- tactics: res://scenes/tactics_summary_view.tscn
+
+【非推奨】return_scene 空時に main_scene へ — サイレント誤動作。
+空なら player_detail で「選択がありません」+ ホームのみ。
+
+
+10. 第1接続画面の比較
+--------------------------------------------------------------------------------
+
+| # | 画面 | player_id | 自然さ | 実装 | 目視 | GM価値 | 推奨 |
+|---|------|-----------|--------|------|------|--------|------|
+| 1 | ロスター | ◎ | ◎ 選手一覧 | ○ 1 .gd | ◎ | ◎ | **第1** |
+| 2 | 契約 PlayerRows | ◎ | ○ 契約文脈 | ○ | ○ | ○ | 第2（C-4） |
+| 3 | 戦術 PlayerRoles | ◎ | ○ 役割文脈 | ○ | ○ | ○ | 第3 |
+| 4 | 契約 RiskRows | × player | △ リスク行 | ○ | △ | △ | 非推奨 |
+| 5 | 日程 | — | △ 試合 | game_detail 向き | ○ | ○ | game 用 |
+
+【結論】第1接続は **ロスター**（氏名「詳細」ボタン）。
+- player_id 安定・IA 上も「選手を見る」入口として最自然
+- 既存上部サマリーと **併存**（置き換えない）— 第1版は専用 scene 追加のみ
+
+
+11. player_detail_view 最小版の表示項目案
+--------------------------------------------------------------------------------
+
+11.1 製品 UI と player_id
+- **製品 UI では player_id を表示しない**（推奨方針）
+- 開発確認: エディタ実行時のみ `OS.is_debug_build()` で
+  画面下端に小さく `ID: 123` を出す案は **可**（本番 export で消える）
+- 常時カード内に ID 行を出す案は **非推奨**
+
+11.2 カード構成（Phase4 既存トーン）
+
+```
+[HeaderCard] 選手詳細（閲覧） / 戻る / ホーム（既存パターン）
+[SummaryCard] 読み取り専用ストリップ
+[Body] Phase4SummaryCard 風 Panel
+  選手詳細
+  {name}（{position}）
+  年齢: …  OVR: …  POT: …（あれば）
+  契約: …
+  状態: …（あれば）
+  国籍枠: …（あれば）
+  参照元: ロスター
+[DataSourceLabel] 読込元キャプション（roster JSON 再読込と同型）
+[FooterNote] 操作なし注意
+```
+
+11.3 既存ロスター上部サマリーとの違い
+- サマリー: 表画面上部・1 行圧縮
+- player_detail: 専用 scene・項目ラベル付き・戻る導線・将来拡張の器
+
+11.4 JSON 再読込
+- player_detail は **Autoload payload を主表示**
+- 任意: 同時に roster JSON を読んで DataSourceLabel のみ更新（他画面と同型）
+- payload と JSON 再読込の矛盾時は **payload 優先**（選択時点のスナップショット）
+
+
+12. game_detail とのAPI共通化
+--------------------------------------------------------------------------------
+
+共通化（案2 で十分）:
+- kind: "player" | "game"
+- payload: Dictionary
+- return_scene: String
+- source_label: String（任意）
+
+player 専用:
+- get_player_id() / set_player(...)
+
+game 専用（将来）:
+- get_event_id() / set_game(event_id, payload, return_scene)
+- event_id は payload にも冗長保持可（表示・ログ用）
+
+schedule から渡す payload 候補:
+- event_id, detail, opponent, round_label, competition_label, home_away, ...
+
+game_detail は **後回しでよい**（player_detail + Autoload 安定後）。
+detail 文字列だけで最小 game_detail は可能（export 追加不要）。
+
+
+13. Phase C/D 実装分割案（調整版）
+--------------------------------------------------------------------------------
+
+Phase C-1 — Autoload のみ【次タスク推奨】
+  新規: godot/scripts/readonly_selection_context.gd
+  変更: godot/project.godot（[autoload] ReadonlySelectionContext=...）
+  既存画面: **未接続**
+  確認: Godot 起動でエラーなし。デバッグビルドで get_node テストは C-2 でも可
+  commit: 単独「Godot閲覧選択Autoloadを追加」
+
+Phase C-2 — player_detail_view 最小 scene
+  新規: godot/scenes/player_detail_view.tscn
+  新規: godot/scripts/player_detail_view.gd
+  未選択時: 「選手が選択されていません」+ ホーム
+  選択時: Autoload payload 表示 + 戻る + HomeNav
+  **まだ roster から繋がない**（F6 単体テストは不可—手動 Autoload set が必要）
+  開発用: player_detail._ready で debug build のみ mock set_player 可（**本番コミット前削除**）
+  commit: 「Godot選手詳細scene最小版を追加」
+
+Phase C-3 — ロスター接続（第1導線）
+  変更: godot/scripts/roster_view.gd のみ
+  追加: 定数 PLAYER_DETAIL_SCENE_PATH
+  詳細ボタン: 既存 _show_selected_player_summary は維持しつつ、
+    長押し/第2ボタンは避け、**「詳細」押下を scene 遷移に切替えるか**をユーザー相談
+  推奨第1版: **新ボタン「詳細画面」は作らず、既存「詳細」を2段階にしない**
+    → 案A: 既存詳細を上部カードのまま残し、氏名横に小さな「画面」ボタン追加（増える）
+    → 案B（推奨）: 既存「詳細」を **長押しでカード / 通常押下で player_detail** は複雑
+    → 案C（推奨・要相談）: 上部カードは残し、**「詳細」横に「拡大」ボタン**で player_detail
+    → 案D（最小変更）: **上部カード導線は維持**、Footer または氏名行に **「詳細画面へ」** 追加
+  本レポートの実装推奨（ユーザー相談後）:
+    **氏名行に flat ボタン「画面」を追加**（「詳細」=上部カード、「画面」=player_detail）
+    または Phase C-3 最初は **上部カードの「詳細」を player_detail 遷移に差し替え**（カード削除）
+
+  【設計推奨・ユーザー相談】C-3 初期:
+    - **上部サマリーカード導線は維持**
+    - 氏名列に **2 ボタン**: 「詳細」（現状）+ 「画面」（player_detail へ）
+    - 1 commit / roster_view.gd のみ
+
+Phase C-4 — contract / tactics 横展開
+  contract_personnel_summary_view.gd / tactics_summary_view.gd
+  PlayerRows / PlayerRoles の「画面」ボタン同型
+
+Phase D — game_detail_view
+  schedule + set_game + event_id
+
+各 phase で pytest（export 回帰）必須。Godot 変更のみの phase では export pytest は回帰確認のみ。
+
+
+14. 最も推奨する次タスク 1 件
+--------------------------------------------------------------------------------
+【推奨】Phase C-1 — ReadonlySelectionContext Autoload の追加のみ
+
+  - godot/scripts/readonly_selection_context.gd（新規）
+  - godot/project.godot（[autoload] 1 行）
+  - 既存 10 画面の .gd / .tscn は **変更しない**
+
+
+15. 推奨理由
+--------------------------------------------------------------------------------
+1) API・payload・戻り方針を本レポートで固定した。まず **状態容器だけ**入れるのが最安全
+2) project.godot 変更を **単独コミット**にし、問題時の bisect が容易
+3) player_detail scene は Autoload なしではテストしづらいが、C-1 は「登録のみ」で
+   既存画面を壊さない
+4) C-2 で scene、C-3 で roster 接続と目視がはっきりする
+5) 6950695 / 4394a12 の推奨パスと一致
+
+
+16. 対象ファイル（C-1 実装時）
+--------------------------------------------------------------------------------
+新規:
+  godot/scripts/readonly_selection_context.gd
+  godot/scripts/readonly_selection_context.gd.uid（Godot 保存時）
+
+変更:
+  godot/project.godot
+
+変更しない:
+  既存全 view .gd / .tscn / data / export / tests
+
+
+17. 対象関数または対象範囲（C-1）
+--------------------------------------------------------------------------------
+ReadonlySelectionContext:
+  - 内部変数: _kind, _player_id, _payload, _return_scene, _source_label
+  - clear(), has_selection(), get_kind()
+  - set_player(player_id, payload, return_scene, source_label="")
+  - get_player_id(), get_payload()（duplicate）
+  - set_player 時: payload に player_id キーが無ければ注入
+
+project.godot:
+  [autoload]
+  ReadonlySelectionContext="*res://scripts/readonly_selection_context.gd"
+
+
+18. 絶対に変えないもの（全 Phase 共通）
+--------------------------------------------------------------------------------
+- save format / Player モデル / Python export スキーマ（C-1）
+- ROSTER_COLUMNS / 9 列表
+- 既存詳細導線の **第1版では削除しない**（C-3 方針による）
+- main_scene パス
+- Theme / JSON mock 構造（player_id 除く）
+
+
+19. 想定 pytest
+--------------------------------------------------------------------------------
+Phase C-1（Autoload のみ）:
+  py -m pytest basketball_sim/tests/test_roster_readonly_export.py
+  py -m pytest basketball_sim/tests/test_contract_personnel_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_tactics_summary_readonly_export.py
+  py -m pytest basketball_sim/tests/test_schedule_readonly_export.py
+  py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py
+  py -m pytest basketball_sim/tests/test_phase0_smoke.py
+  （Godot Autoload は pytest 対象外）
+
+Phase C-2 以降: 同上 + Godot 目視
+
+Phase C-3 以降: export 変更なしなら同上
+
+
+20. Godot 目視確認項目
+--------------------------------------------------------------------------------
+C-1:
+  - ホーム起動・各画面遷移が従来どおり
+  - 出力に Autoload 関連エラーなし
+  - project.godot 以外の .tscn が意図せず変更されていない
+
+C-2:
+  - player_detail 単体（debug mock set 時）表示
+  - 未選択メッセージ
+
+C-3:
+  - ロスター「画面」→ player_detail → 戻る → ロスター
+  - player_id 一致（debug 表示で確認可）
+  - 上部カード「詳細」が従来どおり動作（併存案時）
+
+
+21. 後回し候補
+--------------------------------------------------------------------------------
+- player_id で 3 JSON 再検索・マージ
+- game_detail_view 実装
+- contract / tactics 接続（C-4）
+- 上部カード/インライン詳細の統合・削除
+- LeftRail クリック化
+- Python 本体
+- Autoload への roster 全件キャッシュ
+
+
+22. リスクと注意点
+--------------------------------------------------------------------------------
+- project.godot マージ競合 — C-1 を小さく保つ
+- payload 参照の生 Dictionary 改変 — get_payload は duplicate 返却
+- return_scene  typo — 定数は各 view の SCENE_PATH を再利用
+- 二ボタン（詳細/画面）で UX が煩雑 — ユーザー相談
+- debug mock set_player を C-2 に残すと本番汚染 — 必ず削除
+- RiskRows を player_detail に繋ぐと player_id 無し — 非推奨
+
+
+23. 実装前にユーザー相談すべき論点
+--------------------------------------------------------------------------------
+1) ロスター接続: 既存「詳細」カードを残し、別ボタン「画面」で player_detail か、
+   詳細を置き換えるか
+2) 戻る vs ホーム: 戻るを主導線でよいか（推奨: 戻る + HomeNav 併用）
+3) player_id の debug 表示: 開発ビルドのみでよいか
+4) player_detail 第1版で contract/tactics 接続を同スプリントに含めるか
+5) GUI をどこまで進めてから Python 本体へ戻るか
+6) Python 優先相談: 週次進行 / 試合ログ / 契約FA / 戦術ローテ の順
+
+
+24. 結論
+--------------------------------------------------------------------------------
+- ReadonlySelectionContext（案2: kind + payload + return_scene）は
+  player_detail 最小版と将来 game_detail の両方に耐える
+- payload は **行 Dictionary をコピーし、detail 側で正規化表示**
+- player_id のみで JSON 引き直しは v1 では行わない
+- 戻るは **return_scene**（案2）+ HomeNav 併用
+- 第1接続画面は **ロスター**
+- player_id は **製品 UI 非表示**（debug のみ可）
+
+次にやるべき 1 件:
+  **Phase C-1 — readonly_selection_context.gd + project.godot Autoload 登録のみ**
+
+続き:
+  C-2 player_detail_view → C-3 roster 接続（2ボタン方針はユーザー確認）→ C-4 横展開 → D game_detail
+
+================================================================================
+調査実施: 2026-05-20
+参照 HEAD: 4394a12
+pytest: 本調査では未実施
+================================================================================
