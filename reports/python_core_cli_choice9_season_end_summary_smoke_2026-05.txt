@@ -1,0 +1,230 @@
+================================================================================
+Python本体 — CLI choice "9" season-end summary 実データ確認（2026-05）
+================================================================================
+
+確認日: 2026-05-19
+対象 commit: 6c581e7 — choice9のseason-end summaryを接続
+目的: CLI choice "9"（シーズン最後まで進める）に接続された
+      quiet完走 → season-end summary フローが、実データ save で
+      読みやすいか・出力量が実用範囲か・save 未上書きかを確認する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 確認方法
+================================================================================
+
+- **対話型 CLI:** 未実施（save 上書きリスク回避）
+- **programmatic smoke:** 実施（main.py choice "9" 同等の処理順をメモリ上で再現）
+- **save 上書き:** なし（load_world のみ、save_world 未使用、mtime/size 変更なし）
+
+
+================================================================================
+2. 使用 save
+================================================================================
+
+| save | 用途 | cr（前→後） |
+|---|---|---|
+| debug_user_boost_d1_user.sav | choice "9" 主確認（final compact / season-end summary） | 32 → 33 |
+
+補足:
+- fa_clip_test_04.sav は **未実施**（残り28ラウンドで実行コスト大）
+- 昇降格変動の実データ save は一覧から短い終盤候補を探索したが、
+  debug_user 以外で追加確認に適した save は今回特定せず
+- 昇降格表示（D1→D2 降格 / D2→D1 昇格）は **unit test で確認済み**
+
+
+================================================================================
+3. 実行コマンド
+================================================================================
+
+- Get-ChildItem "$env:USERPROFILE\.basketball_sim\saves" -Filter "*.sav"
+- Select-String basketball_sim/main.py（choice "1"/"2"/"9"、formatter 等）
+- Select-String basketball_sim/systems/season_end_summary_cli_display.py
+- Select-String basketball_sim/tests/test_season_end_summary_cli_display.py
+- Select-String basketball_sim/tests/test_simulate_quiet_mode.py
+- pytest:
+  - basketball_sim/tests/test_season_end_summary_cli_display.py
+  - basketball_sim/tests/test_simulate_quiet_mode.py
+  - basketball_sim/tests/test_post_advance_result_summary_cli_display.py
+  - basketball_sim/tests/test_round_advance_preview.py
+  - basketball_sim/tests/test_season_promotion_relegation.py
+  - basketball_sim/tests（全体）
+- py -c "import basketball_sim.main; print('main import ok')"
+- programmatic smoke →
+  - $env:TEMP\cli_choice9_season_end_summary_smoke_debug_user_boost_d1_user.txt
+  - $env:TEMP\cli_choice9_season_end_summary_smoke_meta.json
+
+
+================================================================================
+4. pytest 結果
+================================================================================
+
+| スイート | 結果 |
+|---|---|
+| test_season_end_summary_cli_display.py（12件） | passed |
+| test_simulate_quiet_mode.py（10件） | passed |
+| test_post_advance_result_summary_cli_display.py（12件） | passed |
+| test_round_advance_preview.py（12件） | passed |
+| test_season_promotion_relegation.py | passed |
+| **関連合計** | **47+ passed** |
+| **basketball_sim/tests 全体** | **100% passed（exit 0）** |
+| import basketball_sim.main | ok |
+
+
+================================================================================
+5. static 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| main.py choice "1" | 変更なし — preview → weekly → `simulate_next_round(quiet=True)` → post summary（L2845–2894） |
+| main.py choice "2" | 変更なし — weekly → `simulate_multiple_rounds(5, quiet=True)` → post summary（L2895–2943） |
+| main.py choice "9" | `_round_before` / `_game_results_before` / `_league_level_before` 保持 → `simulate_to_end(quiet=True)` → `format_season_end_summary_lines(...)`（L2956–2977） |
+| choice "9" post summary | **未使用**（season_end_summary のみ） |
+| Tk advance_one_round | 変更なし — `simulate_next_round()` verbose（L3583） |
+| Tk debug skip | 変更なし — `simulate_to_end()` verbose（L3615） |
+| game_results 構造 | 変更なし（6キーのみ） |
+
+
+================================================================================
+6. formatter 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| 読み取り専用 | season / user_team / new_results を書き換えない |
+| print なし | `season_end_summary_cli_display.py` 内に `print(` なし |
+| 直近N試合 | `user_games[-cap:]`（L142 `_recent_game_lines`）— tail 表示 |
+| 昇降格 | `_promotion_relegation_summary` + `league_level_before` |
+| 順位 | `_find_user_rank` + `get_standings` |
+| PO | `_playoff_summary` + `division_playoff_results` |
+| 大会 | `_competition_summary`（Phase 1 簡易） |
+| 資金/信頼 | `_money_label` + `owner_trust` |
+| ひとこと | 昇格/降格/PO に応じた文言分岐 |
+
+
+================================================================================
+7. programmatic smoke 結果（debug_user_boost_d1_user.sav）
+================================================================================
+
+| 項目 | 値 |
+|---|---|
+| round before → after | **32 → 33** |
+| league_level before → after | **2 → 2** |
+| season_finished | **true** |
+| quiet simulate 行数 | **9行** |
+| season-end summary 行数 | **11行** |
+| 合計（simulate + summary） | **20行** |
+| debug token（PBP/SUB/COMMENTARY/MINUTES/PLAY） | **すべてなし** |
+| save mtime / size | **不変** |
+| save_world | **未呼び出し** |
+
+
+================================================================================
+8. 表示フロー抜粋
+================================================================================
+
+### QUIET SIMULATE（代表）
+
+```
+========== ラウンド 33/33 ==========
+[経営] ラウンド33: シーズン中収益（リーグ分配・放映等） +6,000,000円 ...
+ラウンド消化試合数: 0
+ラウンド平均総得点: 0.0
+
+Season finished
+
+--- League Scoring Stats ---
+Games Played: 1440
+Average Team Score: 70.5
+Average Total Score: 141.0
+```
+
+### SEASON-END SUMMARY（全文）
+
+```
+【シーズン完走サマリー】
+対象: ラウンド 33/33（完走）
+レギュラー成績: 36勝24敗
+所属Division: D2 → D2
+昇降格: 変動なし
+最終順位: D2 4位
+PO: D2進出
+今回進行分: 自チーム 0 試合 / 0勝0敗
+大会: 該当なし
+資金/信頼: 所持金 504億1400万円 / オーナー信頼 50
+ひとこと: オフシーズン準備へ。GM(8)・履歴(6)を確認推奨。
+```
+
+
+================================================================================
+9. 評価
+================================================================================
+
+### 表示順
+**合格** — quiet simulate（compact finalize 含む）→ season-end summary
+
+### 表示量
+**合格** — quiet simulate 9行 + summary 11行 = 合計20行。
+旧 verbose 完走（数千行）には戻っていない。
+
+### season-end summary の見やすさ
+**良好** — 11行で完走結果の要点（成績・順位・PO・資金）が一覧できる。
+直近試合は今回0試合のため未表示（final R 試合0のため想定どおり）。
+
+### 昇降格表示の確認状況
+- **実データ:** D2→D2 変動なし（load 時点で league_level=2）
+- **unit test:** D1→D2 降格 / D2→D1 昇格 / 変動なし を確認済み
+  （test_relegation_display / test_promotion_one_liner / test_no_movement_display）
+
+### choice "1" / "2" / Tk への影響
+**なし** — static 確認で変更なし
+
+### save 上書き
+**なし**
+
+
+================================================================================
+10. 問題点・軽微所見（修正なし）
+================================================================================
+
+1. 実データ save では昇降格変動が出ず、unit test でのみ降格/昇格を確認
+2. debug_user save は load 時点ですでに D2（league_level=2）— ファイル名 d1_user だが表示上は D2 所属
+3. final compact の League Scoring Stats が英語混じり（Season finished / Games Played 等）
+4. 大会表示は Phase 1 簡易（該当なし / 優勝・準優勝1行程度）
+5. fa_clip_test_04.sav からの中盤完走 smoke は未実施
+6. choice "9" 対話型 CLI 本番操作は未実施
+7. Tk は quiet / season-end summary 未接続（スコープ外）
+
+
+================================================================================
+11. 判定
+================================================================================
+
+**合格**
+
+- choice "9" が quiet完走 → season-end summary の順に出る
+- quiet 後行数が実用範囲（9行）
+- summary 11行で読める
+- debug token なし
+- season_finished = true
+- レギュラー成績 / Division / 昇降格 / 順位 / PO / 資金信頼 / ひとこと が出る
+- save 未上書き
+- 進行エラーなし
+- コード変更なし
+- choice "1" / "2" / Tk への影響なし
+
+
+================================================================================
+12. 次に行う具体的タスク
+================================================================================
+
+**Python CLI進行表示まわりの一区切りレポートを作成し、次テーマへ移る**
+
+理由:
+- choice "1" / "2" / "9" の進行表示（preview / weekly / quiet / post summary / season-end summary）が一通り成立
+- ここから先は細かい表示文言調整に寄りやすい
+- 到達点をまとめてから、Python本体の次中規模テーマ（週次進行・試合体験・ログ/実況等）を選ぶのが安全
+
+（choice "9" summary に明確な問題は見つかっていないため、軽微修正指示書は不要）
