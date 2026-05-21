@@ -1,0 +1,326 @@
+================================================================================
+Godot Phase 4 — 詳細導線第1段完了・次にPython本体へ戻るための節目（Phase D-3）
+================================================================================
+
+調査日: 2026-05
+参照 HEAD: 75863ed — Godotロスター詳細戻りでスクロール位置を復元
+調査方法: git log / 関連レポート / grep（Select-String）/ .gd 確認（実装なし）
+
+目的: Phase D で進めてきた player_detail / game_detail 最小詳細導線、
+日程・ロスターの戻り時スクロール復元までを整理し、
+「Godot詳細導線第1段完了」として節目を明確にする。
+次にどの Python 本体機能へ戻るべきかの判断材料を提供する。
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+- **最新コミット:** 75863ed — Godotロスター詳細戻りでスクロール位置を復元
+- **Phase:** Phase 4 / Godot本番GUI準備 / **Phase D 到達点**
+
+### Phase D タイムライン（grep / git log 確認）
+
+| 段階 | コミット（代表） | 内容 |
+|------|------------------|------|
+| D-0 | 3b2a89b | game_detail 最小仕様レポート |
+| D-1 | afe57f3 | game_detail_view 最小版追加 |
+| D-2 | a7bba35 | schedule_view → game_detail_view 接続 |
+| D-2.5a | f9ee3b2 | 詳細戻り時スクロール復元設計レポート |
+| D-2.5b | cba4a29 | ReadonlySelectionContext return_state API 追加 |
+| D-2.5c | e738673 | schedule → game_detail → schedule 戻りスクロール復元 |
+| D-2.5d | 75863ed | roster → player_detail → roster 戻りスクロール復元 |
+| **D-3** | （本レポート） | 詳細導線第1段完了の整理 |
+
+### Phase C（player_detail 導線・D の前提）
+
+| 段階 | コミット | 内容 |
+|------|----------|------|
+| C-0 | 319d1bb | 選択状態・選手詳細最小版 設計 |
+| C-1 | 6072dd8 | ReadonlySelectionContext Autoload |
+| C-2 | 07f969c | player_detail_view 最小版 |
+| C-2 fix | bfc6c9c | Autoload 参照安全化（/root + ctx.call） |
+| C-3 | a58c08b | ロスター → player_detail_view |
+| C-4 | 9eb50d6 / d7e229d | 契約 PlayerRows / 戦術 PlayerRoles → player_detail_view |
+
+Phase D は game_detail 追加と schedule 接続、および戻り UX（scroll 復元）で
+player_detail 導線と対称性を揃えた。
+
+
+================================================================================
+2. 完了した詳細導線
+================================================================================
+
+### player_detail
+
+- **player_detail_view 最小版あり**（player_detail_view.gd / .tscn）
+- **接続済み 3 導線:**
+  1. ロスター（roster_view）→ player_detail_view
+  2. 契約 PlayerRows（contract_personnel_summary_view）→ player_detail_view
+  3. 戦術 PlayerRoles（tactics_summary_view）→ player_detail_view
+- 各接続元: 既存 **「詳細」** ボタン維持（上部/行直下インライン表示）
+- 新規 **「画面」** ボタンで専用詳細 scene へ遷移
+- player_detail_view: Autoload payload のみ表示（JSON 再読込なし）
+- BackButton: `ctx.call("clear", true)` → return_scene へ（75863ed 以降）
+- HomeNavButton: `ctx.call("clear")` のまま
+
+### game_detail
+
+- **game_detail_view 最小版あり**（game_detail_view.gd / .tscn）
+- **接続済み 1 導線:**
+  - 日程 upcoming（schedule_view）→ game_detail_view
+- 既存 **「詳細」** ボタン: 上部 StatusLabel 試合カード表示として維持
+- 新規 **「画面」** ボタンで専用詳細 scene へ遷移
+- game_detail_view: Autoload payload のみ表示
+- BackButton: `ctx.call("clear", true)` → return_scene へ（e738673 以降）
+- HomeNavButton: `ctx.call("clear")` のまま
+
+### 戻り導線・スクロール復元
+
+| 経路 | scroll 保存 | scroll 復元 | Back clear |
+|------|-------------|-------------|------------|
+| 日程 → 試合詳細 → 一覧へ戻る | schedule「画面」押下時 set_return_state | schedule _restore_return_scroll + consume | clear(true) |
+| ロスター → 選手詳細 → 一覧へ戻る | roster「画面」押下時 set_return_state | roster _restore_return_scroll + consume | clear(true) |
+
+- **HomeNavButton:** 従来どおり `clear()` で選択状態 + return_state を全消去
+- **BackButton:** `clear(true)` で選択状態のみ消し return_state を保持して戻る設計
+- 契約 / 戦術: player_detail へ遷移は接続済みだが **scroll 復元は未実装**
+
+
+================================================================================
+3. 「Godot詳細導線第1段完了」の定義
+================================================================================
+
+**Godot詳細導線第1段完了** とは、以下を満たす状態と定義する。
+
+1. 一覧画面から専用詳細画面へ遷移できる
+2. 詳細画面は **Autoload payload のみ** を読む（scene 内 JSON 再読込なし）
+3. **JSON / save / Python 自動起動は行わない**
+4. **読み取り専用** を維持する
+5. 既存の一覧内 **「詳細」** 表示は消さない（詳細=インライン / 画面=専用 scene の併存）
+6. 専用詳細画面から **一覧へ戻れる**（return_scene + BackButton）
+7. 実害が大きい **日程・ロスター** ではスクロール位置も復元される
+8. **player_detail / game_detail** の最小 UI 土台ができた
+
+**本プロジェクトは上記条件を満たしたため、Phase D は「詳細導線第1段完了」として扱う。**
+
+
+================================================================================
+4. 意図的に残した未対応
+================================================================================
+
+以下は「失敗」ではなく、Phase 4 を締めて Python 本体へ比重を移すために
+**意図的に後工程へ回した項目** として整理する。
+
+### 詳細画面の本格化
+
+- player_detail の本格専用 DTO 化は未対応（契約・戦術 payload では表示欠落あり）
+- game_detail の本格専用 DTO 化は未対応
+- box score / 試合ログ / スタッツ詳細は未対応
+- 選手の契約・成績・履歴の本格詳細は未対応
+
+### 戻り UX の横展開
+
+- 契約 PlayerRows → player_detail → 契約へ戻る **scroll 復元は未実装**
+- 戦術 PlayerRoles → player_detail → 戦術へ戻る **scroll 復元は未実装**
+- contract / tactics は schedule/roster と **同型対応可能**（return_state API 済み）
+- 必要時に D-2.5e / D-2.5f として追加可能
+
+### 運用・目視確認
+
+- schedule_from_python.json は使用 save 次第で **upcoming=0** になり得る
+- from_python JSON は手動生成・gitignore 対象のため、古い JSON が残ると目視確認に影響
+- mock fallback（schedule_mock.json 等）で Godot 読取確認は可能
+
+### その他
+
+- `.uid` は Godot 自動生成の未追跡として扱う（commit しない）
+- Godot UI 微調整（余白・Panel 平坦化等）は Phase 4 前半で十分進め済み。第1段締め後は原則停止
+
+
+================================================================================
+5. contract / tactics 横展開判断
+================================================================================
+
+### 結論
+
+**今すぐ contract / tactics へスクロール復元を横展開しない。**
+
+### 理由
+
+1. 実害が確認された **日程・ロスターは修正済み**（D-2.5c / D-2.5d）
+2. contract / tactics も **同型対応は可能**（set_return_state + consume + clear(true)）
+3. ここで横展開を続けると **Phase 4 の締めが遅れる**
+4. 現在の優先は **「詳細導線第1段を締め、Python本体のゲーム体験へ戻る」** こと
+5. contract / tactics は **ユーザー目視で不便が強く出た時点** で同型対応すればよい
+
+### 後続候補（現時点では保留）
+
+- **D-2.5e:** contract_personnel_summary_view + player_detail_view の戻りスクロール復元
+- **D-2.5f:** tactics_summary_view + player_detail_view の戻りスクロール復元
+
+contract / tactics は既に「画面」→ player_detail 接続済み。
+未実装なのは **set_return_state 保存** と **consume 復元** のみ。
+
+
+================================================================================
+6. 現在の安全設計
+================================================================================
+
+（readonly_selection_context.gd / 各 view .gd の grep 確認に基づく）
+
+### ReadonlySelectionContext
+
+- **選択状態**（kind / payload / return_scene / source_label / player_id / event_id）
+  と **return_state**（scene_path → Dictionary）を **分離**
+- return_state は scene_path ごとに保持（`_return_state_by_scene`）
+- `consume_return_state(scene_path)` で **一度きり復元**
+- `clear()` 引数なし: 従来どおり **全消去**（選択 + return_state）
+- `clear(true)`: 選択状態のみ消し **return_state は保持**
+- `has_selection()` は return_state に **影響しない**
+
+### 各画面の共通パターン
+
+- Autoload 取得: `get_node_or_null("/root/ReadonlySelectionContext")` + `ctx.call(...)`
+- **ReadonlySelectionContext. 直接参照禁止**（player_detail / game_detail / 接続元すべて）
+- Godot から **Python 自動起動なし**
+- **save 変更なし**
+- **JSON 構造変更なし**（Phase D 期間）
+- **export 変更なし**（Phase D 期間）
+- 各実装タスク後 **pytest 79 passed** を維持（Python 回帰）
+
+### 詳細画面 Back / Home
+
+| ボタン | 呼び出し | 意味 |
+|--------|----------|------|
+| BackButton | clear(true) | 一覧 scroll 復元のため return_state 保持 |
+| HomeNavButton | clear() | stale state を残さない全消去 |
+
+
+================================================================================
+7. 次に戻るべきPython本体候補
+================================================================================
+
+### 候補A: 週次進行・ラウンド進行のプレイ感強化
+
+- 長期シーズン土台に直結
+- 「次へ進める」ゲーム体験が強くなる
+- Godot GUI から見える成果（日程 upcoming 更新等）にもつながる
+- **推奨度: 高**
+
+### 候補B: 試合ログ / 試合体験 / テキスト実況の強化
+
+- 「試合を味わう気持ちよさ」に直結
+- game_detail の次に自然
+- ただし設計量が大きくなりやすい
+- **推奨度: 高**
+
+### 候補C: 契約 / FA / 編成判断の本体強化
+
+- GM 判断の核
+- ゲームの手ごわさに直結
+- ただし既存ルールとの整合確認が必要
+- **推奨度: 高**
+
+### 候補D: 戦術 / ローテーションの本体強化
+
+- ユーザーが重視している「プリセット→確認→手動調整」の体験に直結
+- ただし UI と本体の両方に関わりやすい
+- **推奨度: 中〜高**
+
+### 候補E: Godot UI 微調整継続
+
+- 画面の完成度は上がる
+- ただしゲーム体験の進行が遅れる
+- 詳細導線第1段完了後は **現時点では非推奨**
+
+### 比較まとめ
+
+| 候補 | 体験への効き | 設計コスト | Phase4後の優先 |
+|------|-------------|-----------|----------------|
+| A 週次進行 | サイクル全体 | 中 | ◎ |
+| B 試合ログ/実況 | 試合の手触り | 大 | ◎ |
+| C 契約/FA | GM判断 | 中〜大 | ○ |
+| D 戦術本体 | ローテ操作 | 中〜大 | ○ |
+| E Godot微調整 | 見た目 | 小 | △（保留） |
+
+
+================================================================================
+8. 推奨結論
+================================================================================
+
+### 推奨
+
+**Phase D はここで締める。次は原則 Python 本体へ戻る。**
+
+### 最有力候補
+
+**「週次進行・試合体験・ログ/実況」周辺の現状調査レポート** を作成する。
+
+### 理由
+
+1. Godot 側の読み取り詳細導線は **第1段として成立** した
+2. これ以上 Godot UI だけを磨くより、**ゲームとして進む / 試合が起きる / 判断が返ってくる** 体験を太くすべき
+3. 最終目標（Steam 1500円・1万本以上）には、見た目より先に **中身のプレイサイクル** を強化する必要がある
+4. **いきなり大実装ではなく、まず Python 本体の現在地調査** を挟むのが安全
+5. 調査結果次第で A（週次進行）と B（試合体験）のどちらを先に実装するか決められる
+
+### Phase 4 後半ロードマップ（62ca2b1）との整合
+
+- game_detail 最小 1 本 → **完了**
+- player + game 最小詳細導線 → **完了**
+- 戻り scroll（実害大の schedule/roster）→ **完了**
+- **→ Python 本体へ比重移行**（本レポートで正式に宣言）
+
+
+================================================================================
+9. 次に行う具体的タスク
+================================================================================
+
+次に行う具体的タスク:
+**Python本体の「週次進行・試合体験・ログ/実況」周辺の現状調査レポートを作成する。**
+
+想定コミット:
+Godot詳細導線第1段完了を整理
+（本ファイル: godot_phase4_detail_routes_phase1_complete_2026-05.txt）
+
+次回想定タスク名:
+Python本体の週次進行と試合体験の現状を調査する
+
+調査レポートで確認すべき観点（案）:
+- 週次/ラウンド advance の現行 API と save への反映
+- 試合シミュレーション / ログ生成の有無と出力形式
+- Godot schedule export との接続点（event_id / upcoming 更新）
+- 実装済み vs スタブ vs 未着手の切り分け
+- 小さく始められる第1実装候補
+
+
+================================================================================
+付録: コード確認メモ（2026-05 grep）
+================================================================================
+
+### ReadonlySelectionContext API（実装済み）
+
+- set_player / set_game / set_selection
+- get_payload / get_return_scene / get_source_label / get_player_id / get_event_id
+- set_return_state / get_return_state / consume_return_state / clear_return_state
+- clear(preserve_return_state := false)
+
+### scroll 復元接続済み
+
+- schedule_view: set_return_state + consume_return_state + $Margin/RootCol/Scroll
+- roster_view: 同上
+
+### scroll 復元未接続（player_detail 遷移のみ）
+
+- contract_personnel_summary_view: set_player のみ（set_return_state なし）
+- tactics_summary_view: set_player のみ（set_return_state なし）
+
+### 詳細画面 Back
+
+- player_detail_view: clear(true) — 75863ed
+- game_detail_view: clear(true) — e738673
+
+================================================================================
+END
+================================================================================
