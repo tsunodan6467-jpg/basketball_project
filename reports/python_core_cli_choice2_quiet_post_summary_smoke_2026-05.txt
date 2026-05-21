@@ -1,0 +1,238 @@
+================================================================================
+Python本体 — CLI choice "2" quiet進行後サマリー 実データ確認（2026-05）
+================================================================================
+
+確認日: 2026-05-19
+対象 commit: 64937e1 — choice2のquiet進行後サマリーを接続
+目的: CLI choice "2"（5ラウンド進める）に接続された
+      weekly check → quiet simulate → post summary フローが、
+      実データ save で読みやすいか・出力量が実用範囲か・save 未上書きかを確認する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 確認方法
+================================================================================
+
+- **対話型 CLI:** 未実施（save 上書きリスク回避）
+- **programmatic smoke:** 実施（main.py choice "2" 同等の処理順をメモリ上で再現）
+- **save 上書き:** なし（load_world のみ、save_world 未使用、mtime/size 変更なし）
+
+
+================================================================================
+2. 使用 save
+================================================================================
+
+| save | 用途 | cr（前→後） |
+|---|---|---|
+| fa_clip_test_04.sav | choice "2" 主確認（中盤・自チーム10試合/5R） | 5 → 10 |
+
+補足: debug_user_boost_d1_user.sav は今回未使用（final compact 寄りだが choice "2" 確認として fa_clip 優先）。
+
+
+================================================================================
+3. 実行コマンド
+================================================================================
+
+- Get-ChildItem "$env:USERPROFILE\.basketball_sim\saves" -Filter "*.sav"
+- Select-String basketball_sim/main.py（choice "1"/"2"/"9"、quiet、formatter 等）
+- Select-String basketball_sim/tests/test_simulate_quiet_mode.py
+- pytest:
+  - basketball_sim/tests/test_simulate_quiet_mode.py
+  - basketball_sim/tests/test_post_advance_result_summary_cli_display.py
+  - basketball_sim/tests/test_round_advance_preview.py
+  - basketball_sim/tests/test_round_advance_preview_readonly_export.py
+  - basketball_sim/tests/test_match_postgame_cli_display.py
+  - basketball_sim/tests/test_schedule_display.py
+  - basketball_sim/tests/test_reg_slot_pass_through.py
+  - basketball_sim/tests（全体）
+- py -c "import basketball_sim.main; print('main import ok')"
+- programmatic smoke →
+  - $env:TEMP\cli_choice2_quiet_post_summary_smoke_fa_clip_test_04.txt
+  - $env:TEMP\cli_choice2_quiet_post_summary_smoke_meta.json
+
+
+================================================================================
+4. pytest 結果
+================================================================================
+
+| スイート | 結果 |
+|---|---|
+| test_simulate_quiet_mode.py（9件） | passed |
+| test_post_advance_result_summary_cli_display.py（12件） | passed |
+| test_round_advance_preview.py（12件） | passed |
+| test_round_advance_preview_readonly_export.py（7件） | passed |
+| test_match_postgame_cli_display.py（17件） | passed |
+| test_schedule_display.py（18件） | passed |
+| test_reg_slot_pass_through.py（3件） | passed |
+| **関連合計** | **78 passed** |
+| **basketball_sim/tests 全体** | **100% passed（exit 0）** |
+| import basketball_sim.main | ok |
+
+
+================================================================================
+5. static 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| main.py choice "1" | 変更なし — preview → weekly → `simulate_next_round(quiet=True)` → post summary（L2845–2894） |
+| main.py choice "2" | weekly → `simulate_multiple_rounds(5, quiet=True)` → post summary（L2895–2943） |
+| choice "2" で round_advance_preview | **未使用**（preview は choice "1" のみ） |
+| choice "2" post summary max_games | **10 明示**（L2938） |
+| main.py choice "9" | 変更なし — `season.simulate_to_end()`（L2956–2957） |
+| Tk advance_one_round | 変更なし — `season.simulate_next_round()` quiet なし（L3561） |
+| test_simulate_quiet_mode.py | 複数ラウンド quiet / before-after slice / max_games=10 テスト追加済み |
+
+
+================================================================================
+6. programmatic smoke 結果（fa_clip_test_04.sav）
+================================================================================
+
+| 項目 | 値 |
+|---|---|
+| round before → after | **5 → 10** |
+| total_rounds | 33 |
+| game_results before → after | 264 → 504（added 240） |
+| 自チーム試合数（summary 対象） | **10 試合** |
+| 合計 stdout 行数 | **99 行** |
+| weekly check 行数 | 7 行（+ 空行 1） |
+| quiet simulate 部分行数 | **78 行** |
+| post summary 行数 | **14 行** |
+| debug token（PBP/SUB/COMMENTARY/MINUTES/PLAY） | **すべてなし** |
+| 「ほか N 試合」 | **なし**（10試合以内のため max_games=10 が効いている） |
+| sim_error | なし |
+| save mtime / size | **不変** |
+| save_world | **未呼び出し** |
+
+round_label: `ラウンド 6〜10/33（5ラウンド進行分）`
+
+
+================================================================================
+7. 表示フロー抜粋
+================================================================================
+
+### WEEKLY CHECK（全文）
+
+```
+【週送り前チェック】
+今週: 昇格圏争い
+注意: 編成面 特記なし
+注意: 財務赤字傾向・再契約候補あり・FA候補確認余地あり
+進める前チェック: 財務と起用の確認推奨
+```
+
+### QUIET SIMULATE（代表行）
+
+```
+========== ラウンド 6/33 ==========
+[経営] ラウンド6: シーズン中収益（リーグ分配・放映等） +5,000,000円 (セーブ確認プレイチーム 所持金 2,193,245,671円)
+[経営] ラウンド6: シーズン中収益（主場・門前概算） +500,000円 (セーブ確認プレイチーム 所持金 2,193,745,671円)
+ラウンド消化試合数: 48
+ラウンド平均総得点: 147.0
+
+========== ラウンド 7/33 ==========
+[National Team Window] Round 7 | cycle_year=1 | アジアカップ予選
+代表ウィークのため、このラウンドのクラブ公式戦は行いません。
+...
+ラウンド消化試合数: 0
+ラウンド平均総得点: 0.0
+
+========== ラウンド 10/33 ==========
+[経営] ラウンド10: シーズン中収益（リーグ分配・放映等） +5,000,000円 ...
+ラウンド消化試合数: 48
+ラウンド平均総得点: 143.5
+```
+
+※ ラウンド7は代表ウィークのため National Team 関連ログが出るが、
+  試合 debug token（[PBP] 等）は出ない。
+
+### POST SUMMARY（全文）
+
+```
+【ラウンド結果サマリー】
+対象: ラウンド 6〜10/33（5ラウンド進行分）
+自チーム試合: 10 試合
+○ セーブ確認プレイチーム 71 - 65 Yokohama Bulls_35
+● セーブ確認プレイチーム 64 - 67 Yokohama Bulls_35
+○ セーブ確認プレイチーム 70 - 63 Nagoya Mariners_38
+○ セーブ確認プレイチーム 74 - 72 Osaka Dragons_29
+○ セーブ確認プレイチーム 98 - 69 Osaka Dragons_29
+○ セーブ確認プレイチーム 82 - 71 Tokyo Lions_42
+● セーブ確認プレイチーム 58 - 76 Osaka Bears_46
+○ セーブ確認プレイチーム 62 - 59 Osaka Bears_46
+○ セーブ確認プレイチーム 71 - 50 Tokyo Mariners_47
+○ セーブ確認プレイチーム 84 - 63 Tokyo Mariners_47
+ひとこと: 8勝2敗。次ラウンド前にロスター/戦術確認推奨。
+```
+
+
+================================================================================
+8. 評価
+================================================================================
+
+### 表示順
+**合格** — weekly check（1回）→ quiet 5ラウンド進行 → post summary
+
+### 表示量
+**合格** — 合計 99 行（目安 100 行以下）。quiet simulate 部分 78 行（目安 80 行前後）。
+旧 verbose 相当（数千行×5）には戻っていない。
+
+### post summary の見やすさ
+**良好** — 10試合すべて W/L 行が出ており、8勝2敗のひとことが末尾に来る。
+`max_games=10` により「ほか N 試合」は出ず、5ラウンド分として読める。
+
+### choice "1" / "9" / Tk への影響
+**なし** — static 確認で choice "1"（preview 付き1R）、choice "9"（simulate_to_end）、
+Tk（simulate_next_round verbose）いずれも 64937e1 以前の挙動のまま。
+
+### save 上書き
+**なし**（mtime / size 不変、save_world 未使用）
+
+### 進行後エラー
+**なし**
+
+
+================================================================================
+9. 問題点・軽微所見（修正なし）
+================================================================================
+
+1. weekly check の「進める前チェック」と post summary の「次ラウンド前にロスター/戦術確認推奨」
+   がやや重なる — 現状は許容範囲。
+2. 5ラウンド進行時は `========== ラウンド N/33 ==========` 見出しが5回出る。
+   代表ウィーク（R7）では National Team ログが約40行追加される。
+   将来、複数ラウンド用に見出し/代表ウィーク出力を圧縮してもよい。
+3. choice "9" は依然 `simulate_to_end()` verbose のまま — 今回スコープ外。
+4. Tk `advance_one_round` は quiet 未接続 — 今回スコープ外。
+5. game_results slice は全試合（240件）だが summary は自チーム10件のみ抽出 — 設計どおり。
+
+
+================================================================================
+10. 判定
+================================================================================
+
+**合格**
+
+- weekly → quiet 5ラウンド進行 → post summary の順に出る
+- quiet 後行数が実用範囲（99行、debug token なし）
+- 自チーム10試合 summary が読める
+- max_games=10 が効いている（「ほか」なし）
+- save 未上書き
+- 進行エラーなし
+- コード変更なし
+- choice "1" / "9" / Tk への影響なし
+
+
+================================================================================
+11. 次に行う具体的タスク
+================================================================================
+
+**choice "9" 用 season-end summary / tail表示の設計レポートを作成する**
+
+理由:
+- choice "1" と "2" は quiet + post summary が成立した
+- choice "9" は既存 formatter の先頭 N 件流用では season-end 特有の情報
+  （昇降格・PO・表彰・最終成績・compact 出力）との整合が必要
+- いきなり実装せず、season-end summary 設計を挟むのが安全
+
+（quiet のみ先行接続は、season-end summary 設計後に再評価）
