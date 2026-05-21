@@ -1,0 +1,397 @@
+================================================================================
+Godot Phase 4 — game_detail_view 最小仕様（Phase D-0）
+================================================================================
+
+調査日: 2026-05
+参照 HEAD: 62ca2b1 — Godot Phase4後半ロードマップを整理
+調査方法: git log / ロードマップ / grep / JSON 確認 / schedule_readonly CLI（実装なし）
+
+目的: Phase D-1 / D-2 実装前に event payload・表示・戻る導線・schedule 接続範囲を固定する。
+
+
+1. 現在地
+================================================================================
+
+- **Phase 4 後半ロードマップ整理済み**（62ca2b1）
+- 今回: **Phase D-0 — game_detail_view 最小仕様レポート**（本ファイル）
+- **player_detail:** ロスター / 契約 PlayerRows / 戦術 PlayerRoles の **3 導線**接続済み
+- **日程:** upcoming「詳細」→ 上部 StatusLabel 試合カード（第1段完了）
+- **game_detail_view:** **未存在**（scenes 14 本に player_detail_view のみ）
+- **ReadonlySelectionContext:** `set_game` / `get_event_id` / `KIND_GAME` 実装済み
+- **Godot:** 読み取り専用。Python 自動起動・save・編集・進行操作 **なし**
+- **player_detail 同型:** `/root/ReadonlySelectionContext` + `ctx.call(...)`（直接参照禁止）
+
+
+2. schedule 側の現状確認
+================================================================================
+
+### JSON 読込（schedule_view.gd）
+
+- `_schedule_json_paths`:
+  1. `res://data/schedule_from_python.json`（優先）
+  2. `res://data/schedule_mock.json`（fallback）
+- 先頭で開け・パース成功した JSON を採用（roster/contract 同型）
+
+### upcoming 表示
+
+- `upcoming_games[]` を `_add_upcoming_block(row)` で ScrollContent に追加
+- 各行 `meta_row` 末尾に **「詳細」** ボタン（`detail_btn.pressed` → `_show_upcoming_game_detail.bind(row)`）
+- **既存「詳細」は消さない**（Phase D-2 でも維持）
+
+### 既存「詳細」挙動
+
+- `_show_upcoming_game_detail(game)`:
+  - `game.get("detail")` を上部 `_status_label` に「試合詳細\n{detail}」表示
+  - 空なら「詳細情報はありません。」
+  - `_set_upcoming_game_detail_visible(true)`（上部 Panel カード）
+
+### export（schedule_readonly.py `_normalize_upcoming_row`）
+
+返却キー（grep 確認）:
+- `round`, `round_label`, `month_label`
+- `competition_type`, `competition_label`
+- `opponent`, `home_away`
+- `detail`（`detail_text_for_upcoming_row` 由来）
+- `event_id`（str。無ければ `"-"`）
+- `label`, `is_user_team_game`
+
+### event_id 確認結果（2026-05 調査時）
+
+| ファイル | upcoming 件数 | missing event_id キー | 備考 |
+|----------|---------------|----------------------|------|
+| schedule_mock.json | 8 | 0 | first_event_id=`mock_r31_league_a` |
+| schedule_from_python.json | **0** | 0（行なし） | **exists=True だが upcoming_games 空** |
+
+注意:
+- Godot が from_python を優先読込すると **upcoming 行が 0 件** になり、
+  「画面」ボタン目視確認ができない可能性がある
+- D-2 実装後・目視前に **schedule_from_python.json 再生成** を推奨
+- mock に退避して fallback 確認する一時手段も可（恒久は再生成）
+
+
+3. game_detail_view 最小仕様
+================================================================================
+
+### 新規予定ファイル
+
+- `godot/scripts/game_detail_view.gd`
+- `godot/scenes/game_detail_view.tscn`
+
+### 基本方針
+
+- **player_detail_view と同型**
+- `ReadonlySelectionContext` の **kind == `"game"`** のときのみ本表示
+- **JSON / save / Python は読まない**（Autoload payload のみ）
+- 編集・保存・進行操作なし
+- 参照: `get_node_or_null("/root/ReadonlySelectionContext")` + `ctx.call(...)`
+- **`ReadonlySelectionContext.` 直接参照禁止**（コンパイルエラー回避）
+- `project.godot` 変更なし（Autoload 済み）
+- `readonly_selection_context.gd` API 変更なし
+
+### scene 構成（player_detail 同型）
+
+Root: Control（1280×720 フル rect）
+- Background ColorRect（Phase4 既存トーン）
+- Margin → MainContainer VBox
+  - HeaderCard: タイトル / サブタイトル / Readonly バッジ
+  - SummaryCard: 対戦名（NameLabel 相当）/ メタ（MetaLabel）
+  - BodyCard: DetailRows VBox
+  - DataSourceLabel
+  - FooterNoteLabel（読み取り専用注意）
+  - FooterRow: BackButton「一覧へ戻る」/ HomeNavButton「ホームへ戻る（表示のみ）」
+- Theme: `phase4_readonly_core.tres`（player_detail 同型）
+- ext_resource に **未解決 uid を付けない**（player_detail 教訓）
+
+### 表示項目
+
+| UI | 内容 |
+|----|------|
+| タイトル | `試合詳細（閲覧）` |
+| サブタイトル | `ReadonlySelectionContext から選択中の試合情報を表示` |
+| サマリー名 | **opponent** 中心（空なら「—」） |
+| サマリーメタ | `round_label` / `competition_label` / `home_away` を「・」連結 |
+| 詳細行 | 下表 |
+
+詳細行（payload キー → 表示ラベル）:
+
+| ラベル | payload キー（優先順） |
+|--------|------------------------|
+| 対戦 | `opponent` |
+| ラウンド | `round_label`（なければ `round` を文字列化） |
+| 大会 | `competition_label`（なければ `competition_type`） |
+| ホーム/アウェイ | `home_away` |
+| 月表示 | `month_label` |
+| 詳細 | `detail`（複数行可・autowrap） |
+| ラベル | `label` |
+| 参照元 | `ctx.call("get_source_label")`（空なら「不明」） |
+
+- **event_id:** 製品 UI **非表示**
+- **debug:** `OS.is_debug_build()` のみ DetailRows 末尾に
+  `debug event_id: {id}`（小さく薄色。player_detail の player_id 同型）
+- 欠落キーは **「—」**（例外なし）
+
+### 未選択時（F6 単体・kind!=game・payload 空）
+
+- NameLabel 相当: `選択中の試合情報はありません`
+- MetaLabel: `日程などの一覧画面から試合を選択すると、ここに詳細が表示されます。`
+- DetailRows: 最低 1 行 `未選択`
+- DataSourceLabel: `選択状態: 未選択`
+
+### 戻る導線
+
+**BackButton:**
+- `return_scene` 非空 → `ctx.call("clear")` → `change_scene_to_file(return_scene)`
+- `return_scene` 空 → 遷移せず DataSourceLabel 等 `戻り先がありません`
+
+**HomeNavButton:**
+- `ctx.call("clear")` → `change_scene_to_file("res://scenes/home_dashboard.tscn")`
+- 失敗時 `push_warning`
+
+### Autoload 読取（_ready イメージ）
+
+```gdscript
+const KIND_GAME := "game"
+
+func _apply_from_selection_context() -> void:
+    var ctx := _selection_context()
+    if ctx == null:
+        _show_unselected("選択状態: ReadonlySelectionContext が見つかりません")
+        return
+    if not bool(ctx.call("has_selection")):
+        _show_unselected("")
+        return
+    if str(ctx.call("get_kind")) != KIND_GAME:
+        _show_unselected("")
+        return
+    var payload_v = ctx.call("get_payload")
+    # TYPE_DICTIONARY 確認後表示
+    _return_scene = str(ctx.call("get_return_scene"))
+    _show_game(payload, str(ctx.call("get_source_label")), ctx)
+```
+
+`set_game` 呼び出し側（D-2）:
+```gdscript
+ctx.call("set_game", event_id, payload, _SCHEDULE_VIEW_SCENE_PATH, "日程")
+```
+
+
+4. schedule_view 接続範囲（D-2 予定）
+================================================================================
+
+### 変更予定ファイル
+
+- **`godot/scripts/schedule_view.gd` のみ**
+
+### 追加定数
+
+```gdscript
+const _GAME_DETAIL_VIEW_SCENE_PATH := "res://scenes/game_detail_view.tscn"
+const _SCHEDULE_VIEW_SCENE_PATH := "res://scenes/schedule_view.tscn"
+```
+
+（`_PLAYER_DETAIL_VIEW_SCENE_PATH` ではない）
+
+### 追加ヘルパー
+
+- `_selection_context() -> Node`
+- `_event_id_from_row(game_row: Dictionary) -> String`
+- `_show_schedule_status_message(message: String, is_error: bool = true)`（任意・StatusLabel + 既存 error 表示流用）
+- `_open_game_detail_view(game_row: Dictionary) -> void`
+
+### `_event_id_from_row` 仕様
+
+- `game_row.get("event_id", "")` を str 化・strip
+- null / 空 / `"-"` → **無効**（遷移しない）
+- 有効な非空文字列のみ OK
+
+### 既存挙動維持
+
+- 既存「詳細」ボタン **残す**
+- `_show_upcoming_game_detail(row)` **変更しない**
+- **追加位置:** `_add_upcoming_block` 内 `meta_row`、
+  `detail_btn` の直後に `screen_btn`
+- **追加しない場所:**
+  - advance_hint / empty_message ブロック
+  - next_game_card
+  - ScrollContent 以外
+
+### 「画面」ボタン
+
+- `text = "画面"`
+- `flat = true`
+- `font_size = 11`
+- `custom_minimum_size = Vector2(32, 0)`
+- `pressed.connect(_open_game_detail_view.bind(row))`
+
+### `_open_game_detail_view` 処理
+
+1. `event_id := _event_id_from_row(game_row)` — 無効なら StatusLabel エラー
+2. `ctx := _selection_context()` — null なら「選択状態を保存できません」
+3. `payload := game_row.duplicate()`
+4. payload に `event_id` 無ければ注入
+5. `ctx.call("set_game", event_id, payload, _SCHEDULE_VIEW_SCENE_PATH, "日程")`
+6. `change_scene_to_file(_GAME_DETAIL_VIEW_SCENE_PATH)`
+
+### エラー文言（固定）
+
+| 条件 | メッセージ |
+|------|------------|
+| event_id 欠落/無効 | `試合詳細画面を開けません: event_id がありません` |
+| Autoload null | `選択状態を保存できません` |
+| scene 遷移失敗 | `試合詳細画面を開けませんでした` |
+
+既存上部試合カード（`_game_detail_panel`）は **触らない**。
+エラーは `_status_label` + `_set_upcoming_game_detail_visible` または
+schedule 既存の StatusLabel エラー表示パターンに合わせる。
+
+
+5. from_python JSON 再生成方針
+================================================================================
+
+### いつ必要か
+
+- `schedule_from_python.json` が存在し、かつ
+  - `upcoming_games[]` が **空**（現状 0 件）、または
+  - 各行に `event_id` キーが無い / 値が空 / `"-"` のみ
+- D-2 目視・「画面」確認前に実施
+
+### git 方針
+
+- `godot/.gitignore` で `data/schedule_from_python.json` は **手動生成・原則コミットしない**
+- git status に出ない場合は正常
+
+### CLI（schedule_readonly.py `_cli_main` 確認済み）
+
+```powershell
+py -m basketball_sim.export.schedule_readonly `
+  --save "$env:USERPROFILE\.basketball_sim\saves\debug_user_boost_d1_user_cellb.sav" `
+  --output "godot/data/schedule_from_python.json" `
+  --max-upcoming 8
+```
+
+引数名: **`--max-upcoming`**（default 8）— ロードマップ案と一致
+
+### 再生成後確認
+
+```powershell
+py -c "import json; from pathlib import Path; p=Path('godot/data/schedule_from_python.json'); d=json.loads(p.read_text(encoding='utf-8')); rows=d.get('upcoming_games', []); print('rows=', len(rows)); print('missing_event_id=', sum(1 for x in rows if 'event_id' not in x)); print('empty_event_id=', sum(1 for x in rows if not str(x.get('event_id','')).strip() or str(x.get('event_id','')).strip()=='-')); print('first_event_id=', rows[0].get('event_id') if rows else None); print('first_keys=', sorted(rows[0].keys()) if rows else [])"
+```
+
+期待: rows>0, missing_event_id=0, empty_event_id=0, first_event_id が非空 str
+
+### 一時確認（任意）
+
+- `schedule_from_python.json` を退避 → mock fallback で UI 確認
+- 恒久対応は再生成
+
+
+6. 実装分割案
+================================================================================
+
+----------------------------------------------------------------------
+Phase D-1: game_detail_view 最小版追加
+----------------------------------------------------------------------
+
+変更:
+- `godot/scripts/game_detail_view.gd` 新規
+- `godot/scenes/game_detail_view.tscn` 新規
+
+変更しない:
+- schedule_view.gd
+- project.godot
+- readonly_selection_context.gd
+- player_detail_view.gd / .tscn
+- JSON / export / tests
+
+確認:
+- F6 単体で未選択表示
+- HomeNavButton → home_dashboard
+- BackButton → return_scene 空で「戻り先がありません」
+- Godot 起動・既存画面に影響なし
+- pytest 回帰（export 未変更でも実行）
+
+想定 commit: `Godot試合詳細ビュー最小版を追加`
+
+----------------------------------------------------------------------
+Phase D-2: schedule_view 接続
+----------------------------------------------------------------------
+
+変更:
+- `godot/scripts/schedule_view.gd` のみ
+
+変更しない:
+- game_detail_view.gd / .tscn
+- readonly_selection_context.gd
+- project.godot
+- JSON / export / tests（再生成はローカルのみ）
+
+確認:
+- upcoming に「詳細」「画面」並列
+- 「詳細」→ 上部カード（従来）
+- 「画面」→ game_detail_view（参照元「日程」）
+- 「一覧へ戻る」→ schedule_view
+- schedule_from_python 再生成済みで event_id 有効行を確認
+
+想定 commit: `Godot日程から試合詳細画面へ接続`
+
+----------------------------------------------------------------------
+Phase D-3（節目・実装後）: 詳細導線第1段完了レポート
+----------------------------------------------------------------------
+
+- player_detail 3 導線 + game_detail 1 導線
+- 「Godot 詳細導線第 1 段完了」宣言
+- 原則 Python 本体復帰へ（優先はユーザー相談）
+
+
+7. やらないこと
+================================================================================
+
+- **D-0（本レポート）では実装しない**
+- **D-1 で schedule_view へ接続しない**
+- **D-2 で既存「詳細」ボタンを消さない**
+- Godot から Python を **自動起動しない**
+- save / 編集 / 進行操作を **つながない**
+- event_id を **製品 UI で大きく表示しない**
+- `ReadonlySelectionContext.` **直接参照を使わない**
+- 細かい **余白調整を主目的にしない**
+- schedule export / mock / tests は **原則変更しない**
+- game_detail 用の **新規 export DTO は D-1/D-2 では作らない**（payload 既存キーで足りる）
+
+
+8. 推奨結論
+================================================================================
+
+**推奨:**
+1. **D-1:** game_detail_view 最小版を追加
+2. **D-2:** schedule_view から接続（「詳細」維持 + 「画面」追加）
+3. **節目レポート** で player + game 最小詳細導線完了を宣言
+4. **原則 Python 本体へ復帰**（週次進行 / 試合ログ / 契約FA / 戦術ローテ — ユーザー相談）
+
+**理由:**
+- player_detail と **同型** で安全に横展開（実績: Phase C）
+- `set_game` / `get_event_id` **既存**
+- schedule export / mock に **event_id** あり
+- 「**試合を味わう気持ちよさ**」に最も近い Godot 側の残タスク
+- Phase 4 **詳細導線第 1 段** の自然な締め
+- player_detail 本格化より **軽い**（専用 export 不要）
+
+
+9. 次に行う具体的タスク
+================================================================================
+
+次に行う具体的タスク:
+**game_detail_view.tscn / game_detail_view.gd の最小版を追加する（Phase D-1）。**
+
+想定コミット:
+`Godot試合詳細ビュー最小版を追加`
+
+実装時参照:
+- 本レポート §3（game_detail_view 最小仕様）
+- `player_detail_view.gd` / `.tscn`（同型テンプレ）
+- `readonly_selection_context.gd`（set_game シグネチャ）
+
+
+================================================================================
+調査実施: 2026-05-20
+pytest: 未実施（レポートのみ）
+================================================================================
