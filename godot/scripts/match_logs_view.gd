@@ -10,9 +10,11 @@ var _match_logs_json_paths: Array[String] = [
 const _LOAD_FAILED_MESSAGE := "試合ログデータ読込に失敗しました"
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
 const _DETAIL_HINT := "試合を選択すると、実況 excerpt と key plays を表示します。"
+const _DETAIL_SCROLL_HEIGHT := 210
 
 var _last_loaded_uri: String = ""
 var _detail_panel: PanelContainer = null
+var _detail_scroll: ScrollContainer = null
 var _detail_style_normal: StyleBoxFlat = null
 var _detail_style_error: StyleBoxFlat = null
 
@@ -375,14 +377,25 @@ func _setup_detail_card_style() -> void:
 	_detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var margin := MarginContainer.new()
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	_detail_scroll = ScrollContainer.new()
+	_detail_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_detail_scroll.custom_minimum_size = Vector2(0, _DETAIL_SCROLL_HEIGHT)
+	_detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_detail_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+
 	parent.remove_child(_status_label)
-	margin.add_child(_status_label)
+	_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_detail_scroll.add_child(_status_label)
+	margin.add_child(_detail_scroll)
 	_detail_panel.add_child(margin)
 	parent.add_child(_detail_panel)
 	parent.move_child(_detail_panel, idx)
 
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status_label.add_theme_font_size_override("font_size", 14)
 	_status_label.add_theme_constant_override("line_spacing", 4)
 	_status_label.add_theme_color_override("font_color", Color(0.08, 0.11, 0.18, 1))
