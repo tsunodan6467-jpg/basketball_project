@@ -11,6 +11,8 @@ var _contract_personnel_summary_json_paths: Array[String] = [
 const _LOAD_FAILED_MESSAGE := "契約・人事情報を読み込めませんでした。"
 
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
+const _PLAYER_DETAIL_VIEW_SCENE_PATH := "res://scenes/player_detail_view.tscn"
+const _CONTRACT_PERSONNEL_SUMMARY_VIEW_SCENE_PATH := "res://scenes/contract_personnel_summary_view.tscn"
 
 var _last_loaded_uri: String = ""
 var _risk_detail_style_normal: StyleBoxFlat = null
@@ -35,6 +37,10 @@ func _ready() -> void:
 	_ensure_risk_inline_detail_styles()
 	_ensure_player_contract_inline_detail_styles()
 	_apply_snapshot(_load_snapshot())
+
+
+func _selection_context() -> Node:
+	return get_node_or_null("/root/ReadonlySelectionContext")
 
 
 func _load_snapshot() -> Dictionary:
@@ -272,11 +278,19 @@ func _fill_player_rows(rows: Array) -> void:
 		var detail_lab: Label = detail_parts["label"] as Label
 		detail_btn.pressed.connect(_on_player_contract_detail_button_pressed.bind(detail_panel, detail_lab, p))
 
+		var screen_btn := Button.new()
+		screen_btn.text = "画面"
+		screen_btn.flat = true
+		screen_btn.custom_minimum_size = Vector2(32, 0)
+		screen_btn.add_theme_font_size_override("font_size", 11)
+		screen_btn.pressed.connect(_open_contract_player_detail_view.bind(p))
+
 		var row_inner := HBoxContainer.new()
 		row_inner.add_theme_constant_override("separation", 4)
 		row_inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row_inner.add_child(line)
 		row_inner.add_child(detail_btn)
+		row_inner.add_child(screen_btn)
 
 		var margin := MarginContainer.new()
 		margin.add_theme_constant_override("margin_left", 4)
@@ -514,6 +528,56 @@ func _on_player_contract_detail_button_pressed(
 			other.visible = false
 	detail_lab.text = _format_player_contract_detail_text(p)
 	detail_panel.visible = true
+
+
+func _player_id_from_row(player_row: Dictionary) -> int:
+	var raw: Variant = player_row.get("player_id", -1)
+	if raw == null:
+		return -1
+	if typeof(raw) in [TYPE_INT, TYPE_FLOAT]:
+		return int(raw)
+	if typeof(raw) == TYPE_STRING:
+		var s := str(raw).strip_edges()
+		if s.is_valid_int():
+			return s.to_int()
+	return -1
+
+
+func _show_contract_status_message(message: String, is_error: bool = true) -> void:
+	_status_label.text = message
+	_set_status_error_visible(is_error)
+
+
+func _open_contract_player_detail_view(player_row: Dictionary) -> void:
+	var player_id := _player_id_from_row(player_row)
+	if player_id <= 0:
+		_show_contract_status_message("選手詳細画面を開けません: player_id がありません", true)
+		return
+
+	var ctx := _selection_context()
+	if ctx == null:
+		_show_contract_status_message("選択状態を保存できません", true)
+		return
+
+	var payload := player_row.duplicate()
+	if not payload.has("player_id"):
+		payload["player_id"] = player_id
+
+	ctx.call(
+		"set_player",
+		player_id,
+		payload,
+		_CONTRACT_PERSONNEL_SUMMARY_VIEW_SCENE_PATH,
+		"契約人事",
+	)
+
+	var err := get_tree().change_scene_to_file(_PLAYER_DETAIL_VIEW_SCENE_PATH)
+	if err != OK:
+		_show_contract_status_message("選手詳細画面を開けませんでした", true)
+		push_warning(
+			"[contract_personnel_summary_view] change_scene_to_file failed: %s err=%s"
+			% [_PLAYER_DETAIL_VIEW_SCENE_PATH, err]
+		)
 
 
 func _set_status_error_visible(visible: bool) -> void:
