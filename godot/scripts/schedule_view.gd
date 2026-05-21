@@ -32,11 +32,13 @@ var _game_detail_style_error: StyleBoxFlat = null
 @onready var _next_game_ha: Label = %NextGameHomeAwayLabel
 @onready var _next_game_status: Label = %NextGameStatusLabel
 @onready var _scroll_content: VBoxContainer = %ScrollContent
+@onready var _scroll: ScrollContainer = $Margin/RootCol/Scroll
 
 
 func _ready() -> void:
 	_setup_upcoming_game_detail_style()
 	_apply_snapshot(_load_schedule_snapshot())
+	_queue_restore_return_scroll()
 
 
 func _selection_context() -> Node:
@@ -583,6 +585,17 @@ func _open_game_detail_view(game_row: Dictionary) -> void:
 		_show_schedule_status_message("選択状態を保存できません", true)
 		return
 
+	ctx.call(
+		"set_return_state",
+		_SCHEDULE_VIEW_SCENE_PATH,
+		{
+			"scroll_vertical": _current_scroll_vertical(),
+			"source": "schedule",
+			"target_kind": "game",
+			"target_id": event_id,
+		},
+	)
+
 	var payload := game_row.duplicate()
 	if not payload.has("event_id"):
 		payload["event_id"] = event_id
@@ -602,6 +615,48 @@ func _open_game_detail_view(game_row: Dictionary) -> void:
 			"[schedule_view] change_scene_to_file failed: %s err=%s"
 			% [_GAME_DETAIL_VIEW_SCENE_PATH, err]
 		)
+
+
+func _queue_restore_return_scroll() -> void:
+	call_deferred("_restore_return_scroll")
+
+
+func _restore_return_scroll() -> void:
+	var ctx := _selection_context()
+	if ctx == null:
+		return
+	var state_v: Variant = ctx.call("consume_return_state", _SCHEDULE_VIEW_SCENE_PATH)
+	if typeof(state_v) != TYPE_DICTIONARY:
+		return
+	var state: Dictionary = state_v as Dictionary
+	if state.is_empty():
+		return
+	var scroll_y := _scroll_int_or(state.get("scroll_vertical", null), -1)
+	if scroll_y < 0:
+		return
+	if _scroll == null:
+		return
+	_scroll.scroll_vertical = scroll_y
+
+
+func _current_scroll_vertical() -> int:
+	if _scroll == null:
+		return 0
+	return int(_scroll.scroll_vertical)
+
+
+func _scroll_int_or(v: Variant, fallback: int) -> int:
+	if v == null:
+		return fallback
+	if typeof(v) in [TYPE_INT, TYPE_FLOAT]:
+		return int(v)
+	if typeof(v) == TYPE_STRING:
+		var s := str(v).strip_edges()
+		if s.is_valid_int():
+			return s.to_int()
+		if s.is_valid_float():
+			return int(float(s))
+	return fallback
 
 
 func _on_home_nav_button_pressed() -> void:

@@ -146,7 +146,7 @@ func _on_back_button_pressed() -> void:
 		return
 	var ctx := _selection_context()
 	if ctx != null:
-		ctx.call("clear")
+		ctx.call("clear", true)
 	var err := get_tree().change_scene_to_file(_return_scene)
 	if err != OK:
 		push_warning(
