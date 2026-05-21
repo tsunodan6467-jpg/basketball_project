@@ -1,7 +1,8 @@
 """
-10 画面分の Godot 向け *_from_python.json を一括生成する CLI。
+11 画面分の Godot 向け *_from_python.json を一括生成する CLI。
 
 各画面の既存 export_*_from_world を呼ぶだけ。セーブは読み取りのみ（各 export 内の load_world）。
+match_logs_from_python.json を含む。
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from basketball_sim.export.contract_personnel_summary_readonly import (
 from basketball_sim.export.facility_summary_readonly import export_facility_summary_json_from_world
 from basketball_sim.export.finance_summary_readonly import export_finance_summary_json_from_world
 from basketball_sim.export.home_dashboard_readonly import export_home_dashboard_json_from_world
+from basketball_sim.export.match_logs_readonly import export_match_logs_json_from_world
 from basketball_sim.export.owner_mission_readonly import export_owner_mission_json_from_world
 from basketball_sim.export.roster_readonly import export_roster_json_from_world
 from basketball_sim.export.schedule_readonly import export_schedule_json_from_world
@@ -33,10 +35,11 @@ def export_godot_readonly_bundle(
     max_history: int = 5,
     max_missions: int = 8,
     max_players: int = 8,
+    max_logs: int = 50,
     continue_on_error: bool = False,
 ) -> Dict[str, Any]:
     """
-    ``output_dir`` に 10 個の ``*_from_python.json`` を書き出す。
+    ``output_dir`` に 11 個の ``*_from_python.json`` を書き出す。
 
     Args:
         save_path: 読み取り専用の .sav パス。
@@ -45,6 +48,7 @@ def export_godot_readonly_bundle(
         max_history: ``export_finance_summary_json_from_world`` に渡す既定（finance CLI 既定 5）。
         max_missions: ``export_owner_mission_json_from_world`` の既定 8。
         max_players: ``export_tactics_summary_json_from_world`` と ``export_contract_personnel_summary_json_from_world`` の既定 8。
+        max_logs: ``export_match_logs_json_from_world`` に渡す既定 50。
         continue_on_error: True のとき例外を記録して次へ進む。False のとき最初の失敗で打ち切り。
     """
     save = Path(save_path)
@@ -81,6 +85,11 @@ def export_godot_readonly_bundle(
             "contract_personnel_summary",
             "contract_personnel_summary_from_python.json",
             lambda op: export_contract_personnel_summary_json_from_world(save, op, max_players=max_players),
+        ),
+        (
+            "match_logs",
+            "match_logs_from_python.json",
+            lambda op: export_match_logs_json_from_world(save, op, max_logs=max_logs),
         ),
     ]
 
@@ -119,14 +128,14 @@ def export_godot_readonly_bundle(
 
 def _cli_main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Read-only: export all 10 Godot *_from_python.json files from a single .sav.",
+        description="Read-only: export all 11 Godot *_from_python.json files from a single .sav.",
     )
     parser.add_argument("--save", type=Path, required=True, help="Path to .sav (read only)")
     parser.add_argument(
         "--output-dir",
         type=Path,
         required=True,
-        help="Directory to write the 10 *_from_python.json files (created if missing)",
+        help="Directory to write the 11 *_from_python.json files (created if missing)",
     )
     parser.add_argument(
         "--max-upcoming",
@@ -157,6 +166,13 @@ def _cli_main(argv: Optional[List[str]] = None) -> int:
         help="Passed to tactics_summary and contract_personnel_summary exports (default: 8)",
     )
     parser.add_argument(
+        "--max-logs",
+        type=int,
+        default=50,
+        metavar="N",
+        help="Passed to match_logs export (default: 50)",
+    )
+    parser.add_argument(
         "--continue-on-error",
         action="store_true",
         help="Continue after a failed export; exit 1 if any failed",
@@ -170,6 +186,7 @@ def _cli_main(argv: Optional[List[str]] = None) -> int:
         max_history=int(args.max_history),
         max_missions=int(args.max_missions),
         max_players=int(args.max_players),
+        max_logs=int(args.max_logs),
         continue_on_error=bool(args.continue_on_error),
     )
     return 0 if result["failed_count"] == 0 else 1

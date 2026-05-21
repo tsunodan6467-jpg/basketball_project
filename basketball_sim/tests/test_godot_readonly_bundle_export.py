@@ -27,6 +27,7 @@ EXPECTED_JSON_NAMES: List[str] = [
     "owner_mission_from_python.json",
     "tactics_summary_from_python.json",
     "contract_personnel_summary_from_python.json",
+    "match_logs_from_python.json",
 ]
 
 
@@ -52,10 +53,11 @@ def _minimal_save(path: Path) -> None:
 
 
 def test_expected_output_filenames_list() -> None:
-    assert len(EXPECTED_JSON_NAMES) == 10
+    assert len(EXPECTED_JSON_NAMES) == 11
     assert "home_dashboard_from_python.json" in EXPECTED_JSON_NAMES
     assert "tactics_summary_from_python.json" in EXPECTED_JSON_NAMES
     assert "contract_personnel_summary_from_python.json" in EXPECTED_JSON_NAMES
+    assert "match_logs_from_python.json" in EXPECTED_JSON_NAMES
 
 
 def test_bundle_result_contains_output_paths(tmp_path: Path) -> None:
@@ -63,7 +65,7 @@ def test_bundle_result_contains_output_paths(tmp_path: Path) -> None:
     out_dir = tmp_path / "out"
     _minimal_save(sav)
     result = export_godot_readonly_bundle(sav, out_dir)
-    assert result["success_count"] == 10
+    assert result["success_count"] == 11
     assert result["failed_count"] == 0
     assert Path(result["output_dir"]) == out_dir.resolve()
     keys = {e["key"] for e in result["succeeded"]}
@@ -78,6 +80,7 @@ def test_bundle_result_contains_output_paths(tmp_path: Path) -> None:
         "owner_mission",
         "tactics_summary",
         "contract_personnel_summary",
+        "match_logs",
     }
     for name in EXPECTED_JSON_NAMES:
         assert (out_dir / name).is_file()
@@ -151,7 +154,7 @@ def test_continue_on_error_records_and_continues(monkeypatch: pytest.MonkeyPatch
     _minimal_save(sav)
     result = export_godot_readonly_bundle(sav, out_dir, continue_on_error=True)
     assert result["failed_count"] == 1
-    assert result["success_count"] == 9
+    assert result["success_count"] == 10
     assert (out_dir / "tactics_summary_from_python.json").is_file()
     assert (out_dir / "contract_personnel_summary_from_python.json").is_file()
     assert not (out_dir / "roster_from_python.json").exists()
@@ -181,7 +184,7 @@ def test_cli_main_prints_wrote_and_bundle_complete(capsys: pytest.CaptureFixture
     assert code == 0
     out = capsys.readouterr().out
     assert "Wrote" in out
-    assert "Bundle complete: 10 succeeded, 0 failed" in out
+    assert "Bundle complete: 11 succeeded, 0 failed" in out
 
 
 def test_cli_nonzero_when_bundle_has_failures(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -266,3 +269,31 @@ def test_max_missions_and_max_players_passed(monkeypatch: pytest.MonkeyPatch, tm
     assert m_m.get("v") == 3
     assert m_p.get("v") == 4
     assert m_c.get("v") == 4
+
+
+def test_match_logs_payload_in_bundle(tmp_path: Path) -> None:
+    sav = tmp_path / "m.sav"
+    out_dir = tmp_path / "mlout"
+    _minimal_save(sav)
+    export_godot_readonly_bundle(sav, out_dir)
+    body = json.loads((out_dir / "match_logs_from_python.json").read_text(encoding="utf-8"))
+    assert body["screen_title"] == "試合ログ（閲覧）"
+    assert isinstance(body["summary"], dict)
+    assert isinstance(body["match_logs"], list)
+    assert body["summary"]["has_season"] is False
+
+
+def test_max_logs_passed_to_match_logs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    seen: Dict[str, Any] = {}
+
+    real = godot_readonly_bundle.export_match_logs_json_from_world
+
+    def _wrap(save: Path | str, op: Path | str, *, max_logs: int = 50) -> Dict[str, Any]:
+        seen["max_logs"] = max_logs
+        return real(save, op, max_logs=max_logs)
+
+    monkeypatch.setattr(godot_readonly_bundle, "export_match_logs_json_from_world", _wrap)
+    sav = tmp_path / "m.sav"
+    _minimal_save(sav)
+    export_godot_readonly_bundle(sav, tmp_path / "mlout2", max_logs=7)
+    assert seen.get("max_logs") == 7
