@@ -1,0 +1,665 @@
+================================================================================
+Godot — match_logs mock JSON と読取専用一覧画面 設計（2026-05）
+================================================================================
+
+調査日: 2026-05-21
+対象 commit: 4ae47a1 — match_logs readonly exportを実データ確認
+目的: Python export 済み `match_logs_from_python.json` を Godot でどう読み、
+      読取専用「試合ログ一覧」画面をどう構成するかを設計する。
+コード変更: なし（本レポートのみ）。
+
+================================================================================
+1. 現在地
+================================================================================
+
+Python 側（成立済み）:
+
+| 項目 | 状態 |
+|---|---|
+| Season.match_logs 保存 | user_team 関与試合のみ、excerpt 軽量 |
+| match_logs_from_python.json export | match_logs_readonly.py |
+| godot_readonly_bundle | **11 件**（match_logs 末尾追加） |
+| bundle smoke | success_count=11 / failed_count=0 |
+| max_logs | 既定 50、bundle/CLI 反映確認済み |
+| full PBP / full commentary export | **なし** |
+| schema_version / kind / generated_at | **なし**（既存 10 export 同型） |
+
+Godot 側（未着手）:
+
+| 項目 | 状態 |
+|---|---|
+| godot/data/*_mock.json | **10 本**（match_logs なし） |
+| godot/data/*_from_python.json | **リポジトリ同梱なし**（手動配置・gitignore 想定） |
+| match_logs 画面 | **未存在** |
+| match_logs_mock.json | **未作成** |
+| home_dashboard からの入口 | **未接続** |
+
+参照レポート:
+- reports/python_core_match_logs_readonly_export_design_2026-05.txt
+- reports/python_core_match_logs_readonly_export_bundle_smoke_2026-05.txt
+- reports/python_core_match_logs_phase1_smoke_2026-05.txt
+
+================================================================================
+2. 調査ファイル
+================================================================================
+
+### Godot data（10 mock のみ、from_python 同梱なし）
+- godot/data/schedule_mock.json
+- godot/data/roster_mock.json
+- godot/data/home_dashboard_mock.json 他 7 本
+
+### Godot scripts（主要）
+- godot/scripts/home_dashboard.gd — JSON 読込 + 10 画面遷移
+- godot/scripts/schedule_view.gd — upcoming 一覧 + StatusLabel 試合詳細カード
+- godot/scripts/roster_view.gd — RowList 一覧 + StatusLabel 選手詳細カード
+- godot/scripts/game_detail_view.gd — ReadonlySelectionContext 予定試合専用
+- godot/scripts/readonly_selection_context.gd — KIND_PLAYER / KIND_GAME
+
+### Godot scenes（主要）
+- godot/scenes/home_dashboard.tscn — HeaderNavRow + CardNavMenu（10 ボタン）
+- godot/scenes/schedule_view.tscn — StatusLabel / ScrollContent
+- godot/scenes/roster_view.tscn — StatusLabel / RowList / phase4_readonly_core.tres
+- godot/scenes/game_detail_view.tscn
+
+### Python export（読取のみ）
+- basketball_sim/export/match_logs_readonly.py
+- basketball_sim/export/godot_readonly_bundle.py
+
+================================================================================
+3. 既存 Godot JSON 読込パターン
+================================================================================
+
+全 readonly 画面で共通（schedule / roster / home_dashboard 等）:
+
+```gdscript
+var _json_paths: Array[String] = [
+    "res://data/{screen}_from_python.json",  # 優先
+    "res://data/{screen}_mock.json",         # fallback
+]
+```
+
+### 読込フロー
+1. 配列を先頭から走査
+2. `FileAccess.file_exists(path)` → 無ければ次へ
+3. `FileAccess.open(path, READ)` → 失敗なら `push_warning` して次へ
+4. `JSON.parse_string(text)` → null なら次へ
+5. root が Dictionary でなければ次へ
+6. 成功時 `_last_loaded_uri = path`、print ログ、dict を返す
+7. 全候補失敗 → `{"_error": _LOAD_FAILED_MESSAGE}`
+
+### 表示まわり
+| 要素 | パターン |
+|---|---|
+| 読込元表示 | `_data_source_caption(uri)` — from_python なら「Python生成JSON（手動配置・優先）」 |
+| エラー | `d.has("_error")` → StatusLabel にメッセージ、本体クリア |
+| empty_message | トップレベル `empty_message` を strip → 専用 Panel ブロックまたは Scroll 内表示 |
+| notes | footer に join（schedule 型）または固定 footer（roster 型） |
+
+### match_logs で踏襲する点
+- パス配列: `match_logs_from_python.json` → `match_logs_mock.json`
+- `_LOAD_FAILED_MESSAGE := "試合ログデータ読込に失敗しました"`
+- `_last_loaded_uri` / `_data_source_caption` 同型
+- DTO キーは Python export をそのまま読む（Godot 側で schema 追加しない）
+
+================================================================================
+4. 既存一覧 / 詳細 UI パターン
+================================================================================
+
+### schedule_view（予定試合一覧）
+| 要素 | 実装 |
+|---|---|
+| 一覧 | ScrollContent に PanelContainer 行（明るい StyleBoxFlat 0.965/0.975/0.99） |
+| 行内容 | round / competition / H-A メタ + 対戦 + detail テキスト |
+| 「詳細」ボタン | `_show_upcoming_game_detail(row)` → **StatusLabel カード**に detail 表示 |
+| 「画面」ボタン | ReadonlySelectionContext.set_game → **game_detail_view** 別 scene |
+| StatusLabel | `_setup_upcoming_game_detail_style()` で PanelContainer 包装（青系 normal / 赤系 error） |
+| empty | `_add_empty_message_block(empty_message)` — 「お知らせ」見出し + 本文 Panel |
+
+### roster_view（選手一覧）
+| 要素 | 実装 |
+|---|---|
+| 一覧 | RowList（Scroll 内 TableCard）に PanelContainer 行 + HSeparator |
+| 「詳細」ボタン | `_show_selected_player_summary(p)` → **StatusLabel カード** |
+| 「画面」ボタン | ReadonlySelectionContext.set_player → player_detail_view |
+| StatusLabel | roster と同型の `_summary_panel` 包装 |
+
+### game_detail_view（別 scene・予定試合専用）
+- JSON を**読まない**
+- ReadonlySelectionContext payload のみ（opponent, round_label, detail 等）
+- payload 形状は **schedule upcoming row** 向け
+- commentary_excerpt / key_plays / score 等は**未対応**
+
+### Phase 4 UI 共通トーン
+- Theme: `res://themes/phase4_readonly_core.tres`
+- 背景: 暗色 ColorRect
+- 行/カード: 明るい平坦 Panel（角丸 2px、margin 4px）
+- StatusLabel 詳細カード: 角丸 6px、青枠 normal / 赤枠 error
+- Header: ReadonlyBadge + screen_title + team_name + meta
+
+### match_logs に流用するパターン
+| 流用元 | 用途 |
+|---|---|
+| schedule_view 行 Panel | match_log 1 行の外枠 |
+| schedule_view meta_row + 詳細ボタン | round/competition + summary_line + [詳細] |
+| roster/schedule StatusLabel カード | commentary / key_plays 詳細（**同一画面内**） |
+| schedule empty_message block | has_logs=false / empty_message 表示 |
+| roster/schedule ホーム戻る | Footer BackButton → home_dashboard |
+
+### 新規画面にすべきか / game_detail 拡張か
+| 案 | 評価 |
+|---|---|
+| 新規 match_logs_view | **推奨** — payload 形状・用途が異なる |
+| game_detail_view 拡張 | **非推奨** — 予定試合 vs 消化済みログの混在 |
+| schedule_view に混在 | **非推奨** — upcoming と過去ログの責務混在 |
+
+**結論:** 新規 `match_logs_view`。詳細は **別 scene 遷移せず** StatusLabel カード（roster/schedule 同型）。
+
+================================================================================
+5. match_logs JSON 構造の Godot 利用方針
+================================================================================
+
+Python export DTO を **変更せず** 読む。
+
+### トップレベル（Godot が参照するキー）
+| キー | 用途 |
+|---|---|
+| screen_title | Header タイトル |
+| team_name | チーム名 |
+| league_level | メタ表示（D{n}） |
+| season_label | コンテキスト行 |
+| summary | has_season / has_logs / count / exported_count / latest_round / current_round / total_rounds |
+| match_logs[] | 一覧行のデータ源 |
+| empty_message | logs 空 or season 未接続 |
+| notes | footer |
+
+### summary の使い方
+```
+メタ例: 「保存 {count} 件（表示 {exported_count}）・最新 R{latest_round}」
+has_season=false → empty_message 優先、一覧は出さない
+has_logs=false → empty_message 表示、match_logs は []
+count > exported_count → footer に「直近 {exported_count} 件のみ表示（max_logs）」注記可
+```
+
+### match_logs[] entry（一覧 + 詳細）
+| キー | 一覧 | 詳細カード |
+|---|---|---|
+| summary_line | **主行**（○/●/△ + スコア） | 見出し |
+| round, competition_type, stage | メタ行 | 詳細行 |
+| home_team, away_team, home_score, away_score | 補助 | 詳細行 |
+| user_result, user_team | 省略可 | 詳細行 |
+| event_id, match_id | 省略（debug のみ） | debug 行 optional |
+| commentary_excerpt | total_lines のみ一覧 | head/tail 全文 |
+| key_plays | 件数のみ一覧 | 各行展開 |
+| week, day_of_week | optional メタ | optional |
+
+Godot 側でも entry 欠損時は空文字/空配列で落ちないよう `_str_cell` / `_dict_or_empty` パターンを踏襲。
+
+================================================================================
+6. match_logs_mock.json 構造案（次実装で作成・今回は未作成）
+================================================================================
+
+ファイル: `godot/data/match_logs_mock.json`
+命名: 既存 `{screen}_mock.json` と一致。
+
+### 方針
+- **logs あり 2 件** を同梱（見栄え・詳細カード確認用）
+- **empty 専用 mock は作らない** — empty は `empty_message` + コード分岐で十分
+- Python export smoke（fa_clip_test_04 相当）と **キー互換** を維持
+- チーム名は mock 既存トーンに合わせ「架空」系でも可。下記はユーザー案ベース。
+
+### 構造案（2 entry）
+
+```json
+{
+  "screen_title": "試合ログ（閲覧）",
+  "team_name": "横浜ブルズ",
+  "league_level": 3,
+  "season_label": "シーズン 1",
+  "summary": {
+    "has_season": true,
+    "has_logs": true,
+    "count": 2,
+    "exported_count": 2,
+    "latest_round": 6,
+    "current_round": 6,
+    "total_rounds": 33
+  },
+  "match_logs": [
+    {
+      "match_id": "regular_season_r6_g33",
+      "event_id": "regular_season_r6_g33",
+      "round": 6,
+      "competition_type": "regular_season",
+      "stage": "regular_season",
+      "week": 6,
+      "day_of_week": "Sat",
+      "home_team": "横浜ブルズ",
+      "away_team": "大阪ウィングス",
+      "home_score": 74,
+      "away_score": 72,
+      "user_team_involved": true,
+      "user_team": "横浜ブルズ",
+      "user_result": "W",
+      "summary_line": "○ 横浜ブルズ 74 - 72 大阪ウィングス",
+      "commentary_excerpt": {
+        "head": [
+          "第1Q 10:00 試合開始。横浜ブルズのボール。",
+          "速攻からのレイアップ成功。",
+          "大阪ウィングスも即座に3Pで返す。",
+          "第1Qは互角の展開。",
+          "ベンチの指示が目立つ序盤。"
+        ],
+        "tail": [
+          "第4Q 00:45 横浜ブルズ、逆転のチャンス。",
+          "クラッチでフリースロー2本成功。",
+          "大阪ウィングス、最後の3Pはリングに触れるのみ。",
+          "第4Q 00:12 横浜ブルズが勝ち越しの3P。",
+          "試合終了。横浜ブルズ 74 - 72。"
+        ],
+        "total_lines": 363
+      },
+      "key_plays": [
+        {
+          "play_no": 168,
+          "quarter": 4,
+          "result_type": "made_2",
+          "commentary_text": "終盤、横浜ブルズがフリースロー2本で同点。",
+          "home_score": 70,
+          "away_score": 70
+        },
+        {
+          "play_no": 170,
+          "quarter": 4,
+          "result_type": "made_3",
+          "commentary_text": "終盤、横浜ブルズが勝ち越しの3P。",
+          "home_score": 72,
+          "away_score": 70
+        }
+      ],
+      "captured_at": "simulate_next_round"
+    },
+    {
+      "match_id": "regular_season_r5_g12",
+      "event_id": "regular_season_r5_g12",
+      "round": 5,
+      "competition_type": "regular_season",
+      "stage": "regular_season",
+      "week": 5,
+      "day_of_week": "Wed",
+      "home_team": "京都ナイツ",
+      "away_team": "横浜ブルズ",
+      "home_score": 81,
+      "away_score": 78,
+      "user_team_involved": true,
+      "user_team": "横浜ブルズ",
+      "user_result": "L",
+      "summary_line": "● 横浜ブルズ 78 - 81 京都ナイツ",
+      "commentary_excerpt": {
+        "head": ["第1Q 開始。", "京都ナイツが先制。", "横浜ブルズも追い上げ。"],
+        "tail": ["終盤、京都ナイツが押し切る。", "試合終了。"],
+        "total_lines": 355
+      },
+      "key_plays": [
+        {
+          "play_no": 160,
+          "quarter": 4,
+          "result_type": "made_2",
+          "commentary_text": "京都ナイツ、逆転成功。",
+          "home_score": 79,
+          "away_score": 78
+        }
+      ],
+      "captured_at": "simulate_next_round"
+    }
+  ],
+  "empty_message": "",
+  "notes": [
+    "読み取り専用。操作は含みません。",
+    "commentary は試合時点の head/tail excerpt のみ。full PBP は含みません。"
+  ]
+}
+```
+
+### 0 件 mock 要否（最終方針）
+**不要。** empty / season 未接続は export の `empty_message` と `summary.has_*` で UI テスト可能。
+mock は **正常系 2 件** に集中する。
+
+================================================================================
+7. 0 件 / エラー時の表示方針
+================================================================================
+
+| 条件 | UI 動作 |
+|---|---|
+| 両 JSON なし / 全 parse 失敗 | StatusLabel カード（error 色）に `_LOAD_FAILED_MESSAGE` |
+| summary.has_season == false | Scroll 内 `_add_empty_message_block(empty_message)` + 一覧空 |
+| summary.has_logs == false | 同上（「まだ保存済みの試合ログはありません。」） |
+| match_logs[] 空だが empty_message あり | empty ブロックのみ |
+| entry が dict でない | スキップ（行を出さない） |
+| entry 必須キー欠損 | `_str_cell` / 空配列で表示、落とさない |
+| commentary_excerpt 欠損 | 詳細カードで「実況 excerpt なし」 |
+| key_plays 空 | 詳細カードで「key plays なし」 |
+| key_plays > 8 | export 済みなので最大 8。Godot は受け取った分を表示 |
+
+load エラー時は roster/schedule 同様、詳細カードを error 表示に切替。
+
+================================================================================
+8. 新規画面構造案
+================================================================================
+
+### ファイル（次実装）
+| 種別 | パス |
+|---|---|
+| scene | godot/scenes/match_logs_view.tscn |
+| script | godot/scripts/match_logs_view.gd |
+
+### ノード構成（roster_view / schedule_view 準拠）
+
+```
+MatchLogsView (Control, theme=phase4_readonly_core.tres)
+├── Background (ColorRect)
+└── Margin
+    └── RootCol (VBoxContainer)
+        ├── HeaderCard (PanelContainer)
+        │   └── HeaderInner
+        │       ├── TitleLabel (%ScreenTitleLabel)
+        │       ├── TeamNameLabel (%TeamNameLabel)
+        │       ├── ContextMetaLabel (%ContextMetaLabel)  # season_label + summary
+        │       └── ReadonlyStripLabel
+        ├── StatusLabel (%StatusLabel)  # _ready で Panel 包装 → DetailCard
+        ├── Scroll (ScrollContainer)
+        │   └── ScrollContent (%ScrollContent)  # VBoxContainer — ログ行
+        ├── DataSourceLabel (%DataSourceLabel)
+        ├── FooterNoteLabel (%FooterNoteLabel)
+        └── FooterRow (HBoxContainer)
+            ├── BackButton → home_dashboard
+            └── （Phase 1 では他 nav 不要）
+```
+
+`_ready` 内で schedule/roster と同型に StatusLabel を PanelContainer で包装する
+（`_setup_match_log_detail_style()`）。
+
+================================================================================
+9. 一覧 row 設計
+================================================================================
+
+### 1 行 = PanelContainer + 明るい StyleBoxFlat（schedule upcoming 同型）
+
+**メタ行（HBox）:**
+```
+R{round} ／ {competition_type} ／ {stage短縮}     [詳細]
+```
+
+**主行（Label 16px）:**
+```
+{summary_line}
+```
+例: `○ 横浜ブルズ 74 - 72 大阪ウィングス`
+
+**補助行（Label 11px、グレー）:**
+```
+実況 {total_lines} 行 / key plays {len(key_plays)} 件
+```
+
+### 行間
+- 行と行の間に HSeparator または margin（roster 型）
+
+### 並び順
+- JSON 配列順のまま（古→新）。Python export 保存順。
+- Godot 側で reverse しない（正本尊重）。必要なら Phase 2 で toggle。
+
+### 50 行上限
+- export max_logs=50 で上限。Godot は来た分を描画。
+- 行テキストは summary 中心で軽量。commentary/key_plays 全文は **詳細ボタン時のみ** 生成。
+
+================================================================================
+10. 詳細カード設計（StatusLabel / 同一画面）
+================================================================================
+
+「詳細」押下 → `_show_match_log_detail(entry: Dictionary)`
+
+StatusLabel テキスト（複数行 `\n` 連結）例:
+
+```
+試合ログ詳細
+{summary_line}
+
+ラウンド: R6 / regular_season / regular_season
+対戦: 横浜ブルズ vs 大阪ウィングス
+スコア: 74 - 72 / 結果: W
+
+--- 開始直後（excerpt head）---
+{head line 1}
+...
+--- 終盤（excerpt tail）---
+{tail line 1}
+...
+（全 {total_lines} 行中、先頭/末尾 excerpt のみ）
+
+--- Key plays ---
+Q4 #{play_no} {home}-{away} {commentary_text}
+...
+
+※ full PBP ではありません（読み取り専用 excerpt）
+```
+
+Phase 1 では **ReadonlySelectionContext / 別 scene 遷移は使わない**。
+
+================================================================================
+11. commentary excerpt 表示方針
+================================================================================
+
+| 項目 | 方針 |
+|---|---|
+| 一覧 | `total_lines` のみ（「実況 N 行」） |
+| 詳細 | head / tail を見出し付きで全文表示（各最大 5 行） |
+| head/tail 空 | 「excerpt なし」 |
+| full commentary | **表示しない**（export に無い） |
+| total_lines | 詳細末尾に「全 N 行中 excerpt のみ」と注記 |
+
+文字列は `autowrap_mode = AUTOWRAP_WORD_SMART`、StatusLabel line_spacing 4。
+
+================================================================================
+12. key_plays 表示方針
+================================================================================
+
+| 項目 | 方針 |
+|---|---|
+| 一覧 | `len(key_plays)` のみ |
+| 詳細 | 各 play を 1 行〜2 行 |
+| 表示フィールド | play_no, quarter, result_type, commentary_text, home_score, away_score |
+| text フィールド | あれば付加、なければ commentary_text 優先 |
+| events ネスト | export 側で除外済み。Godot でも参照しない |
+| 空 | 「key plays なし」 |
+| 件数 | 最大 8（export 正規化済み） |
+
+表示例:
+`Q4 #170 [made_3] 72-70 終盤、横浜ブルズが勝ち越しの3P。`
+
+================================================================================
+13. navigation / 入口設計
+================================================================================
+
+### 現状（home_dashboard.gd）
+- 10 画面分の `change_scene_to_file` ハンドラ
+- 入口: HeaderNavRow（5）+ CardNavMenu ColTeam/League/Club/Mgmt（各 2〜3）
+- 試合関連: **ScheduleNavButton** / MenuCardScheduleButton → schedule_view
+
+### match_logs 入口案
+| 配置候補 | 評価 |
+|---|---|
+| ColLeague（順位表・日程の近く） | **最有力** — 試合結果ログの意味が近い |
+| ColTeam | 次点 |
+| HeaderNavRow 6 個目 | 可能だが Header が横に長くなる |
+
+### 追加内容（案 B 時）
+- `home_dashboard.gd`: `_MATCH_LOGS_VIEW_SCENE_PATH := "res://scenes/match_logs_view.tscn"`
+- `_on_match_logs_view_button_pressed()` — 既存と同型
+- `home_dashboard.tscn`: MenuCardMatchLogsButton（ColLeague、Schedule 下または横）
+- ラベル: **「試合ログ」** または **「試合ログ（閲覧）」**
+
+### Phase 1 設計上の整理
+- schedule からの導線は **後工程**（event_id 突合が必要）
+- ホームから直接入るのが自然
+
+================================================================================
+14. game_detail_view との関係
+================================================================================
+
+| 観点 | game_detail_view | match_logs_view（新規） |
+|---|---|---|
+| データ源 | ReadonlySelectionContext | JSON ファイル |
+| 試合種別 | **予定** upcoming | **消化済み** 保存ログ |
+| payload | opponent, detail, event_id… | summary_line, commentary_excerpt, key_plays… |
+| 画面遷移 | schedule 「画面」ボタン | 不要（同一画面詳細カード） |
+| 改修 | **触らない** | 新規作成 |
+
+ReadonlySelectionContext に KIND_MATCH_LOG を足す案は Phase 1 では **見送り**
+（game_detail との混同リスク、JSON 直読の方が単純）。
+
+event_id で schedule ↔ match_logs を繋ぐのは **後工程**。
+
+================================================================================
+15. UI 負荷・表示量
+================================================================================
+
+| 要因 | 見積 | 対策 |
+|---|---|---|
+| 最大 50 行 | 中 | 行は summary + 2 補助行のみ。軽量 Panel |
+| commentary 全文 | 重くなり得る | 詳細押下時のみ head/tail テキスト組立（最大 10 行） |
+| key_plays 8 × 50 行 | 一覧では件数のみ | 詳細時のみ展開 |
+| Scroll 全 rebuild | _clear_scroll + 再追加（既存同型） | Phase 1 は許容 |
+
+結論: **一覧軽量 + 詳細遅延生成** で Phase 1 は問題なし。
+
+================================================================================
+16. 実装案比較
+================================================================================
+
+| 案 | 内容 | メリット | 懸念 | 評価 |
+|---|---|---|---|---|
+| A | mock + match_logs_view、メニュー未接続 | 既存導線無変更 | 到達しにくい | ○ |
+| B | mock + match_logs_view + ホーム「試合ログ」入口 | すぐ確認可、export 成果が見える | menu/scene 差分 | **◎** |
+| C | schedule_view に混在 | 試合関連で近い | 責務混在、非推奨 | × |
+| D | game_detail_view 拡張 | 名前が近い | payload 混在 | × |
+
+### メニュー接続の影響見積（案 B）
+- home_dashboard.gd: 定数 1 + ハンドラ 1（約 10 行）
+- home_dashboard.tscn: Button 1 + signal 1
+- 既存 10 ハンドラパターンのコピーで **低リスク**
+- ColLeague に Schedule / Standings があるため **列追加が自然**
+
+================================================================================
+17. 推奨案
+================================================================================
+
+**案 B: match_logs_mock.json + 新規 match_logs_view + home_dashboard に「試合ログ」入口**
+
+- 詳細は **同一画面 StatusLabel カード**（schedule/roster 同型）
+- game_detail_view / schedule_view / ReadonlySelectionContext は **Phase 1 未変更**
+
+================================================================================
+18. 推奨理由
+================================================================================
+
+1. Python export DTO が確定しており、Godot は **既存 10 画面と同じ JSON 読込パターン** で接続できる。
+2. roster/schedule の StatusLabel 詳細カードが commentary/key_plays 表示にそのまま適合する。
+3. game_detail_view は予定試合専用であり、消化済みログを混ぜると ReadonlySelectionContext 責務が崩れる。
+4. home_dashboard へのボタン 1 個追加は **確立済みパターン** で、案 A より確認コストが低い。
+5. mock は 2 件 logs ありで十分。empty は export empty_message で UI 分岐可能。
+6. bundle 11 件化済みのため、手動配置 `match_logs_from_python.json` も mock fallback と同型で試せる。
+
+================================================================================
+19. 次実装時の変更対象ファイル候補（案 B）
+================================================================================
+
+### 新規
+| ファイル | 内容 |
+|---|---|
+| godot/data/match_logs_mock.json | 本レポート §6 構造案 |
+| godot/scenes/match_logs_view.tscn | §8 ノード構成 |
+| godot/scripts/match_logs_view.gd | JSON 読込 + 一覧 + 詳細カード + ホーム戻る |
+
+### 変更
+| ファイル | 内容 |
+|---|---|
+| godot/scenes/home_dashboard.tscn | ColLeague に「試合ログ」ボタン |
+| godot/scripts/home_dashboard.gd | scene path 定数 + `_on_match_logs_view_button_pressed` |
+
+### 触らない（Phase 1）
+- game_detail_view.gd / .tscn
+- schedule_view.gd
+- readonly_selection_context.gd
+- basketball_sim/**（export は既存のまま利用）
+- godot/data/match_logs_from_python.json（生成物、commit しない）
+
+### .uid 注意
+- 新規 .tscn / .gd 作成時に Godot が .uid を生成する可能性あり
+- **意図的に add する場合のみ** commit 方針を別途決める（既存画面は .uid 同梱あり）
+- 本プロジェクトでは godot/scripts/*.gd.uid が untracked で存在 — 乱立に注意
+
+================================================================================
+20. 確認コマンド・テスト方針（次実装）
+================================================================================
+
+### Godot 手動確認
+1. Godot エディタで `match_logs_view.tscn` を開く（import エラーなし）
+2. mock のみで Run Current Scene → 2 行 + 詳細カード
+3. home_dashboard → 「試合ログ」→ 遷移
+4. `match_logs_from_python.json` を `godot/data/` に手動配置 → from_python 優先読込
+5. empty_message 確認: from_python で count=0 の JSON を一時配置
+
+### 自動（任意）
+- Godot headless: `--path godot --quit-after 1` で project load
+- Python 側: 既存 export テスト非回帰（Godot 変更では pytest 追加不要）
+
+### 非回帰
+- 既存 10 readonly 画面が開けること
+- schedule 「画面」→ game_detail_view が壊れていないこと
+
+================================================================================
+21. 後工程へ回す項目
+================================================================================
+
+- schedule から event_id で match_log へ飛ぶ導線
+- ReadonlySelectionContext KIND_MATCH_LOG（必要なら）
+- game_detail_view と match_logs 詳細の統合検討
+- game_results metadata 拡張（event_id join）
+- CLI match_logs 閲覧メニュー
+- full PBP 保存 / export
+- box score 詳細 export
+- player 別スタッツ連携
+- key_plays / commentary 品質改善
+- フィルタ / 検索 UI
+- 長期シーズン向け UI（50 行超の仮想スクロール最適化）
+- match log 別 scene 詳細化
+- 実データ save 進行後の from_python 常時同梱運用
+
+================================================================================
+22. 設計上の懸念（修正は後工程）
+================================================================================
+
+1. **実データ save 本体に match_logs 未保存**の場合、from_python は empty。
+   mock fallback があるため開発中は mock で UI 確認可能。
+2. schedule upcoming の event_id と match_logs event_id は一致し得るが、
+   **過去試合は schedule JSON に無い** — 導線設計は別途必要。
+3. home_dashboard ナビが 10→11 になり、CardNavMenu レイアウトがやや詰まる可能性
+   （ColLeague 3 ボタン化）。必要なら Phase 2 で nav 再配置。
+4. StatusLabel 1 枚に長文を載せるため、極端に長い commentary 行は wrap で縦に伸びる
+   （max 5+5 行なので Phase 1 許容）。
+
+================================================================================
+23. 次に行う具体的タスク（1 件）
+================================================================================
+
+**Godot match_logs mock JSON + 読取専用一覧画面 第 1 段を実装する**
+
+内容:
+1. `godot/data/match_logs_mock.json` 作成（§6 構造案）
+2. `godot/scenes/match_logs_view.tscn` + `godot/scripts/match_logs_view.gd`
+3. `home_dashboard` に「試合ログ」入口追加（案 B）
+4. mock で一覧 / 詳細カード / empty_message 分岐を目視確認
+5. `match_logs_from_python.json` は手動配置で確認（commit しない）
+
+================================================================================
+END
+================================================================================
