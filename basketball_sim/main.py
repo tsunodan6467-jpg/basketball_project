@@ -2954,7 +2954,29 @@ def run_interactive_season(
                 elif choice == "8":
                     run_gm_menu(teams, user_team, free_agents, season=season)
                 elif choice == "9":
-                    season.simulate_to_end()
+                    _round_before = int(getattr(season, "current_round", 0) or 0)
+                    _game_results_before = len(getattr(season, "game_results", []) or [])
+                    _league_level_before = getattr(user_team, "league_level", None)
+                    season.simulate_to_end(quiet=True)
+                    try:
+                        from basketball_sim.systems.season_end_summary_cli_display import (
+                            format_season_end_summary_lines,
+                        )
+
+                        _game_results_after = getattr(season, "game_results", []) or []
+                        _new_results = _game_results_after[_game_results_before:]
+                        for _summary_ln in format_season_end_summary_lines(
+                            season,
+                            user_team,
+                            _new_results,
+                            round_before=_round_before,
+                            league_level_before=_league_level_before,
+                            max_recent_games=10,
+                        ):
+                            print(_summary_ln)
+                        print("")
+                    except Exception:
+                        pass
                 elif choice == "10":
                     save_path = _prompt_save_path()
                     payload = build_save_payload(

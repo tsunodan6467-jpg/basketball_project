@@ -205,3 +205,14 @@ def test_post_summary_multi_round_max_games_ten() -> None:
     assert "ほか" not in text
     assert "5ラウンド進行分" in text
     assert "10勝0敗" in text
+
+
+def test_simulate_to_end_quiet_finishes_without_debug_tokens(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    season = _make_multi_round_season(3)
+    season.simulate_to_end(quiet=True)
+    out = capsys.readouterr().out
+    assert season.season_finished is True
+    for token in ("[PBP]", "[COMMENTARY]", "[MINUTES]", "[PLAY]", "[SUB]"):
+        assert token not in out
