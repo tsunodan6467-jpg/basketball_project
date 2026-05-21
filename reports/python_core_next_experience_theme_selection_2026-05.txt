@@ -1,0 +1,351 @@
+================================================================================
+Python本体 — 次の体験強化テーマ選定 比較レポート（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+対象 commit: 9f56649 — CLIラウンド進行前後の表示フローを確認
+目的: CLI choice "1" の前後表示フロー成立後、次に着手すべき Python 本体体験強化を
+      比較し、次タスクを1件に絞る。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+【成立済み】
+- round_advance_preview.py / round_advance_preview_readonly.py
+- CLI choice "1": preview（8行cap）→ weekly（5行前後）→ simulate → post summary（4〜6行）
+- post_advance_result_summary_cli_display.py（game_results 差分 slice）
+- 実データ smoke 合格（reports/python_core_cli_round_advance_full_flow_smoke_2026-05.txt）
+
+【直近で見えた課題】
+- simulate_next_round() の通常 print が支配的
+  - fa_clip_test_04.sav: 約 8009 行（48試合ラウンド）
+  - debug_user_boost_d1_user.sav: 約 3808 行（game 0 + Season finished 統計）
+- preview / weekly / post summary は有用だが、simulate 出力に埋もれる
+
+
+================================================================================
+2. 調査ファイル・要点
+================================================================================
+
+■ basketball_sim/main.py
+- choice "1"（L2845〜2894）: preview → weekly → simulate_next_round → post summary
+- choice "2"（L2895）: season.simulate_multiple_rounds(5) のみ（preview/post なし）
+- choice "9"（L2909）: season.simulate_to_end() のみ
+- Tk advance_one_round（L3514）: simulate_next_round() + 1行ログのみ
+- verbose / quiet 引数は main.py 側に存在しない
+
+■ basketball_sim/models/season.py
+- simulate_next_round()（L2780〜2918）: verbose/quiet 引数なし
+- simulate_multiple_rounds / simulate_to_end は simulate_next_round をループ呼び出しのみ
+- game_results.append は1箇所（L2880〜2887）:
+  home_team, away_team, home_score, away_score, score_diff, total_score
+  ※ round / event_id / competition_type は未格納
+- ラウンド内 print 源:
+  - ラウンド見出し（L2795）
+  - 自チーム試合のみ: schedule_importance / match_preview / postgame（L2827〜2878）
+  - 全試合: Match.simulate() 内 print（間接）
+  - 経営ログ（_apply_inseason_*）
+  - EASL / 全日本カップ / CPU管理
+  - ラウンド集計2行（L2914〜2915）
+  - 最終ラウンド: _finalize_season()（Season finished + 大量統計、L2936〜）
+
+■ basketball_sim/models/match.py
+- Match.simulate()（L2803〜3010）: verbose/quiet 引数なし
+- 試合ごとに必ず末尾で4系統の debug print を実行:
+  - _print_minutes_log（両チーム）
+  - _print_play_by_play_debug_summary()
+  - _print_commentary_preview()
+  - _print_play_sequence_preview()
+- 試合中 print:
+  - _print_active_roster / _print_starting_five（試合開始時）
+  - [SUB] 交代ログ（L1964）
+  - 【試合動向】 momentum note（L419）
+- play_by_play_log / commentary_log は Match インスタンス内に保持されるが save 未永続化
+
+■ basketball_sim/systems/match_postgame_cli_display.py
+- format_match_postgame_cli_lines: 自チーム試合のみ season.py から print
+- PBP 集計ベースの振り返り。quiet 化時は「残す候補」だが post summary と役割が一部重複
+
+■ basketball_sim/systems/post_advance_result_summary_cli_display.py
+- game_results 差分から W/L 一覧 + ひとこと（4〜6行）
+- quiet 化後に「最後に残すべき表示」として最適。save 構造非依存
+
+■ basketball_sim/tests/
+- simulate_next_round を呼ぶテストは複数あるが、PBP/COMMENTARY/MINUTES の print 内容に
+  依存する assertion は見当たらない（capsys は FA表・export CLI 等別用途）
+- quiet/verbose 関連テストは未存在
+- quiet 化実装時は「出力抑制下でも simulate が完走する」smoke + capsys で行数上限確認が妥当
+
+
+================================================================================
+3. 出力量の内訳（推定）
+
+fa_clip_test_04 1ラウンド（48試合）≈ 8009 行 → 試合あたり約 167 行
+
+主因（Match.simulate 全試合共通）:
+- [ACTIVE] / [STARTERS] / [SUB] / 【試合動向】
+- [MINUTES] / [PBP] Debug Summary / [COMMENTARY] Preview / [PLAY] Preview
+
+副因（season.py）:
+- 自チーム試合のみ postgame / preview（2試合分）
+- 経営・杯・ラウンド集計
+
+結論: quiet 化は season.py だけでは不十分。Match.simulate() への抑制伝播が必須。
+
+
+================================================================================
+4. 比較対象 A〜E
+================================================================================
+
+--------------------------------------------------------------------------------
+A. simulate_next_round 出力 quiet化 / 表示抑制
+--------------------------------------------------------------------------------
+
+【利点】
+- 直近 smoke で判明した「post summary 埋没」を直接解決
+- save 構造変更なしで改善可能
+- choice "1" の preview / weekly / post summary 投資を活かせる
+- choice "2" / "9" / Tk 接続前の安全な土台になる
+
+【リスク】
+- Match.simulate() に print が散在（10箇所以上）。引数設計を誤るとデバッグ用途が壊れる
+- simulate_next_round / simulate_multiple_rounds / simulate_to_end / Tk 全経路への伝播が必要
+- 「何を残すか」の UX 判断（自チーム postgame vs post summary のみ等）
+
+【変更範囲】
+- season.py: simulate_next_round(quiet=...) 等
+- match.py: simulate(quiet=...) + _print_* 系のガード
+- main.py: choice "1" で quiet=True 指定
+- 新規テスト（出力行数・完走確認）
+- 想定: 中〜大（ファイル数は少ないが Match 内部に及ぶ）
+
+【save 影響】
+- なし（表示のみ）
+
+【Godot 移行前価値】
+- 高。CLI/Tk 双方の simulate 体験改善。Godot は readonly export 経由で詳細を見る設計のため、
+  Python CLI の debug dump 抑制は Godot 本体には必須ではないが、開発・検証効率は上がる
+
+【今すぐ度】 ★★★★★（最高）
+
+【後工程へ回す理由】
+- なし（むしろ先にやるべき）
+
+【最小実装の方向性（調査結果）】
+- quiet=True のような引数は現状存在しない → 新設が必要
+- season.simulate_next_round(quiet=True) → Match(...).simulate(quiet=True) の伝播が最小筋
+- choice "1" quiet 時の残し候補:
+  1. preview / weekly（main.py、既存）
+  2. ラウンド見出し + ラウンド集計2行（任意）
+  3. post summary（main.py、既存）
+- 抑制候補:
+  - 非自チーム試合の Match 全 debug 出力
+  - 自チーム試合の PBP/COMMENTARY/PLAY/MINUTES debug（post summary で代替）
+  - 自チーム postgame 詳細は optional（post summary と重複するため quiet では省略可）
+- _finalize_season 統計は別フラグ（finalize_quiet 等）の検討余地あり
+
+
+--------------------------------------------------------------------------------
+B. game_results に round / event_id / competition_type 追加（最小設計）
+--------------------------------------------------------------------------------
+
+【利点】
+- schedule_display.py が「疑似ラウンド正規化」で凌いでいる箇所を正本化できる
+- post summary / Godot game_detail / 結果履歴の紐付け精度向上
+- append 箇所は season.py 1箇所（L2880）で済む見込み
+
+【リスク】
+- save 互換: 旧 dict にキーが無い場合の読み取り側防御が全経路必要
+- schedule_display / export / Godot readonly bundle / tests への波及
+- event_id 取得には SeasonEvent との対応設計が必要（単純 append 以上）
+
+【変更範囲】
+- season.py append + load 時デフォルト
+- schedule_display.py, export 系, post summary（任意）
+- テスト更新: 中
+
+【save 影響】
+- あり（game_results dict スキーマ拡張。後方互換設計は可能だが「構造変更」）
+
+【Godot 移行前価値】
+- 中〜高（Godot は schedule export の event_id を既に使用。game_results 側の正本化は
+  game_detail 本格化時に効く）
+
+【今すぐ度】 ★★☆☆☆
+
+【後工程へ回す理由】
+- quiet 化なしに post summary 拡張や Tk 接続を先にすると、UX 改善効果が simulate 出力に
+  相殺される
+- save 構造に触れるため、表示整理より重い。設計レポート単体の価値はあるが実装は後
+
+
+--------------------------------------------------------------------------------
+C. post summary を choice "2" / "9" に広げる
+--------------------------------------------------------------------------------
+
+【利点】
+- 複数ラウンド一括進行後も自チーム結果を一覧できる
+- before/after slice パターンは choice "1" で確立済み
+
+【リスク】
+- choice "2"（5ラウンド）: slice は可能だが simulate 出力が 5倍（quiet なしで ~4万行）
+- choice "9"（シーズン完走）: post summary 自体も試合数比例で肥大。表示 cap 必須
+- preview / weekly 未接続のまま広げても体験は incomplete
+- quiet 化なしでは問題が悪化するだけ
+
+【変更範囲】
+- main.py choice "2" / "9" ブロックのみ（小）
+- ただし前提として A が必要
+
+【save 影響】
+- なし
+
+【Godot 移行前価値】
+- 低〜中（CLI 便利機能。Godot は別 UI）
+
+【今すぐ度】 ★★☆☆☆
+
+【後工程へ回す理由】
+- A（quiet 化）と choice "1" の post summary 安定化の後が安全
+- choice "9" は cap / 折りたたみ設計が別途必要
+
+
+--------------------------------------------------------------------------------
+D. Tk MainMenuView へ preview / result summary 接続
+--------------------------------------------------------------------------------
+
+【利点】
+- Tk ユーザーにも preview / 結果サマリー体験を提供
+- main.py advance_one_round（L3514）に接続点は明確
+
+【リスク】
+- MainMenuView に表示欄・レイアウト追加が必要
+- Tk は Godot 置換予定のため、投資対効果が限定的
+- simulate_next_round の print は Tk コンソール/stdout に流れる現状のままでは
+  summary 接続だけでは埋もれ問題は解決しない
+
+【変更範囲】
+- main_menu_view.py, main.py Tk フロー（中）
+- preview / post summary formatter の再利用（小）
+
+【save 影響】
+- なし
+
+【Godot 移行前価値】
+- 低（Godot Phase D で readonly export 接続が主戦場）
+
+【今すぐ度】 ★☆☆☆☆
+
+【後工程へ回す理由】
+- CLI 側 quiet 化 + game_results 正本化（B）の後、Godot/Tk どちらにも同 API を渡せる
+- Tk 専用 UI 作業は置換予定と競合
+
+
+--------------------------------------------------------------------------------
+E. PBP / commentary 永続化の前段設計
+--------------------------------------------------------------------------------
+
+【利点】
+- Match に play_by_play_log / commentary_log は既に存在（L157〜158）
+- Godot game_detail 本格化・試合ログ再閲に必須の将来資産
+- 設計レポートのみなら save 互換リスクを抑えられる
+
+【リスク】
+- 全試合 PBP を save に載せるとサイズ急増（1試合数百イベント × シーズン数千試合）
+- game_results 拡張（B）+ export スキーマ + Godot 側の三位一体設計が必要
+- 実装は重い。quiet 化とは独立だが UX 優先度は後
+
+【変更篡囲】
+- 設計のみ: 中（調査・スキーマ案）
+- 実装: 大（match / season / save / export / godot）
+
+【save 影響】
+- 大（永続化時）
+
+【Godot 移行前価値】
+- 高（ただし「今すぐ実装」ではなく設計段階）
+
+【今すぐ度】 ★★★☆☆（設計） / ★☆☆☆☆（実装）
+
+【後工程へ回す理由】
+- CLI の immediate pain（出力埋没）とは別軸
+- B（game_results メタ）とセットで設計するのが自然
+
+
+================================================================================
+5. 比較表
+================================================================================
+
+| 候補 | 体験効果 | 実装リスク | 変更範囲 | save影響 | 今すぐ度 | コメント |
+|------|----------|------------|----------|----------|----------|----------|
+| A quiet化 | 高 | 中 | 中（season+match+main） | なし | ★★★★★ | post summary 埋没を直接解決。既存 quiet 足場なし→設計が必要 |
+| B game_results拡張 | 中〜高 | 中 | 中 | あり | ★★☆☆☆ | append 1箇所だが読取/export 波及。Godot 本格化前の基盤 |
+| C post summary拡張 | 中 | 低〜中 | 小 | なし | ★★☆☆☆ | A なしでは choice 2/9 が更に読めなくなる |
+| D Tk接続 | 中 | 中 | 中 | なし | ★☆☆☆☆ | Godot 置換予定。CLI quiet 化が先 |
+| E PBP永続化設計 | 高（将来） | 高 | 大 | 大 | ★★☆☆☆ | 設計のみなら可。実装は B とセットで後 |
+
+【総合判断】
+仮説「A が最有力」は調査結果と一致。
+- verbose/quiet 引数は season.py / match.py いずれにも未存在
+- 8009 行の大半は Match.simulate() の全試合 debug print
+- save 構造を変えずに UX 改善できる唯一の候補が A
+- ただし Match 内部まで及ぶため、「いきなり実装」より設計レポート1枚を挟むのが安全
+  （ユーザー指定どおり）
+
+
+================================================================================
+6. 次に行う具体的タスク（1件）
+================================================================================
+
+【選定】
+simulate_next_round の出力抑制 / quiet 化の最小設計レポートを作成する
+
+【理由】
+1. smoke で simulate 通常出力 数千行 → post summary 埋没が実測済み
+2. preview / weekly / post summary は成立済み。不足は simulate 側の出力量制御
+3. choice "2" / "9" や Tk 接続、game_results 拡張の前に、出力量方針を固定すべき
+4. save 構造非依存で改善可能
+5. Match.simulate に print が集中しており、実装前に「抑制レベル」「残す出力」
+   「引数伝播経路」を文書化しないと手戻りリスクが高い
+
+【安全条件】
+- save 構造変更なし
+- save_world 呼び出しなし / 実 save 上書きなし
+- 既存 simulate ロジック（スコア・game_results 追加）を変えない
+- デフォルトは現状 verbose（後方互換）とする設計
+- テスト: simulate 完走 + quiet 時出力行数上限
+
+【想定変更ファイル（設計レポート完了後の実装フェーズ参考）】
+- basketball_sim/models/match.py
+- basketball_sim/models/season.py
+- basketball_sim/main.py（choice "1" のみ quiet 指定から開始）
+- basketball_sim/tests/test_simulate_quiet_cli.py（新規想定）
+
+【後工程へ回す項目】
+- B game_results 拡張（実装）→ quiet 化後、post summary / schedule 精度向上として
+- C post summary の choice "2" / "9" 拡張 → quiet 化後
+- D Tk MainMenuView 接続 → CLI 安定後 / Godot 優先度判断後
+- E PBP / commentary 永続化（実装）→ B とセットで game_detail 本格化時
+
+
+================================================================================
+7. pytest
+================================================================================
+
+今回はコード変更なしのため pytest 未実施。
+テスト調査結果: simulate_next_round の PBP/COMMENTARY print 依存テストはなし。
+quiet 化実装時は新規テスト追加を推奨。
+
+
+================================================================================
+8. 参照
+================================================================================
+
+- reports/python_core_cli_round_advance_full_flow_smoke_2026-05.txt
+- basketball_sim/main.py L2845〜2910, L3514
+- basketball_sim/models/season.py L2780〜2931, L2880
+- basketball_sim/models/match.py L2803〜3010, L1964, L3003〜3007
+- basketball_sim/systems/schedule_display.py L635〜650（game_results 疑似ラウンド）
