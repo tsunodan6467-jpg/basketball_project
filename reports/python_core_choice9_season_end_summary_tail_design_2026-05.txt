@@ -1,0 +1,508 @@
+================================================================================
+Python本体 — CLI choice "9" season-end summary / tail表示 設計（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+対象 commit: dae3039 — choice2のquiet進行後サマリーを実データ確認
+目的: CLI choice "9"（シーズン最後まで進める）に、quiet / post summary / tail /
+      season-end summary / game_results 拡張のどれをどう接続すべきかを整理する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+| 経路 | 現状 |
+|---|---|
+| choice "1" | preview → weekly → `simulate_next_round(quiet=True)` → post summary |
+| choice "2" | weekly → `simulate_multiple_rounds(5, quiet=True)` → post summary（max_games=10） |
+| choice "9" | **`season.simulate_to_end()` のみ**（verbose、summary なし） |
+| Tk advance_one_round | `simulate_next_round()` verbose |
+| Tk debug skip | `simulate_to_end()` verbose |
+
+直近 smoke（choice "2"）: fa_clip_test_04.sav で 99 行・合格（dae3039 レポート参照）。
+
+
+================================================================================
+2. 調査ファイル
+================================================================================
+
+- basketball_sim/main.py（L2845–2957: choice "1"/"2"/"9"、L3459–3593: Tk）
+- basketball_sim/models/season.py
+  - `simulate_next_round(quiet=False)` L2821
+  - `simulate_to_end(quiet=False)` L2979
+  - `_finalize_season(compact=False)` L2986（quiet 時 compact=True 伝播 L2967–2968）
+  - `game_results.append` L2930–2937（6キーのみ）
+  - `get_standings` L3161
+  - `division_playoff_results` L3036
+  - `awards_by_division` L3033, L3452
+  - `_process_promotion_relegation` L3294
+- basketball_sim/systems/post_advance_result_summary_cli_display.py
+- basketball_sim/systems/schedule_importance_cli_display.py（順位重要度）
+- basketball_sim/systems/history_display.py（履歴・表彰表示）
+- basketball_sim/tests/test_simulate_quiet_mode.py
+- basketball_sim/tests/test_post_advance_result_summary_cli_display.py
+- basketball_sim/tests/test_season_promotion_relegation.py
+- reports/python_core_cli_choice2_quiet_post_summary_smoke_2026-05.txt
+
+
+================================================================================
+3. choice "9" の現状
+================================================================================
+
+### main.py（L2956–2957）
+
+```python
+elif choice == "9":
+    season.simulate_to_end()
+```
+
+- **quiet 未接続** — `quiet=True` 未指定
+- **post summary 未接続** — `_game_results_before` slice なし
+- **weekly / preview なし** — 完走専用のため choice "1"/"2" とは別設計が自然
+- **final compact 未使用** — verbose 完走時は `_finalize_season(compact=False)` が走る
+
+### simulate_to_end の挙動（season.py L2979–2981）
+
+```python
+def simulate_to_end(self, *, quiet: bool = False):
+    while not self.season_finished:
+        self.simulate_next_round(quiet=quiet)
+```
+
+- API は **`quiet=True` 対応済み**
+- 最終ラウンド到達時: `_finalize_season(compact=quiet)`（L2967–2968）
+  - quiet=True → compact=True → PO/EASL/ACL/表彰の大量 print を抑制
+  - ただし `Season finished` + League Scoring Stats 4行 + ラウンド見出し/経営/集計は残る
+
+### choice "9" を quiet のみにした場合の改善 / 不足
+
+| 観点 | quiet のみ（案A） |
+|---|---|
+| 実装規模 | main.py 1行変更で可能 |
+| 出力量 | 大幅削減（後述 smoke: 9行 simulate 部） |
+| debug token | 抑制される（Match quiet 伝播済み） |
+| final compact | **出る**（Season finished + 基本統計） |
+| 結果把握 | **弱い** — 昇降格・PO・表彰・自チーム最終順位が compact で隠れる |
+| ユーザー体験 | 「静かになったが、シーズン結果が分からない」状態になりやすい |
+
+
+================================================================================
+4. quietのみ先行接続の可否（案A）
+================================================================================
+
+**評価: 可能だが単独では不十分（第三候補）**
+
+### 根拠
+
+- `simulate_to_end(quiet=True)` は season.py に既存。main.py 接続のみ。
+- choice "1" quiet smoke と同型で、final ラウンドは compact finalize が効く
+  （762250e / dae3039 レポートで debug_user_boost_d1_user.sav 31行相当を確認済み）。
+- compact 時も内部処理（PO・昇降格・awards_by_division 更新・league_level 変更）は走る。
+
+### 不足点
+
+- compact により `_process_promotion_relegation` の print が出ない（L3347–3402）
+- `_calculate_and_print_awards_by_division(print_results=False)` で表彰 print なし
+- 自チームの昇降格（例: D1→D2）が CLI 上見えない
+- 「何が起きたか」は GM メニュー / 順位表 / 履歴を別途開く必要がある
+
+
+================================================================================
+5. 既存 post summary 流用の可否（案B）
+================================================================================
+
+**評価: 非推奨（第二候補より下）**
+
+### 技術的には可能な部分
+
+- before/after slice は choice "1"/"2" と同型で安全
+- 勝敗集計（wins/losses/draws）は **added 全件** を対象に計算（L142–145）
+- `round_label="シーズン完走分"` は引数で渡せる
+
+### 問題点（先頭N件）
+
+post_advance_result_summary_cli_display.py L133–134:
+
+```python
+shown = games[:cap] if cap else []
+```
+
+- 試合行は **先頭 max_games 件** のみ表示
+- choice "9" で中盤（例: fa_clip cr 5）から完走すると、added に 20〜30 ラウンド分が入る
+- 自チーム試合は 50〜60 試合規模になり得るが、表示されるのは **進行開始直後の序盤試合**
+- シーズン完走後に「最終局面の試合」が見えない — 体験として致命的
+
+### 文言の不整合
+
+| 箇所 | 問題 |
+|---|---|
+| 表題 `【ラウンド結果サマリー】` | シーズン完走には不自然 |
+| 0試合時「このラウンドの自チーム試合結果はありません。」 | 完走全体を指すと不自然 |
+| ひとこと「次ラウンド前にロスター/戦術確認推奨。」 | season_finished 後は不適切 |
+
+### 任意 smoke で確認（debug_user_boost_d1_user.sav）
+
+- cr 32→33（残り1R）、added=0、自チーム試合0
+- post summary 案B仮出力:
+
+```
+【ラウンド結果サマリー】
+対象: シーズン完走分
+自チーム試合: 0 試合
+ひとこと: このラウンドの自チーム試合結果はありません。
+```
+
+- quiet simulate 部: **9行**（compact finalize 含む）
+- **昇降格 D1→D2 は発生しているが summary に一切出ない**
+- save 上書きなし
+
+fa_clip_test_04.sav からの choice "9" 全完走 smoke は **未実施**
+（残り28ラウンドで重いため。設計上の先頭N件問題はコード読取で確定）。
+
+
+================================================================================
+6. tail表示拡張の可否（案C）
+================================================================================
+
+**評価: 一時対応として有効（第二候補）**
+
+### 実装イメージ
+
+post_advance_result_summary_cli_display.py に例:
+
+```python
+def format_post_advance_result_summary_lines(..., *, tail: bool = False, ...):
+    ...
+    shown = games[-cap:] if tail else games[:cap]
+```
+
+### メリット
+
+- choice "1"/"2" は `tail=False` デフォルトで **既存挙動維持**
+- choice "9" だけ `tail=True, max_games=10` で **直近試合** を表示可能
+- 勝敗集計は added 全件のまま — シーズン完走分の総W-L は正しい
+- 変更ファイルが formatter + main + tests に収まる
+
+### 残る問題
+
+- 表題・ひとこと文言は「ラウンド結果」のまま — season-end 感は弱い
+- 「ほか N 試合」→ 完走時は **「以前 N 試合」** 等への文言分岐が必要
+- 昇降格・PO・表彰・最終順位は **依然出ない**
+- formatter 責務が「1R/5R 用」と「完走用」で混在し始める
+
+### テスト追加規模（見積）
+
+- tail=True で末尾N件表示
+- tail=True + 11試合で「以前 1 試合」等
+- choice "1"/"2" 既存テスト非回帰
+- おおよそ 3〜5 ケース追加
+
+
+================================================================================
+7. season-end summary 新設の可否（案D）
+================================================================================
+
+**評価: 第一候補 — choice "9" に最も自然**
+
+### 新規モジュール案
+
+`basketball_sim/systems/season_end_summary_cli_display.py`
+
+```python
+def format_season_end_summary_lines(
+    season,
+    user_team,
+    new_results,
+    *,
+    max_recent_games: int = 10,
+) -> List[str]:
+    ...
+```
+
+### Phase 1 で出せる項目（追加データなし）
+
+| 項目 | データソース |
+|---|---|
+| 【シーズン完走サマリー】表題 | 固定 |
+| 最終ラウンド | `season.current_round` / `season.total_rounds` |
+| 自チームレギュラー成績 | `user_team.regular_wins` / `regular_losses` |
+| 所属 Division / 順位 | `season.get_standings(season.leagues[level])` で user を検索（leagues リストはシーズン開始時編成のまま。昇降格後も D1 順位表に残留チームとして rank 取得可能） |
+| 昇降格 | `_process_promotion_relegation` 後の `user_team.league_level` 変化 + `history_milestones` の promoted/relegated |
+| PO 絡み | `season.division_playoff_results[level]` の champion / runner_up / playoff_teams に user が含まれるか |
+| 今回進行分 W-L | new_results slice から自チーム試合を集計（post summary と同型ロジック） |
+| 直近 N 試合 | 自チーム試合リストの `[-max_recent_games:]` |
+| 主要大会（短く） | `emperor_cup_results` / `easl_results` / `acl_results` — user 関与があれば1行 |
+| 財務/信頼 | `user_team.money` / `user_team.owner_trust` |
+| 次に見る画面 | 「オフシーズンへ」「GM(8)」「履歴(6)」等の固定ヒント |
+
+### Phase 1 で難しい / 後回し
+
+| 項目 | 理由 |
+|---|---|
+| ラウンド別試合内訳 | game_results に round なし |
+| 大会別試合フィルタ | competition_type なし |
+| 表彰の詳細一覧 | awards_by_division はあるが formatter 新規 or 既存流用設計が必要 |
+| PO ブラケット詳細 | division_playoff_results は champion/runner_up/playoff_teams のみ |
+| 試合ごとの postgame メモ | Match 非保持 |
+
+### game_results に round がない問題の Phase 1 対処
+
+- **今回進行分** は before/after slice 全体を「完走進行分」とラベル付け
+- 直近 N 試合は slice 内の時系列末尾 — tail と同等
+- ラウンド範囲ラベル（例: 6〜33）は `round_before+1 〜 round_after` で main.py 側が組み立て可能（choice "2" 同型）
+- 精密な「PO 試合だけ」等は Phase 2 以降
+
+
+================================================================================
+8. game_results 拡張が先か（案E）
+================================================================================
+
+**評価: 後工程推奨（今すぐは不要）**
+
+### 現状構造（season.py L2930–2937）
+
+```python
+{
+    "home_team", "away_team", "home_score", "away_score",
+    "score_diff", "total_score",
+}
+```
+
+### optional key 追加の場合
+
+- 例: `round`, `event_id`, `competition_type`
+- 旧 save 読込: キー欠落なら formatter が fallback — **互換は取りやすい**
+- 新 save 書込: キーが増える — save 構造変更扱いで慎重に
+- season.py append 1箇所 + formatter + save 回帰テストが必要
+
+### 今回の流れでの位置づけ
+
+- choice "9" Phase 1 summary は **拡張なしで成立可能**
+- 拡張は「ラウンド別表示」「大会別 tail」「Godot readonly 精度向上」向け
+- **設計レポート → Phase 1 実装 → 拡張設計** の順が安全
+
+
+================================================================================
+9. 現在のデータだけで出せる項目 / 出せない項目
+================================================================================
+
+### 出せる（Phase 1）
+
+- 最終ラウンド、regular W-L、division 順位（get_standings）
+- 昇降格結果（league_level 変化、milestones）
+- PO 進出/優勝/準優（division_playoff_results）
+- 天皇杯/EASL/ACL 結果（season 結果 dict、user 関与判定）
+- 今回進行分の自チーム W-L + 直近 N 試合（new_results slice）
+- 所持金、オーナー信頼度
+- awards_by_division から user 所属選手の MVP 等（Phase 1 は1行要約まで）
+
+### 出しにくい / 別設計
+
+- ラウンド別・大会別の試合一覧
+- PO 各ラウンドスコア
+- シーズン全体の PBP / commentary
+- オフシーズン処理結果（choice "9" 時点では未実行）
+
+
+================================================================================
+10. 比較表
+================================================================================
+
+| 案 | 内容 | 実装リスク | 体験効果 | save影響 | 今すぐ度 | コメント |
+|---|---|---:|---:|---:|---:|---|
+| A | quietのみ接続 | 低 | 中 | なし | 中 | 出力は減るが結果把握が弱い |
+| B | 既存post summary流用 | 低〜中 | 低 | なし | 低 | 先頭N件問題・文言不整合 |
+| C | 既存formatterにtail追加 | 中 | 中〜高 | なし | 中 | 一時対応として有効、season-end感は弱い |
+| D | season-end summary新設 | 中 | 高 | なし | 高 | choice "9" に最も自然 |
+| E | game_results拡張 | 中〜高 | 高 | あり得る | 低〜中 | 後工程向き |
+
+### 案別 想定変更ファイル
+
+**案A quietのみ**
+- basketball_sim/main.py
+- basketball_sim/tests/test_simulate_quiet_mode.py（simulate_to_end quiet 追加）
+
+**案C tail追加**
+- basketball_sim/systems/post_advance_result_summary_cli_display.py
+- basketball_sim/main.py
+- basketball_sim/tests/test_post_advance_result_summary_cli_display.py
+- basketball_sim/tests/test_simulate_quiet_mode.py
+
+**案D season-end summary新設**
+- basketball_sim/systems/season_end_summary_cli_display.py（新規）
+- basketball_sim/main.py
+- basketball_sim/tests/test_season_end_summary_cli_display.py（新規）
+
+**案E game_results拡張**
+- basketball_sim/models/season.py
+- formatter 群 / save 互換テスト
+- 今回は後工程推奨
+
+
+================================================================================
+11. 推奨案
+================================================================================
+
+**第一候補: 案D — season-end summary を小さく新設**
+
+choice "9" 実装時の接続:
+
+```python
+_game_results_before = len(season.game_results or [])
+_round_before = season.current_round
+season.simulate_to_end(quiet=True)
+_new_results = season.game_results[_game_results_before:]
+# format_season_end_summary_lines(season, user_team, _new_results, ...)
+```
+
+**第二候補: 案C — 既存 formatter に tail 追加**
+
+案D 実装前の **暫定** としては有効。ただし season-end 表示責務は formatter に載せすぎない。
+
+**第三候補: 案A — quiet のみ**
+
+案D/C と **セット** なら意味がある。単独では体験が半端。
+
+**非推奨: 案B — 既存 post summary そのまま流用**
+
+**後工程: 案E — game_results 拡張**
+
+
+================================================================================
+12. 推奨理由
+================================================================================
+
+1. choice "9" のユーザー意図は「残り全部進めて、シーズン結果を把握する」こと
+2. 試合羅列より **最終順位・昇降格・PO・大会結果** が重要
+3. 既存 post summary は 1R/5R 用に最適化済み。無理な拡張は choice "1"/"2" への影響リスク
+4. `simulate_to_end(quiet=True)` + compact finalize は出力量削減に有効（API 済み）
+5. game_results 拡張なしでも Phase 1 summary は season/team 既存フィールドで構成可能
+6. 任意 smoke で、quiet のみ + post summary 案B では **昇降格 D1→D2 が summary に出ない** ことを確認
+
+
+================================================================================
+13. Phase 1 実装スコープ案（案D）
+================================================================================
+
+### main.py choice "9" ブロック
+
+1. `_game_results_before` / `_round_before` 保持
+2. `season.simulate_to_end(quiet=True)`
+3. `format_season_end_summary_lines(season, user_team, new_results, max_recent_games=10)`
+4. 例外は握る（choice "1"/"2" 同型）
+5. save_world は呼ばない（既存どおり）
+
+### season_end_summary Phase 1 出力（約 15〜25 行想定）
+
+```
+【シーズン完走サマリー】
+対象: ラウンド 33/33（完走）
+Division 1 最終: 8位 (36-24)
+昇降格: D1 → D2 降格
+PO: プレーオフ進出 / 準優勝 等（該当時のみ）
+自チーム試合（今回進行分）: N 試合 / X勝Y敗
+直近試合:
+  ○ ...
+  ● ...
+大会: 天皇杯 — / EASL — / ACL —（該当1行）
+所持金: ... / オーナー信頼: ...
+ひとこと: オフシーズン準備を。GM(8)・履歴(6)を確認推奨。
+```
+
+### 触らない
+
+- choice "1"/"2"/"9" 以外
+- season.py simulate ロジック
+- post_advance_result_summary_cli_display.py 本体（Phase 1）
+- Tk / Godot
+
+
+================================================================================
+14. テスト方針（次実装時）
+================================================================================
+
+### 新規 test_season_end_summary_cli_display.py
+
+- 最小 season/user_team stub で落ちない
+- get_standings から順位行が出る
+- new_results から直近 N 試合（tail）
+- max_recent_games が効く
+- 0試合時に落ちない
+- 昇降格 stub（league_level 変化 / milestones）で1行出る
+- PO results stub で champion 表示
+
+### 既存テスト拡張
+
+- `simulate_to_end(quiet=True)` が debug token なしで season_finished になる
+- capsys 行数上限（debug_user 相当で 50 行以下目安）
+- choice "1"/"2" 非回帰
+- main import ok
+- save 構造不変
+
+
+================================================================================
+15. 任意 programmatic smoke 結果
+================================================================================
+
+### 実施: debug_user_boost_d1_user.sav
+
+| 項目 | 値 |
+|---|---|
+| round before → after | 32 → 33 |
+| simulate_to_end(quiet=True) 行数 | **9行**（非空） |
+| debug token | すべてなし |
+| season_finished | true |
+| added game_results | 0（最終Rは試合0） |
+| post summary 案B 自チーム試合 | 0（無意味） |
+| user regular record | 36-24 |
+| user league_level after | **2（D1→D2 降格）** |
+| division_playoff_results | keys [1,2,3] |
+| save 上書き | なし |
+
+出力: `$env:TEMP\cli_choice9_season_end_summary_design_debug_user.txt`
+
+### 未実施: fa_clip_test_04.sav から choice "9" 全完走
+
+- 残り 28 ラウンドで実行コスト大
+- 先頭N件問題は formatter コード（L133–134）で確定
+- choice "2" smoke（5R）で quiet + slice + summary の安全系は検証済み
+
+
+================================================================================
+16. 後工程へ回す項目
+================================================================================
+
+- game_results へ round / event_id / competition_type 追加
+- season-end summary 本格版（表彰詳細・PO ブラケット・財務詳細）
+- post summary 文言一般化（「ラウンド」→「対象期間」）
+- choice "9" 対話型 CLI 実地確認
+- Godot シーズン終了画面
+- Tk quiet 接続
+- PBP / commentary 永続化
+
+
+================================================================================
+17. 判定
+================================================================================
+
+**設計調査完了 — 実装着手可能**
+
+- choice "9" は quiet API + compact finalize 済みだが、summary 未接続
+- 既存 post summary 流用は先頭N件問題で不適
+- season-end summary 新設（小）+ quiet が最適経路
+
+
+================================================================================
+18. 次に行う具体的タスク
+================================================================================
+
+**choice "9" に `simulate_to_end(quiet=True)` + `format_season_end_summary_lines` を接続する実装**
+
+- 新規: `season_end_summary_cli_display.py`（Phase 1 スコープ）
+- 変更: `main.py` choice "9" ブロックのみ
+- 新規: `test_season_end_summary_cli_display.py` + quiet simulate_to_end テスト
+- 参照 save: debug_user_boost_d1_user.sav（昇降格・compact 確認）、fa_clip_test_04.sav（中盤完走は時間に余裕があれば）
+
+※ 本タスクは **実装指示書ではなく実装そのもの**。設計レポート完了に伴い次チャットで着手。
