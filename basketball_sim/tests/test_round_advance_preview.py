@@ -207,3 +207,50 @@ def test_non_game_event_included() -> None:
     d = build_round_advance_preview_dict(s, u)
     assert len(d["next_round_events"]) == 1
     assert d["next_round_events"][0]["event_type"] == "break"
+
+
+def _preview_lines_with_hint(monkeypatch: pytest.MonkeyPatch, one_line: str) -> list[str]:
+    import basketball_sim.systems.round_advance_preview as rap
+
+    def _fake_dict(season: object, user_team: object, **kwargs: object) -> dict:
+        return {
+            "screen_title": SCREEN_TITLE,
+            "team_name": "T",
+            "summary": {
+                "current_round": 1,
+                "next_round": 2,
+                "total_rounds": 3,
+                "can_advance": True,
+                "next_round_month_week": "—",
+                "user_team_game_count": 0,
+            },
+            "advance_hint": {"one_line": one_line},
+            "warnings": [],
+            "schedule_lines": [],
+            "notes": [],
+        }
+
+    monkeypatch.setattr(rap, "build_round_advance_preview_dict", _fake_dict)
+    return format_round_advance_preview_lines(None, None)
+
+
+def test_format_lines_does_not_duplicate_advance_hint_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lines = _preview_lines_with_hint(monkeypatch, "進行予告: ラウンド6・テスト")
+    hint_lines = [ln for ln in lines if ln.startswith("進行予告")]
+    assert hint_lines == ["進行予告: ラウンド6・テスト"]
+    assert "進行予告: 進行予告:" not in "\n".join(lines)
+
+    lines_fw = _preview_lines_with_hint(monkeypatch, "進行予告：ラウンド6・テスト")
+    hint_lines_fw = [ln for ln in lines_fw if ln.startswith("進行予告")]
+    assert hint_lines_fw == ["進行予告：ラウンド6・テスト"]
+    assert "進行予告：進行予告：" not in "\n".join(lines_fw)
+
+
+def test_format_lines_adds_advance_hint_prefix_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lines = _preview_lines_with_hint(monkeypatch, "ラウンド6・自チーム 2試合まとめ進行")
+    hint_lines = [ln for ln in lines if ln.startswith("進行予告")]
+    assert hint_lines == ["進行予告: ラウンド6・自チーム 2試合まとめ進行"]

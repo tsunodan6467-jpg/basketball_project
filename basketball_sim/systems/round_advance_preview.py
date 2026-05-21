@@ -295,6 +295,15 @@ def build_round_advance_preview_dict(
     }
 
 
+def _advance_hint_display_line(one_line: str) -> Optional[str]:
+    hint_line = one_line.strip()
+    if not hint_line:
+        return None
+    if hint_line.startswith(("進行予告:", "進行予告：")):
+        return hint_line
+    return f"進行予告: {hint_line}"
+
+
 def format_round_advance_preview_lines(
     season: Any,
     user_team: Any,
@@ -323,8 +332,9 @@ def format_round_advance_preview_lines(
         lines.append("次の進行: 進行不可")
 
     one_line = (data.get("advance_hint") or {}).get("one_line") or ""
-    if one_line.strip():
-        lines.append(f"進行予告: {one_line.strip()}")
+    hint_display = _advance_hint_display_line(one_line)
+    if hint_display:
+        lines.append(hint_display)
 
     for w in data.get("warnings") or []:
         if isinstance(w, str) and w.strip():
