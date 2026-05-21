@@ -1,0 +1,337 @@
+================================================================================
+Python本体 — choice "2" / "9" への quiet / post summary 拡張可否 調査（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+対象 commit: 102e63d — quiet化後のCLIラウンド進行表示を確認
+目的: choice "2"（5ラウンド）/ choice "9"（完走）/ Tk に quiet と post summary を
+      広げるべきか、どこまでが安全かを調査する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+【choice "1" 成立済み】
+- preview → weekly → simulate_next_round(quiet=True) → post summary
+- fa_clip: ~8009行 → 27行 / debug_user: ~3808行 → 31行
+- レポート: python_core_cli_round_advance_quiet_full_flow_smoke_2026-05.txt
+
+【未接続】
+- choice "2": simulate_multiple_rounds(5) のみ（verbose）
+- choice "9": simulate_to_end() のみ（verbose）
+- Tk advance_one_round: simulate_next_round() のみ（verbose）
+
+
+================================================================================
+2. 調査ファイル
+================================================================================
+
+- basketball_sim/main.py（L2845〜2910, L3514）
+- basketball_sim/models/season.py（simulate_* / _finalize_season）
+- basketball_sim/systems/post_advance_result_summary_cli_display.py
+- basketball_sim/systems/round_advance_preview.py
+- basketball_sim/systems/weekly_advance_cli_display.py
+- basketball_sim/tests/test_simulate_quiet_mode.py
+- basketball_sim/tests/test_post_advance_result_summary_cli_display.py
+
+
+================================================================================
+3. choice "2" の現状
+================================================================================
+
+main.py（L2895〜2896）:
+```python
+elif choice == "2":
+    season.simulate_multiple_rounds(5)
+```
+
+- quiet 未接続
+- preview / weekly / post summary 未接続
+- before/after slice なし
+
+season.py:
+```python
+def simulate_multiple_rounds(self, rounds: int, *, quiet: bool = False):
+    for _ in range(rounds):
+        if self.season_finished:
+            break
+        self.simulate_next_round(quiet=quiet)
+```
+→ **quiet=True は API 上すでに使用可能**（main から渡すだけ）
+
+
+================================================================================
+4. choice "9" の現状
+================================================================================
+
+main.py（L2909〜2910）:
+```python
+elif choice == "9":
+    season.simulate_to_end()
+```
+
+season.py:
+```python
+def simulate_to_end(self, *, quiet: bool = False):
+    while not self.season_finished:
+        self.simulate_next_round(quiet=quiet)
+```
+→ **quiet=True は API 上すでに使用可能**
+
+- preview / weekly / post summary 未接続
+- 完走時 _finalize_season(compact=quiet) が最終ラウンドで効く
+
+
+================================================================================
+5. Tk advance_one_round の現状
+================================================================================
+
+main.py L3514:
+```python
+season.simulate_next_round()  # quiet=False 既定
+```
+- preview / post summary 表示枠なし（`[MAIN_MENU] round=...` のみ）
+- Godot 置換予定のため CLI より優先度低
+
+
+================================================================================
+6. quiet 接続の技術的可否
+================================================================================
+
+| 対象 | quiet API | main 接続 | 備考 |
+|---|---|---|---|
+| choice "2" | 可 | 未 | `simulate_multiple_rounds(5, quiet=True)` 1行 |
+| choice "9" | 可 | 未 | `simulate_to_end(quiet=True)` 1行 |
+| Tk | 可 | 未 | UI 設計が必要 |
+
+simulate ロジック・game_results 構造の変更は不要。
+
+
+================================================================================
+7. before/after slice 方式の可否
+================================================================================
+
+choice "1" と同パターン:
+```python
+before = len(season.game_results)
+season.simulate_multiple_rounds(5, quiet=True)  # or simulate_to_end(quiet=True)
+added = season.game_results[before:]
+format_post_advance_result_summary_lines(user_team, added, ...)
+```
+
+**安全** — game_results は append のみ、slice は時系列順（進行順）。
+
+
+================================================================================
+8. post summary formatter の再利用可否
+================================================================================
+
+`format_post_advance_result_summary_lines`（post_advance_result_summary_cli_display.py）:
+
+| 機能 | 内容 |
+|---|---|
+| 入力 | new_results 任意長 list |
+| 自チーム抽出 | home/away 名一致で全件走査 |
+| 表示件数 | `games[:cap]` — **先頭 N 件**（時系列の古い方から） |
+| max_games | 既定 5、引数で変更可 |
+| 残件 | `ほか {remaining} 試合` |
+| 勝敗集計 | **全 games 対象**（表示 cap とは独立） |
+| round_label | 任意文字列（「5ラウンド進行分」等可） |
+| ひとこと | 「このラウンドの〜」文言（0試合時）— 複数ラウンドではやや不自然 |
+
+【choice "2"】
+- **そのまま使える**（max_games=10 推奨）
+- 5ラウンド × 2試合/週 ≈ 10試合 → cap 10 で全件表示可能
+
+【choice "9"】
+- 勝敗集計（X勝Y敗）は全件で正しい
+- **試合行の表示は先頭 N 件** → 完走後は「シーズン序盤」が出て**直近試合が見えない**
+- game_results に round 列がないため「ラウンド 20〜33 分」等の絞り込み不可
+- **専用設計 or 直近 N 件表示拡張が必要**
+
+
+================================================================================
+9. formatter の限界（設計メモ・今回は未修正）
+================================================================================
+
+1. 表示は先頭 cap 件のみ（`shown = games[:cap]`）— 完走 summary に不向き
+2. 0試合時ひとこと「このラウンドの〜」— 複数ラウンド/完走ラベルと語感不一致
+3. タイトル「【ラウンド結果サマリー】」— 5ラウンド/完走では「進行結果サマリー」等が自然
+4. round/event_id なし — 期間ラベルは main 側 round_label 文字列頼み
+
+【拡張案（将来）】
+- A: `max_games` + `tail=True` で直近 N 件
+- B: 新規 `format_multi_round_advance_result_summary_lines`
+- C: choice "9" は season-end summary を別モジュールで新設
+
+choice "2" は A 不要（試合数 ≤ cap）。choice "9" は A または C が必要。
+
+
+================================================================================
+10. preview / weekly の扱い
+================================================================================
+
+【round_advance_preview】
+- 1ラウンド先（next_round）専用設計
+- choice "2" にそのまま流用すると「次の1ラウンド」しか見えず**5ラウンド進行予告にならない**
+- 推奨: choice "2" では preview **出さない**、または 1行「5ラウンドをまとめて進行します」のみ
+
+【weekly_advance_check】
+- 編成/財務チェックは進行前状態に依存
+- 推奨: choice "2" では **進行前に1回だけ** 出す（毎ラウンドは不要）
+
+【choice "9"】
+- preview/weekly は完走前に1回 or 省略。完走後は compact finalize が別系統。
+
+
+================================================================================
+11. programmatic smoke 結果（メモリ上・save 未上書き）
+================================================================================
+
+### choice "2" 相当 — fa_clip_test_04.sav（cr 5→10）
+
+| 項目 | 値 |
+|---|---|
+| rounds_advanced | 5 |
+| added_all_games | 240 |
+| user_games_in_slice | **10** |
+| simulate stdout (quiet) | **79 行**（verbose なら数千行×5） |
+| post summary (max_games=10) | **14 行** |
+| save mtime | 不変 |
+
+summary 抜粋:
+```
+対象: ラウンド 6〜10/33（5ラウンド進行分）
+自チーム試合: 10 試合
+○/● ×10（全件表示、ほか N なし）
+ひとこと: 6勝4敗。次ラウンド前にロスター/戦術確認推奨。
+```
+
+→ **choice "2" + quiet + 既存 formatter + max_games=10 は実用的**
+
+### choice "9" 相当 — debug_user_boost_d1_user.sav（cr 32→33、1ラウンドのみ）
+
+| 項目 | 値 |
+|---|---|
+| user_games | 0 |
+| simulate stdout (quiet) | 12 行 |
+| summary | 4 行（0試合） |
+
+→ 最終1ラウンドのみのため完走 bulk 問題は未再現
+
+### choice "9" — fa_clip_test_04.sav
+- **未実施**（残り28ラウンド、時間・出力量のため）
+- 見込み: 自チーム試合 ~56件（2試合/週×28）、先頭10件のみ表示 → **直近が見えない**
+
+### fa_clip で choice "9" 試算
+- 28ラウンド quiet simulate: ラウンドあたり ~5行 × 28 ≈ 140行 + finalize compact（許容）
+- post summary: 先頭10/56試合 → **UX 上問題**
+
+
+================================================================================
+12. pytest（任意）
+================================================================================
+
+| スイート | 結果 |
+|---|---|
+| test_simulate_quiet_mode.py | 6 passed |
+| test_post_advance_result_summary_cli_display.py | 12 passed |
+| main import | ok |
+
+simulate_multiple_rounds / simulate_to_end の quiet 専用テストは未存在（実装時追加推奨）。
+
+
+================================================================================
+13. 比較表
+================================================================================
+
+| 対象 | quiet接続 | post summary | 実装リスク | 体験効果 | 今すぐ度 | コメント |
+|------|-----------|--------------|------------|----------|----------|----------|
+| choice "2" | 可（1行） | 既存formatter可 | 低 | 高 | **高** | max_games=10、range round_label |
+| choice "9" quiet のみ | 可（1行） | — | 低 | 中 | 中 | 出力抑制だけなら可 |
+| choice "9" + summary | 可 | **要設計** | 中〜高 | 中 | 低 | 先頭N問題・完走情報と競合 |
+| Tk | 可 | UI要 | 中 | 低 | 低 | Godot 後工程 |
+
+【実装推奨順】
+1. choice "2": quiet + post summary（既存 formatter）
+2. choice "9": quiet のみ（summary は後）
+3. choice "9": season-end summary 設計
+4. Tk
+
+
+================================================================================
+14. 各対象への推奨
+================================================================================
+
+### choice "2" — **次に実装候補（推奨）**
+- `simulate_multiple_rounds(5, quiet=True)`
+- before/after slice + post summary
+- `round_label=f"ラウンド {cr_before+1}〜{cr_after}/{total}（5ラウンド進行分）"`
+- `max_games=10`
+- weekly: 進行前1回（任意）
+- preview: **1ラウンド用は使わない**（省略 or 1行予告）
+
+### choice "9" — **quiet のみ先行、post summary は後工程**
+- quiet 接続で verbose 数千行×N は解消
+- post summary は先頭N問題 + 昇降格/PO/賞との役割分担が必要
+- game_results round 列がないと期間絞り込み不可
+- season-end 専用 summary または formatter `tail=True` 拡張を先に設計
+
+### Tk — **後工程**
+- 表示枠なし / Godot 置換予定
+- CLI choice "2" 安定後
+
+
+================================================================================
+15. 次に行う具体的タスク（1件）
+================================================================================
+
+**choice "2" に quiet + 5ラウンド分 post summary を最小接続する実装指示書を作成する**
+
+理由:
+- API 足場済み（simulate_multiple_rounds(quiet=True)）
+- before/after slice は choice "1" と同型で安全
+- smoke で 10試合/14行 summary が実用的と確認
+- max_games=10 で cap 設計が軽い
+- choice "9" より先に複数ラウンド summary の土台を作れる
+
+代替（formatter 文言修正が必要と判断した場合）:
+→ choice "2" 用 multi-round post summary 小設計レポート
+
+
+================================================================================
+16. 実装時の安全条件（choice "2" 向け）
+================================================================================
+
+- save / game_results 構造変更なし
+- choice "1" 挙動不変
+- quiet=False 既定維持
+- preview は 1ラウンド用をそのまま流用しない
+- max_games=10、round_label は cr_before+1〜cr_after
+- テスト: simulate_multiple_rounds(quiet=True) + summary 行数 smoke
+- save_world 呼ばない
+
+
+================================================================================
+17. 後工程へ回す項目
+================================================================================
+
+- choice "9" post summary（tail 表示 / season-end summary）
+- game_results round/event_id 拡張
+- choice "9" preview/weekly 方針
+- Tk quiet + summary
+- formatter 文言一般化（「このラウンド」→「今回の進行」）
+- PBP / commentary 永続化
+
+
+================================================================================
+18. 参照
+================================================================================
+
+- reports/python_core_cli_round_advance_quiet_full_flow_smoke_2026-05.txt
+- reports/python_core_simulate_quiet_mode_minimal_design_2026-05.txt
+- $env:TEMP\cli_choice2_quiet_post_summary_fa_clip_test_04.txt
+- basketball_sim/main.py L2895-2910
+- basketball_sim/systems/post_advance_result_summary_cli_display.py L109-147
