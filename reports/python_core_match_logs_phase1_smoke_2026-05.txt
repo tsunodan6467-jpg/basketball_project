@@ -1,0 +1,281 @@
+================================================================================
+Python本体 — 軽量 match_logs 保存 Phase 1 実データ確認（2026-05）
+================================================================================
+
+確認日: 2026-05-19
+対象 commit: e0561dc — user_team試合の軽量match_logs保存を追加
+目的: PBP / commentary 永続化 Phase 1 として追加された `Season.match_logs` 保存系が、
+      静的実装・pytest・実データ save の programmatic smoke で安全に動作するか確認する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 確認方法
+================================================================================
+
+- **static 確認:** season.py / match_log_builder.py / save_load.py / テストファイルを grep
+- **pytest:** match_log_builder / quiet simulate / save-load / 既存 summary 系 / main import / 全体
+- **programmatic smoke:** fa_clip_test_04.sav を load_world のみで読み、
+  `season.simulate_next_round(quiet=True)` をメモリ上実行
+- **対話型 CLI:** 未実施（save 上書きリスク回避）
+- **save 上書き:** なし（save_world 未呼び出し、mtime/size 不変）
+
+
+================================================================================
+2. 使用 save
+================================================================================
+
+| save | 用途 | cr（前→後） | サイズ |
+|---|---|---|---|
+| fa_clip_test_04.sav | Phase 1 主確認（中盤・自チーム2試合/R） | 5 → 6 | 1,370,770 bytes |
+
+補足:
+- debug_user_boost_d1_user.sav は今回未使用（final 寄り。旧 save 補完は pytest stub で確認済み）
+- save 一覧は `$env:USERPROFILE\.basketball_sim\saves` に複数存在（fa_clip_test_01〜05 等）
+
+
+================================================================================
+3. 実行コマンド
+================================================================================
+
+- git log --oneline -5
+- Get-ChildItem "$env:USERPROFILE\.basketball_sim\saves" -Filter "*.sav"
+- Select-String basketball_sim/models/season.py（match_logs / build_user_match_log_entry 等）
+- Select-String basketball_sim/systems/match_log_builder.py
+- Select-String basketball_sim/persistence/save_load.py（normalize_payload / match_logs）
+- Select-String basketball_sim/tests/test_match_log_builder.py
+- Select-String basketball_sim/tests/test_simulate_quiet_mode.py
+- Select-String basketball_sim/tests/test_phase0_smoke.py
+- git diff 1cce7b1..e0561dc -- basketball_sim/models/match.py godot/ basketball_sim/export/
+- pytest:
+  - basketball_sim/tests/test_match_log_builder.py（8件）
+  - basketball_sim/tests/test_simulate_quiet_mode.py（12件）
+  - basketball_sim/tests/test_phase0_smoke.py（17件）
+  - basketball_sim/tests/test_post_advance_result_summary_cli_display.py（12件）
+  - basketball_sim/tests/test_season_end_summary_cli_display.py（12件）
+  - basketball_sim/tests/test_match_postgame_cli_display.py（17件）
+  - basketball_sim/tests/test_round_advance_preview.py（12件）
+  - basketball_sim/tests/test_reg_slot_pass_through.py（3件）
+  - basketball_sim/tests（全体）
+- py -c "import basketball_sim.main; print('main import ok')"
+- programmatic smoke →
+  - $env:TEMP\match_logs_phase1_fa_clip_test_04_smoke.txt
+  - $env:TEMP\match_logs_phase1_fa_clip_test_04_meta.json
+
+
+================================================================================
+4. pytest 結果
+================================================================================
+
+| スイート | 件数 | 結果 |
+|---|---|---|
+| test_match_log_builder.py | 8 | passed |
+| test_simulate_quiet_mode.py | 12 | passed |
+| test_phase0_smoke.py | 17 | passed |
+| test_post_advance_result_summary_cli_display.py | 12 | passed |
+| test_season_end_summary_cli_display.py | 12 | passed |
+| test_match_postgame_cli_display.py | 17 | passed |
+| test_round_advance_preview.py | 12 | passed |
+| test_reg_slot_pass_through.py | 3 | passed |
+| **関連合計（上記8ファイル）** | **93** | **passed** |
+| **basketball_sim/tests 全体** | **100%** | **passed（exit 0）** |
+| import basketball_sim.main | — | ok |
+
+
+================================================================================
+5. static 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| Season.__init__ に `self.match_logs = []` | **あり**（season.py L172） |
+| simulate_next_round で Match.simulate() 後に capture | **あり**（L2921 simulate → L2931–2947 capture） |
+| capture 位置 | **game_results.append の直前**（L2949）。score 取得後・既存 append 順序を維持 |
+| build_user_match_log_entry 使用 | **あり**（L2933–2941） |
+| user_team is None 時 append しない | **あり**（`if user_team is not None:` で囲む） |
+| capture 失敗で進行停止しない | **あり**（try/except Exception: pass） |
+| game_results 6キー維持 | **あり**（home_team / away_team / home_score / away_score / score_diff / total_score） |
+| match.py 変更 | **なし**（1cce7b1..e0561dc diff 空） |
+| export/ 変更 | **なし** |
+| godot/ 変更 | **なし** |
+| main.py 変更 | **なし**（CLI 表示追加なし） |
+
+
+================================================================================
+6. builder 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| 読み取り専用（Match/Season/Team/Player 非改変） | **docstring + 実装ともに read-only** |
+| print なし | **確認** |
+| full PBP 非保存 | **play_by_play_log 未参照** |
+| commentary excerpt のみ | **get_commentary_lines → head/tail + total_lines** |
+| head/tail 上限 | **max_commentary_head=5 / max_commentary_tail=5（デフォルト）** |
+| key_plays 末尾最大8件 | **get_play_sequence_log()[-8:]** |
+| key_plays の events ネスト除外 | **_plain_dict で events スキップ** |
+| Team/Player オブジェクト非保存 | **_plain_dict は str/int/float/bool/None のみ** |
+| user 非関与 → None | **_user_involved 判定 + テストあり** |
+| event metadata 保存 | **event_id / round / competition_type / stage / week / day_of_week** |
+| score 不明でも落ちない | **user_result=unknown / summary_line=？** |
+| match_id | **event_id ベース（仮採番）** |
+
+
+================================================================================
+7. save/load 互換確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| normalize_payload で resume_season.match_logs 補完 | **あり**（save_load.py L145–146） |
+| 旧 save（match_logs なし）→ [] | **test_normalize_payload_fills_missing_match_logs_on_resume_season PASS** |
+| match_logs 付き roundtrip 保持 | **test_save_load_roundtrip_preserves_match_logs PASS** |
+| payload_schema_version 変更 | **なし（PAYLOAD_SCHEMA_VERSION=1 据え置き）** |
+| 据え置き妥当性 | optional 属性追加のみ。resume_season は pickle 同一グラフのため、
+  normalize で [] 補完する既存パターンと整合。**今後 export や必須化時は version 見直し要** |
+
+
+================================================================================
+8. programmatic smoke 結果（fa_clip_test_04.sav）
+================================================================================
+
+| 項目 | 値 |
+|---|---|
+| save パス | C:\Users\tsuno\.basketball_sim\saves\fa_clip_test_04.sav |
+| round before → after | **5 → 6** |
+| before match_logs | **0** |
+| after match_logs | **2** |
+| added_logs 件数 | **2**（自チーム2試合と一致） |
+| game_results before → after | 264 → 312（added **48** = ラウンド全試合） |
+| user_team | セーブ確認プレイチーム |
+| added_logs 全件 user_team_involved | **True** |
+
+### added_logs 概要
+
+| # | event_id | user_result | home-away score | commentary total_lines | key_plays |
+|---|---|---|---|---|---|
+| 1 | regular_season_r6_g33 | L | 66-68 vs Yokohama Bulls_35 | 368 | 8 |
+| 2 | regular_season_r6_g34 | W | 74-72 vs Yokohama Bulls_35 | 363 | 8 |
+
+### entry 必須キー確認（2件とも missing_keys=[]）
+
+match_id, event_id, round, competition_type, stage, home_team, away_team,
+home_score, away_score, user_team_involved, user_team, user_result, summary_line,
+commentary_excerpt, key_plays, captured_at
+
+### commentary_excerpt 確認
+
+| 項目 | 結果 |
+|---|---|
+| head 行数 | **各5行（<=5）** |
+| tail 行数 | **各5行（<=5）** |
+| total_lines | **368 / 363（>0、300行級）** |
+| full commentary list 保存 | **なし**（commentary_full / commentary キーなし） |
+
+### key_plays 確認
+
+| 項目 | 結果 |
+|---|---|
+| 件数 | **各8件（<=8）** |
+| events ネスト | **なし** |
+| Team/Player オブジェクト | **なし** |
+
+### game_results キー不変
+
+追加分（先頭3件確認）すべて6キーのみ:
+home_team, away_team, home_score, away_score, score_diff, total_score
+
+### quiet stdout / debug token
+
+| 項目 | 結果 |
+|---|---|
+| stdout 行数（非空） | 5行（ラウンド集計等のみ） |
+| [PBP] / [SUB] / [COMMENTARY] / [MINUTES] / [PLAY] | **すべてなし** |
+
+### save 上書き
+
+| 項目 | 結果 |
+|---|---|
+| before mtime / size | 1775627804.3881676 / 1,370,770 |
+| after mtime / size | **同一** |
+| save_overwritten | **false** |
+| save_world 呼び出し | **なし** |
+
+
+================================================================================
+9. 表示・CLI への影響
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| CLI match_logs 表示導線 | **なし**（意図どおり未追加） |
+| post_advance_result_summary | **変更なし**（pytest pass） |
+| season_end_summary | **変更なし**（pytest pass） |
+| match_postgame_cli_display | **変更なし**（pytest pass） |
+| round_advance_preview | **変更なし**（pytest pass） |
+| export / Godot | **未接続**（Phase 1 スコープ外） |
+
+
+================================================================================
+10. 問題点・軽微所見
+================================================================================
+
+**問題点（要修正）:** なし
+
+**軽微所見（今回は修正しない）:**
+- export / Godot にはまだ未接続
+- match_logs を CLI で見返す導線はまだない
+- game_results とは join していない（Phase 2 候補）
+- match_id は event_id ベースの仮採番
+- full PBP / 全試合保存は意図的に未実装
+- commentary 品質改善は後工程
+- シーズン長期進行時の save サイズ増加は今後モニタリング要
+- payload_schema_version 据え置きは現状妥当だが、export 必須化時は再検討
+
+
+================================================================================
+11. 判定
+================================================================================
+
+**合格**
+
+判定根拠:
+- user_team 関与試合のみ match_logs が増加（48試合消化に対し added_logs=2）
+- 非 user 試合非保存は pytest で確認済み
+- full PBP 非保存、commentary excerpt head/tail 制限内、key_plays 最大8件
+- Team/Player オブジェクト非保存
+- game_results 6キー維持
+- 旧 save 互換補完あり、roundtrip で match_logs 保持
+- save 未上書き、既存テスト全体 pass
+- match.py / export / Godot / CLI 表示への不要差分なし
+
+
+================================================================================
+12. 次に行う具体的タスク（1件）
+================================================================================
+
+**match_logs readonly export 設計レポートを作成する**
+
+理由:
+- Phase 1 で保存が成立したため、Godot / 将来画面へ渡す readonly export 設計が自然な次段階
+- いきなり Godot 画面実装より JSON 構造設計を先に固める方が安全
+- CLI 表示より export 正本を先に定義すると、詳細画面実装にも接続しやすい
+
+代替（問題発見時のみ）:
+軽量 match_logs Phase 1 の軽微修正指示書を作成する。
+→ 今回は問題なしのため不要。
+
+
+================================================================================
+付録: 参照 commit diff 概要（e0561dc）
+================================================================================
+
+変更ファイル（6）:
+- basketball_sim/models/season.py (+19)
+- basketball_sim/systems/match_log_builder.py (+271, 新規)
+- basketball_sim/persistence/save_load.py (+5)
+- basketball_sim/tests/test_match_log_builder.py (+266, 新規)
+- basketball_sim/tests/test_simulate_quiet_mode.py (+63)
+- basketball_sim/tests/test_phase0_smoke.py (+61)
+
+合計: +685 行
