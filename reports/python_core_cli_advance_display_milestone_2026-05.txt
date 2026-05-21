@@ -1,0 +1,298 @@
+================================================================================
+Python本体 — CLI進行表示まわり 第1段 一区切り（2026-05）
+================================================================================
+
+作成日: 2026-05-19
+対象 commit: b355513 — choice9のseason-end summaryを実データ確認
+目的: choice "1" / "2" / "9" の quiet + summary 接続までの到達点を整理し、
+      CLI進行表示まわり第1段を一区切りにする。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+| 経路 | 状態 |
+|---|---|
+| choice "1" | preview → weekly → quiet 1R → post summary **成立** |
+| choice "2" | weekly → quiet 5R → post summary（max_games=10） **成立** |
+| choice "9" | quiet完走 → season-end summary **成立** |
+| Tk | 旧 verbose のまま（後工程） |
+| Godot | Python CLI進行表示未接続（read-only JSON閲覧系、後工程） |
+
+直近確認: b355513 合格 / origin/main push 済み
+
+
+================================================================================
+2. 今回一区切りにする範囲
+================================================================================
+
+**含む:**
+- ラウンド進行 preview（choice "1" のみ）
+- weekly check（choice "1" / "2"）
+- Match / Season quiet 化
+- post advance result summary（choice "1" / "2"）
+- season-end summary（choice "9"）
+- 関連 unit test / smoke レポート
+
+**含まない（後工程）:**
+- Tk quiet / summary 接続
+- Godot 接続
+- game_results metadata 拡張
+- PBP / commentary 永続化
+- 表示文言の全面一般化
+
+
+================================================================================
+3. 進行表示まわりの変更履歴
+================================================================================
+
+| commit | 内容 |
+|---|---|
+| 1f73718 | ラウンド進行 preview の接続方針を整理 |
+| 763375f | CLI choice "1" にラウンド進行 preview を表示 |
+| f59e262 | preview 目視確認を整理 |
+| 1e637b3 | preview 進行予告表示を整理 |
+| 76d782d | 進行後直近試合結果サマリーを調査 |
+| 69d311c | CLI 進行後に自チーム結果サマリーを表示 |
+| 90f486f | 不明スコア文言を整理 |
+| 9f56649 | 進行前後表示フローを確認 |
+| 0139129 | 次体験強化テーマ選定（quiet 化が最有力） |
+| 001a9fe | simulate_next_round quiet 化 最小設計 |
+| 762250e | **Match/Season quiet 化 + choice "1" 接続** |
+| 102e63d | quiet 化後 full flow smoke（合格） |
+| 08ad63f | choice "2"/"9" quiet/summary 拡張可否調査 |
+| 64937e1 | **choice "2" quiet + post summary 接続** |
+| dae3039 | choice "2" 実データ確認（合格） |
+| ecc46d4 | choice "9" season-end summary 設計 |
+| 6c581e7 | **choice "9" quiet + season-end summary 接続** |
+| b355513 | choice "9" 実データ確認（合格） |
+
+**主要モジュール（現行）:**
+- `round_advance_preview.py` — preview（choice "1"）
+- `weekly_advance_cli_display.py` — weekly check
+- `post_advance_result_summary_cli_display.py` — 1R/5R post summary
+- `season_end_summary_cli_display.py` — 完走 summary（choice "9" 新規）
+
+
+================================================================================
+4. choice "1" の現在フロー
+================================================================================
+
+```
+round advance preview（先頭8行）
+  ↓
+weekly check（1回）
+  ↓
+_game_results_before 保持
+  ↓
+simulate_next_round(quiet=True)
+  ↓
+post advance result summary（max_games=5 既定）
+```
+
+- 1ラウンド進行向け
+- preview は choice "1" 専用（choice "2"/"9" では未使用）
+
+
+================================================================================
+5. choice "2" の現在フロー
+================================================================================
+
+```
+weekly check（1回）
+  ↓
+_round_before / _game_results_before 保持
+  ↓
+simulate_multiple_rounds(5, quiet=True)
+  ↓
+post advance result summary（max_games=10）
+  ↓
+round_label: ラウンド N〜M/Total（5ラウンド進行分）
+```
+
+- 5ラウンド進行向け
+- preview なし
+
+
+================================================================================
+6. choice "9" の現在フロー
+================================================================================
+
+```
+_round_before / _game_results_before / _league_level_before 保持
+  ↓
+simulate_to_end(quiet=True)
+  ↓
+season-end summary（max_recent_games=10）
+```
+
+- 完走向け
+- post advance result summary は使わない
+- weekly / preview なし
+- final compact（quiet 時 `_finalize_season(compact=True)`）
+
+
+================================================================================
+7. quiet 化の到達点
+================================================================================
+
+| 項目 | 内容 |
+|---|---|
+| Match | `quiet=False` デフォルト、`[PBP]`/`[SUB]`/`[COMMENTARY]`/`[MINUTES]` 等を抑制 |
+| Season | `simulate_next_round(quiet=)` / `simulate_multiple_rounds(quiet=)` / `simulate_to_end(quiet=)` |
+| Finalize | 最終Rで `_finalize_season(compact=quiet)` — PO/表彰/大量統計 print を抑制 |
+| 効果（choice "1"） | fa_clip: **約8009行 → 27行**（99.7%削減） |
+| debug token | quiet 時 CLI 出力に `[PBP]` 等なし（smoke 確認済み） |
+| 非破壊 | `quiet=False` 既存 verbose 挙動維持 |
+
+
+================================================================================
+8. summary 系の到達点
+================================================================================
+
+| formatter | 用途 | 特徴 |
+|---|---|---|
+| post_advance_result_summary | choice "1"/"2" | game_results slice から自チーム試合、先頭N件、W/L集計 |
+| season_end_summary | choice "9" | 完走専用、tail直近N試合、順位/昇降格/PO/大会/資金 |
+
+- いずれも **読み取り専用**（season/team/save 非変更）
+- game_results は既存6キーのみ（round/event_id/competition_type なし）
+
+
+================================================================================
+9. 実データ確認結果の要約
+================================================================================
+
+| choice | save | round | 出力量 | 自チームsummary | save |
+|---|---|---|---|---|---|
+| "1" | fa_clip_test_04.sav | 5→6 | **27行**（preview+weekly+quiet+summary） | 2試合 W/L | 未上書き |
+| "2" | fa_clip_test_04.sav | 5→10 | **99行**（weekly7 + quiet78 + summary14） | 10試合 W/L | 未上書き |
+| "9" | debug_user_boost_d1_user.sav | 32→33 | quiet **9行** + summary **11行** | 0試合（final R試合0） | 未上書き |
+
+参照 smoke レポート:
+- python_core_cli_round_advance_quiet_full_flow_smoke_2026-05.txt（choice "1"）
+- python_core_cli_choice2_quiet_post_summary_smoke_2026-05.txt（choice "2"）
+- python_core_cli_choice9_season_end_summary_smoke_2026-05.txt（choice "9"）
+
+
+================================================================================
+10. pytest 結果（b355513 時点再確認）
+================================================================================
+
+| スイート | 結果 |
+|---|---|
+| test_simulate_quiet_mode.py（10件） | passed |
+| test_post_advance_result_summary_cli_display.py（12件） | passed |
+| test_season_end_summary_cli_display.py（12件） | passed |
+| test_round_advance_preview.py | passed |
+| test_season_promotion_relegation.py | passed |
+| **basketball_sim/tests 全体** | **100% passed（exit 0）** |
+| import basketball_sim.main | ok |
+
+
+================================================================================
+11. まだ触っていない範囲
+================================================================================
+
+- Tk `advance_one_round` — `simulate_next_round()` verbose
+- Tk debug skip — `simulate_to_end()` verbose
+- Godot 進行 / summary 接続
+- choice "9" 中盤完走 smoke（fa_clip 残り28R）
+- 対話型 CLI 本番操作での最終目視確認
+- post summary tail モード（choice "9" には season-end summary で代替）
+
+
+================================================================================
+12. 残課題
+================================================================================
+
+1. final compact の一部英語表示（Season finished / Games Played 等）
+2. choice "9" 実データでの昇降格変動確認未完了（unit test のみ）
+3. fa_clip から choice "9" 中盤完走 smoke 未実施
+4. Tk quiet / summary 未接続
+5. Godot 未接続
+6. game_results に round / event_id / competition_type なし
+7. PBP / commentary 永続化なし
+8. 試合詳細・ログを後から見返す導線が弱い
+9. post summary / season-end summary 文言一般化は後工程
+10. save 構造拡張は慎重設計が必要
+
+
+================================================================================
+13. 次の中規模テーマ候補比較
+================================================================================
+
+| 候補 | 内容 | メリット | 懸念 | 優先度 |
+|---|---|---|---|---|
+| A | game_results metadata 拡張設計 | summary精度向上、Godot export向き | save互換、慎重設計必要 | 中 |
+| B | **PBP/commentary 永続化前段設計** | **試合を味わう体験に直結**、ログ見返し土台 | Match/Season/save/export横断、設計先行必要 | **高** |
+| C | 試合後ログ/直近試合詳細CLI設計 | post summary から深掘り導線 | 保存データ不足、Bと連動 | 中 |
+| D | Tk/Godot quiet summary接続 | GUI見せ方 | export設計先行、現優先度低 | 低 |
+| E | 表示文言・英語ログ軽微整理 | 見た目改善 | 中核体験前進として弱い | 低 |
+
+
+================================================================================
+14. 推奨次テーマ
+================================================================================
+
+**第一候補: PBP / commentary 永続化の前段設計レポート**
+
+理由:
+- quiet 化で「大量 debug 出力を抑える」段階は完了
+- 次は「試合ログを後から見返せる」方向が自然
+- 国内バスケGMの核「試合を味わう気持ちよさ」に直結
+- Match / Season / save / export に関わるため、いきなり実装せず設計から
+
+**第二候補: game_results metadata 拡張設計** — PBP永続化の基盤として関連
+
+**第三候補: 試合後ログ/直近試合詳細CLI設計** — 保存データ不足の可能性
+
+
+================================================================================
+15. 次に行う具体的タスク
+================================================================================
+
+**PBP / commentary 永続化の前段設計レポートを作成する**
+
+調査観点（次タスク）:
+- Match.play_by_play_log / commentary の現状と寿命
+- game_results との関係（metadata 拡張が先か）
+- save / export への載せ方と互換性
+- CLI / Godot での見返し導線
+- Phase 1 最小スコープ
+
+※ 設計調査中に「metadata 拡張が先決」と判断した場合は、
+  次タスクを game_results metadata 拡張最小設計レポートに切り替えてよい。
+
+
+================================================================================
+16. 一区切り判定
+================================================================================
+
+**判定: Python CLI進行表示まわり第1段は一区切り**
+
+理由:
+- choice "1" / "2" / "9" の主要進行系が quiet + summary で成立
+- 実データ smoke 合格済み（fa_clip / debug_user）
+- 既存テスト全体 pass
+- save 未上書きで確認済み
+- 残課題はあるが、次は表示文言調整よりログ/実況体験の土台へ進むべき
+
+
+================================================================================
+17. 参照 reports 一覧
+================================================================================
+
+- python_core_round_advance_preview_integration_direction_2026-05.txt
+- python_core_round_advance_preview_cli_smoke_2026-05.txt
+- python_core_post_advance_result_summary_survey_2026-05.txt
+- python_core_cli_round_advance_full_flow_smoke_2026-05.txt
+- python_core_next_experience_theme_selection_2026-05.txt
+- python_core_simulate_quiet_mode_minimal_design_2026-05.txt
+- python_core_cli_round_advance_quiet_full_flow_smoke_2026-05.txt
+- python_core_multi_round_quiet_post_summary_survey_2026-05.txt
+- python_core_cli_choice2_quiet_post_summary_smoke_2026-05.txt
+- python_core_choice9_season_end_summary_tail_design_2026-05.txt
+- python_core_cli_choice9_season_end_summary_smoke_2026-05.txt
