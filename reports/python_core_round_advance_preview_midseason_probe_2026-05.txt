@@ -1,0 +1,229 @@
+================================================================================
+Python本体 — ラウンド進行 preview mid-season 実データ確認（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+参照 HEAD: 1adc744 — Python本体のラウンド進行previewをexport可能にする
+調査方法: ローカル .sav 読取専用スキャン + round_advance_preview_readonly CLI 実行
+コード変更: なし（本レポートのみ追加）
+
+
+================================================================================
+1. 目的
+================================================================================
+
+- `basketball_sim.export.round_advance_preview_readonly` を **実セーブ** で確認する。
+- 前回手動確認で使った `debug_user_boost_d1_user_cellb.sav` は
+  `resume_season=None` のため `can_advance=False` だった（仕様どおり）。
+- 今回はローカル保存済み `.sav` から以下を満たす mid-season セーブを特定し、
+  `summary.can_advance=True` になることを実データで確認する。
+
+  条件:
+  - resume_season is not None
+  - season_finished is False
+  - current_round < total_rounds
+  - round_advance_preview_readonly 実行時に summary.can_advance=True
+
+
+================================================================================
+2. 調査環境
+================================================================================
+
+最新コミット: 1adc744
+save_dir: C:\Users\tsuno\.basketball_sim\saves
+save_dir 存在: True
+.sav 件数: 20
+OS: Windows 10 (win32 10.0.26200)
+シェル: PowerShell
+Python: py ランチャー（プロジェクトルートから実行）
+
+禁止呼び出し grep（作業前確認）:
+- round_advance_preview_readonly.py: docstring の説明文字列のみ（実呼び出しなし）
+- round_advance_preview.py: docstring + ローカル変数 season_finished / current_round 読取のみ（代入は preview 内の一時変数）
+
+
+================================================================================
+3. 実行した主なコマンド
+================================================================================
+
+1. save 一覧
+   Get-ChildItem $env:USERPROFILE\.basketball_sim\saves -Filter *.sav
+
+2. 全 .sav season 状態スキャン（load_world / validate_payload のみ）
+   Python ワンショット（name, candidate, has_season, current_round, ...）
+
+3. MID 候補自動抽出（sorted 順で最初の mid-season）
+   Python ワンショット → $env:TEMP\round_preview_midseason_candidate_path.txt
+
+4. preview export（candidate 選定後）
+   py -m basketball_sim.export.round_advance_preview_readonly `
+     --save "<candidate>" `
+     --output "$env:TEMP\round_advance_preview_midseason_probe.json" `
+     --max-events 32 --print-lines
+
+5. JSON 確認
+   py -c "json.loads(...)" （summary / warnings / events 等）
+
+6. 任意 pytest
+   py -m pytest basketball_sim/tests/test_round_advance_preview.py
+   py -m pytest basketball_sim/tests/test_round_advance_preview_readonly_export.py
+
+
+================================================================================
+4. save 一覧と候補判定
+================================================================================
+
+| save basename | has_resume_season | current_round | total_rounds | season_finished | user_team | candidate | 備考 |
+|---|---:|---:|---:|---:|---|---|---|
+| debug_user_boost_d1_postoff.sav | False | — | — | — | dlasjfasfjd2 | - | resume_season=None（年度メニュー等） |
+| debug_user_boost_d1_user.sav | True | 32 | 33 | False | dlasjfasfjd2 | MID | mid-season候補 |
+| debug_user_boost_d1_user_cellb.sav | False | — | — | — | dlasjfasfjd2 | - | resume_season=None（前回確認セーブ） |
+| debug_user_boost_d1_user_postfloor.sav | False | — | — | — | dlasjfasfjd2 | - | resume_season=None |
+| debug_user_boost_d2_postoff.sav | False | — | — | — | dlasjfasfjd2 | - | resume_season=None |
+| debug_user_boost_d2_user.sav | True | 32 | 33 | False | dlasjfasfjd2 | MID | mid-season候補 |
+| debug_user_boost_d2_user_cellb.sav | False | — | — | — | dlasjfasfjd2 | - | resume_season=None |
+| debug_user_boost_d2_user_postfloor.sav | False | — | — | — | dlasjfasfjd2 | - | resume_season=None |
+| fa_clip_test_01.sav | True | 32 | 33 | False | セーブ確認プレイチーム | MID | mid-season候補 |
+| fa_clip_test_02.sav | False | — | — | — | セーブ確認プレイチーム | - | resume_season=None |
+| fa_clip_test_03.sav | True | 0 | 33 | False | セーブ確認プレイチーム | MID | mid-season候補（シーズン開始直前） |
+| fa_clip_test_04.sav | True | 5 | 33 | False | セーブ確認プレイチーム | MID | mid-season候補 |
+| fa_clip_test_05.sav | True | 10 | 33 | False | セーブ確認プレイチーム | MID | mid-season候補 |
+| fa_clip_var_20260408_01.sav | True | 1 | 33 | False | sannpuru1 | MID | mid-season候補 |
+| fa_clip_var_20260408_02.sav | False | — | — | — | sannpuru2 | - | resume_season=None |
+| fa_clip_var_20260408_03.sav | True | 32 | 33 | False | sannpuru3 | MID | mid-season候補 |
+| fa_gap_20260408_10man_01.sav | True | 5 | 33 | False | sannpuru1 | MID | mid-season候補 |
+| fa_gap_20260408_10man_02.sav | True | 10 | 33 | False | sannpuru1 | MID | mid-season候補 |
+| fa_gap_20260408_10man_03.sav | False | — | — | — | sannpruuu3 | - | resume_season=None |
+| fa_gap_20260408_postoff_01.sav | True | 0 | 33 | False | otamesisannpuru | MID | mid-season候補 |
+
+MID 候補数: 12 / 20
+非 MID の主因: resume_season=None（8件）— 年度メニュー保存・オフシーズン保存等
+
+
+================================================================================
+5. 選定した candidate
+================================================================================
+
+basename: debug_user_boost_d1_user.sav
+current_round / total_rounds: 32 / 33
+season_finished: False
+user_team: dlasjfasfjd2
+
+選定理由:
+- sorted(.sav) 順で最初に条件を満たした mid-season セーブ
+- resume_season 接続済み、season_finished=False、32 < 33
+
+
+================================================================================
+6. round_advance_preview_readonly 実行結果
+================================================================================
+
+実行: 実施済み
+
+実行コマンド:
+  py -m basketball_sim.export.round_advance_preview_readonly
+    --save C:\Users\tsuno\.basketball_sim\saves\debug_user_boost_d1_user.sav
+    --output C:\Users\tsuno\AppData\Local\Temp\round_advance_preview_midseason_probe.json
+    --max-events 32 --print-lines
+
+output json path:
+  C:\Users\tsuno\AppData\Local\Temp\round_advance_preview_midseason_probe.json
+  （$env:TEMP — commit 対象外）
+
+結果サマリ:
+
+| 項目 | 値 |
+|---|---|
+| screen_title | ラウンド進行プレビュー（読取専用） |
+| team_name | dlasjfasfjd2 |
+| can_advance | True |
+| current_round | 32 |
+| next_round | 33 |
+| total_rounds | 33 |
+| next_round_month_week | 6月1週目 |
+| user_team_game_count | 0 |
+| next_round_events 件数 | 0 |
+| user_game.has_game | False |
+| warnings | []（空） |
+| first_event | None |
+
+schedule_lines / advance_hint 概要（next_round_events=0 だが preview は有効）:
+- schedule_lines 先頭: 「次の進行（ラウンド 33 / 全 33・6月1週目）」
+- 自チーム game カード 0 件（杯・代表等は同進行で処理）
+- ディビジョンPO／シーズン締め：リーグ戦なしの週
+- advance_hint.one_line: 「進行予告: ラウンド33・自チームの対戦カード0件（杯等は同進行）／試合の合間の介入なし」
+
+解釈:
+- can_advance=True は確認できた。
+- next_round=33 は最終ラウンド（PO/シーズン締め週）のため、
+  get_events_for_round(33) が空・自チーム game 0 件はデータ上あり得る。
+- preview は「結果予測」ではなく「次ラウンド予定確認」なので、
+  schedule_lines / advance_hint で PO 週の説明が出ている点は妥当。
+
+--print-lines 結果概要:
+- 例外なしで完走（終了行: Wrote ...round_advance_preview_midseason_probe.json）
+- UTF-8 キャプチャ内容:
+  - 【ラウンド進行プレビュー（読取専用）】
+  - クラブ: dlasjfasfjd2
+  - 現在: ラウンド 32 / 33
+  - 次の進行: ラウンド 33 / 33（6月1週目）
+  - 自チーム試合: 0 試合
+  - 読み取り専用。simulate_next_round / Match.simulate は呼びません。
+- PowerShell コンソール直接表示は cp932 文字化けあり得るが、
+  export モジュールの _print_line により CLI 自体は例外で停止しない。
+
+
+================================================================================
+7. 判定
+================================================================================
+
+A. 成功
+
+- mid-season save（debug_user_boost_d1_user.sav）で can_advance=True を確認
+- preview JSON / CLI lines が実データで出力された
+- save 上書きなし（load_world のみ）
+- simulate_next_round / Match.simulate / save_world 未使用
+- Godot 自動起動なし
+
+補足:
+- 前回セーブ debug_user_boost_d1_user_cellb.sav は resume_season=None → can_advance=False（仕様どおり再確認）
+- 自チーム game カード付きの richer な mid-season 例は fa_clip_test_04.sav（5/33）等にも存在するが、
+  今回の選定ルール（sorted 最初の MID）に従い debug_user_boost_d1_user.sav を使用
+
+
+================================================================================
+8. 注意点
+================================================================================
+
+- resume_season=None の save では can_advance=False になる（年度メニュー保存等）
+- 年度メニュー保存・シーズン終了済み save では preview 進行不可
+- preview は結果予測ではなく次ラウンド予定確認
+- 最終ラウンド手前（32/33）では next_round_events=0 でも can_advance=True になり得る
+- $env:TEMP の JSON は検証用。commit しない
+- ローカル .sav は commit しない
+- Godot 連携は今回行わない
+
+
+================================================================================
+9. 任意 pytest 結果
+================================================================================
+
+実施: あり
+
+  py -m pytest basketball_sim/tests/test_round_advance_preview.py
+  py -m pytest basketball_sim/tests/test_round_advance_preview_readonly_export.py
+
+結果: 17 passed, 0 failed
+
+
+================================================================================
+10. 次に行う具体的タスク
+================================================================================
+
+成功判定のため、次は以下の設計レポートを作成する:
+
+- round_advance_preview_readonly を Godot 用手動 JSON 出力候補として扱うか、
+  まず Python CLI/Tk の「次へ進む前確認」へ接続するかを比較する設計レポート
+
+参考: fa_clip_test_04.sav（current_round=5/33）等を使えば、
+next_round_events > 0 / user_game.has_game=True の richer な実データ確認も可能。
