@@ -169,6 +169,7 @@ class Season:
         self.total_points = 0
         self.game_count = 0
         self.game_results = []
+        self.match_logs = []
 
         self.current_round = 0
         self.season_finished = False
@@ -2924,6 +2925,24 @@ class Season:
             ):
                 try:
                     print("\n".join(format_match_postgame_cli_lines(match, user_team)))
+                except Exception:
+                    pass
+
+            if user_team is not None:
+                try:
+                    from basketball_sim.systems.match_log_builder import build_user_match_log_entry
+
+                    _entry = build_user_match_log_entry(
+                        match=match,
+                        event=event,
+                        user_team=user_team,
+                        home_score=home_score,
+                        away_score=away_score,
+                    )
+                    if _entry is not None:
+                        if not hasattr(self, "match_logs") or self.match_logs is None:
+                            self.match_logs = []
+                        self.match_logs.append(_entry)
                 except Exception:
                     pass
 

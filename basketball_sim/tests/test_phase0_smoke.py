@@ -41,6 +41,67 @@ def test_normalize_payload_fills_missing_keys() -> None:
     assert p.get("resume_season") is None
 
 
+def test_normalize_payload_fills_missing_match_logs_on_resume_season() -> None:
+    class _OldSeasonStub:
+        all_teams = []
+        free_agents = []
+
+    season = _OldSeasonStub()
+    p = {
+        "teams": [],
+        "free_agents": [],
+        "user_team_id": 1,
+        "season_count": 1,
+        "resume_season": season,
+    }
+    normalize_payload(p)
+    rs = p["resume_season"]
+    assert hasattr(rs, "match_logs")
+    assert rs.match_logs == []
+
+
+def test_save_load_roundtrip_preserves_match_logs(tmp_path: Path) -> None:
+    from basketball_sim.main import generate_teams
+    from basketball_sim.models.season import Season
+    from basketball_sim.utils import sim_rng as sim_rng_mod
+
+    sim_rng_mod.init_simulation_random(11_223_344)
+    teams = generate_teams()
+    user = teams[0]
+    user.is_user_team = True
+    fa: list = []
+    season = Season(teams, fa)
+    season.match_logs = [
+        {
+            "match_id": "sample-1",
+            "event_id": "sample-1",
+            "user_team_involved": True,
+            "commentary_excerpt": {"head": ["a"], "tail": ["b"], "total_lines": 2},
+            "key_plays": [{"play_no": 1}],
+        }
+    ]
+
+    path = tmp_path / "logs.sav"
+    payload_in = build_save_payload(
+        teams=teams,
+        free_agents=fa,
+        user_team_id=int(user.team_id),
+        season_count=1,
+        tracked_player_name=None,
+        at_annual_menu=False,
+        simulation_seed=sim_rng_mod.get_last_simulation_seed(),
+        resume_season=season,
+    )
+    save_world(path, payload_in)
+    out = load_world(path)
+    validate_payload(out)
+    rebind_resume_season_to_world(out)
+    rs = out.get("resume_season")
+    assert rs is not None
+    assert len(rs.match_logs) == 1
+    assert rs.match_logs[0]["match_id"] == "sample-1"
+
+
 def test_validate_payload_requires_core_keys() -> None:
     with pytest.raises(ValueError, match="不足"):
         validate_payload({"teams": [], "free_agents": []})

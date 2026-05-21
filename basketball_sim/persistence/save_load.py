@@ -139,6 +139,11 @@ def normalize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
                 ensure_merchandise_on_team(t)
             except Exception:
                 continue
+
+    rs = payload.get("resume_season")
+    if rs is not None:
+        if not hasattr(rs, "match_logs") or rs.match_logs is None:
+            rs.match_logs = []
     return payload
 
 

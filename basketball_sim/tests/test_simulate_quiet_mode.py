@@ -216,3 +216,66 @@ def test_simulate_to_end_quiet_finishes_without_debug_tokens(
     assert season.season_finished is True
     for token in ("[PBP]", "[COMMENTARY]", "[MINUTES]", "[PLAY]", "[SUB]"):
         assert token not in out
+
+
+def _make_user_team_season(*, user_involved: bool = True) -> Season:
+    teams = generate_teams()
+    user = teams[0]
+    user.is_user_team = True
+    if user_involved:
+        home, away = user, teams[1]
+    else:
+        home, away = teams[1], teams[2]
+    season = Season(teams, [])
+    season.events_by_round[1] = [
+        SeasonEvent(
+            event_id="r1g1",
+            week=1,
+            day_of_week="Wed",
+            event_type="game",
+            competition_id="regular_season",
+            competition_type="regular_season",
+            stage="regular_season",
+            home_team=home,
+            away_team=away,
+            round_number=1,
+            label="g1",
+        ),
+    ]
+    return season
+
+
+def test_simulate_next_round_quiet_captures_user_match_logs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    season = _make_user_team_season(user_involved=True)
+    before_logs = len(season.match_logs)
+    before_results = len(season.game_results)
+    season.simulate_next_round(quiet=True)
+    capsys.readouterr()
+
+    assert len(season.game_results) == before_results + 1
+    assert set(season.game_results[-1].keys()) == {
+        "home_team",
+        "away_team",
+        "home_score",
+        "away_score",
+        "score_diff",
+        "total_score",
+    }
+    assert len(season.match_logs) == before_logs + 1
+    entry = season.match_logs[-1]
+    assert entry["user_team_involved"] is True
+    assert entry["event_id"] == "r1g1"
+    assert entry["commentary_excerpt"]["total_lines"] > 0
+    assert len(entry["key_plays"]) <= 8
+
+
+def test_simulate_next_round_quiet_skips_non_user_match_logs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    season = _make_user_team_season(user_involved=False)
+    before_logs = len(season.match_logs)
+    season.simulate_next_round(quiet=True)
+    capsys.readouterr()
+    assert len(season.match_logs) == before_logs
