@@ -1,0 +1,241 @@
+================================================================================
+Python本体 — quiet化後 CLI 1ラウンド進行フロー 実データ最終確認（2026-05）
+================================================================================
+
+確認日: 2026-05-19
+対象 commit: 762250e — simulate_next_roundのquiet化を実装
+目的: quiet化後の CLI choice "1" フロー（preview → weekly → quiet simulate → post summary）
+      が実データで読みやすいか、行数・表示順・compact を最終確認する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 確認方法
+================================================================================
+
+- **対話型 CLI:** 未実施（save 上書きリスク回避）
+- **programmatic smoke:** 実施（main.py choice "1" 同等、quiet=True）
+- **save 上書き:** なし（load_world のみ、save_world 未使用、mtime 変更なし）
+
+
+================================================================================
+2. 使用 save
+================================================================================
+
+| save | 用途 | cr（前→後） |
+|---|---|---|
+| fa_clip_test_04.sav | 自チーム2試合・中盤 | 5 → 6 |
+| debug_user_boost_d1_user.sav | 自チーム0・最終ラウンド compact | 32 → 33 |
+
+
+================================================================================
+3. 実行コマンド
+================================================================================
+
+- Get-ChildItem saves
+- Select-String（main.py / match.py / season.py）
+- pytest: test_simulate_quiet_mode + 関連6スイート + main import
+- programmatic smoke → $env:TEMP\cli_round_advance_quiet_full_flow_*.txt
+
+
+================================================================================
+4. pytest 結果
+================================================================================
+
+| スイート | 結果 |
+|---|---|
+| test_simulate_quiet_mode.py | passed |
+| test_post_advance_result_summary_cli_display.py | passed |
+| test_round_advance_preview.py | passed |
+| test_round_advance_preview_readonly_export.py | passed |
+| test_match_postgame_cli_display.py | passed |
+| test_schedule_display.py | passed |
+| test_reg_slot_pass_through.py | passed |
+| **合計** | **75 passed** |
+| import basketball_sim.main | ok |
+
+
+================================================================================
+5. static 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| main.py choice "1" | `season.simulate_next_round(quiet=True)`（L2877） |
+| main.py choice "2" | `simulate_multiple_rounds(5)` — quiet 未接続 |
+| main.py choice "9" | `simulate_to_end()` — quiet 未接続 |
+| Tk advance_one_round | `simulate_next_round()` — quiet 未接続（L3514） |
+| Match.__init__ | `quiet: bool = False` + `self._quiet` 存在 |
+| Match debug print | `if not self._quiet:` ガード（ACTIVE/STARTERS/SUB/PBP 等） |
+| season.simulate_next_round | `quiet=False` デフォルト、`_simulate_quiet` フラグ |
+| _finalize_season | `compact=False` デフォルト、quiet 時 compact=True 伝播 |
+| post summary 接続 | choice "1" で _game_results_before/after slice 維持 |
+
+
+================================================================================
+6. programmatic smoke 結果
+================================================================================
+
+| save | 総行数 | 非空行 | sim_error | PBP/SUB | Season finished | mtime |
+|---|---:|---:|---|---|---|---|
+| fa_clip_test_04.sav | 27 | 24 | なし | なし | なし | 不変 |
+| debug_user_boost_d1_user.sav | 31 | 26 | なし | なし | あり（compact） | 不変 |
+
+補足: game_results 差分 slice はラウンド全試合（fa_clip: 48件）だが、
+post summary は自チーム試合のみ抽出（2件）— 想定どおり。
+
+
+================================================================================
+7. quiet 前後比較
+================================================================================
+
+| save | quiet前（762250e前） | quiet後（今回） | 削減率 |
+|---|---:|---:|---|
+| fa_clip_test_04.sav | 約 8009 行 | **27 行** | 99.7% |
+| debug_user_boost_d1_user.sav | 約 3808 行 | **31 行** | 99.2% |
+
+前回実装報告（27行 / 31行）と今回一致。実用範囲（50行以下）を大幅に下回る。
+
+
+================================================================================
+8. 表示フロー抜粋
+================================================================================
+
+### fa_clip_test_04.sav
+
+**PREVIEW（8行）**
+```
+【ラウンド進行プレビュー（読取専用）】
+...
+自チーム試合: 2 試合
+```
+
+**WEEKLY（5行）**
+```
+【週送り前チェック】
+今週: 昇格圏争い
+...
+```
+
+**QUIET SIMULATE（代表）**
+```
+========== ラウンド 6/33 ==========
+[経営] ラウンド6: シーズン中収益（リーグ分配・放映等） +5,000,000円 ...
+[経営] ラウンド6: シーズン中収益（主場・門前概算） +500,000円 ...
+ラウンド消化試合数: 48
+ラウンド平均総得点: 147.1
+```
+
+**POST SUMMARY（全文）**
+```
+【ラウンド結果サマリー】
+対象: ラウンド 6/33
+自チーム試合: 2 試合
+○ セーブ確認プレイチーム 88 - 83 Yokohama Bulls_35
+○ セーブ確認プレイチーム 85 - 74 Yokohama Bulls_35
+ひとこと: 2勝0敗。好調を維持しています。
+```
+
+---
+
+### debug_user_boost_d1_user.sav
+
+**PREVIEW（冒頭）**
+```
+自チーム試合: 0 試合
+進行予告: ラウンド33・自チームの対戦カード0件（杯等は同進行）／...
+```
+
+**QUIET SIMULATE + COMPACT**
+```
+========== ラウンド 33/33 ==========
+[経営] ラウンド33: シーズン中収益（リーグ分配・放映等） +6,000,000円 ...
+ラウンド消化試合数: 0
+ラウンド平均総得点: 0.0
+
+Season finished
+
+--- League Scoring Stats ---
+Games Played: 1440
+Average Team Score: 70.5
+Average Total Score: 141.0
+```
+※ division stat leaders / awards / Richest Clubs / [PBP] 等は **出ない**
+
+**POST SUMMARY（全文）**
+```
+【ラウンド結果サマリー】
+対象: ラウンド 33/33
+自チーム試合: 0 試合
+ひとこと: このラウンドの自チーム試合結果はありません。
+```
+
+
+================================================================================
+9. 評価
+================================================================================
+
+### 表示順
+**合格** — preview → weekly → quiet simulate（見出し/経営/集計）→ post summary
+
+### 表示量
+**合格** — 両 save とも 27〜31 行。scroll 不要で post summary が即読める。
+
+### post summary の見やすさ
+**良好** — quiet simulate 直後に W/L 一覧 + ひとことが末尾に来る。埋没なし。
+
+### 最終ラウンド compact
+**良好** — Season finished + 基本スコア統計 4行のみ。大量ランキング/PBP なし。
+
+### 進行後エラー
+**なし**
+
+### save 上書き
+**なし**（mtime 不変、save_world 未使用）
+
+
+================================================================================
+10. 問題点・軽微所見（修正なし）
+================================================================================
+
+1. preview「読取専用」— 開発確認向け。製品 UI では表現変更余地あり
+2. weekly「ロスター/戦術確認推奨」と post「ひとこと」の推奨がやや重なる
+3. final compact の残し統計（Games Played 等）は将来もう少し整えてもよい
+4. choice "2" / "9" / Tk は quiet 未接続のまま — 大量出力の旧挙動
+5. game_results slice は全試合件数だが post summary フィルタで問題なし
+
+
+================================================================================
+11. 判定
+================================================================================
+
+**合格**
+
+- preview → weekly → quiet simulate → post summary の順
+- fa_clip: 自チーム2試合 summary（○/●、ひとこと）
+- debug: 自チーム0試合 summary + Season finished compact
+- quiet 後行数 27〜31（実用範囲）
+- 進行エラーなし / save 未上書き / コード変更なし
+
+
+================================================================================
+12. 次に行う具体的タスク（1件）
+================================================================================
+
+**choice "2" / "9" への quiet / post summary 拡張可否を調査するレポートを作成する**
+
+理由:
+- choice "1" の体験は成立（quiet + post summary）
+- choice "2"（5ラウンド）/ "9"（完走）は旧 verbose 出力のまま
+- 複数ラウンド summary には cap 設計が必要
+- いきなり実装せず調査レポートが安全
+
+
+================================================================================
+13. 参照
+================================================================================
+
+- reports/python_core_simulate_quiet_mode_minimal_design_2026-05.txt
+- reports/python_core_cli_round_advance_full_flow_smoke_2026-05.txt
+- $env:TEMP\cli_round_advance_quiet_full_flow_fa_clip_test_04.txt
+- $env:TEMP\cli_round_advance_quiet_full_flow_debug_user_boost_d1_user.txt
