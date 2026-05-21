@@ -2893,7 +2893,54 @@ def run_interactive_season(
                     except Exception:
                         pass
                 elif choice == "2":
-                    season.simulate_multiple_rounds(5)
+                    try:
+                        from basketball_sim.systems.weekly_advance_cli_display import (
+                            format_weekly_advance_check_lines,
+                        )
+
+                        for _wk_ln in format_weekly_advance_check_lines(
+                            season=season, user_team=user_team, free_agents=free_agents
+                        ):
+                            print(_wk_ln)
+                        print("")
+                    except Exception:
+                        pass
+                    _round_before = int(getattr(season, "current_round", 0) or 0)
+                    _total_rounds = int(getattr(season, "total_rounds", 0) or 0)
+                    _game_results_before = len(getattr(season, "game_results", []) or [])
+                    season.simulate_multiple_rounds(5, quiet=True)
+                    try:
+                        from basketball_sim.systems.post_advance_result_summary_cli_display import (
+                            format_post_advance_result_summary_lines,
+                        )
+
+                        _round_after = int(
+                            getattr(season, "current_round", _round_before) or _round_before
+                        )
+                        _game_results_after = getattr(season, "game_results", []) or []
+                        _new_results = _game_results_after[_game_results_before:]
+                        _start_round = (
+                            min(_round_before + 1, _round_after)
+                            if _round_after > _round_before
+                            else _round_before
+                        )
+                        if _round_after > _round_before:
+                            _round_label = (
+                                f"ラウンド {_start_round}〜{_round_after}/{_total_rounds}"
+                                "（5ラウンド進行分）"
+                            )
+                        else:
+                            _round_label = "5ラウンド進行分"
+                        for _summary_ln in format_post_advance_result_summary_lines(
+                            user_team,
+                            _new_results,
+                            round_label=_round_label,
+                            max_games=10,
+                        ):
+                            print(_summary_ln)
+                        print("")
+                    except Exception:
+                        pass
                 elif choice == "3":
                     season.print_midseason_leaderboards()
                 elif choice == "4":

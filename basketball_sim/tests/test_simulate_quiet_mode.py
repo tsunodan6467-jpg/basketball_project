@@ -123,3 +123,85 @@ def test_finalize_season_compact_smoke() -> None:
 
     assert season.season_finished is True
     assert captured.get("quiet") is True
+
+
+def _make_multi_round_season(rounds: int = 5) -> Season:
+    teams = generate_teams()
+    season = Season(teams, [])
+    home, away = teams[0], teams[1]
+    for rnd in range(1, rounds + 1):
+        season.events_by_round[rnd] = [
+            SeasonEvent(
+                event_id=f"r{rnd}g1",
+                week=rnd,
+                day_of_week="Wed",
+                event_type="game",
+                competition_id="regular_season",
+                competition_type="regular_season",
+                stage="regular_season",
+                home_team=home,
+                away_team=away,
+                round_number=rnd,
+                label=f"g{rnd}",
+            ),
+        ]
+    return season
+
+
+def test_simulate_multiple_rounds_quiet_advances_and_suppresses_debug(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    season = _make_multi_round_season(5)
+    before_round = season.current_round
+    before_results = len(season.game_results)
+    season.simulate_multiple_rounds(5, quiet=True)
+    out = capsys.readouterr().out
+    assert season.current_round == before_round + 5
+    assert len(season.game_results) == before_results + 5
+    for token in ("[PBP]", "[COMMENTARY]", "[MINUTES]", "[PLAY]", "[SUB]"):
+        assert token not in out
+    line_count = len([ln for ln in out.splitlines() if ln.strip()])
+    assert line_count <= 80
+
+
+def test_simulate_multiple_rounds_before_after_slice() -> None:
+    season = _make_multi_round_season(5)
+    before = len(season.game_results)
+    season.simulate_multiple_rounds(5, quiet=True)
+    added = season.game_results[before:]
+    assert isinstance(added, list)
+    assert len(added) == 5
+    assert set(added[0].keys()) == {
+        "home_team",
+        "away_team",
+        "home_score",
+        "away_score",
+        "score_diff",
+        "total_score",
+    }
+
+
+def test_post_summary_multi_round_max_games_ten() -> None:
+    from basketball_sim.systems.post_advance_result_summary_cli_display import (
+        format_post_advance_result_summary_lines,
+    )
+
+    class _T:
+        name = "UserFC"
+
+    rows = [
+        {"home_team": "UserFC", "away_team": f"O{i}", "home_score": 80, "away_score": 70}
+        for i in range(10)
+    ]
+    text = "\n".join(
+        format_post_advance_result_summary_lines(
+            _T(),
+            rows,
+            round_label="ラウンド 6〜10/33（5ラウンド進行分）",
+            max_games=10,
+        )
+    )
+    assert "自チーム試合: 10 試合" in text
+    assert "ほか" not in text
+    assert "5ラウンド進行分" in text
+    assert "10勝0敗" in text
