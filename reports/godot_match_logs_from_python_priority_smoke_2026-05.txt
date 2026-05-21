@@ -1,0 +1,341 @@
+================================================================================
+Godot — match_logs_from_python.json 優先読込 確認（2026-05）
+================================================================================
+
+確認日: 2026-05-21
+対象 commit: b601bd7 — Godot試合ログ一覧の手動確認を整理
+参考 commit:
+  - cf208fc — match_logs readonly exportを追加
+  - 4ae47a1 — match_logs readonly exportを実データ確認
+  - c24736e — Godotに試合ログ一覧の第1段を追加
+  - 2944a1a — match_logs詳細カードをスクロール表示に修正
+目的: `godot/data/match_logs_from_python.json` を手動配置した場合、
+      mock ではなく Python 生成 JSON が Godot match_logs_view で優先読込されることを確認する。
+コード変更: なし（本レポートのみ）。
+
+================================================================================
+1. 確認方法
+================================================================================
+
+| 層 | 内容 |
+|---|---|
+| programmatic | fa_clip_test_04.sav load → メモリ simulate 1R → temp .sav → export JSON |
+| 手動配置 | temp JSON を `godot/data/match_logs_from_python.json` に Copy-Item |
+| static | JSON parse / git status / match_logs_view.gd 優先読込ロジック確認 |
+| Godot エディタ | PATH 未検出のため本セッションでは未実行 |
+
+対話型 CLI は未使用。実データ save 本体には save_world を呼ばない。
+
+================================================================================
+2. 使用 save
+================================================================================
+
+| save | パス | 用途 |
+|---|---|---|
+| 実データ save | `%USERPROFILE%\.basketball_sim\saves\fa_clip_test_04.sav` | load + メモリ simulate のみ |
+| temp save | `$env:TEMP\match_logs_from_python_priority_smoke\temp_match_logs_priority.sav` | save_world 出力先（temp のみ） |
+| temp JSON | `$env:TEMP\match_logs_from_python_priority_smoke\match_logs_from_python.json` | export 出力 |
+| Godot 配置 | `godot/data/match_logs_from_python.json` | 確認用一時配置（commit 禁止） |
+
+実データ save 属性（作業前後）:
+- size: 1,370,770 bytes
+- mtime (UTC): 2026-04-08T05:56:44.388168+00:00
+- 作業後: **不変（real_save_unchanged: true）**
+
+================================================================================
+3. temp .sav / temp JSON 作成手順
+================================================================================
+
+1. `load_world(fa_clip_test_04.sav)`
+2. `validate_payload(payload)`
+3. `find_user_team(teams, user_team_id)` → セーブ確認プレイチーム
+4. `season = payload["resume_season"]`
+5. before: match_logs=0, current_round=5
+6. `season.simulate_next_round(quiet=True)`（メモリのみ）
+7. after: match_logs=2, current_round=6
+8. `save_world(temp_sav, payload)` — temp パスのみ
+9. `export_match_logs_json_from_world(temp_sav, temp_json, max_logs=50)`
+10. JSON parse 確認
+
+実行スクリプト（repo 外）:
+`$env:TEMP\match_logs_from_python_priority_smoke\run_smoke.py`
+
+メタ出力:
+`$env:TEMP\match_logs_from_python_priority_smoke\smoke_meta.json`
+
+================================================================================
+4. 実データ save 未上書き確認
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| save_world 先 | temp .sav のみ |
+| 実データ save size 前後 | 1,370,770 → 1,370,770（不変） |
+| 実データ save mtime 前後 | 不変 |
+| real_save_unchanged | **true** |
+
+================================================================================
+5. generated match_logs_from_python.json summary
+================================================================================
+
+| 項目 | 値 |
+|---|---|
+| team_name | セーブ確認プレイチーム |
+| season_label | 1年目　11月3週目　ラウンド7/33 |
+| summary.count | 2 |
+| summary.exported_count | 2 |
+| summary.has_season | true |
+| summary.has_logs | true |
+| summary.latest_round | 6 |
+| summary.current_round | 6 |
+| summary.total_rounds | 33 |
+| len(match_logs) | 2 |
+| empty_message | （空） |
+| simulate 前後 | match_logs 0→2, round 5→6 |
+
+match_logs[0]:
+- match_id: regular_season_r6_g33
+- summary_line: ○ セーブ確認プレイチーム 65 - 64 Yokohama Bulls_35
+- user_result: W
+- commentary_excerpt.total_lines: 360
+- key_plays: 8 件
+
+match_logs[1]:
+- match_id: regular_season_r6_g34
+- summary_line: ● セーブ確認プレイチーム 68 - 81 Yokohama Bulls_35
+- user_result: L
+
+mock との差分（優先読込判別用）:
+- mock team_name: 横浜ブルズ
+- from_python team_name: セーブ確認プレイチーム
+- mock summary_line 例: ○ 横浜ブルズ 74 - 72 大阪ウィングス
+- from_python summary_line 例: ○ セーブ確認プレイチーム 65 - 64 Yokohama Bulls_35
+
+→ Godot 上で mock 内容が出なければ from_python 優先読込と判断可能。
+
+================================================================================
+6. godot/data への手動配置
+================================================================================
+
+実行:
+```
+Copy-Item "$env:TEMP\match_logs_from_python_priority_smoke\match_logs_from_python.json" `
+  "godot\data\match_logs_from_python.json" -Force
+```
+
+parse 確認:
+```
+py -c "import json, pathlib; ..."
+→ 2 2 2
+→ team: セーブ確認プレイチーム
+→ line0: ○ セーブ確認プレイチーム 65 - 64 Yokohama Bulls_35
+```
+
+git status:
+- `?? godot/data/match_logs_from_python.json`（未追跡、add していない）
+
+================================================================================
+7. Godot 優先読込確認
+================================================================================
+
+### static（コード確認）
+
+match_logs_view.gd:
+- `_match_logs_json_paths[0]` = `res://data/match_logs_from_python.json`
+- `_match_logs_json_paths[1]` = `res://data/match_logs_mock.json`
+- `FileAccess.file_exists(path)` で存在する from_python を先に読む
+- `_data_source_caption()` が `match_logs_from_python.json` 末尾で
+  `読込元: Python生成JSON（手動配置・優先） / ...` を返す
+
+配置時の期待動作:
+1. from_python が存在 → mock は読まれない
+2. team_name / summary_line が Python 生成内容になる
+3. DataSourceLabel が Python 生成 JSON を示す
+
+### Godot エディタ UI
+
+| 項目 | 本セッション |
+|---|---|
+| Godot CLI | PATH 未検出 |
+| Godot 実行ファイル | 標準パス未検出 |
+| Run Current Scene | **未実施** |
+
+前回（b601bd7 手動確認）で mock fallback の UI 動作は成立済み。
+今回の from_python 優先読込は、配置 JSON と mock の内容差により UI 上も判別可能。
+ただし **本セッションでは Godot エディタを起動していない** ため、
+DataSourceLabel / 詳細カード / HomeNavButton の実画面確認は未実施。
+
+================================================================================
+8. DataSourceLabel 表示（期待値）
+================================================================================
+
+from_python 配置時の期待表示:
+```
+読込元: Python生成JSON（手動配置・優先） / res://data/match_logs_from_python.json
+```
+
+mock fallback 時（from_python なし）:
+```
+読込元: 同梱モックJSON / res://data/match_logs_from_python.json
+```
+※ 末尾ファイル名は `_data_source_caption` の実装どおり uri 全体を表示
+
+================================================================================
+9. 一覧表示件数（期待値）
+================================================================================
+
+- exported_count: 2
+- 一覧 row: 2 件
+- 各 row: R6 / regular_season / summary_line / 実況行数 / key plays 件数
+
+================================================================================
+10. 詳細カード / 内部スクロール / HomeNavButton（期待値）
+================================================================================
+
+前回 mock 手動確認（b601bd7）で以下は成立済み:
+- 詳細ボタン → StatusLabel 詳細カード（excerpt / key plays）
+- 詳細カード内部スクロール（_DETAIL_SCROLL_HEIGHT := 210）
+- HomeNavButton → home_dashboard 復帰
+
+from_python 配置時も同一 UI ロジックのため、
+詳細内容のみ Python 生成 JSON 由来に変わる想定。
+**本セッションの Godot 実画面確認: 未実施**
+
+================================================================================
+11. 確認後の match_logs_from_python.json 削除
+================================================================================
+
+実行:
+```
+Remove-Item "godot\data\match_logs_from_python.json" -Force
+```
+
+結果:
+- `godot/data/match_logs_from_python.json` **削除済み**
+- Test-Path → False
+- git status に当該ファイルなし
+
+temp 側（$env:TEMP）は残置（repo / commit 対象外）:
+- temp_match_logs_priority.sav
+- match_logs_from_python.json
+- smoke_meta.json
+- run_smoke.py
+
+================================================================================
+12. git status 確認（レポート作成前）
+================================================================================
+
+```
+?? docs/CURSOR_TO_CHATGPT_NEW_CHAT_HANDOFF_2026-05-11.md
+?? godot/scripts/game_detail_view.gd.uid
+?? godot/scripts/match_logs_view.gd.uid
+?? godot/scripts/player_detail_view.gd.uid
+?? godot/scripts/readonly_selection_context.gd.uid
+```
+
+- `godot/data/match_logs_from_python.json`: なし（削除済み）
+- `.uid`: add していない
+- コード diff: なし
+
+禁止パス diff（作業前）: 空
+
+================================================================================
+13. 触っていない範囲
+================================================================================
+
+- basketball_sim/**
+- godot/scripts/** / godot/scenes/**
+- godot/data/match_logs_mock.json
+- docs/** / tests/**
+- .sav（実データ save 未上書き）
+- .uid
+- `match_logs_from_python.json`（commit なし）
+
+================================================================================
+14. 問題点
+================================================================================
+
+blocking 問題: **なし**（programmatic / 配置 / 削除 / 実 save 安全）
+
+未完了（後追い可能）:
+- Godot エディタでの from_python 優先読込 **実画面確認**（本セッション未実施）
+
+================================================================================
+15. 軽微所見
+================================================================================
+
+- 実データ save 本体には match_logs が未保存のため、temp .sav 経由で JSON を生成した
+- 今回の `match_logs_from_python.json` は確認用手動配置であり commit 対象ではない
+- Godot CLI / 実行ファイルは PATH・標準パスとも未検出 → 手動確認中心
+- 将来は bundle 出力をユーザー操作で `godot/data/` に配置する手順整備が必要
+- schedule 連携 / CLI match_logs 閲覧 / game_results metadata 拡張は未実装
+- filter / search / reverse sort は未実装
+- simulate 1R 後の match_logs 2件はいずれも R6（user team 関連試合）
+
+================================================================================
+16. 判定
+================================================================================
+
+**条件付き合格**
+
+| 基準 | 結果 |
+|---|---|
+| temp .sav 経由で実データ入り JSON 生成 | **OK** |
+| summary.count / exported_count 正しい | **OK（2/2）** |
+| godot/data へ手動配置 | **OK** |
+| Godot が from_python を優先読込（static） | **OK** |
+| DataSourceLabel が Python 生成 JSON を示す（static 期待値） | **OK** |
+| 一覧表示（Godot UI） | **未実施** |
+| 詳細カード / 内部スクロール / HomeNavButton（Godot UI） | **未実施（前回 mock UI は OK）** |
+| 実データ save 未上書き | **OK** |
+| match_logs_from_python.json 未 commit | **OK** |
+| .uid 未 commit | **OK** |
+| コード変更なし | **OK** |
+
+programmatic 確認と優先読込ロジックは合格。
+Godot エディタ実画面は本セッション未実施のため、完全合格には Godot Run Current Scene の追確認を推奨。
+
+追確認手順（任意）:
+1. temp JSON を再度 `godot/data/` にコピー
+2. Godot で match_logs_view.tscn → Run Current Scene
+3. team_name が「セーブ確認プレイチーム」、DataSourceLabel が Python 生成 JSON を示すことを確認
+4. 確認後 JSON を削除
+
+================================================================================
+17. 後工程へ回す項目
+================================================================================
+
+- Godot エディタ from_python 優先読込の実画面追確認（任意）
+- bundle 出力 → godot/data 手動配置手順の整備
+- schedule → event_id → match_logs 連携
+- game_results metadata 拡張
+- CLI match_logs 閲覧メニュー
+- full PBP 保存 / export
+- box score 詳細 / player 別スタッツ連携
+- key_plays / commentary 品質改善
+- filter / search / reverse sort
+- 解像度別詳細カード高さ調整
+
+================================================================================
+18. 次に行う具体的タスク（1件）
+================================================================================
+
+**Python→Godot match_logs 接続の一区切りレポートを作成する**
+
+理由:
+- Python 保存 → readonly export → bundle 11件化 → Godot mock 表示 →
+  from_python 生成・配置・優先読込ロジック確認まで到達
+- 第1段として一区切り可能
+- Godot 実画面追確認は任意で同レポートに追記可能
+
+================================================================================
+19. 関連レポート
+================================================================================
+
+- reports/python_core_match_logs_readonly_export_bundle_smoke_2026-05.txt
+- reports/godot_match_logs_view_phase1_manual_smoke_2026-05.txt
+- reports/godot_match_logs_mock_and_readonly_list_design_2026-05.txt
+
+================================================================================
+END
+================================================================================
