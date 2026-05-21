@@ -1,0 +1,120 @@
+{
+  "screen_title": "試合ログ（閲覧）",
+  "team_name": "横浜ブルズ",
+  "league_level": 3,
+  "season_label": "シーズン 1",
+  "summary": {
+    "has_season": true,
+    "has_logs": true,
+    "count": 2,
+    "exported_count": 2,
+    "latest_round": 6,
+    "current_round": 6,
+    "total_rounds": 33
+  },
+  "match_logs": [
+    {
+      "match_id": "regular_season_r6_g33",
+      "event_id": "regular_season_r6_g33",
+      "round": 6,
+      "competition_type": "regular_season",
+      "stage": "regular_season",
+      "week": 6,
+      "day_of_week": "Sat",
+      "home_team": "横浜ブルズ",
+      "away_team": "大阪ウィングス",
+      "home_score": 74,
+      "away_score": 72,
+      "user_team_involved": true,
+      "user_team": "横浜ブルズ",
+      "user_result": "W",
+      "summary_line": "○ 横浜ブルズ 74 - 72 大阪ウィングス",
+      "commentary_excerpt": {
+        "head": [
+          "第1Q 10:00 試合開始。横浜ブルズのボール。",
+          "速攻からのレイアップ成功。",
+          "大阪ウィングスも即座に3Pで返す。",
+          "第1Qは互角の展開。",
+          "ベンチの指示が目立つ序盤。"
+        ],
+        "tail": [
+          "第4Q 00:45 横浜ブルズ、逆転のチャンス。",
+          "クラッチでフリースロー2本成功。",
+          "大阪ウィングス、最後の3Pはリングに触れるのみ。",
+          "第4Q 00:12 横浜ブルズが勝ち越しの3P。",
+          "試合終了。横浜ブルズ 74 - 72。"
+        ],
+        "total_lines": 363
+      },
+      "key_plays": [
+        {
+          "play_no": 168,
+          "quarter": 4,
+          "result_type": "made_2",
+          "commentary_text": "終盤、横浜ブルズがフリースロー2本で同点。",
+          "home_score": 70,
+          "away_score": 70
+        },
+        {
+          "play_no": 170,
+          "quarter": 4,
+          "result_type": "made_3",
+          "commentary_text": "終盤、横浜ブルズが勝ち越しの3P。",
+          "home_score": 72,
+          "away_score": 70
+        }
+      ],
+      "captured_at": "simulate_next_round"
+    },
+    {
+      "match_id": "regular_season_r5_g12",
+      "event_id": "regular_season_r5_g12",
+      "round": 5,
+      "competition_type": "regular_season",
+      "stage": "regular_season",
+      "week": 5,
+      "day_of_week": "Wed",
+      "home_team": "京都ナイツ",
+      "away_team": "横浜ブルズ",
+      "home_score": 81,
+      "away_score": 78,
+      "user_team_involved": true,
+      "user_team": "横浜ブルズ",
+      "user_result": "L",
+      "summary_line": "● 横浜ブルズ 78 - 81 京都ナイツ",
+      "commentary_excerpt": {
+        "head": [
+          "第1Q 開始。京都ナイツが先制。",
+          "横浜ブルズもドライブで追い上げる。",
+          "序盤は互いに高確率のシュート。",
+          "京都ナイツがリバウンドで優位。",
+          "横浜ブルズはタイムアウトで修正を図る。"
+        ],
+        "tail": [
+          "第4Q 01:10 横浜ブルズが1点差まで迫る。",
+          "京都ナイツ、ポストプレーで加点。",
+          "横浜ブルズの同点3Pは惜しくも外れる。",
+          "残り8秒、京都ナイツがフリースロー成功。",
+          "試合終了。横浜ブルズは3点差で敗戦。"
+        ],
+        "total_lines": 355
+      },
+      "key_plays": [
+        {
+          "play_no": 160,
+          "quarter": 4,
+          "result_type": "made_2",
+          "commentary_text": "京都ナイツ、終盤に逆転成功。",
+          "home_score": 79,
+          "away_score": 78
+        }
+      ],
+      "captured_at": "simulate_next_round"
+    }
+  ],
+  "empty_message": "",
+  "notes": [
+    "読み取り専用。操作は含みません。",
+    "commentary は試合時点の head/tail excerpt のみ。full PBP は含みません。"
+  ]
+}

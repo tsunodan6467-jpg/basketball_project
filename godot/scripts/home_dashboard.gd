@@ -17,6 +17,7 @@ const _FINANCE_SUMMARY_VIEW_SCENE_PATH := "res://scenes/finance_summary_view.tsc
 const _OWNER_MISSION_VIEW_SCENE_PATH := "res://scenes/owner_mission_view.tscn"
 const _CONTRACT_PERSONNEL_SUMMARY_VIEW_SCENE_PATH := "res://scenes/contract_personnel_summary_view.tscn"
 const _TACTICS_SUMMARY_VIEW_SCENE_PATH := "res://scenes/tactics_summary_view.tscn"
+const _MATCH_LOGS_VIEW_SCENE_PATH := "res://scenes/match_logs_view.tscn"
 
 ## 直近で読み取りに成功した `res://` パス（表示用）
 var _last_loaded_uri: String = ""
@@ -217,4 +218,14 @@ func _on_contract_personnel_summary_view_button_pressed() -> void:
 		push_warning(
 			"[home_dashboard] change_scene_to_file failed: %s err=%s"
 			% [_CONTRACT_PERSONNEL_SUMMARY_VIEW_SCENE_PATH, err]
+		)
+
+
+func _on_match_logs_view_button_pressed() -> void:
+	# 閲覧専用: シーン切替のみ。Python 起動・save・ゲーム進行は行わない。
+	var err := get_tree().change_scene_to_file(_MATCH_LOGS_VIEW_SCENE_PATH)
+	if err != OK:
+		push_warning(
+			"[home_dashboard] change_scene_to_file failed: %s err=%s"
+			% [_MATCH_LOGS_VIEW_SCENE_PATH, err]
 		)
