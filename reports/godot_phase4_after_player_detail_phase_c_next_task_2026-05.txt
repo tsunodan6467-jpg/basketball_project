@@ -1,0 +1,211 @@
+================================================================================
+Godot Phase 4 — player_detail 導線 Phase C 完了後の次タスク比較
+================================================================================
+
+調査日: 2026-05
+参照 HEAD: d7e229d — Godot戦術から選手詳細画面へ接続
+調査方法: git log / grep / 既存 export・scene 一覧（実装・pytest なし）
+
+================================================================================
+1. 現在地
+================================================================================
+
+- Phase 4 / Godot 本番 GUI 準備 / **player_detail 導線 Phase C 完了**
+- 最新コミット: **d7e229d**
+- **ロスター・契約 PlayerRows・戦術 PlayerRoles** の 3 導線から
+  `player_detail_view.tscn` へ接続済み
+- `ReadonlySelectionContext` Autoload 登録済み
+  (`project.godot` [autoload] ReadonlySelectionContext)
+- Autoload は **player / game 両方** の基礎 API を保持
+  (`set_player`, `set_game`, `get_event_id` 等)
+- `player_detail_view` は **payload 表示の最小版**（JSON 再読込なし）
+- まだ **編集・保存・Python 自動起動・ゲーム進行はしない** 読み取り専用
+- `game_detail_view` scene / script は **未存在**（scenes 14 本に player_detail のみ追加）
+- 日程 `schedule_view.gd` は upcoming「詳細」→ **上部試合カード** のみ（scene 跨ぎなし）
+- schedule export / mock には **event_id** あり（Phase A 以前から）
+
+
+2. 完了済み大項目
+================================================================================
+
+- Body 平坦 Panel 横展開（複数画面）
+- 日程 3 ブロック外装統一（upcoming / advance_hint / empty_message）
+- ロスター詳細導線 第1段（氏名「詳細」→ 上部サマリーカード）
+- 日程 upcoming 詳細導線 第1段（「詳細」→ 上部試合カード）
+- 契約 RiskRows 詳細導線（行直下インライン）
+- 戦術 PlayerRoles 詳細導線（行直下インライン）
+- 契約 PlayerRows 詳細導線（行直下インライン）
+- player_id export 追加（roster / contract / tactics + mock + tests）
+- ReadonlySelectionContext Autoload（Phase C-1）
+- player_detail_view 最小版（Phase C-2）
+- ロスター / 契約 / 戦術 から player_detail_view へ接続（Phase C-3 / C-4）
+- player_detail Autoload 参照の安全化（/root 経由 + ctx.call）
+- from_python JSON の player_id 再生成確認（ローカル手動・gitignore）
+
+
+3. 未完了の重要課題
+================================================================================
+
+- **日程 event_id → game_detail_view** は未着手
+- **player_detail_view** は最小版。詳細データ統合・正本設計は未着手
+- 契約・戦術から渡る payload は各サマリー行由来のため、
+  契約・国籍枠・状態など **表示項目が不足する場合がある**（player_detail 側は「—」表示）
+- Godot GUI は **読み取り専用中心**（10 本線 + player_detail）
+- Python 本体側の GM 判断・長期運営・試合体験の本格強化には **未復帰**
+- Phase 4 後半の **優先順位整理**（game_detail / player_detail 本格化 / Python 復帰）が必要
+- RiskRows・日程から player_detail への接続は **意図的に未実施**（設計上非推奨）
+
+
+4. 次候補の比較
+================================================================================
+
+------------------------------------------------------------
+候補A: 日程 event_id → game_detail_view へ進む
+------------------------------------------------------------
+
+良い点:
+- player_detail と **同型**（Autoload kind=game + 専用 scene + 戻る導線）
+- `ReadonlySelectionContext.set_game()` は **既に実装済み**
+- schedule export / mock に **event_id** と **detail** 文字列あり
+- 日程 upcoming「詳細」は既存。横に「画面」追加で Phase C と同型接続可能
+- 試合・日程を「味わう」体験に近づく
+
+注意点:
+- 新規 `game_detail_view.gd` / `.tscn` が必要（Phase C-2 相当）
+- `schedule_view.gd` 接続 + project.godot 変更は不要（Autoload 済み）
+- event payload 項目・表示仕様を先に 1 枚で固定した方が安全
+- 古い `schedule_from_python.json`（event_id 欠落等）の再生成確認が必要になる可能性
+- player_detail より **試合コンテキスト固有**（対戦・ラウンド・ホームアウェイ等）
+
+向いている状況:
+- Godot の **詳細画面導線をもう 1 本** 完成させたい場合
+
+
+------------------------------------------------------------
+候補B: player_detail_view を本格化する
+------------------------------------------------------------
+
+良い点:
+- 既存 3 導線（ロスター・契約・戦術）の見返りが大きい
+- 同一選手を画面横断で見る **製品 UI** に近づく
+
+注意点:
+- **どのデータを正本にするか** 設計が必要（payload のみ / roster JSON 再検索 / 専用 export）
+- 契約行・戦術行 payload だけでは OVR/POT/契約/国籍が **欠けることがある**
+- 選手詳細専用 export + mock + from_python + tests を増やすか要判断
+- player_detail_view.gd の表示・正規化ロジック拡張が必要
+
+向いている状況:
+- player_detail を **製品画面** に近づけたい場合
+
+
+------------------------------------------------------------
+候補C: Python 本体へ戻る
+------------------------------------------------------------
+
+良い点:
+- ゲームの面白さ・長期運営・GM 判断の **中核** に戻れる
+- Steam 品質に直結しやすい
+
+注意点:
+- Godot Phase 4 導線が一段落した直後。**何を優先するか** 未整理のまま戻ると分散しやすい
+- 週次進行 / 試合ログ / 契約 FA / 戦術ローテ等、**ユーザー相談が必須**
+
+向いている状況:
+- UI 導線より **ゲーム体験の中身** を優先したい場合
+
+
+------------------------------------------------------------
+候補D: Phase 4 後半ロードマップ整理を挟む
+------------------------------------------------------------
+
+良い点:
+- Phase C 完了点を **正確に固定** できる
+- game_detail / player_detail 本格化 / Python 復帰の **優先順位を安全に決定**
+- 実装コミット単位（D-1 Autoload 相当は済 / game scene 最小版 / schedule 接続）を先に設計できる
+- 直接の実装リスクが小さい
+
+注意点:
+- その場の **実装進捗は小さい**（レポートのみ）
+
+向いている状況:
+- 作業分岐前に **安全確認** したい場合（**今が該当**）
+
+
+------------------------------------------------------------
+候補E: 細かい UI 調整を続ける
+------------------------------------------------------------
+
+良い点:
+- 見た目の統一感は上がる
+
+注意点:
+- 最近 Body 平坦 Panel・余白・行区切り等を **継続実施済み**
+- 主要導線・ゲーム体験より **優先度は低い**
+- 明確な崩れが無い限り後回しでよい
+
+向いている状況:
+- **表示崩れ・目視 NG** がある場合のみ
+
+
+5. 推奨結論
+================================================================================
+
+【最推奨】候補D — Phase 4 後半ロードマップ整理を挟む
+
+理由:
+1. Phase C で player_detail 導線が **3 本完成** し、節目として現在地固定が必要
+2. 次の候補 A/B/C はいずれも **やや大きめ**（新 scene・正本設計・Python 本体）
+3. ここで優先を整理しないと、Godot 導線拡張を続けるのか Python へ戻るのかが **曖昧**
+4. 安定性重視の運用（調査レポート → 小 commit → push）に合う
+5. 6950695 / 319d1bb 以来の「Autoload → player_detail → 横展開」パターンが一区切り
+
+【次点】候補A — 日程 event_id → game_detail_view
+
+理由:
+1. `ReadonlySelectionContext` は **set_game(event_id, payload, return_scene, source_label)** 済み
+2. schedule JSON に **event_id** あり（export: `_normalize_upcoming_row`）
+3. player_detail と **同設計** で game_detail へ横展開可能
+4. 試合・日程体験につながる
+
+ただし:
+- **候補 A に進む前に**、game_detail_view **最小仕様** と
+  日程側接続範囲（「詳細」維持 + 「画面」追加等）を
+  **1 枚の設計レポートで固定する** のが安全（Phase C 設計レポート 319d1bb と同型）
+
+
+6. 次に行う具体的タスク
+================================================================================
+
+次に行う具体的タスク:
+**Phase 4 後半ロードマップ整理レポートを作成し、
+game_detail / player_detail 本格化 / Python 本体復帰の優先順位を確定する。**
+
+想定ファイル例:
+  reports/godot_phase4_second_half_roadmap_2026-05.txt
+
+レポートで決めること（案）:
+- Phase D（game_detail）を先にするか、player_detail 本格化か、Python 復帰か
+- game_detail 最小版の表示項目・payload・source_label（「日程」）
+- player_detail 本格化時の正本（payload / roster export / 専用 DTO）
+- Python 復帰時の第1優先（週次進行 / 試合ログ / 契約 FA / 戦術ローテ）
+- 各フェーズの commit 分割（scene 追加 → 接続のみ → push）
+
+実装は **ロードマップ確定後** に 1 タスクずつ。
+
+
+================================================================================
+参考: Phase C 到達点（grep 確認）
+================================================================================
+
+- roster_view.gd: _open_player_detail_view, ctx.call("set_player", ...), source「ロスター」
+- contract_personnel_summary_view.gd: _open_contract_player_detail_view, source「契約人事」
+- tactics_summary_view.gd: _open_tactics_player_detail_view, source「戦術」
+- player_detail_view.gd: _selection_context(), payload 正規化表示, 戻る/ホーム
+- schedule_view.gd: _show_upcoming_game_detail（上部カードのみ）, event_id 未参照
+- game_detail_view: 未存在
+
+================================================================================
+調査実施: 2026-05-20
+pytest: 未実施（レポートのみ）
+================================================================================
