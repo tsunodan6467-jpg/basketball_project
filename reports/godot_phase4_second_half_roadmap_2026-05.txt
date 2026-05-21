@@ -1,0 +1,271 @@
+================================================================================
+Godot Phase 4 — 後半ロードマップ整理
+================================================================================
+
+調査日: 2026-05
+参照 HEAD: 92ad71c — Godot選手詳細導線後の次タスクを比較
+調査方法: git log / 直前レポート / grep / scene 一覧（実装・pytest なし）
+
+================================================================================
+1. 現在地
+================================================================================
+
+- **Phase 4 / Godot 本番 GUI 準備** — player_detail 導線 Phase C 完了後、後半方針決定の節目
+- 最新コミット: **92ad71c**
+- **player_detail 導線 Phase C 完了**
+  - C-1: ReadonlySelectionContext Autoload
+  - C-2: player_detail_view 最小版
+  - C-3: ロスター → player_detail_view
+  - C-4: 契約 PlayerRows / 戦術 PlayerRoles → player_detail_view
+- **接続済み 3 導線:** ロスター / 契約 PlayerRows / 戦術 PlayerRoles
+- **日程:** upcoming「詳細」→ 上部試合カード（第1段完了）。**game_detail_view 未着手**
+- **Autoload:** set_player / set_game / get_event_id 等（readonly_selection_context.gd）
+- **player_detail_view:** payload 表示最小版（/root 経由 ctx.call、JSON 再読込なし）
+- **Godot GUI:** 10 本線 + player_detail、**読み取り専用中心**
+- **Python 本体:** Godot からの自動起動・保存・編集・ゲーム進行は **行っていない**
+- **scenes:** 14 本（player_detail_view のみ詳細専用 scene。game_detail なし）
+
+
+2. Phase 4 後半で解くべき問題
+================================================================================
+
+1. **Godot 詳細導線をどこまで進めるか**
+   - player は 3 導線完成。game（日程試合）は未接続。
+
+2. **game_detail を先に作るか**
+   - Autoload・export・日程 UI の土台はある。専用 scene のみ未作成。
+
+3. **player_detail_view を本格化するか**
+   - 契約・戦術 payload では表示欠落あり。正本・専用 DTO が要設計。
+
+4. **Python 本体（GM 判断・試合体験・長期運営）へ戻るか**
+   - Steam 品質の中核。Godot だけ進めると「見た目先行」リスク。
+
+5. **細かい UI 調整をどこで止めるか**
+   - Body 平坦 Panel・余白・行区切り等は継続済み。原則 **新規の細調整は止める**。
+
+6. **Steam 品質: 見た目 vs ゲーム体験**
+   - Phase 4 前半〜C で **導線・読み取り UI の骨格** は確保。
+   - 後半は **game_detail 最小 1 本** で試合導線を足したうえで、
+     **Python 本体へ比重を移す** のがバランス良い。
+
+
+3. 候補比較
+================================================================================
+
+------------------------------------------------------------
+候補A: game_detail_view 最小版へ進む
+------------------------------------------------------------
+
+内容:
+- `ReadonlySelectionContext.set_game(...)`（ctx.call 経由）を使う
+- `game_detail_view.tscn` / `game_detail_view.gd` 最小版を新規追加
+- 日程 upcoming の既存「詳細」は **維持**
+- 横に「画面」ボタンを追加（Phase C と同型）
+- upcoming 行 Dictionary を shallow copy して payload 渡し
+- `event_id` + payload（round_label, opponent, competition_label, home_away, detail 等）
+- source_label: **「日程」**
+- return_scene: `res://scenes/schedule_view.tscn`
+
+良い点:
+- player_detail と **同型** で横展開しやすい
+- Autoload に **set_game / get_event_id 実装済み**
+- schedule export `_normalize_upcoming_row` に **event_id / detail** あり
+- schedule_mock.json に event_id 付き upcoming_games あり
+- 「試合を味わう気持ちよさ」に最も近い Godot 側の次一手
+
+注意点:
+- 新規 scene / script が必要（player_detail C-2 相当）
+- game payload **表示項目を先に固定**（最小仕様レポート推奨）
+- 既存日程「詳細」上部カードと **併存**（役割分担: 詳細=カード / 画面=専用 scene）
+- `schedule_from_python.json` が古い場合は **再生成確認**（roster/contract/tactics と同型）
+
+評価:
+- **Phase 4 後半の次実装として最も自然**
+- 実装前に **game_detail 最小仕様レポート 1 枚** を挟むのが安全
+
+
+------------------------------------------------------------
+候補B: player_detail_view 本格化へ進む
+------------------------------------------------------------
+
+内容:
+- 表示情報拡充、契約・戦術・ロスター payload 不足の補完
+- 専用 player_detail export / mock / from_python の要否検討
+
+良い点:
+- 既存 3 導線の価値向上、製品 UI に近づく
+
+注意点:
+- payload のみでは限界（契約行に status 無し、戦術行に contract 無し等）
+- **正本データ**（どの JSON / export を信頼するか）の設計が必要
+- 専用 DTO 追加は export + mock + tests の作業増
+- 今すぐ最優先にすると **Godot 側に寄りすぎる**
+
+評価:
+- **重要だが今すぐ最優先ではない**
+- game_detail 最小導線完了後、または Python 本体復帰後の再検討が安全
+
+
+------------------------------------------------------------
+候補C: Python 本体へ戻る
+------------------------------------------------------------
+
+内容:
+- GM 判断、週次進行、契約/FA、試合ログ、長期運営など
+
+良い点:
+- ゲーム面白さ・Steam 品質に直結
+- UI だけ整って中身が薄いリスクを避けられる
+
+注意点:
+- Phase 4 詳細導線が **player のみ** で止まる
+- game_detail なしだと **試合を味わう導線** が弱いまま
+- 第1 Python タスクは **ユーザー相談必須**
+
+評価:
+- **かなり重要**
+- **game_detail 最小導線まで** 作ってから戻る方が区切りがよい
+
+
+------------------------------------------------------------
+候補D: 細かい UI 調整を続ける
+------------------------------------------------------------
+
+内容:
+- 余白、行間、カード見た目、ボタン配置など
+
+良い点:
+- 見た目の統一感向上
+
+注意点:
+- 最近 Body 平坦 Panel・余白・行区切りを **継続実施済み**
+- 主要導線・ゲーム体験より優先度低
+- 明確な崩れが無い限り後回し
+
+評価:
+- **今は原則止める**
+- 目視 NG・表示崩れがある場合のみ対応
+
+
+4. 推奨ロードマップ
+================================================================================
+
+Phase 4 後半の推奨順:
+
+----------------------------------------------------------------------
+Phase D-0: game_detail_view 最小仕様レポート作成【次タスク】
+----------------------------------------------------------------------
+- 実装なし
+- event payload / 表示項目 / 戻る導線 / schedule 接続範囲を固定
+- 想定: reports/godot_phase4_game_detail_minimum_spec_2026-05.txt
+
+----------------------------------------------------------------------
+Phase D-1: game_detail_view.tscn / game_detail_view.gd 最小版追加
+----------------------------------------------------------------------
+- Autoload payload（kind=game）を読むだけ
+- JSON / save / Python は読まない
+- 未選択表示、一覧へ戻る、ホームへ戻る（player_detail 同型）
+- ReadonlySelectionContext 直接参照禁止（/root + ctx.call）
+- project.godot 変更なし（Autoload 済み）
+
+----------------------------------------------------------------------
+Phase D-2: schedule_view から game_detail_view へ接続
+----------------------------------------------------------------------
+- 変更: schedule_view.gd のみ
+- 既存 upcoming「詳細」→ 上部カード **維持**
+- 新規「画面」ボタン追加
+- ctx.call("set_game", event_id, payload, SCHEDULE_SCENE_PATH, "日程")
+- event_id 欠落・空・"-" 時は遷移せず StatusLabel で表示
+- schedule_from_python.json 再生成確認（必要時）
+
+----------------------------------------------------------------------
+Phase 4 節目チェック
+----------------------------------------------------------------------
+- player_detail（3 導線）+ game_detail（1 導線）の **最小詳細導線が揃った状態** で整理
+- **「Godot 詳細導線第 1 段完了」** と定義
+- 調査レポート 1 枚 + push
+
+----------------------------------------------------------------------
+次の大方針（Phase 4 第 1 段完了後）
+----------------------------------------------------------------------
+- **原則 Python 本体へ戻る**
+- 第 1 優先候補（ユーザー相談）:
+  - 週次進行
+  - 試合ログ / 試合体験
+  - 契約 / FA
+  - 戦術 / ローテ
+- **player_detail 本格化** は専用 DTO・正本設計が必要になった段階で再開
+- **細 UI 調整** は原則停止（不具合時のみ）
+
+
+5. この順番を推す理由
+================================================================================
+
+1. **player_detail は 3 導線完成済み。** 次に game_detail を最小接続すれば、
+   詳細画面基盤が **player / game の 2 系統** になり Phase 4 の設計意図（6950695 / 319d1bb）に合致。
+
+2. **game_detail は「試合を味わう気持ちよさ」** に直結。日程は既に event_id・detail を export 済み。
+
+3. **player_detail 本格化** は正本・専用 export が要り **重い**。最小 game_detail の後回しでも 3 導線は使える。
+
+4. **Python 本体復帰は重要** だが、game_detail 最小まで作ると
+   「Godot 読み取り詳細導線 Phase 4 第 1 段」として **きれいに区切れる**。
+
+5. **細 UI 調整** は最近継続済み。Steam 品質では **中身優先** のタイミング。
+
+6. **安定性:** D-0 仕様レポート → D-1 scene のみ → D-2 接続のみ、の分割は Phase C と同型で実績あり。
+
+7. **push 運用:** 各 milestone で commit + push し、ChatGPT コネクター等と GitHub 同期を維持。
+
+
+6. やらないこと
+================================================================================
+
+- 今すぐ **player_detail 専用 export** を作らない
+- 今すぐ **player_detail を大改修** しない
+- 今すぐ **schedule の既存「詳細」** を消さない
+- 今すぐ **Godot から Python を自動起動** しない
+- 今すぐ **save / 編集 / 進行操作** を Godot 側につながない
+- **細かい余白調整** を主目的にしない
+- game_detail 実装前に **仕様レポートをスキップ** しない
+- RiskRows / 契約リスク行から player_detail へ **無理に接続** しない
+
+
+7. 次に行う具体的タスク
+================================================================================
+
+次に行う具体的タスク:
+**game_detail_view 最小仕様レポートを作成し、
+event payload・表示項目・戻る導線・schedule_view 接続範囲を固定する。**
+
+想定ファイル:
+  reports/godot_phase4_game_detail_minimum_spec_2026-05.txt
+
+レポートで固定する項目（案）:
+- payload 必須: event_id, detail, opponent, round_label, competition_label, home_away
+- 表示: 試合名/対戦、ラウンド、大会、H/A、detail 本文、参照元「日程」
+- event_id 非表示（製品 UI）、debug のみ可（player_detail 同型）
+- 戻る: return_scene + clear、ホーム: home_dashboard
+- schedule「詳細」維持 + 「画面」追加（Phase C-3 同型）
+- event_id 欠落時の StatusLabel 文言
+- schedule_from_python 再生成手順
+- Phase D-1 / D-2 の commit 分割
+
+
+================================================================================
+参考: grep 確認サマリー（92ad71c 時点）
+================================================================================
+
+- project.godot: ReadonlySelectionContext autoload, main_scene=home_dashboard
+- readonly_selection_context.gd: set_player, set_game, get_event_id, clear 等
+- player_detail_view.gd: kind=player のみ表示、_selection_context() 経由
+- roster / contract / tactics: 各 _open_*_player_detail_view + ctx.call
+- schedule_view.gd: _show_upcoming_game_detail（上部カード）、event_id 未参照
+- schedule_readonly.py: upcoming_games に event_id, detail, opponent 等
+- game_detail_view: 未存在
+
+================================================================================
+調査実施: 2026-05-20
+pytest: 未実施（レポートのみ）
+================================================================================
