@@ -1,0 +1,388 @@
+================================================================================
+Python本体 — ラウンド進行 preview 接続方針比較（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+参照 HEAD: 79b2346 — ラウンド進行previewのmid-season実データ確認を整理
+参照レポート:
+  - python_core_round_advance_dry_run_design_2026-05.txt
+  - python_core_round_advance_preview_midseason_probe_2026-05.txt
+調査方法: 関連ファイル Read + grep + 任意 richer save probe
+コード変更: なし（本レポートのみ追加）
+
+
+================================================================================
+1. 目的
+================================================================================
+
+round_advance_preview の以下が完了している。
+
+- Python本体 read-only preview 関数（round_advance_preview.py）
+- .sav から preview JSON / CLI lines を出す export/CLI（round_advance_preview_readonly.py）
+- mid-season 実データで can_advance=True 確認済み（midseason_probe レポート）
+
+次に、接続先をどこに優先するかを比較し、**次の実装1件**を決める。
+
+比較対象:
+  A. Godot 用手動 JSON 出力候補
+  B. Python CLI の「次へ進む前確認」接続
+  C. Python Tk MainMenuView の「次へ進む前確認」接続
+
+今回は設計のみ。実装しない。
+
+
+================================================================================
+2. 現在の到達点
+================================================================================
+
+### round_advance_preview.py
+
+- build_round_advance_preview_dict(season, user_team, **kwargs) -> dict
+- format_round_advance_preview_lines(season, user_team, **kwargs) -> list[str]
+- season / user_team から read-only preview を返す
+- schedule_display / weekly_advance_cli_display / competition_display を再利用
+- simulate_next_round / Match.simulate / save_world は呼ばない
+
+### round_advance_preview_readonly.py
+
+- build_round_advance_preview_dict_from_world(save_path, ...)
+- export_round_advance_preview_json_from_world(save_path, output_path, ...)
+- format_round_advance_preview_lines_from_world(save_path, ...)
+- load_world のみ。save_world なし
+- CLI: --save / --output / --max-events / --no-weekly-check / --print-lines
+
+### mid-season 実データ確認（前回）
+
+- debug_user_boost_d1_user.sav（32/33）で can_advance=True 確認
+- next_round_events=0 でも PO/シーズン締め週として schedule_lines / advance_hint が有効
+- resume_season=None の save（debug_user_boost_d1_user_cellb.sav 等）は can_advance=False（仕様どおり）
+
+### richer save 任意確認（今回）
+
+fa_clip_test_04.sav（current_round=5/33）で export 実行:
+
+| 項目 | 値 |
+|---|---|
+| can_advance | True |
+| current_round / next_round | 5 / 6 |
+| next_round_events 件数 | 32（--max-events=32 で cap） |
+| user_team_game_count | 2 |
+| user_game.has_game | False |
+| warnings | [] |
+| first_event 概要 | regular_season_r6_g1, 日本リーグ, Yokohama Kings_4 vs Kyoto Eagles_10 |
+
+補足:
+- user_team_game_count=2 と user_game.games=0 の乖離あり（count_user_games_in_sim_round と
+  get_events_for_round 行の is_user_team_game 判定の差）。実装接続時に目視確認推奨。
+- events 自体は rich に取れており、mid-season 中盤 save でも preview export は機能する。
+
+
+================================================================================
+3. 調査結果 — 既存接続点
+================================================================================
+
+### CLI「次へ進む」入口（main.py）
+
+**ファイル:** basketball_sim/main.py
+
+- シーズンメニュー choice=="1"（1ラウンド進める）L2845〜2858:
+  - **既に** format_weekly_advance_check_lines(season, user_team, free_agents) を表示
+  - 直後に season.simulate_next_round()
+  - 例外時は pass（週送り前チェック失敗でも進行は止めない）
+- choice "2" / "9" は simulate_multiple_rounds / simulate_to_end（preview 未接続）
+- Tk UI モード: advance_one_round() L3376〜3478
+  - season_finished 時はオフシーズン処理
+  - 通常時は **preview なしで** season.simulate_next_round() のみ
+
+**結論:** CLI choice "1" が **最小差分の接続ポイント**。weekly_advance と同じ直前位置。
+
+### Tk MainMenuView 進行入口
+
+**ファイル:** basketball_sim/systems/main_menu_view.py
+
+- advance_button（「次へ進む」）→ _on_advance() → on_advance コールバック（main.py 注入）
+- _build_next_game_info(): next_advance_display_hints / build_emperor_cup_main_next_lines 等
+  （schedule_display ベース。round_advance_preview は未使用）
+- _refresh_advance_button(): _main_menu_advance_button_and_hint 連動
+- on_advance 未接続時は messagebox「次へ進む処理は main.py 接続時に追加します。」
+
+**結論:** Tk は main.py の advance_one_round 経由。UI 側に preview 欄は未整備。
+
+### weekly_advance_cli_display.py
+
+- format_weekly_advance_check_lines: 週送り前チェック（ロスター/経営/試合タグ等）
+- round_advance_preview から include_weekly_check=True 時に再利用済み
+- simulate_next_round 本体は変更しない方針と docstring で明記
+
+**重複リスク:** CLI choice "1" で weekly_advance + preview 両方出すと冗長。
+→ preview は include_weekly_check=False + 上位5〜8行に限定が妥当。
+
+### Godot / export bundle 連携
+
+**godot_readonly_bundle.py:**
+- 10 画面分 export（home, roster, club_history, standings, schedule, facility, finance,
+  owner_mission, tactics, contract_personnel）
+- **round_advance_preview は未組み込み**
+
+**Godot 側（grep）:**
+- schedule_view.gd: schedule_from_python.json / schedule_mock.json
+  advance_hint ブロック表示済み（Phase D 完了）
+- round_advance / round_advance_preview 関連の scene / script / JSON **なし**
+- 全画面共通: from_python 優先 + mock fallback + FileAccess 手動読込
+- Python 自動起動なし（方針維持）
+
+**結論:** Godot 接続は新規 JSON 種別 + scene（または schedule 拡張）+ mock が必要。
+既存 schedule の advance_hint と内容が一部重複し得る。
+
+
+================================================================================
+4. 案A: Godot 用手動 JSON 出力候補
+================================================================================
+
+### 目的
+
+round_advance_preview_readonly の JSON を Godot 読み取り画面で表示。
+手動 export → godot/data/round_advance_preview_from_python.json の流れ。
+
+### 利点
+
+- Godot 画面に「次へ進む前確認」を出せる
+- Phase D で作った詳細導線（schedule_view の advance_hint 等）と相性がよい
+- JSON DTO として確認・目視しやすい
+- 画面化すれば Steam 向け見た目に近づく
+
+### 欠点
+
+- Godot は Python 自動起動しない方針 → 手動 export 運用が増える
+- from_python JSON の古さ問題が再発（schedule と同様の運用負荷）
+- Python 本体プレイサイクル改善より優先度が下がる可能性
+- 「進行操作」は Godot に置かない方針のため、表示だけ増える
+- scene / mock / bundle / README 更新が広がりやすい
+
+### 必要になりそうな実装
+
+- JSON ファイル名整理（round_advance_preview_from_python.json）
+- godot_readonly_bundle.py への任意組み込み
+- Godot mock JSON 追加
+- Godot scene / script 新規、または schedule_view 内サブブロック追加
+- from_python / mock fallback 設計
+- 目視確認（Godot 4.6.2）
+
+### リスク
+
+- Godot UI 作業に戻りすぎる（Phase D 直後に Python 本体へ戻ったばかり）
+- 今回の目的（Python 本体強化）から逸れる
+- 手動 JSON 更新忘れで表示が古く見える
+- schedule_view の advance_hint と二重表示・情報設計の整理が必要
+
+
+================================================================================
+5. 案B: Python CLI の「次へ進む前確認」接続
+================================================================================
+
+### 目的
+
+CLI で simulate_next_round() を呼ぶ前に、preview lines を表示。
+既存 weekly_advance_cli_display より詳しい「次ラウンド予定」を見せる。
+
+### 利点
+
+- Python 本体プレイサイクルに直接効く
+- Godot を触らず小さく実装できる
+- **接続点が既に特定済み**（main.py choice "1" L2845 付近）
+- simulate_next_round を改修せず UX 改善できる
+- weekly_advance と同様 try/except + 進行継続パターンを踏襲可能
+- テスト追加が比較的容易（import + format 呼び出しの smoke）
+
+### 欠点
+
+- main.py が大きい（3700行超）ため、差分箇所を誤るリスク
+- CLI 表示量が増えすぎる可能性
+- weekly_advance_cli_display との重複整理が必要
+- choice "2"/"9" には未接続のまま残る
+
+### 必要になりそうな実装
+
+- main.py choice "1" 直前:
+  format_round_advance_preview_lines(season, user_team,
+    season_count=..., free_agents=..., include_weekly_check=False)[:8]
+- 既存 weekly_advance は維持するか、preview に統合するかは実装時判断
+  （推奨: まず両方出さず preview 短縮版を追加、weekly は残すか preview 側に任せる）
+- 最小 smoke テスト（関数 import / 例外時 pass）
+- simulate_next_round 本体は変更しない
+
+### リスク
+
+- CLI 出力が冗長になる → include_weekly_check=False + 行数 cap で緩和
+- main.py 周辺フロー破壊 → 変更は choice "1" ブロック内に限定
+- 進行前確認の二重表示 → preview と weekly の役割分担を実装指示で固定
+
+
+================================================================================
+6. 案C: Python Tk MainMenuView の「次へ進む前確認」接続
+================================================================================
+
+### 目的
+
+Tk GUI「次へ進む」付近に preview 情報を表示。
+MainMenuView に preview lines を出す。
+
+### 利点
+
+- Python GUI プレイ体験に直結
+- Godot より現行実プレイに近い
+- 将来 Godot へ持っていく前の確認になる
+- _build_next_game_info 等、既存 schedule_display 表示と並置可能
+
+### 欠点
+
+- Tk UI は将来的に Godot へ置き換わる可能性が高い
+- MainMenuView が非常に大きい（16000行超）→ 差分リスク
+- UI 配置調整（Text ウィジェット追加等）が必要
+- Tk UI 微調整に入りすぎると本筋から逸れる
+- advance_one_round 側（main.py L3478）にも別途検討が必要
+
+### 必要になりそうな実装
+
+- MainMenuView に preview 表示欄追加、または _build_next_game_info 拡張
+- on_advance 前更新タイミング整理
+- main.py advance_one_round 直前表示（CLI と二重実装になりやすい）
+- Tk 目視確認
+
+### リスク
+
+- UI 微調整が増える
+- Godot 一本化方針から見て投資効率がやや落ちる
+- CLI 接続後に Tk も同様にすると重複実装
+
+
+================================================================================
+7. 比較表
+================================================================================
+
+| 案 | 体験への効き | 実装リスク | 変更範囲 | Godotとの整合 | Python本体強化との整合 | すぐ着手すべき度 | コメント |
+|---|---|---|---|---|---|---|---|
+| A Godot手動JSON | 中（閲覧のみ） | 中〜高 | export+bundle+Godot scene+mock | 高（既存10画面パターン踏襲） | 低 | 低 | 見た目は良いが手動運用・古さ問題。Phase D直後の逆戻りリスク |
+| B Python CLI接続 | 高（実プレイ直前） | 低〜中 | main.py 1箇所中心 | 低（Godot未変更） | 高 | **最高** | 接続点特定済み。最小差分で simulate 本体に触れず改善 |
+| C Python Tk接続 | 高（GUI実プレイ） | 中〜高 | main.py + MainMenuView | 中（将来Godot移行時に再実装） | 中 | 中 | CLI後の第2段が妥当。MainMenuView巨大でリスク大 |
+
+### 推奨順
+
+1. **B: Python CLI の「次へ進む前確認」接続**
+2. **C: Tk MainMenuView 接続**
+3. **A: Godot 手動 JSON 表示**
+
+### 理由
+
+- Godot 詳細導線第1段を締め、Python 本体へ戻った直後
+- まず Python 本体プレイサイクルを太くするべき
+- CLI なら小さく接続でき、simulate_next_round 本体に触れず体験改善
+- 接続点（main.py choice "1" + 既存 weekly_advance 直前）が grep で確定
+- Tk 接続は次段階でよい
+- Godot 表示は魅力的だが、手動 JSON 古さ問題と Godot UI 作業への逆戻りリスク
+
+
+================================================================================
+8. 次に実装するなら何をするか（1件に絞る）
+================================================================================
+
+**推奨実装:**
+
+「CLI の次へ進む（choice "1"）直前に round_advance_preview の短縮 lines を表示する」
+
+### 想定変更
+
+- basketball_sim/main.py の CLI 進行直前のみ（L2845〜2858 付近）
+- 可能なら新規テストまたは既存 smoke で import / format 確認
+- simulate_next_round 本体は変更しない
+- round_advance_preview.py は原則変更しない
+- Godot は変更しない
+
+### 表示方針
+
+```python
+from basketball_sim.systems.round_advance_preview import format_round_advance_preview_lines
+
+lines = format_round_advance_preview_lines(
+    season, user_team,
+    season_count=season_count,  # 利用可能なら
+    free_agents=free_agents,
+    include_weekly_check=False,  # weekly と二重化回避
+)
+for ln in lines[:8]:
+    print(ln)
+print("")
+```
+
+- 既存 format_weekly_advance_check_lines との関係:
+  - **第1実装:** preview 短縮版を追加。weekly は一旦維持（情報量が異なる）
+  - **第2整理:** 重複が目立つ場合 weekly を preview に統合または weekly を省略
+- 「読み取り専用」文言は開発中維持。製品 UI では後で表現変更余地あり
+
+### 接続位置（確定）
+
+main.py L2845:
+```
+if choice == "1":
+    try:
+        # ここに preview 短縮表示を追加
+        format_weekly_advance_check_lines(...)  # 既存
+    except Exception:
+        pass
+    season.simulate_next_round()
+```
+
+
+================================================================================
+9. 実装時の安全条件
+================================================================================
+
+- simulate_next_round 本体は変更しない
+- Match / save / season 状態更新に触れない
+- 表示追加のみ
+- CLI の進行可否判定を変えない（choice "1" は従来どおり simulate 実行）
+- エラー時は preview 表示できなくても進行自体を止めない
+  → try/except で preview 失敗時は短い警告のみ（weekly と同パターン）
+- 既存テストを通す
+- Godot 変更なし
+- round_advance_preview.py / round_advance_preview_readonly.py は原則変更しない
+
+
+================================================================================
+10. 残す後続候補
+================================================================================
+
+- Tk MainMenuView への接続（advance_one_round 直前 or _build_next_game_info 拡張）
+- Godot 用 round_advance_preview JSON / mock / scene
+- godot_readonly_bundle.py への round_advance_preview 任意追加
+- richer save（fa_clip_test_04.sav 等）での user_game.has_game 乖離調査
+- preview lines の製品向け文言調整（「読み取り専用」表現）
+- 進行後の直近試合結果サマリー export
+- game_results に event_id / round / competition を付与する設計
+- CLI choice "2"/"9" への preview 適用要否
+
+
+================================================================================
+11. 任意 pytest 結果
+================================================================================
+
+実施: あり
+
+  py -m pytest basketball_sim/tests/test_round_advance_preview.py
+  py -m pytest basketball_sim/tests/test_round_advance_preview_readonly_export.py
+
+結果: 17 passed, 0 failed
+
+
+================================================================================
+12. 次に行う具体的タスク
+================================================================================
+
+次に行う具体的タスク:
+CLI の「次へ進む」直前に round_advance_preview の短縮表示を追加する実装指示書を作成する。
+
+想定コミット:
+ラウンド進行previewの接続方針を整理
+
+次回想定タスク名:
+CLIの次へ進む前にラウンド進行previewを表示する
