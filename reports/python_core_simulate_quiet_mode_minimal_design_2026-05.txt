@@ -1,0 +1,465 @@
+================================================================================
+Python本体 — simulate_next_round 出力抑制（quiet 化）最小設計レポート（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+対象 commit: 0139129 — Python本体の次の体験強化テーマを選定
+目的: CLI choice "1" で成立した preview / weekly / post summary を活かすため、
+      simulate_next_round / Match の出力抑制（quiet 化）について、
+      実装前の最小設計を確定する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+【成立済み】
+- CLI choice "1": preview（8行）→ weekly（5行）→ simulate → post summary（4〜6行）
+- post_advance_result_summary_cli_display.py（game_results 差分 slice）
+- 実データ smoke 合格（reports/python_core_cli_round_advance_full_flow_smoke_2026-05.txt）
+
+【課題（実測）】
+| save | simulate 行数 | 内訳メモ |
+|------|-------------:|----------|
+| fa_clip_test_04.sav（cr 5→6, 48試合） | 約 8009 | 試合 simulate が主体 |
+| debug_user_boost_d1_user.sav（cr 32→33, game 0） | 約 3808 | _finalize_season 統計が主体 |
+
+post summary は有用だが、simulate 通常出力に埋没する。
+
+
+================================================================================
+2. 出力量問題の整理
+================================================================================
+
+【問題の本質】
+- main.py 側の前後表示（preview / weekly / post summary）は合計約 20 行で読める
+- season.simulate_next_round() の stdout が 1 ラウンドで数千行になり UX を支配
+- quiet / verbose 引数は season.py / match.py とも **現状未存在**
+
+【simulate_next_round 呼び出し箇所（調査）】
+| 箇所 | quiet 化の初回対象 |
+|------|-------------------|
+| main.py choice "1"（L2877） | **はい（Phase 1）** |
+| main.py Tk advance_one_round（L3514） | いいえ（後工程） |
+| main.py choice "2" simulate_multiple_rounds(5) | いいえ（後工程） |
+| main.py choice "9" simulate_to_end() | いいえ（後工程） |
+| tests（phase0 / reg_slot / inseason_cash 等） | デフォルト quiet=False のまま |
+
+【Match.simulate 呼び出し】
+- season.simulate_next_round 内（L2871）が CLI 1 ラウンド進行の主経路
+- 他: 杯/EASL/PO/_finalize_season 内、offseason、各種 test/run スクリプト
+- Phase 1 は season.simulate_next_round 経由のみ quiet 伝播で十分（他経路はデフォルト verbose 維持）
+
+
+================================================================================
+3. 出力源の内訳
+================================================================================
+
+■ A. Match クラス（全試合 × 試合数 — 最大の主因）
+
+【重要: __init__ でも print される】
+Match(...) 生成時（L121〜128）:
+- _print_active_roster × 2（[ACTIVE]）
+- _print_starting_five × 2（[STARTERS]）
+
+simulate() 中:
+- [SUB] 交代ログ（L1964）— 試合あたり数十行の可能性
+- 【試合動向】 momentum note（L419）— 得点時に occasional
+
+simulate() 末尾（L3003〜3007）:
+- _print_minutes_log × 2（[MINUTES] + 選手行）
+- _print_play_by_play_debug_summary()（[PBP] Debug Summary + event counts + first/last 8）
+- _print_commentary_preview()（[COMMENTARY] Preview, default 8+8 行）
+- _print_play_sequence_preview()（[PLAY] Preview, default 5+5 行）
+
+不戦敗経路（L321〜325）も同様の debug print あり。
+
+推定: 48 試合ラウンドで 8009 行 → **試合あたり約 167 行**
+  Match 関連が全体の 90% 以上と推定。
+
+■ B. season.simulate_next_round（自チーム試合のみ + ラウンド共通）
+
+自チーム試合のみ（L2824〜2878）:
+- format_schedule_importance_cli_lines → print
+- format_match_preview_cli_lines → print
+- format_match_postgame_cli_lines → print（10〜15 行/試合程度）
+
+ラウンド共通:
+- ラウンド見出し 1 行（L2795）
+- 代表ウィンドウ banner 等（条件付き）
+- 経営ログ: 自チーム向け 0〜2 行（L2743, L2772）
+- EASL / 全日本カップ（条件付き、杯週は追加）
+- ラウンド集計 2 行（L2914〜2915）
+
+■ C. _finalize_season（最終ラウンドのみ — game 0 でも大量）
+
+current_round >= total_rounds で simulate_next_round 末尾から呼ばれる（L2917〜2918）。
+
+print 群（L2943〜2988）:
+- "Season finished"
+- League Scoring Stats + _print_scoring_distribution_summary
+- EASL / 全日本カップ結果 + bracket summary
+- _print_stat_leaders_by_division
+- _calculate_and_print_awards_by_division
+- PO simulate（内部 Match.simulate も verbose）
+- ACL / popularity / _print_position_stat_profile 等
+
+debug_user_boost_d1_user.sav で game 0 でも約 3808 行 → **finalize 統計が quiet 未対策だと最終ラウンドで再び埋没**
+
+
+================================================================================
+4. quiet 化候補案 1〜3
+================================================================================
+
+--------------------------------------------------------------------------------
+案1: Match debug print のみ抑制（season 側は現状維持）
+--------------------------------------------------------------------------------
+
+設計:
+- Match(..., quiet=False), simulate() 内 debug のみガード
+- season.simulate_next_round(quiet=False) → Match(quiet=quiet)
+- season 側: 自チーム preview / importance / postgame、経営ログ、ラウンド集計は **すべて残す**
+
+抑制: Match 内 [ACTIVE][STARTERS][SUB][MINUTES][PBP][COMMENTARY][PLAY][試合動向]
+残す: season 側すべて + main.py preview/weekly/post summary
+
+推定削減: 8009 → 約 50〜150 行（自チーム postgame 2試合 + 経営 + 集計）
+
+--------------------------------------------------------------------------------
+案2: Match debug + season 自チーム詳細も抑制（post summary を主表示）
+--------------------------------------------------------------------------------
+
+設計:
+- Match(..., quiet=True) で __init__ 含む Match 全 print 抑制
+- season.simulate_next_round(quiet=True):
+  - Match(quiet=True) に伝播
+  - 自チーム importance / preview / postgame の print を **スキップ**
+  - ラウンド見出し + ラウンド集計 2 行 + 自チーム経営ログ 0〜2 行は **残す**
+- main.py: preview / weekly / post summary は従来どおり（simulate 外）
+
+抑制: 案1 + season 自チーム match 前後詳細
+残す: main.py 前後表示 + ラウンド見出し/集計/経営 + エラー
+
+推定削減: 8009 → 約 15〜25 行（simulate ブロック）+ main.py 前後約 20 行
+
+--------------------------------------------------------------------------------
+案3: display_mode 文字列（"verbose" / "summary" / "silent"）
+--------------------------------------------------------------------------------
+
+設計:
+- simulate_next_round(display_mode: str = "verbose")
+- Match(..., display_mode=...) で段階的抑制
+  - verbose: 現状
+  - summary: 案2 相当
+  - silent: ラウンド見出し・集計も抑制（エラーのみ）
+
+抑制/残す: モード表で定義
+
+推定削減: summary で案2 同等、silent で simulate 側ほぼ 0 行
+
+
+================================================================================
+5. 比較表
+================================================================================
+
+| 案 | 抑制範囲 | 実装リスク | 行数削減効果 | 既存互換 | 初回実装向き | コメント |
+|----|----------|------------|--------------|----------|--------------|----------|
+| 1 | Match のみ | 中 | 大（〜98%） | 高 | 中 | __init__ print 忘れリスク。自チーム postgame と post summary が重複 |
+| 2 | Match + season 自チーム詳細 | 中 | **最大（中盤）** | 高 | **高** | choice "1" の UX と一致。post summary が主役になる |
+| 3 | モード3段 | 中〜高 | 大 | 高 | 低 | 将来拡張向きだが初回は API 過剰。bool から始めて後で拡張可 |
+
+【finalize 統計は別軸】
+案1〜3 いずれも Match quiet だけでは最終ラウンド 3808 行問題を解決しない。
+→ quiet=True 時の _finalize_season(compact=True) を設計に追加（後述 §8）。
+
+
+================================================================================
+6. 推奨案
+================================================================================
+
+**案2（bool quiet）を Phase 1 推奨。display_mode は Phase 2 以降で必要なら追加。**
+
+【推奨 API（最小）】
+```python
+# match.py
+class Match:
+    def __init__(self, ..., quiet: bool = False):
+        self._quiet = quiet
+        ...
+
+    def simulate(self) -> Tuple[Team, int, int]:
+        # self._quiet を参照して print をガード
+
+# season.py
+def simulate_next_round(self, *, quiet: bool = False):
+    ...
+    match = Match(..., quiet=quiet)
+    match.simulate()
+    if not quiet and user_team is ...:
+        print postgame ...
+    ...
+    if self.current_round >= self.total_rounds:
+        self._finalize_season(compact=quiet)
+
+def simulate_multiple_rounds(self, rounds: int, *, quiet: bool = False):
+    ...
+
+def simulate_to_end(self, *, quiet: bool = False):
+    ...
+```
+
+【main.py Phase 1】
+```python
+season.simulate_next_round(quiet=True)  # choice "1" のみ
+```
+
+【デフォルト】
+quiet=False → **既存挙動完全維持**（tests / choice 2/9 / Tk / offseason 杯 PO 経路）
+
+
+================================================================================
+7. 推奨理由
+================================================================================
+
+1. post summary が既に W/L 一覧 + ひとことを提供 → quiet 時の自チーム postgame は冗長
+2. Match __init__ + simulate の print が行数の 90% 超 → Match._quiet が必須
+3. simulate() にだけ quiet を付けても __init__ の [ACTIVE]/[STARTERS] が残る（調査で確認）
+4. bool 1 個はテストしやすく、既存 simulate_next_round() 呼び出しは引数省略で互換
+5. choice "1" だけ変更すれば、preview/weekly/post summary 投資を最大活用
+6. save / game_results / play_by_play_log 生成ロジックには触れない
+
+
+================================================================================
+8. quiet 時に抑える出力
+================================================================================
+
+【Match（quiet=True 時 — 全試合）】
+- _print_active_roster / _print_starting_five（__init__）
+- [SUB] 交代ログ
+- 【試合動向】 momentum note
+- _print_minutes_log
+- _print_play_by_play_debug_summary
+- _print_commentary_preview
+- _print_play_sequence_preview
+- 不戦敗時の [FORFEIT-RESULT] 以外 debug dump（結果 1 行は要検討: 抑制可）
+
+※ play_by_play_log / commentary_log の **生成** は継続（表示のみ抑制）。
+  postgame formatter / 将来永続化にデータは残る。
+
+【season.simulate_next_round（quiet=True 時）】
+- 自チーム: schedule_importance / match_preview / postgame の print
+- EASL / 杯 / 代表ウィンドウの詳細ログ（**Phase 1 は Match quiet のみでも杯試合 Match print は抑制される**）
+- CPU 管理: print なし（cpu_management.py に print 未確認）
+
+【_finalize_season（compact=True — quiet から伝播）】
+- _print_stat_leaders_by_division
+- _calculate_and_print_awards_by_division
+- _print_scoring_distribution_summary の詳細分布
+- _print_easl_summary / bracket 詳細
+- _print_popularity_rankings / _print_position_stat_profile 等の大量 dump
+- PO/ACL 内 Match.simulate は **compact 時も quiet 伝播**（Match(..., quiet=True)）
+
+【Phase 1 で抑えない（finalize compact でも残す）】
+- "Season finished" 1 行
+- Games Played / Average Team Score / Average Total Score（3〜4 行）
+- 自チームが関与する優勝チーム名が分かる 1 行（任意）
+
+
+================================================================================
+9. quiet 時に残す出力
+================================================================================
+
+【main.py（simulate 外 — 常に残す）】
+- format_round_advance_preview_lines（最大 8 行）
+- format_weekly_advance_check_lines（約 5 行）
+- format_post_advance_result_summary_lines（4〜6 行）
+
+【season.simulate_next_round（quiet=True 時）】
+- ラウンド見出し: `========== ラウンド N/33 ==========`（1 行）
+- ラウンド集計 2 行（消化試合数 / 平均総得点）
+- 自チーム経営ログ 0〜2 行（[経営] — 財務フィードバックとして有用、行数少）
+- エラー・警告（例: シーズン終了済みメッセージ）
+
+【最小構成オプション（より aggressive）】
+- ラウンド見出し / 集計 / 経営も抑制し、main.py 前後 + post summary のみ
+- 削減効果は微増（±5 行）。Phase 1 では **見出し+集計+経営は残す** 方がデバッグしやすい
+
+【期待される choice "1" 1 回の総行数（中盤 save 想定）】
+- preview + weekly: 約 13 行
+- simulate quiet ブロック: 約 3〜7 行
+- post summary: 約 4〜6 行
+- **合計: 約 20〜26 行**（現状 8000 行超から 99% 削減）
+
+
+================================================================================
+10. 最終ラウンド / Season finished 統計の扱い
+================================================================================
+
+【問題】
+- game 0 最終ラウンドでも _finalize_season が約 3700+ 行を出力
+- Match quiet のみでは post summary が再び埋没
+
+【設計方針】
+- `_finalize_season(compact: bool = False)` を新設
+- simulate_next_round(quiet=True) → _finalize_season(compact=True)
+- compact=True:
+  - 残す: "Season finished" + League Scoring Stats 基本 3 行
+  - 抑える: division stat leaders / awards / PO simulate の verbose Match / popularity dump 等
+- compact=False: 現状維持（choice 9 / テスト / debug 用）
+
+【完全抑制はしない理由】
+- シーズン終了は重要イベント。0 行は危険
+- 詳細統計が必要なユーザーは choice 3/4 メニューや verbose 経路を利用
+
+【Phase 分け】
+- Phase 1 実装: Match quiet + season 自チーム詳細抑制 + finalize compact
+- Phase 2: choice "9" に quiet オプション、または「詳細統計を別メニューへ」検討
+
+
+================================================================================
+11. 呼び出し設計（決定事項）
+================================================================================
+
+| # | 設計判断 | 決定 |
+|---|----------|------|
+| 1 | quiet 化対象範囲 | Match 全 print + season 自チーム match 詳細 + finalize compact |
+| 2 | 引数追加先 | Match.__init__(quiet), Season.simulate_next_round(quiet), _finalize_season(compact) |
+| 3 | デフォルト | quiet=False / compact=False（既存挙動維持） |
+| 4 | CLI choice "1" のみ | Phase 1 で quiet=True。安全 |
+| 5 | choice "2"/"9"/Tk | Phase 1 では触らない（verbose 維持） |
+| 6 | Match print 抑制 | §8 一覧すべて（__init__ 含む） |
+| 7 | season 残す | 見出し + 集計 2 行 + 経営 0〜2 行 |
+| 8 | finalize | compact モード（基本数行 + Season finished） |
+| 9 | quiet 時主表示 | main.py post summary |
+| 10 | テスト | §12 |
+| 11 | 安全条件 | §13 |
+| 12 | 次タスク | §14 |
+
+
+================================================================================
+12. テスト方針
+================================================================================
+
+【新規ファイル想定】
+basketball_sim/tests/test_simulate_quiet_mode.py
+
+【必須テストケース】
+1. quiet=False（デフォルト）: simulate_next_round 後に game_results 件数増加・current_round +1
+2. quiet=True: 同上（ロジック不変）
+3. quiet=True + capsys: 出力行数が閾値以下（例: 50 行/ラウンド for mini fixture）
+4. Match(quiet=True).simulate(): stdout に [PBP]/[COMMENTARY]/[MINUTES]/[SUB] が含まれない
+5. Match(quiet=False).simulate(): 従来どおり [PBP] 等が含まれる（回帰）
+6. Match(quiet=True) __init__: [ACTIVE]/[STARTERS] が出ない
+7. finalize: compact=True で "Season finished" は出るが stat leaders 大量行が出ない（mini season）
+
+【既存テスト】
+- simulate_next_round 呼び出し 5 件: print 内容に非依存 → quiet=False デフォルトで **破壊なし**
+- capsys 使用テスト（FA表/export CLI 等）: simulate 経路と無関係
+
+【save 構造】
+- 専用テスト不要（変更なし）。game_results dict 形状不変を実装時に確認即可
+
+【pytest】
+- 今回（設計のみ）: 未実施
+- 実装フェーズ: 上記新規 + 既存全 pytest 実行
+
+
+================================================================================
+13. 実装時の安全条件
+================================================================================
+
+- save 構造変更なし（game_results / .sav スキーマ触らない）
+- save_world 呼び出し追加なし
+- simulate ロジック（スコア計算・game_results append・current_round 更新）不変
+- print ガードのみ（if not self._quiet: print(...)）
+- デフォルト quiet=False
+- choice "2" / "9" / Tk advance_one_round は Phase 1 で変更しない
+- post_advance_result_summary_cli_display.py / round_advance_preview.py は触らない
+- Godot / export / save-load は触らない
+- PO/杯経路の Match は Phase 1 では quiet 未伝播（finalize compact 内 PO は Phase 1 で quiet 伝播を検討 — finalize 大量出力対策）
+
+
+================================================================================
+14. 想定変更ファイル
+================================================================================
+
+【Phase 1 実装で触る】
+- basketball_sim/models/match.py
+  - __init__(quiet=False), self._quiet
+  - 全 print 箇所（約 10 カ所）にガード
+- basketball_sim/models/season.py
+  - simulate_next_round(quiet=False)
+  - simulate_multiple_rounds / simulate_to_end に quiet 引数追加（伝播のみ、main 未使用）
+  - Match(..., quiet=quiet)
+  - 自チーム preview/importance/postgame の quiet ガード
+  - _finalize_season(compact=False)
+- basketball_sim/main.py
+  - choice "1": season.simulate_next_round(quiet=True) の 1 行変更
+- basketball_sim/tests/test_simulate_quiet_mode.py（新規）
+
+【触らない】
+- save / load / export / godot
+- post_advance_result_summary_cli_display.py
+- match_postgame_cli_display.py（呼び出し側で skip するため本体変更不要）
+- round_advance_preview.py / weekly_advance_cli_display.py
+
+
+================================================================================
+15. 変更禁止ファイル（今回・次回実装共通）
+================================================================================
+
+- save/load 関連
+- Godot / export
+- post_advance_result_summary_cli_display.py（表示 API 確定済み）
+- round_advance_preview.py
+- .sav / *_from_python.json
+
+
+================================================================================
+16. 次に行う具体的タスク（1件）
+================================================================================
+
+【選定】
+**simulate_next_round quiet 化の最小実装指示書を作成する**
+
+【内容】
+- 本設計レポートに基づく、ファイル別の具体的 diff 方針
+- Match print 箇所チェックリスト（行番号付き）
+- season.py ガード箇所チェックリスト
+- _finalize_season compact の残し/抑え一覧
+- test_simulate_quiet_mode.py のテストケース雛形
+- 実装後 smoke 手順（fa_clip_test_04.sav programmatic、save 非上書き）
+- ロールバック条件（pytest 失敗 / 出力行数が閾値超）
+
+【実装指示書の後の実装フェーズ分割案】
+- Step A: Match._quiet（__init__ + simulate 全 print ガード）+ 単体テスト
+- Step B: season.simulate_next_round(quiet) + main.py choice "1"
+- Step C: _finalize_season(compact) + 最終ラウンド smoke
+
+※ Match 単独が全体の 90% のため、Step A 完了時点で中間 smoke 可能。
+
+
+================================================================================
+17. 後工程へ回す項目
+================================================================================
+
+- choice "2" / "9" への quiet 接続（5 ラウンド / 完走時の post summary 複数ラウンド化とセット）
+- Tk MainMenuView への preview / post summary + quiet simulate
+- display_mode 3 段階 API への拡張（必要になったら）
+- game_results round/event_id/competition_type 拡張
+- PBP / commentary 永続化
+- quiet 時でも自チーム postgame を「詳細表示オプション」で見られる CLI メニュー
+
+
+================================================================================
+18. 参照
+================================================================================
+
+- reports/python_core_cli_round_advance_full_flow_smoke_2026-05.txt
+- reports/python_core_next_experience_theme_selection_2026-05.txt
+- basketball_sim/main.py L2845〜2910, L3514
+- basketball_sim/models/season.py L2780〜2918, L2936〜2993, L2880
+- basketball_sim/models/match.py L121〜128, L419, L474〜528, L1079〜1101, L1459〜1480, L1964, L3003〜3007
+- basketball_sim/systems/match_postgame_cli_display.py L660〜742
+- basketball_sim/systems/post_advance_result_summary_cli_display.py L109〜147
