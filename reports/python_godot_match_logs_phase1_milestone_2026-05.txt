@@ -1,0 +1,360 @@
+================================================================================
+Python→Godot match_logs 接続 第1段 一区切り（2026-05）
+================================================================================
+
+確認日: 2026-05-21
+目的: Python 側で保存された軽量 match_logs を、readonly export 経由で
+      Godot match_logs_view に表示する接続第1段が成立したことを整理する。
+コード変更: なし（本レポートのみ）。
+
+================================================================================
+1. 現在地
+================================================================================
+
+最新 commit: 0e14bb7 — Godot match_logs from_python実画面追確認をレポート追記
+push: 完了 / origin/main
+
+第1段の到達点:
+- Python 軽量 match_logs 保存 → save/load 互換 → readonly export → bundle 11件化
+- Godot mock 表示 → from_python 優先読込（実画面確認済み）
+- full PBP を持たない軽量方針を維持
+- 実データ save 未上書き / 生成 JSON 未 commit
+
+================================================================================
+2. 対象 commit 一覧
+================================================================================
+
+### A. Python 保存・永続化
+
+| commit | 内容 |
+|---|---|
+| 1cce7b1 | PBP commentary 永続化の前段設計を整理 |
+| e0561dc | user_team 試合の軽量 match_logs 保存を追加 |
+| c49d9e4 | 軽量 match_logs 保存 Phase1 を実データ確認 |
+
+### B. readonly export / bundle
+
+| commit | 内容 |
+|---|---|
+| 8427486 | match_logs readonly export 設計を整理 |
+| cf208fc | match_logs readonly export を追加 |
+| 4ae47a1 | match_logs readonly export を実データ確認 |
+
+### C. Godot 一覧画面
+
+| commit | 内容 |
+|---|---|
+| 60de336 | Godot 試合ログ一覧画面の設計を整理 |
+| c24736e | Godot に試合ログ一覧の第1段を追加 |
+| 2944a1a | match_logs 詳細カードをスクロール表示に修正 |
+| b601bd7 | Godot 試合ログ一覧の手動確認を整理 |
+
+### D. from_python 優先読込
+
+| commit | 内容 |
+|---|---|
+| 6cdaa72 | Godot 試合ログの Python 生成 JSON 優先読込を確認 |
+| 0e14bb7 | Godot match_logs from_python 実画面追確認をレポート追記 |
+
+================================================================================
+3. 第1段で成立したこと（全体）
+================================================================================
+
+1. Python 側で user_team 関連試合のみ軽量 match_logs 保存
+2. save/load 互換対応（古い save は match_logs=[] 補完）
+3. match_logs readonly export 追加
+4. Godot readonly bundle 10件 → 11件化
+5. Godot match_logs mock JSON / 一覧画面 / ホーム入口追加
+6. 詳細カードの固定高さ + 内部スクロール化（210px）
+7. mock JSON で Godot 実画面確認
+8. Python 生成 match_logs_from_python.json の生成・手動配置確認
+9. Godot 実画面で from_python 優先読込確認
+10. 確認後 match_logs_from_python.json は削除、commit なし
+
+================================================================================
+4. Python 側で成立したこと
+================================================================================
+
+| 項目 | 内容 |
+|---|---|
+| 保存先 | `Season.match_logs` |
+| 生成タイミング | `simulate_next_round` 時 |
+| 対象 | user_team 関連試合のみ |
+| game_results | 既存 6 キー維持 |
+| full PBP / full commentary | 保存しない |
+| commentary_excerpt | head/tail のみ |
+| key_plays | 最大 8 件程度の軽量情報 |
+| quiet=True | 内部ログは残り、match_logs 生成に利用可能 |
+
+主要ファイル（e0561dc）:
+- `basketball_sim/models/season.py`
+- `basketball_sim/persistence/save_load.py`
+- `basketball_sim/systems/match_log_builder.py`
+- 関連テスト 3 ファイル
+
+================================================================================
+5. save/load 互換で成立したこと
+================================================================================
+
+- 古い save には `match_logs=[]` を補完
+- 実データ save 未上書き方針を維持
+- programmatic smoke（c49d9e4）: fa_clip_test_04.sav で round 5→6、match_logs 0→2
+- 実データ save 本体には save_world を呼ばない確認済み
+
+================================================================================
+6. readonly export で成立したこと
+================================================================================
+
+| 項目 | 内容 |
+|---|---|
+| モジュール | `basketball_sim/export/match_logs_readonly.py` |
+| 出力 | `match_logs_from_python.json` |
+| default max_logs | 50 |
+| JSON-safe normalize | あり |
+| schema_version / kind / generated_at | 既存 Godot readonly JSON 方針に合わせ **入れていない** |
+
+top-level keys:
+- `screen_title`, `team_name`, `league_level`, `season_label`
+- `summary`, `match_logs`, `empty_message`, `notes`
+
+summary keys:
+- `has_season`, `has_logs`, `count`, `exported_count`
+- `latest_round`, `current_round`, `total_rounds`
+
+実データ確認（4ae47a1）: pytest 14件 + bundle smoke 合格
+
+================================================================================
+7. Godot bundle で成立したこと
+================================================================================
+
+| 項目 | 内容 |
+|---|---|
+| 変更 | `godot_readonly_bundle.py` 10件 → 11件 |
+| 追加 JSON | `match_logs_from_python.json` |
+| 非回帰 | 既存 10 画面 JSON を壊していない |
+| max_logs | bundle オプション `--max-logs` 対応 |
+
+================================================================================
+8. Godot mock 表示で成立したこと
+================================================================================
+
+| ファイル | 役割 |
+|---|---|
+| `godot/data/match_logs_mock.json` | 正常系 mock（2件 W/L） |
+| `godot/scenes/match_logs_view.tscn` | Phase 4 読み取り専用レイアウト |
+| `godot/scripts/match_logs_view.gd` | JSON 読込 / 一覧 / 詳細カード |
+| `home_dashboard` ColLeague | 「試合ログ」入口 |
+
+読込順:
+1. `res://data/match_logs_from_python.json`（存在時優先）
+2. `res://data/match_logs_mock.json`（fallback）
+
+手動確認（b601bd7）: mock 2件表示、詳細ボタン、詳細カード、
+内部スクロール、HomeNavButton — **すべて OK**
+
+================================================================================
+9. Godot from_python 優先読込で成立したこと
+================================================================================
+
+### programmatic 確認（6cdaa72）
+
+使用 save: `fa_clip_test_04.sav`（実データ save 未上書き）
+- temp .sav 経由
+- memory simulate: round 5→6、match_logs 0→2
+- generated JSON:
+  - team_name: セーブ確認プレイチーム
+  - summary.count / exported_count: 2 / 2
+  - len(match_logs): 2
+  - 1件目: ○ セーブ確認プレイチーム 65 - 64 Yokohama Bulls_35
+
+### Godot 実画面追確認（0e14bb7）
+
+| 項目 | 結果 |
+|---|---|
+| from_python 優先読込 | **確認済み** |
+| mock 内容ではない | **確認済み**（team_name / summary_line で判別） |
+| DataSourceLabel | **Python生成JSON（手動配置・優先）を確認済み** |
+| 一覧 2件 | **確認済み** |
+| 詳細ボタン / 詳細カード | **確認済み** |
+| 詳細カード内部スクロール | **確認済み** |
+| HomeNavButton / ホーム復帰 | **確認済み** |
+| 確認後 JSON 削除 | **削除済み、commit なし** |
+
+初版（6cdaa72）: 条件付き合格 → 追確認後 **合格**
+
+================================================================================
+10. 実データ save 安全性
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| fa_clip_test_04.sav 上書き | **なし** |
+| save_world 先 | temp .sav のみ |
+| size / mtime | 作業前後不変（1,370,770 bytes） |
+| match_logs_from_python.json commit | **なし** |
+| godot/data/match_logs_from_python.json 残存 | **なし**（Test-Path → False） |
+
+================================================================================
+11. 確認済み UI 挙動
+================================================================================
+
+| 画面 / 操作 | 状態 |
+|---|---|
+| match_logs_view 起動 | OK |
+| Header / team_name / season / summary | OK |
+| DataSourceLabel（mock / from_python） | OK |
+| 一覧 row（summary_line 中心） | OK |
+| 詳細ボタン | OK |
+| StatusLabel 詳細カード（excerpt / key plays） | OK |
+| full PBP 非表示注記 | OK |
+| 詳細カード内部スクロール（210px） | OK |
+| HomeNavButton → home_dashboard | OK |
+| home_dashboard「試合ログ」入口 | OK |
+
+================================================================================
+12. 触っていない範囲
+================================================================================
+
+- schedule_view / game_detail_view / readonly_selection_context（第1段では未拡張）
+- Python CLI match_logs 閲覧メニュー
+- game_results metadata 拡張
+- full PBP 保存 / export
+- box score 詳細 / player 別スタッツ連携
+- filter / search / reverse sort
+- Godot 自動 Python 起動
+- Godot 側から save 直接読込
+
+================================================================================
+13. 既知の制約
+================================================================================
+
+以下は問題ではなく、後工程として整理する。
+
+- 実データ save 本体にはまだ match_logs が保存されていないケースがある
+- 今回の from_python 確認は temp .sav 経由
+- Godot への JSON 配置はまだ手動
+- 自動 Python 起動はしていない
+- Godot 側から save を直接読まない
+- schedule → event_id → match_logs 連携は未実装
+- game_results metadata 拡張は未実装
+- CLI match_logs 閲覧導線は未実装
+- full PBP 保存 / export は未実装
+- box score 詳細は未実装
+- player 別スタッツ連携は未実装
+- filter / search / reverse sort は未実装
+- 詳細カード高さは現状 210px 固定
+- key_plays / commentary 品質改善は後工程
+
+================================================================================
+14. まだ未実装の項目
+================================================================================
+
+| カテゴリ | 項目 |
+|---|---|
+| 導線 | schedule → event_id → match_logs 詳細連携 |
+| CLI | match_logs 閲覧メニュー |
+| UI | filter / search / reverse sort |
+| データ | game_results metadata 拡張 |
+| 表示 | full PBP / box score / player stats |
+| 品質 | key_plays / commentary 文面改善 |
+| 運用 | bundle → godot/data 手動配置手順の整備 |
+| レイアウト | 解像度別詳細カード高さ調整 |
+
+================================================================================
+15. static 確認結果（本レポート作成時）
+================================================================================
+
+```
+git log --oneline -15
+→ 0e14bb7 .. 1cce7b1 を確認
+
+git show --stat（主要 commit）
+→ e0561dc: season/save_load/match_log_builder + tests
+→ cf208fc: match_logs_readonly.py + bundle 11件化
+→ c24736e: Godot match_logs_view + mock + home 入口
+→ 2944a1a: 詳細カード ScrollContainer
+→ b601bd7 / 6cdaa72 / 0e14bb7: 各 smoke レポート
+
+Test-Path "godot/data/match_logs_from_python.json"
+→ False
+
+git diff -- basketball_sim godot docs tests
+→ 空（コード変更なし）
+
+git status --short
+→ 未追跡: docs handoff, .uid のみ（add していない）
+```
+
+================================================================================
+16. 判定
+================================================================================
+
+**合格 / Python→Godot match_logs 接続 第1段完了**
+
+理由:
+- Python 側の軽量 match_logs 保存が成立
+- save/load 互換が成立
+- readonly export が成立
+- bundle 11件化が成立
+- Godot mock 表示が成立
+- Godot from_python 優先読込が実画面で成立
+- full PBP を持たない軽量方針を維持
+- 実データ save 未上書き
+- 生成 JSON 未 commit
+- 既存画面・既存 JSON を壊していない
+
+================================================================================
+17. 次に行う具体的タスク（1件）
+================================================================================
+
+**match_logs を次のゲーム体験へつなげる後工程候補を比較する設計レポートを作成する**
+
+理由:
+- 接続第1段は完了した
+- schedule 連携や CLI メニューを実装する前に、
+  どの導線がプレイ体験に最も効くか整理する必要がある
+
+比較候補（設計レポートで整理）:
+1. schedule → event_id → match_logs 詳細連携
+2. CLI match_logs 閲覧メニュー
+3. match_logs 一覧の filter / search / reverse sort
+4. key_plays / commentary 品質改善
+5. box score / player stats への拡張
+
+※ 今回は比較設計レポートの作成を次タスクとするのみ。実装はしない。
+
+================================================================================
+18. 関連レポート
+================================================================================
+
+- reports/python_core_pbp_commentary_persistence_pre_design_2026-05.txt
+- reports/python_core_match_logs_phase1_smoke_2026-05.txt
+- reports/python_core_match_logs_readonly_export_design_2026-05.txt
+- reports/python_core_match_logs_readonly_export_bundle_smoke_2026-05.txt
+- reports/godot_match_logs_mock_and_readonly_list_design_2026-05.txt
+- reports/godot_match_logs_view_phase1_manual_smoke_2026-05.txt
+- reports/godot_match_logs_from_python_priority_smoke_2026-05.txt
+
+================================================================================
+19. フロー概要（参考）
+================================================================================
+
+```
+[Python simulate_next_round]
+        ↓
+Season.match_logs（軽量、user_team 関連のみ）
+        ↓
+[save/load 互換] ← 古い save は match_logs=[] 補完
+        ↓
+match_logs_readonly.py → match_logs_from_python.json
+        ↓
+[手動配置] godot/data/match_logs_from_python.json
+        ↓
+Godot match_logs_view（from_python 優先 → mock fallback）
+        ↓
+一覧 + 詳細カード（excerpt / key plays のみ、full PBP なし）
+```
+
+================================================================================
+END
+================================================================================
