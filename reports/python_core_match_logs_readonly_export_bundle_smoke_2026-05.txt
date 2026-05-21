@@ -1,0 +1,305 @@
+================================================================================
+Python本体 — match_logs readonly export + bundle 11件化 実データ確認（2026-05）
+================================================================================
+
+確認日: 2026-05-21
+対象 commit: cf208fc — match_logs readonly exportを追加
+目的: match_logs_from_python.json export および godot_readonly_bundle 11件化が、
+      実データ save / programmatic smoke / bundle 出力で正しく動作するか確認する。
+コード変更: なし（本レポートのみ）。
+
+================================================================================
+1. 確認方法
+================================================================================
+
+| 層 | 内容 |
+|---|---|
+| static | git log / grep / git diff（禁止パス） |
+| pytest | export 新規・bundle 更新・関連・全体 |
+| programmatic smoke（単体 export） | fa_clip_test_04.sav を load → メモリ上 simulate 1R → JSON 出力 |
+| bundle smoke | temp .sav（match_logs 3件）→ bundle 11 JSON 出力 |
+
+対話型 CLI は未使用（save 誤上書き回避）。
+fa_clip_test_04.sav 本体には save_world を呼ばない。
+
+================================================================================
+2. 使用 save
+================================================================================
+
+| save | 用途 | 備考 |
+|---|---|---|
+| fa_clip_test_04.sav | 単体 export programmatic smoke | サイズ 1,370,770 bytes。resume_season あり。ディスク上 match_logs=0（未進行保存） |
+| temp bundle_smoke.sav | bundle smoke のみ | `$env:TEMP\godot_readonly_bundle_match_logs_smoke\`。検証用一時 save。実データ非上書き |
+
+debug_user_boost_d1_user.sav: 今回未使用（必須ではない）。
+
+================================================================================
+3. 実行コマンド
+================================================================================
+
+### static
+```
+git log --oneline -5
+Select-String basketball_sim/export/match_logs_readonly.py ...
+Select-String basketball_sim/export/godot_readonly_bundle.py ...
+Select-String basketball_sim/tests/test_match_logs_readonly_export.py ...
+Select-String basketball_sim/tests/test_godot_readonly_bundle_export.py ...
+git diff 8427486..cf208fc -- basketball_sim/models/season.py ... godot/ docs/ reports/
+```
+
+### pytest
+```
+py -m pytest basketball_sim/tests/test_match_logs_readonly_export.py
+py -m pytest basketball_sim/tests/test_godot_readonly_bundle_export.py
+py -c "import basketball_sim.main; print('main import ok')"
+py -m pytest basketball_sim/tests/test_match_log_builder.py
+py -m pytest basketball_sim/tests/test_simulate_quiet_mode.py
+py -m pytest basketball_sim/tests/test_phase0_smoke.py
+py -m pytest basketball_sim/tests/test_schedule_readonly_export.py
+py -m pytest basketball_sim/tests/test_standings_readonly_export.py
+py -m pytest basketball_sim/tests/test_roster_readonly_export.py
+py -m pytest basketball_sim/tests/test_home_dashboard_readonly_export.py
+py -m pytest basketball_sim/tests/test_post_advance_result_summary_cli_display.py
+py -m pytest basketball_sim/tests/test_season_end_summary_cli_display.py
+py -m pytest basketball_sim/tests
+```
+
+### programmatic smoke（単体 export）
+- load_world(fa_clip_test_04.sav)
+- season.simulate_next_round(quiet=True) ×1（メモリのみ）
+- build_match_logs_readonly_dict / write_match_logs_json
+- 出力: `$env:TEMP\match_logs_from_python_smoke.json`
+- メタ: `$env:TEMP\match_logs_readonly_export_smoke_meta.json`
+
+### bundle smoke
+- temp .sav に match_logs 3件の resume_season を save_world（temp のみ）
+- export_godot_readonly_bundle(temp_sav, temp_out, max_logs=2)
+- 出力: `$env:TEMP\godot_readonly_bundle_match_logs_smoke\bundle_out\`
+
+================================================================================
+4. pytest 結果
+================================================================================
+
+| スイート | 件数 | 結果 |
+|---|---|---|
+| test_match_logs_readonly_export.py | 14 | **passed** |
+| test_godot_readonly_bundle_export.py | 16 | **passed** |
+| import basketball_sim.main | — | **ok** |
+| 関連 9 ファイル（match_log_builder / quiet / phase0 / 6 export 等） | 97 | **passed** |
+| basketball_sim/tests 全体 | 全件 | **passed（Exit 0）** |
+
+================================================================================
+5. static 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| git diff 8427486..cf208fc（season/match/match_log_builder/save_load/godot/docs/reports） | **空（変更なし）** |
+| match_logs_readonly.py 存在 | **あり** |
+| godot_readonly_bundle.py 11件化 | **確認** |
+| season / match / match_log_builder / save_load / Godot 未変更 | **確認** |
+
+================================================================================
+6. match_logs_readonly.py 確認結果
+================================================================================
+
+### 公開関数（3つ）
+| 関数 | 確認 |
+|---|---|
+| build_match_logs_readonly_dict | **あり** |
+| write_match_logs_json | **あり**（戻り値 None — schedule 等と同型） |
+| export_match_logs_json_from_world | **あり** |
+
+### 設計遵守
+| 項目 | 結果 |
+|---|---|
+| schema_version / kind / generated_at | **追加なし**（grep 0件） |
+| full PBP / full commentary export | **なし**（docstring + notes で明示、commentary_full キーなし） |
+| defensive normalize | **_normalize_commentary_excerpt / _normalize_key_plays / _normalize_match_log_entry** |
+| max_logs 既定 | **_DEFAULT_MAX_LOGS = 50** |
+| load_world のみ | export_*_from_world 内で load_world + validate_payload |
+| save_world | **export モジュール内に呼び出しなし** |
+| JSON 形式 | UTF-8, ensure_ascii=False, indent=2, 末尾改行 |
+
+================================================================================
+7. godot_readonly_bundle 確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| docstring / CLI | 10 → **11** JSON |
+| 末尾追加 | **match_logs** → **match_logs_from_python.json** |
+| import | export_match_logs_json_from_world |
+| max_logs 引数 | export_godot_readonly_bundle(..., max_logs=50) |
+| CLI | **--max-logs** 追加 |
+| 既存10件の順序 | home_dashboard → … → contract_personnel_summary（**不変**） |
+| match_logs | **末尾**（11番目） |
+
+tasks 順序（先頭→末尾）:
+1. home_dashboard_from_python.json
+2. roster_from_python.json
+3. club_history_from_python.json
+4. standings_from_python.json
+5. schedule_from_python.json
+6. facility_summary_from_python.json
+7. finance_summary_from_python.json
+8. owner_mission_from_python.json
+9. tactics_summary_from_python.json
+10. contract_personnel_summary_from_python.json
+11. match_logs_from_python.json  ← 新規
+
+================================================================================
+8. programmatic smoke 結果（fa_clip_test_04.sav — 単体 export）
+================================================================================
+
+| 項目 | 値 |
+|---|---|
+| save パス | C:\Users\tsuno\.basketball_sim\saves\fa_clip_test_04.sav |
+| round before → after | **5 → 6** |
+| before match_logs → after（メモリ） | **0 → 2** |
+| summary.count | **2** |
+| summary.exported_count | **2** |
+| summary.latest_round | **6** |
+| len(match_logs) | **2** |
+| empty_message | **""**（logs あり） |
+| JSON parse | **OK** |
+| save mtime 不変 | **OK** |
+| save size 不変 | **OK（1,370,770 bytes）** |
+| save_world（実データ） | **未呼び出し** |
+
+### entry 確認（2件）
+| match_id | 必須キー | head | tail | total_lines | key_plays | events ネスト |
+|---|---|---|---|---|---|---|
+| regular_season_r6_g33 | 欠損なし | 5 | 5 | 360 | 8 | なし |
+| regular_season_r6_g34 | 欠損なし | 5 | 5 | 359 | 8 | なし |
+
+| 項目 | 結果 |
+|---|---|
+| commentary head/tail <= 5 | **OK** |
+| commentary total_lines > 0 | **OK** |
+| key_plays <= 8 | **OK** |
+| schema_version / kind / generated_at | payload に **なし** |
+| commentary_full / full PBP | **なし** |
+
+出力先:
+- C:\Users\tsuno\AppData\Local\Temp\match_logs_from_python_smoke.json
+- C:\Users\tsuno\AppData\Local\Temp\match_logs_readonly_export_smoke_meta.json
+
+================================================================================
+9. bundle smoke 結果（temp .sav — 推奨A）
+================================================================================
+
+| 項目 | 値 |
+|---|---|
+| temp save | $env:TEMP\godot_readonly_bundle_match_logs_smoke\bundle_smoke.sav |
+| output_dir | $env:TEMP\godot_readonly_bundle_match_logs_smoke\bundle_out\ |
+| bundle success_count | **11** |
+| bundle failed_count | **0** |
+| 11 JSON 存在 | **OK** |
+| match_logs_from_python.json 存在 | **OK** |
+| 既存10 JSON parse | **全件 OK** |
+| match_logs JSON parse | **OK** |
+
+### match_logs payload（max_logs=2 指定）
+| 項目 | 値 |
+|---|---|
+| summary.count（全件） | **3** |
+| summary.exported_count | **2** |
+| len(match_logs) | **2**（末尾2件） |
+| screen_title | 試合ログ（閲覧） |
+| summary / empty_message キー | **あり** |
+| max_logs 反映 | **OK**（count=3, exported=2） |
+
+bundle keys（11）: club_history, contract_personnel_summary, facility_summary,
+finance_summary, home_dashboard, match_logs, owner_mission, roster, schedule,
+standings, tactics_summary
+
+CLI 出力: `Bundle complete: 11 succeeded, 0 failed`
+
+### max_logs 伝播（pytest 引用）
+test_godot_readonly_bundle_export.py::test_max_logs_passed_to_match_logs で
+export_godot_readonly_bundle(..., max_logs=7) → export_match_logs_json_from_world に 7 が渡ることを確認済み。
+
+================================================================================
+10. 既存10 JSON 非回帰確認
+================================================================================
+
+| 確認 | 結果 |
+|---|---|
+| bundle smoke で既存10ファイル生成 | **OK** |
+| 既存10 JSON parse | **全件 OK** |
+| 既存10 export pytest | **passed** |
+| bundle 既存テスト（10→11 更新後） | **passed** |
+| tasks 順序・ファイル名 | **変更なし（match_logs は末尾追加のみ）** |
+
+================================================================================
+11. save 上書き有無 / 生成 JSON 未 commit
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| fa_clip_test_04.sav 上書き | **なし**（mtime/size 不変） |
+| save_world on 実データ | **なし** |
+| temp .sav | bundle smoke 用のみ（$env:TEMP） |
+| godot/data への出力 | **なし** |
+| *_from_python.json commit | **なし**（生成物は $env:TEMP のみ） |
+| .sav commit | **なし** |
+
+================================================================================
+12. 問題点・軽微所見
+================================================================================
+
+### 問題点（修正要）
+**なし**
+
+### 軽微所見（今回修正しない）
+- Godot 画面は未接続（match_logs_view 等なし）
+- match_logs_mock.json は未作成
+- schedule から event_id で match_log へ飛ぶ導線は未実装
+- CLI で match_logs を見返す導線は未実装
+- game_results metadata 拡張（event_id 等）は未実装
+- **fa_clip_test_04.sav ディスク本体には match_logs 未保存**（load 時 before_logs=0）。
+  実データ save に対して bundle CLI のみ実行すると match_logs は 0 件 empty payload になる。
+  ログ付き bundle 確認には temp .sav または進行後 save が必要。
+- bundle 11件化後、Godot 側で利用するには mock / 画面実装が必要
+- temp .sav bundle smoke は検証用であり、実データ save 上書きではない
+
+================================================================================
+13. 判定
+================================================================================
+
+**合格**
+
+判定基準との対応:
+- match_logs_from_python.json 出力: **OK**
+- JSON parse: **OK**
+- count / exported_count 正しい: **OK**（2/2、bundle max_logs 3/2 も OK）
+- defensive normalize: **OK**
+- commentary head/tail 制限内: **OK**
+- key_plays 最大8件: **OK**
+- full PBP / full commentary export なし: **OK**
+- schema_version/kind/generated_at なし: **OK**
+- bundle 11件成功: **OK**
+- 既存10 JSON 出力・parse: **OK**
+- save 未上書き: **OK**
+- 生成 JSON 未 commit: **OK**
+- 既存テスト全体 pass: **OK**
+
+================================================================================
+14. 次に行う具体的タスク（1件）
+================================================================================
+
+**Godot match_logs mock JSON と読取専用一覧画面の設計レポートを作成する**
+
+理由:
+- Python 側は「保存 → export → bundle 11件」まで成立
+- 次は Godot でどう見せるかを実装前に設計で固める段階
+- mock JSON / from_python fallback / 一覧 / 詳細 / commentary excerpt / key plays 表示を先に整理すべき
+- Godot 既存 UI（schedule_view 等）との整合が重要
+
+代替（今回は不要）:
+- export/bundle に問題があれば「match_logs readonly export の軽微修正指示書を作成する」
+
+================================================================================
+END
+================================================================================
