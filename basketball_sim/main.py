@@ -2844,6 +2844,24 @@ def run_interactive_season(
 
                 if choice == "1":
                     try:
+                        from basketball_sim.systems.round_advance_preview import (
+                            format_round_advance_preview_lines,
+                        )
+
+                        _preview_lines = format_round_advance_preview_lines(
+                            season,
+                            user_team,
+                            season_count=season_count,
+                            free_agents=free_agents,
+                            include_weekly_check=False,
+                        )
+                        for _preview_ln in _preview_lines[:8]:
+                            print(_preview_ln)
+                        if _preview_lines:
+                            print("")
+                    except Exception:
+                        pass
+                    try:
                         from basketball_sim.systems.weekly_advance_cli_display import (
                             format_weekly_advance_check_lines,
                         )
