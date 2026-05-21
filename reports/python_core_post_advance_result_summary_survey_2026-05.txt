@@ -1,0 +1,299 @@
+================================================================================
+Python本体 — 進行後の直近試合結果サマリー 現状調査（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+対象 commit: 1e637b3 — ラウンド進行previewの進行予告表示を整理
+目的: CLI で「1ラウンド進めた後に何が起きたか」を短く返すため、
+      simulate_next_round() 後の自チーム直近試合結果サマリー実装可否を調査する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 調査したファイル
+================================================================================
+
+- basketball_sim/main.py — CLI choice "1" / preview 接続 / 進行後出力の有無
+- basketball_sim/models/season.py — simulate_next_round / game_results
+- basketball_sim/models/match.py — Match.simulate / PBP / commentary
+- basketball_sim/systems/schedule_display.py — user判定 / past_league_result_rows
+- basketball_sim/systems/match_postgame_cli_display.py — 試合直後 CLI（既存）
+- basketball_sim/export/schedule_readonly.py — Godot DTO 参考
+- basketball_sim/tests/ — game_results / simulate / postgame 関連テスト
+
+
+================================================================================
+2. simulate_next_round() の現状フロー（要約）
+================================================================================
+
+**ファイル:** season.py L2780〜2918
+
+1. season_finished なら return
+2. round_number = current_round + 1
+3. round_events = get_events_for_round(round_number)
+4. 代表ウィンドウ週なら national 処理（リーグ game スキップ可）
+5. 各 event_type=="game" について:
+   - 自チーム試合なら importance preview / match preview CLI 表示
+   - Match(...).simulate()
+   - **自チーム試合なら format_match_postgame_cli_lines(match, user_team) を print**
+   - **game_results.append({home_team, away_team, home_score, away_score, score_diff, total_score})**
+6. inseason FA / EASL / 天皇杯（該当ラウンド）
+7. 経営ラウンド処理
+8. current_round += 1
+9. CPU management / ラウンド平均得点 print
+10. 最終ラウンドなら _finalize_season()
+
+**main.py CLI choice "1"（L2845〜2876）:**
+- preview 短縮表示（進行前）
+- weekly_advance_check_lines（進行前）
+- season.simulate_next_round()
+- **進行後の専用サマリーは未実装**
+
+**choice "2" / "9":**
+- simulate_multiple_rounds(5) / simulate_to_end()
+- preview / 進行後サマリーとも未接続
+
+
+================================================================================
+3. game_results の現状構造
+================================================================================
+
+### 初期化
+Season.__init__ L171: `self.game_results = []`
+
+### 追記箇所（grep）
+**season.py 内の append は1箇所のみ**（L2880、simulate_next_round の game event ループ）。
+
+```python
+self.game_results.append({
+    "home_team": event.home_team.name,      # str（Team.name）
+    "away_team": event.away_team.name,
+    "home_score": home_score,
+    "away_score": away_score,
+    "score_diff": abs(home_score - away_score),
+    "total_score": home_score + away_score,
+})
+```
+
+### 含まれないフィールド
+- round / round_number
+- event_id
+- competition_type
+- day_of_week
+- user_team フラグ
+- Match オブジェクト参照
+- PBP / commentary / box score
+
+### 天皇杯 / EASL
+別状態（emperor_cup_results, easl 等）で管理。game_results には通常ループの game event のみ append。
+
+### schedule_display.past_league_result_rows（L1295〜）
+- game_results から自チーム行を **team名一致** で抽出
+- competition_display は **regular_season 固定**
+- round_label は **"—"**（データなし）
+- 注記: 「大会種別・節は game_results に未格納」
+
+
+================================================================================
+4. 調査項目への回答
+================================================================================
+
+| # | 項目 | 結論 |
+|---|---|---|
+| 1 | 進行後 game_results の形 | dict リスト。上記6キーのみ |
+| 2 | round / event_id / competition_type | **なし** |
+| 3 | 今回追加分だけ抽出 | **可能**。before=len(...); simulate; slice [before:] |
+| 4 | 自チーム試合だけ判定 | **可能**。home_team/away_team と user_team.name 一致（past_league_result_rows 同型） |
+| 5 | 同一ラウンド複数試合 | **可能**。slice 内を自チーム filter で複数行（fa_clip_test_04 で2試合確認） |
+| 6 | 自チーム0件（PO/締め週） | added_count=0 または user_added=0。「自チーム試合なし」表示で対応 |
+| 7 | PBP/commentary を進行後に使えるか | **不可**（Match 破棄。game_results に未保存） |
+| 8 | まず score だけの短縮サマリー | **推奨**。既存データで十分 |
+| 9 | save 構造変更なしの範囲 | before/after slice + 自チーム filter + W/L 行表示まで |
+| 10 | save 変更が必要な範囲 | round/event_id/competition 付与、PBP/box 永続化、Godot game_detail 連携 |
+
+
+================================================================================
+5. Match.simulate() と永続化
+================================================================================
+
+- 戻り値: (winner, home_score, away_score)
+- Match インスタンスに play_by_play_log / commentary_log を保持
+- simulate 中に PBP debug / commentary preview を **print**
+- simulate_next_round 終了後 Match は参照されず **永続化されない**
+- format_match_postgame_cli_lines(match, user_team) は **simulate 直後・Match 存命中** にのみ利用可能
+  （season.py L2875〜2877 で既に自チーム試合ごとに呼ばれている）
+
+**既存の「進行後」出力:**
+- 自チーム試合ごとに **詳細な試合後 CLI**（postgame）が simulate ループ内で既に出る
+- ラウンド末に「ラウンド消化試合数」「ラウンド平均総得点」
+
+→ 新サマリーは **ラウンド単位の短い一覧**（複数試合の勝敗集約）が価値。詳細 postgame の代替ではない。
+
+
+================================================================================
+6. 任意実データ確認（メモリ上のみ、save 未上書き）
+================================================================================
+
+### fa_clip_test_04.sav（current_round 5→6）
+
+| 項目 | 値 |
+|---|---|
+| before_count | 264 |
+| after_count | 312 |
+| added_count（全試合） | 48 |
+| user_added_count | 2 |
+| added_keys | home_team, away_team, home_score, away_score, score_diff, total_score |
+
+自チーム追加分サンプル:
+- セーブ確認プレイチーム 67 - 87 Yokohama Bulls_35（敗）
+- セーブ確認プレイチーム 85 - 61 Yokohama Bulls_35（勝）
+
+→ len 差分 slice + 自チーム名 filter で理想 UX に近い2行が取れる。
+
+### debug_user_boost_d1_user.sav（current_round 32→33）
+
+| 項目 | 値 |
+|---|---|
+| added_count | 0 |
+| user_added_count | 0 |
+
+→ PO/締め週。game event なし。「自チーム試合: 0」表示パターンが必要。
+
+
+================================================================================
+7. save構造を変えずにできる最小実装案（優先度 A）
+================================================================================
+
+### 新規 read-only 表示モジュール（案）
+`basketball_sim/systems/post_advance_result_summary_cli_display.py`（名称は実装時調整）
+
+```python
+def format_post_advance_result_summary_lines(
+    user_team,
+    new_results: list[dict],  # game_results[before:after]
+    *,
+    round_label: str | None = None,  # 例: f"ラウンド {season.current_round}/{season.total_rounds}"
+) -> list[str]:
+    ...
+```
+
+### main.py choice "1" 接続（simulate 後のみ）
+
+```python
+_before = len(season.game_results)
+season.simulate_next_round()
+_added = season.game_results[_before:]
+# format + print（try/except pass）
+```
+
+### 表示内容（最小）
+- 【ラウンド結果サマリー】
+- 自チーム試合: N 試合（0 なら「自チーム試合なし（PO/締め等）」）
+- 各試合: ○/● + 自チーム名 スコア - スコア 相手名（home/away から W/L 判定）
+- ひとこと: N勝M敗（任意・1行）
+
+### 再利用
+- schedule_display.past_league_result_rows の W/L 判定ロジックを参考（team名一致）
+- match_postgame_cli_display は **再呼び出し不可**（Match 不在）。score 行のみ
+
+### 変更範囲
+- 新規 systems モジュール + tests
+- main.py choice "1" の simulate 直後数行
+- season.py / Match / save 構造 **変更なし**
+
+### choice "2"/"9"
+今回は対象外。将来は before/after を multiple 前後で同様に slice 可能。
+
+
+================================================================================
+8. save構造変更が必要な中〜大実装案（後工程）
+================================================================================
+
+### B. game_results 最小拡張
+append 時に round_number / event_id / competition_type を追加。
+- season.py simulate_next_round の append 1箇所変更
+- save/load 互換（pickle dict 追加は一般に後方互換）
+- 設計レポート1枚を挟む価値あり
+
+### C. PBP / commentary / box score 永続化
+- game_results に nested log を載せる、または別リスト
+- 保存サイズ・性能・Godot game_detail 要件
+- **今回は重すぎる**
+
+### D. Godot game_detail 連携
+- event_id 必須に近い
+- Python 本体の結果体験を先に固める（今回方針と一致）
+
+
+================================================================================
+9. 既存テストで参考になる場所
+================================================================================
+
+| ファイル | 内容 |
+|---|---|
+| test_schedule_display.py::test_past_results_from_game_results | game_results stub + past 行 |
+| test_match_postgame_cli_display.py | 試合直後 CLI（Match 必要） |
+| test_reg_slot_pass_through.py | 同一ラウンド2試合 simulate |
+| test_inseason_cash_round_log.py | simulate_next_round + game_results |
+| test_round_advance_preview.py | 非破壊性パターン |
+
+追加テスト案:
+- format_post_advance_result_summary_lines に dict リストを渡す unit test
+- 0件 / 1件 / 2件 / 自チーム非含有 added の filter
+
+
+================================================================================
+10. 実装時の安全条件
+================================================================================
+
+- simulate_next_round 本体は変更しない
+- game_results.append 仕様は変更しない（最小案）
+- Match / save 構造に触れない
+- 表示追加のみ。進行可否は変えない
+- preview 失敗時と同様 try/except でサマリー失敗時も進行済み状態を壊さない
+- main.py 変更は choice "1" の simulate 直後に限定
+- Godot 変更なし
+
+
+================================================================================
+11. 推奨次タスク（1件）
+================================================================================
+
+**game_results の len 差分 slice で十分可能**（実データ確認済み）。
+round / event_id なしでも CLI 最小サマリーは実装可能。
+
+次に行う具体的タスク:
+CLI の1ラウンド進行後に、game_results 差分から自チーム試合結果サマリーを
+短く表示する実装指示書を作成する。
+
+（代替タスクに落とす条件: 未達 — slice 方式は fa_clip_test_04 で検証済み）
+
+
+================================================================================
+12. 理想 UX とのギャップ
+================================================================================
+
+理想例:
+```
+【ラウンド結果サマリー】
+自チーム試合: 2試合
+○ セーブ確認プレイチーム 82 - 76 Kyoto Eagles_10
+● セーブ確認プレイチーム 69 - 74 Yokohama Kings_4
+ひとこと: 1勝1敗。次ラウンド前にロスター/戦術確認推奨。
+```
+
+最小案で達成可能:
+- 2試合行 + 勝敗記号 + ひとこと（勝敗集計）
+- 大会名・ラウンド番号は game_results からは厳密取得不可
+  → round_label は simulate 後の season.current_round / total_rounds から表示可能
+- competition_type なし → 「日本リーグ相当」注記または省略
+
+既存 postgame 詳細出力との関係:
+- 同一ラウンド内で自チーム試合ごとに postgame は既出
+- 新サマリーは **ラウンド末尾の短い振り返り** として差別化（8行以内目標）
+
+
+================================================================================
+13. pytest
+
+今回コード変更なしのため未実施。
