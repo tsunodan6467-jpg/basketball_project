@@ -72,9 +72,25 @@ def _parse_user_game_row(
     }
 
 
-def _build_one_liner(wins: int, losses: int, draws: int) -> str:
-    if wins == 0 and losses == 0 and draws == 0:
+def _build_one_liner(wins: int, losses: int, draws: int, unknowns: int) -> str:
+    if wins == 0 and losses == 0 and draws == 0 and unknowns == 0:
         return "ひとこと: このラウンドの自チーム試合結果はありません。"
+    if wins == 0 and losses == 0 and draws == 0 and unknowns > 0:
+        return f"ひとこと: {unknowns}試合の結果を確認できませんでした。"
+
+    unknown_suffix = f"、{unknowns}試合結果不明" if unknowns > 0 else ""
+
+    if unknowns > 0:
+        if draws > 0:
+            record = f"{wins}勝{losses}敗{draws}分{unknown_suffix}。"
+        elif losses == 0 and wins > 0:
+            record = f"{wins}勝0敗{unknown_suffix}。"
+        elif wins == 0 and losses > 0:
+            record = f"0勝{losses}敗{unknown_suffix}。"
+        else:
+            record = f"{wins}勝{losses}敗{unknown_suffix}。"
+        return f"ひとこと: {record}次ラウンド前にロスター/戦術確認推奨。"
+
     if draws > 0:
         return (
             f"ひとこと: {wins}勝{losses}敗{draws}分。"
@@ -126,6 +142,7 @@ def format_post_advance_result_summary_lines(
     wins = sum(1 for g in games if g.get("won"))
     losses = sum(1 for g in games if g.get("lost"))
     draws = sum(1 for g in games if g.get("draw"))
-    lines.append(_build_one_liner(wins, losses, draws))
+    unknowns = sum(1 for g in games if g.get("unknown"))
+    lines.append(_build_one_liner(wins, losses, draws, unknowns))
     return lines
 

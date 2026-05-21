@@ -62,6 +62,28 @@ def test_invalid_scores_do_not_crash() -> None:
     text = "\n".join(format_post_advance_result_summary_lines(u, rows))
     assert "？" in text
     assert "結果不明" in text
+    assert "1試合の結果を確認できませんでした。" in text
+    assert "このラウンドの自チーム試合結果はありません。" not in text
+
+
+def test_unknown_score_uses_unknown_one_liner() -> None:
+    u = _user("UserFC")
+    rows = [{"home_team": "UserFC", "away_team": "Other", "home_score": "x", "away_score": 70}]
+    text = "\n".join(format_post_advance_result_summary_lines(u, rows))
+    assert "自チーム試合: 1 試合" in text
+    assert "1試合の結果を確認できませんでした。" in text
+
+
+def test_mixed_result_and_unknown_score_one_liner() -> None:
+    u = _user("UserFC")
+    rows = [
+        {"home_team": "UserFC", "away_team": "A", "home_score": 80, "away_score": 70},
+        {"home_team": "UserFC", "away_team": "B", "home_score": "x", "away_score": 60},
+    ]
+    text = "\n".join(format_post_advance_result_summary_lines(u, rows))
+    assert "自チーム試合: 2 試合" in text
+    assert "1勝0敗、1試合結果不明" in text
+    assert "このラウンドの自チーム試合結果はありません。" not in text
 
 
 def test_max_games_limits_and_shows_remaining() -> None:
