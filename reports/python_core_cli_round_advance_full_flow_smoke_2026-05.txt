@@ -1,0 +1,253 @@
+================================================================================
+Python本体 — CLI 1ラウンド進行 前後表示フロー 実データ確認（2026-05）
+================================================================================
+
+確認日: 2026-05-19
+対象 commit: 90f486f — 進行後結果サマリーの不明スコア文言を整理
+目的: CLI choice "1" の一連表示（preview → weekly → simulate → post summary）
+      が実データで読みやすいか、順序・表示量・役割分担を確認する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 確認方法
+================================================================================
+
+- **対話型 CLI:** 未実施
+- **programmatic smoke:** 実施（main.py choice "1" 同等の処理順を再現）
+- **save 上書き:** なし（load_world のみ、save_world 未使用、メモリ上 season のみ進行）
+
+処理順（再現）:
+1. format_round_advance_preview_lines(..., include_weekly_check=False)[:8]
+2. format_weekly_advance_check_lines(...)
+3. season.simulate_next_round()
+4. game_results 差分 slice → format_post_advance_result_summary_lines(...)
+
+出力保存:
+- $env:TEMP\cli_round_advance_full_flow_fa_clip_test_04.txt
+- $env:TEMP\cli_round_advance_full_flow_debug_user_boost_d1_user.txt
+- $env:TEMP\cli_round_advance_full_flow_meta.json
+
+
+================================================================================
+2. 静的確認（main.py 接続）
+================================================================================
+
+choice "1" ブロック（L2845〜2894）:
+1. preview（try/except pass、最大8行）
+2. weekly check（try/except pass）
+3. _game_results_before = len(...)
+4. season.simulate_next_round()
+5. post summary（try/except pass、round_label=simulate後 current_round）
+
+choice "2" / "9" には post summary / preview 未接続（想定どおり）。
+
+
+================================================================================
+3. 使用 save
+================================================================================
+
+| save | 用途 | cr（前→後） |
+|---|---|---|
+| fa_clip_test_04.sav | 自チーム2試合あり | 5 → 6 |
+| debug_user_boost_d1_user.sav | PO/締め・game 0 | 32 → 33 |
+
+
+================================================================================
+4. 実行コマンド
+================================================================================
+
+- Select-String main.py / post_advance_result_summary_cli_display.py
+- pytest: post_advance, round_advance_preview, round_advance_readonly, schedule_display, match_postgame
+- import basketball_sim.main
+- Python programmatic full-flow smoke（上記2 save）
+
+
+================================================================================
+5. pytest 結果
+================================================================================
+
+| スイート | 結果 |
+|---|---|
+| test_post_advance_result_summary_cli_display.py | passed |
+| test_round_advance_preview.py | passed |
+| test_round_advance_preview_readonly_export.py | passed |
+| test_schedule_display.py | passed |
+| test_match_postgame_cli_display.py | passed |
+| **合計** | **66 passed** |
+| import basketball_sim.main | ok |
+
+
+================================================================================
+6. 表示フロー抜粋
+================================================================================
+
+### fa_clip_test_04.sav（自チーム2試合）
+
+**PREVIEW（8行）**
+```
+【ラウンド進行プレビュー（読取専用）】
+クラブ: セーブ確認プレイチーム
+現在: ラウンド 5 / 33
+次の進行: ラウンド 6 / 33（11月2週目）
+自チーム試合: 2 試合
+進行予告: ラウンド6・自チーム 2試合まとめ進行／試合の合間の介入なし
+次の進行（ラウンド 6 / 全 33・11月2週目）
+この進行に含まれる自チームの対戦カード（game）: 2 試合（同一ラウンド内はまとめてシミュ）
+```
+
+**WEEKLY（5行）**
+```
+【週送り前チェック】
+今週: 昇格圏争い
+注意: 編成面 特記なし
+注意: 財務赤字傾向・再契約候補あり・FA候補確認余地あり
+進める前チェック: 財務と起用の確認推奨
+```
+
+**SIMULATE（抜粋）**
+- ラウンド 6/33 ヘッダー
+- 全リーグ試合 simulate + 自チーム試合 postgame 等
+- **総行数: 約 8009 行**
+- 末尾: ラウンド消化試合数 48 / 平均総得点 146.8
+
+**POST SUMMARY（6行）**
+```
+【ラウンド結果サマリー】
+対象: ラウンド 6/33
+自チーム試合: 2 試合
+● セーブ確認プレイチーム 67 - 68 Yokohama Bulls_35
+○ セーブ確認プレイチーム 69 - 67 Yokohama Bulls_35
+ひとこと: 1勝1敗。次ラウンド前にロスター/戦術確認推奨。
+```
+
+user_games_added: 2 / sim_error: なし
+
+---
+
+### debug_user_boost_d1_user.sav（自チーム0試合・最終ラウンド）
+
+**PREVIEW（8行）**
+```
+【ラウンド進行プレビュー（読取専用）】
+...
+自チーム試合: 0 試合
+進行予告: ラウンド33・自チームの対戦カード0件（杯等は同進行）／...
+```
+
+**WEEKLY（5行）**
+```
+今週: 当節レギュラー出走なし / 昇格圏争い・連勝継続がかかる
+進める前チェック: 先発と戦術の再確認推奨
+```
+
+**SIMULATE（抜粋）**
+- ラウンド 33/33
+- game 0 → 経営ログ + **Season finished** + シーズン終了統計
+- **総行数: 約 3808 行**
+
+**POST SUMMARY（4行）**
+```
+【ラウンド結果サマリー】
+対象: ラウンド 33/33
+自チーム試合: 0 試合
+ひとこと: このラウンドの自チーム試合結果はありません。
+```
+
+user_games_added: 0 / sim_error: なし
+
+
+================================================================================
+7. 評価
+================================================================================
+
+### 表示順
+**合格** — preview → weekly → simulate → post summary の順が再現できた。
+
+### 表示量
+| ブロック | 行数目安 | 評価 |
+|---|---|---|
+| preview | 8（cap） | 適切 |
+| weekly | 5 | 適切 |
+| simulate | 3808〜8009 | **非常に多い**（既存仕様。summary が埋もれやすい） |
+| post summary | 4〜6 | 適切 |
+
+進行前ブロック（preview+weekly）は約13行で読める。
+**致命的ではないが、simulate 通常出力が支配的**で post summary はスクロール末尾に回る。
+
+### preview / weekly / post summary の役割分担
+**許容範囲〜良好**
+
+| ブロック | 役割 |
+|---|---|
+| preview | 次ラウンド予定・自チーム試合数・進行予告 |
+| weekly | 編成/財務/昇格圏等の進行前チェック |
+| post summary | 今回ラウンドの自チーム結果 W/L 一覧 |
+
+重複所見:
+- weekly「財務と起用の確認推奨」と post「ロスター/戦術確認推奨」がやや近いが、
+  前者は進行前、後者は結果後で文脈は異なる。
+
+### 進行後エラー
+**なし**（両 save で simulate_next_round 完走）
+
+### save 上書き
+**なし**
+
+
+================================================================================
+8. 問題点・軽微所見（今回は修正しない）
+================================================================================
+
+1. **simulate_next_round 出力量**
+   - 1ラウンドで数千行（全試合 PBP/postgame 含む）
+   - post summary は有用だが、ターミナル末尾までスクロールが必要
+   - 将来: simulate 出力の quiet モード、または summary を simulate 直後に
+     目立つ区切りで再掲する検討余地
+
+2. **「読取専用」文言（preview）**
+   - 開発中確認として妥当。製品 UI では後で表現変更余地あり
+
+3. **「ロスター/戦術確認推奨」の重なり**
+   - weekly と post summary の両方に類似推奨。致命的ではない
+
+4. **最終ラウンド save（debug_user_boost_d1_user）**
+   - simulate が Season finished 統計を大量出力
+   - post summary「0試合」は preview と整合。自然
+
+5. **自チーム試合あり save で post summary は期待どおり**
+   - ○/●、1勝1敗ひとこと、二重prefix なし（進行予告）
+
+
+================================================================================
+9. 判定
+================================================================================
+
+**合格**
+
+- preview → weekly → simulate → post summary の順
+- 進行停止・例外なし
+- 自チーム試合あり/なし save 双方で post summary 期待どおり
+- 進行前ブロックは読める量
+- save 未上書き・コード変更なし
+
+
+================================================================================
+10. 次に行う具体的タスク
+
+Python本体の次の体験強化テーマを選定する比較レポートを作成する。
+
+候補例（比較レポート内で整理）:
+- game_results に round / event_id / competition_type を持たせる最小設計
+- post summary を choice "2" / "9" に広げるか
+- simulate 出力 quiet 化
+- Tk MainMenuView への preview / result summary 接続
+- PBP/commentary 永続化の前段設計
+
+================================================================================
+11. 行数サマリ（programmatic smoke）
+
+| save | preview | weekly | simulate | post summary | user_games |
+|---|---:|---:|---:|---:|---:|
+| fa_clip_test_04.sav | 8 | 5 | 8009 | 6 | 2 |
+| debug_user_boost_d1_user.sav | 8 | 5 | 3808 | 4 | 0 |
