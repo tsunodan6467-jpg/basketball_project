@@ -9,6 +9,8 @@ var _schedule_json_paths: Array[String] = [
 const _LOAD_FAILED_MESSAGE := "日程データ読込に失敗しました"
 
 const _HOME_DASHBOARD_SCENE_PATH := "res://scenes/home_dashboard.tscn"
+const _GAME_DETAIL_VIEW_SCENE_PATH := "res://scenes/game_detail_view.tscn"
+const _SCHEDULE_VIEW_SCENE_PATH := "res://scenes/schedule_view.tscn"
 
 var _last_loaded_uri: String = ""
 var _game_detail_panel: PanelContainer = null
@@ -35,6 +37,10 @@ var _game_detail_style_error: StyleBoxFlat = null
 func _ready() -> void:
 	_setup_upcoming_game_detail_style()
 	_apply_snapshot(_load_schedule_snapshot())
+
+
+func _selection_context() -> Node:
+	return get_node_or_null("/root/ReadonlySelectionContext")
 
 
 func _load_schedule_snapshot() -> Dictionary:
@@ -262,6 +268,14 @@ func _add_upcoming_block(row: Dictionary) -> void:
 	detail_btn.add_theme_font_size_override("font_size", 11)
 	detail_btn.pressed.connect(_show_upcoming_game_detail.bind(row))
 	meta_row.add_child(detail_btn)
+
+	var screen_btn := Button.new()
+	screen_btn.text = "画面"
+	screen_btn.flat = true
+	screen_btn.custom_minimum_size = Vector2(32, 0)
+	screen_btn.add_theme_font_size_override("font_size", 11)
+	screen_btn.pressed.connect(_open_game_detail_view.bind(row))
+	meta_row.add_child(screen_btn)
 
 	inner.add_child(meta_row)
 
@@ -541,6 +555,53 @@ func _show_upcoming_game_detail(game: Dictionary) -> void:
 
 	_status_label.text = "試合詳細\n%s" % body
 	_set_upcoming_game_detail_visible(true, false)
+
+
+func _event_id_from_row(game_row: Dictionary) -> String:
+	var raw: Variant = game_row.get("event_id", "")
+	if raw == null:
+		return ""
+	var s := str(raw).strip_edges()
+	if s.is_empty() or s == "-":
+		return ""
+	return s
+
+
+func _show_schedule_status_message(message: String, is_error: bool = true) -> void:
+	_status_label.text = message
+	_set_upcoming_game_detail_visible(true, is_error)
+
+
+func _open_game_detail_view(game_row: Dictionary) -> void:
+	var event_id := _event_id_from_row(game_row)
+	if event_id.is_empty():
+		_show_schedule_status_message("試合詳細画面を開けません: event_id がありません", true)
+		return
+
+	var ctx := _selection_context()
+	if ctx == null:
+		_show_schedule_status_message("選択状態を保存できません", true)
+		return
+
+	var payload := game_row.duplicate()
+	if not payload.has("event_id"):
+		payload["event_id"] = event_id
+
+	ctx.call(
+		"set_game",
+		event_id,
+		payload,
+		_SCHEDULE_VIEW_SCENE_PATH,
+		"日程",
+	)
+
+	var err := get_tree().change_scene_to_file(_GAME_DETAIL_VIEW_SCENE_PATH)
+	if err != OK:
+		_show_schedule_status_message("試合詳細画面を開けませんでした", true)
+		push_warning(
+			"[schedule_view] change_scene_to_file failed: %s err=%s"
+			% [_GAME_DETAIL_VIEW_SCENE_PATH, err]
+		)
 
 
 func _on_home_nav_button_pressed() -> void:
