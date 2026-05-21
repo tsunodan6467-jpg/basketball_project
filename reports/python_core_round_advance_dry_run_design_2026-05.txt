@@ -1,0 +1,528 @@
+================================================================================
+Python本体 — ラウンド進行 dry-run / read-only 設計（2026-05）
+================================================================================
+
+調査日: 2026-05
+参照 HEAD: 7eea3b9 — Python本体の週次進行と試合体験を調査
+参照レポート: python_core_weekly_progress_match_experience_survey_2026-05.txt
+調査方法: grep / 重点ファイル Read（実装なし）
+
+目的: `Season.simulate_next_round()` は状態変更を伴う正本のため、
+いきなり改修せず **次ラウンドで何が起きるか** を非破壊で見える化する
+read-only preview の設計を固定する（今回は設計のみ・実装しない）。
+
+
+================================================================================
+1. 調査目的
+================================================================================
+
+- 前回調査（7eea3b9）で以下を確認済み:
+  - `Season.simulate_next_round()` — **実装済み・正本**
+  - `Match.simulate()` — **実装済み**
+  - `schedule_display` / `weekly_advance_cli_display` — **読取専用の部品あり**
+  - **dry-run / read-only API** — **未着手**
+- `simulate_next_round()` は **常に状態変更**（current_round, game_results, 杯/EASL, 経営等）
+- いきなり本体改修せず、まず **read-only preview** で次ラウンド内容を検証・表示する設計が必要
+- 今回は **設計レポートのみ**。Python / Godot / save / tests の変更は行わない
+
+
+================================================================================
+2. 現在のラウンド進行正本
+================================================================================
+
+### Season.simulate_next_round() の役割
+
+**ファイル:** `basketball_sim/models/season.py` L2780〜
+
+1. `season_finished` なら早期 return（print のみ）
+2. `round_number = current_round + 1`
+3. `get_events_for_round(round_number)` でそのラウンドの SeasonEvent 一覧取得
+4. 代表ウィンドウ週なら `_run_national_team_window_log_only`（リーグ game スキップ）
+5. 各 `event_type=="game"` に対し:
+   - ユーザー試合なら importance / preview CLI 表示
+   - `Match(...).simulate()` 実行
+   - ユーザー試合なら postgame CLI 表示
+   - **`game_results.append({home_team, away_team, scores...})`**
+6. `_process_inseason_free_agency(round_number)`
+7. EASL / 全日本カップ（該当ラウンドなら `_play_easl_stage` / `_play_emperor_cup_round`）
+8. `_apply_inseason_league_distribution_round` / `_apply_inseason_matchday_estimate_round`（経営）
+9. **`current_round += 1`**
+10. `run_cpu_management_after_round(self)`
+11. `current_round >= total_rounds` なら **`_finalize_season()`**（PO・表彰・career 等）
+
+### current_round / total_rounds / season_finished
+
+| フィールド | 意味 |
+|-----------|------|
+| `current_round` | **消化済み**ラウンド数（初期 0）。次に進むのは `current_round + 1` |
+| `total_rounds` | `len(schedule_by_round)`（ROUND_CONFIG 由来） |
+| `season_finished` | 最終ラウンド消化後 `_finalize_season` で True |
+
+**schedule_display / upcoming_rows** も「current_round は消化済み、次は +1」とコメントで一致。
+
+### get_events_for_round
+
+```python
+def get_events_for_round(self, round_number: int) -> List[SeasonEvent]:
+    return self.events_by_round.get(round_number, [])
+```
+
+- **読取のみ**（events_by_round は simulate 中に再構築されない — 杯等は別メソッドで副作用）
+- SeasonEvent フィールド: `event_id`, `event_type`, `competition_type`, `home_team`, `away_team`, `round_number`, `label`, ...
+
+### save への反映
+
+- 進行後: `build_save_payload(..., resume_season=season)` → `save_world`（CLI/GUI 手動）
+- **simulate_next_round 自体は save を呼ばない** — 呼び出し側が `ui_flow["dirty"]=True` 等
+
+### 進行入口（grep 確認）
+
+| 入口 | 処理 |
+|------|------|
+| CLI `main.py` choice `"1"` | `format_weekly_advance_check_lines` → **`season.simulate_next_round()`** |
+| Tk `advance_one_round` (main.py L3376) | season_finished 時はオフシーズン、否则 **`simulate_next_round()`** |
+| MainMenuView `_on_advance` | 注入された `on_advance` コールバック |
+
+### read-only dry-run では **絶対に呼んではいけない処理**
+
+| 処理 | 理由 |
+|------|------|
+| `Season.simulate_next_round()` | 上記すべての副作用を一括実行 |
+| `Match.simulate()` | 試合結果・PBP・スタッツ変更 |
+| `game_results.append(...)` | 過去結果の永続的追加 |
+| `current_round += 1` / `season_finished = True` | 進行状態変更 |
+| `_finalize_season()` | PO・表彰・career 等 |
+| `_play_emperor_cup_round` / `_play_easl_stage` | 杯結果・ログ変更 |
+| `_process_inseason_free_agency` | FA 市場変更 |
+| `_apply_inseason_*_round` | チーム所持金等変更 |
+| `run_cpu_management_after_round` | CPU 編成変更 |
+| `_run_national_team_window_log_only` | 代表ウィンドウ副作用（要追加調査 — simulate 内で呼ばれる） |
+| `save_world` / export の JSON 書込 | ファイル副作用 |
+| `Offseason.run()` | オフシーズン全体 |
+
+
+================================================================================
+3. dry-run で読み取れる情報
+================================================================================
+
+状態変更なし（**getattr / get_events_for_round / schedule_display 関数** のみ）で取得可能:
+
+### ラウンドメタ
+
+- `current_round`, `total_rounds`, `season_finished`
+- **次ラウンド番号:** `next_round = current_round + 1`（`next_round > total_rounds` なら進行不可）
+- **月週:** `schedule_display.schedule_month_week_label(season, next_round)`
+- **シーズンラベル:** `home_dashboard_readonly._season_progress_label`（season_count 等）
+
+### 次ラウンドの SeasonEvent 一覧
+
+- `season.get_events_for_round(next_round)` — **全会場** game イベント
+- 各行から読める: `event_id`, `event_type`, `competition_type`, `home_team.name`, `away_team.name`, `label`, `day_of_week`
+
+### 自チーム試合
+
+- `schedule_display.count_user_games_in_sim_round(season, user_team, next_round)` — **game イベント数**
+- `schedule_display.home_away_for_user` / `opponent_name_for_user` — 各 event から
+- `schedule_display.next_round_schedule_lines(season, user_team)` — **CLI 向け複数行サマリ**（杯/EASL/代表/PO 補足含む）
+- `weekly_advance_cli_display._user_regular_opponent_in_round` — **レギュラー1件**の対戦相手のみ（限定的）
+
+### 大会・補完（表示層）
+
+- `upcoming_rows_for_user_team` — **未来複数ラウンド**（dry-run は通常 **next_round のみ** に絞る）
+- 杯/EASL/代表/オールスター **placeholder 行** — upcoming 生成ロジックと同型ヘルパーを next_round 1件に適用可能:
+  - `_should_play_emperor_cup_this_round(next_round)`
+  - `_get_round_easl_stage` / `user_team_participates_in_easl_stage`
+  - `_get_round_national_window` / `_is_all_star_break_round`
+- `build_emperor_cup_main_next_lines` / `build_division_playoff_main_next_lines` — **次戦パネル特化**（杯週・PO期）
+
+### 進行前説明
+
+- `schedule_display.next_advance_display_hints(season, user_team)` → `(block, one_line)`
+- `weekly_advance_cli_display.format_weekly_advance_check_lines` — ロスター/経営/重要度タグ（**試合詳細は薄い**）
+
+### schedule_readonly が Godot に出すもの（同一 season から **再計算可能**）
+
+- `summary.current_round` / `total_rounds`
+- `next_game` — `_build_next_game_dict`
+- `upcoming_games[]` — `upcoming_rows_for_user_team` 先頭 N 件
+- `advance_hint` — `next_advance_display_hints`
+
+### 進行**後**に変わる可能性がある表示項目（preview の「after」説明用）
+
+| 項目 | 進行後の変化 |
+|------|-------------|
+| `current_round` | +1 |
+| `upcoming_games` | 先頭行が消化されシフト |
+| `next_game` | 次の未来試合に更新 |
+| `game_results` | 当ラウンド分が append（スコアのみ） |
+| `emperor_cup_stage_logs` 等 | 杯週なら更新 |
+| チーム `money` 等 | 経営分配 |
+| `season_finished` | 最終ラウンド後 True |
+
+
+================================================================================
+4. dry-run で読んではいけない・呼んではいけない処理
+================================================================================
+
+（§2 と整合 — 非破壊条件のチェックリスト）
+
+### 禁止: シミュレーション・進行
+
+- `simulate_next_round`, `simulate_multiple_rounds`, `simulate_to_end`
+- `Match(...).simulate()`
+- Season 内 `_play_*`, `_process_*`, `_apply_*`, `_finalize_*`（simulate 経由以外でも副作用あり）
+
+### 禁止: 永続化・外部 IO
+
+- `save_world`, `export_*` の write, pickle 書込
+- Godot JSON 書込
+
+### 禁止: 間接副作用の可能性
+
+- `Offseason.run()`
+- CPU / FA 市場サイクル
+
+### 許可: 読取のみ
+
+- `get_events_for_round`
+- `schedule_display.*`（docstring: Season を壊さない）
+- `weekly_advance_cli_display.*`（docstring: simulate 本体を変更しない）
+- `getattr(season, ...)` / `getattr(team, ...)`
+- `format_match_preview_cli_lines` — **要確認:** 内部が Team を変更しない限り OK（現状は表示専用と想定、実装時に grep 確認）
+
+### 非破壊性の検証方法（次回実装）
+
+- preview 呼び出し前後で `current_round`, `len(game_results)`, `season_finished` が同一
+- `Match.simulate` が mock で呼ばれない（patch テスト）
+
+
+================================================================================
+5. dry-run レポートに出すべき項目案
+================================================================================
+
+### JSON dict 案（`build_round_advance_preview_dict` 戻り値）
+
+```json
+{
+  "screen_title": "ラウンド進行プレビュー（読取専用）",
+  "team_name": "ユーザークラブ名",
+  "summary": {
+    "current_round": 5,
+    "next_round": 6,
+    "total_rounds": 33,
+    "season_finished": false,
+    "can_advance": true,
+    "season_label": "1年目　11月2週目　ラウンド6/33",
+    "next_round_month_week": "11月2週目",
+    "user_team_game_count": 1
+  },
+  "user_game": {
+    "has_game": true,
+    "games": [
+      {
+        "event_id": "r6_...",
+        "competition_type": "regular_season",
+        "competition_display": "日本リーグ",
+        "opponent": "対戦相手名",
+        "home_away_short": "H",
+        "home_away_long": "ホーム",
+        "day_of_week": "Sat"
+      }
+    ],
+    "summary_lines": ["..."]
+  },
+  "next_round_events": [
+    {
+      "event_id": "...",
+      "event_type": "game",
+      "competition_type": "regular_season",
+      "competition_display": "日本リーグ",
+      "home_team": "ホーム名",
+      "away_team": "アウェイ名",
+      "is_user_team_game": true,
+      "opponent": "（自チーム視点）",
+      "home_away_short": "H",
+      "home_away_long": "ホーム",
+      "is_display_supplement": false
+    }
+  ],
+  "special_week_flags": {
+    "emperor_cup_week": false,
+    "easl_stage": null,
+    "national_window": null,
+    "all_star_break": false,
+    "post_regular_po_phase": false
+  },
+  "advance_hint": {
+    "block": "次の「次へ進む」1回で...",
+    "one_line": "進行予告: ..."
+  },
+  "schedule_lines": ["next_round_schedule_lines の行..."],
+  "weekly_check_lines": ["format_weekly_advance_check_lines の行..."],
+  "warnings": ["season_finished のため進行不可", ...],
+  "notes": [
+    "読み取り専用。simulate_next_round は呼びません。",
+    "杯/EASL の対戦カードは進行時抽選のため placeholder 表現を含みます。"
+  ]
+}
+```
+
+### CLI lines 案（`format_round_advance_preview_lines`）
+
+1. ヘッダ（クラブ名・current/next/total）
+2. `next_round_schedule_lines` をそのまままたは短縮
+3. `advance_hint.one_line`
+4. `weekly_advance_check_lines` の「進める前チェック」行（任意）
+5. フッタ（read-only 注意）
+
+### season 異常系
+
+| 条件 | warnings / can_advance |
+|------|---------------------|
+| season is None | can_advance=false, 説明のみ |
+| season_finished=True | can_advance=false |
+| next_round > total_rounds | can_advance=false |
+| get_events_for_round 非 callable | 空 events + warning |
+
+
+================================================================================
+6. 実装先候補
+================================================================================
+
+### 候補A: `basketball_sim/systems/round_advance_preview.py`
+
+- systems 配下の **表示/ロジック補助**
+- `(season, user_team) -> dict / lines`
+- save / JSON に触れない
+- pytest で非破壊性を検証しやすい
+
+### 候補B: `basketball_sim/export/round_advance_preview_readonly.py`
+
+- save_path → load_world → JSON 出力
+- Godot 連携に近いが **第1手では責務が重い**（export は第2段）
+
+### 候補C: 既存 `weekly_advance_cli_display.py` 拡張
+
+- 進行前表示と近い
+- **既存 CLI 出力を壊すリスク**
+- 責務混在（チェック vs 次ラウンド全イベント）
+
+### 推奨: **候補A**
+
+**理由:** schedule_display と同型（Season 非変更）、再利用性、テスト容易、simulate_next_round 非接触。
+
+
+================================================================================
+7. 想定API設計（候補A・設計のみ）
+================================================================================
+
+**新規ファイル:** `basketball_sim/systems/round_advance_preview.py`
+
+```python
+SCREEN_TITLE = "ラウンド進行プレビュー（読取専用）"
+
+DEFAULT_NOTES: list[str] = [
+    "読み取り専用。simulate_next_round / Match.simulate は呼びません。",
+]
+
+
+def build_round_advance_preview_dict(
+    season: Any,
+    user_team: Any,
+    *,
+    season_count: int | None = None,
+    at_annual_menu: bool | None = None,
+    free_agents: Any = None,
+    max_events: int = 32,
+    include_weekly_check: bool = True,
+) -> dict:
+    """
+    次ラウンド (current_round + 1) の予定を返す。Season / Team を変更しない。
+    season is None または season_finished でも必須キーを返す。
+    """
+    ...
+
+
+def format_round_advance_preview_lines(
+    season: Any,
+    user_team: Any,
+    **kwargs: Any,
+) -> list[str]:
+    """CLI / レポート用テキスト行。"""
+    ...
+
+
+# --- 内部ヘルパー（private） ---
+
+def _next_round_number(season: Any) -> int | None: ...
+def _can_advance(season: Any) -> bool: ...
+def _team_display_name(team: Any) -> str: ...
+def _event_to_preview_row(season: Any, user_team: Any, event: Any) -> dict: ...
+def _user_games_in_next_round(season: Any, user_team: Any, next_round: int) -> list[dict]: ...
+def _special_week_flags(season: Any, user_team: Any, next_round: int) -> dict: ...
+def _build_warnings(season: Any, next_round: int | None) -> list[str]: ...
+```
+
+### 実装方針（再利用）
+
+| 既存関数 | preview での使い方 |
+|----------|-------------------|
+| `get_events_for_round(next_round)` | next_round_events の正本 |
+| `count_user_games_in_sim_round` | summary.user_team_game_count |
+| `next_advance_display_hints` | advance_hint |
+| `next_round_schedule_lines` | schedule_lines |
+| `schedule_month_week_label` | next_round_month_week |
+| `format_weekly_advance_check_lines` | weekly_check_lines（optional） |
+| `competition_display_name_from_event` | competition_display |
+| `home_away_for_user` / `opponent_name_for_user` | user 視点列 |
+| cup/EASL 判定 | special_week_flags（simulate せず getattr のみ） |
+
+### CLI エントリ（第2段・任意）
+
+```python
+# python -m basketball_sim.systems.round_advance_preview --save path.sav
+# または tests / dev スクリプトから dict 出力
+```
+
+今回は **API 設計のみ**。モジュール `__main__` は次回実装で検討。
+
+
+================================================================================
+8. テスト方針（次回実装）
+================================================================================
+
+**新規:** `basketball_sim/tests/test_round_advance_preview.py`
+
+| テスト | 内容 |
+|--------|------|
+| season=None | 落ちず dict 返却、can_advance=false |
+| season_finished=True | can_advance=false、warnings あり |
+| current_round >= total_rounds | can_advance=false |
+| stub: 次ラウンドに自チーム game 1件 | opponent / home_away / event_id |
+| stub: 自チーム game 0件 | has_game=false, user_team_game_count=0 |
+| get_events_for_round なし stub | 空 events、落ちない |
+| **非破壊** | preview 前後で current_round / len(game_results) 不変 |
+| **非破壊** | Match.simulate を patch — 呼ばれない |
+| advance_hint 連携 | stub season で block/one_line 非空 |
+| max_events | イベント数 cap |
+
+既存 `test_schedule_display.py` の `_SeasonStub` パターンを **流用可能**。
+
+pytest 回帰: 既存 79 passed を維持。
+
+
+================================================================================
+9. 既存機能との接続方針
+================================================================================
+
+### schedule_display.next_advance_display_hints
+
+- preview の **advance_hint ブロックは委譲**（重複実装しない）
+- 「1回の進行で何試合まとめか」説明の正本
+
+### schedule_readonly.build_schedule_readonly_dict
+
+- **別 DTO**（日程全体 vs 次1ラウンド詳細）
+- preview は **next_round にフォーカス** + 全会場 events
+- 将来: export バンドルに `round_advance_preview.json` を **手動追加**可能（第2段）
+- 今回 Godot 自動起動 **なし**
+
+### weekly_advance_cli_display
+
+- preview が `format_weekly_advance_check_lines` を **オプションで同梱**
+- weekly_advance **本体は変更しない**（候補C を避ける）
+
+### main.py / MainMenuView
+
+- 第2段: CLI choice 0.5「プレビューのみ」、Tk ボタン横に「次ラウンド確認」
+- 第1段: **モジュール + pytest のみ**
+
+### Godot / schedule export
+
+- 週次進行 **後** に schedule export 再生成 → upcoming 更新（従来どおり手動）
+- preview JSON は **開発者確認・バランス調整** 向け（必須ではない）
+
+
+================================================================================
+10. リスクと注意点
+================================================================================
+
+| リスク | 対策 |
+|--------|------|
+| simulate_next_round を誤って呼ぶ | モジュール docstring + pytest 非破壊テスト |
+| Match.simulate を呼ぶ | preview 内 import Match 禁止、patch テスト |
+| current_round 意味の誤解 | summary に current/next を明示、doc で「消化済み」 |
+| event_id placeholder | `is_display_supplement` フラグ、notes で説明 |
+| 杯/EASL 対戦未確定 | upcoming 同型の「抽選・同進行」文言 |
+| game_results がスコアのみ | preview は **未来** 向け — 過去結果は別 export |
+| PBP が save に無い | preview でも **結果予測はしない**（dry-run の定義） |
+| weekly_advance 破壊 | 既存ファイル非変更、preview から import のみ |
+| Godot 急ぎ | 第1手は systems のみ、export は後 |
+| format_match_preview が副作用 | 実装時 grep — 疑わしければ preview から除外 |
+| `_run_national_team_window_log_only` | preview では **呼ばない** — 代表週は flags + schedule_lines のみ |
+
+
+================================================================================
+11. 推奨結論
+================================================================================
+
+### 推奨
+
+次は **`basketball_sim/systems/round_advance_preview.py` を新規作成**し、
+状態変更なしで次ラウンド予定を返す **read-only preview 関数** と **pytest** を追加する。
+
+### 理由
+
+1. **`simulate_next_round` に触れず安全**
+2. `schedule_display` と同型 — **Season 非変更の表示補助**
+3. CLI / Tk / 将来 export から **再利用可能**
+4. 「次へ進む」前に **何が起きるか** を見える化 — プレイサイクルに直結
+5. **非破壊性をテストで保証**しやすい
+6. 前回調査（7eea3b9）の推奨第1手と一致
+
+### 実装しないもの（第1手）
+
+- simulate_next_round の改修
+- game_results への event_id 追加
+- Godot 自動 export 連携
+- weekly_advance_cli_display の変更
+
+
+================================================================================
+12. 次に行う具体的タスク
+================================================================================
+
+次に行う具体的タスク:
+**`basketball_sim/systems/round_advance_preview.py` を新規作成し、
+次ラウンド予定を状態変更なしで返す read-only preview 関数とテストを追加する。**
+
+想定コミット（本ファイル）:
+Python本体のラウンド進行previewを設計
+
+次回想定タスク名:
+ラウンド進行 read-only preview 関数を追加する
+
+想定変更ファイル（次回）:
+- 新規: `basketball_sim/systems/round_advance_preview.py`
+- 新規: `basketball_sim/tests/test_round_advance_preview.py`
+- 変更なし: `season.py`, `schedule_display.py`, `weekly_advance_cli_display.py`（原則）
+
+
+================================================================================
+付録: 既存 read-only 関数マップ（dry-run 再利用）
+================================================================================
+
+| 用途 | 関数 | ファイル |
+|------|------|----------|
+| 次ラウンド events | `season.get_events_for_round(n)` | season.py |
+| 自チーム game 数 | `count_user_games_in_sim_round` | schedule_display.py |
+| 進行説明 | `next_advance_display_hints` | schedule_display.py |
+| 次ラウンド CLI サマリ | `next_round_schedule_lines` | schedule_display.py |
+| 月週ラベル | `schedule_month_week_label` | schedule_display.py |
+| 週送り前チェック | `format_weekly_advance_check_lines` | weekly_advance_cli_display.py |
+| 未来 upcoming（参考） | `upcoming_rows_for_user_team` | schedule_display.py |
+| Godot 日程（参考） | `build_schedule_readonly_dict` | schedule_readonly.py |
+
+================================================================================
+END
+================================================================================
