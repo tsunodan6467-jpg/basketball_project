@@ -1,0 +1,493 @@
+================================================================================
+Godot Phase 4 — 詳細画面から戻ったときの一覧スクロール位置復元 設計（Phase D-2.5）
+================================================================================
+
+調査日: 2026-05
+参照 HEAD: a7bba35 — Godot日程から試合詳細画面へ接続
+調査方法: git log / grep（Select-String）/ .gd・.tscn 確認（実装なし）
+
+目的: 詳細導線（player_detail / game_detail）から「一覧へ戻る」際に、
+接続元一覧の ScrollContainer 位置を安全に保存・復元する仕様を実装前に固定する。
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+- **最新コミット:** a7bba35 — Godot日程から試合詳細画面へ接続
+- **Phase D-2 まで完了**
+  - D-0: game_detail 最小仕様レポート
+  - D-1: game_detail_view 最小版
+  - D-2: schedule_view upcoming「画面」→ game_detail_view 接続
+
+- **player_detail 導線（接続済み）**
+  - ロスター（roster_view）→ player_detail_view
+  - 契約 PlayerRows（contract_personnel_summary_view）→ player_detail_view
+  - 戦術 PlayerRoles（tactics_summary_view）→ player_detail_view
+  - 各接続元: 既存「詳細」（上部/行直下カード）維持 + 新規「画面」ボタン
+
+- **game_detail 導線（接続済み）**
+  - 日程 upcoming（schedule_view）→ game_detail_view
+  - 既存「詳細」（上部 StatusLabel 試合カード）維持 + 新規「画面」ボタン
+
+- **Autoload:** ReadonlySelectionContext
+  - set_player / set_game / get_return_scene / get_payload / clear 等
+  - return_scene・source_label は保存されるが、**scroll 位置は未保存**
+
+- **課題**
+  - 詳細画面から「一覧へ戻る」と、接続元 scene が再生成され ScrollContainer が先頭に戻る
+  - 日程（upcoming 試合が下の方）・ロスター（選手一覧が長い）で特にプレイ感が悪い
+  - 契約 PlayerRows / 戦術 PlayerRoles でも同型の問題が起きうる
+
+- **位置づけ**
+  - 単なる余白調整ではなく、**詳細導線の使いやすさ**に直結する問題
+  - clear() タイミングを誤ると復元情報を失うため、**いきなり実装せず本レポートで設計を固定する**
+
+
+================================================================================
+2. 現状仕様の問題点
+================================================================================
+
+（以下は godot/scripts/*.gd の grep / 読取確認に基づく）
+
+### 2.1 scene 切替で ScrollContainer 状態が破棄される
+
+- 接続元画面（schedule_view / roster_view 等）は `change_scene_to_file` で
+  player_detail_view / game_detail_view へ遷移する
+- Godot は scene ツリー全体を差し替えるため、接続元の ScrollContainer.scroll_vertical は保持されない
+- 戻り先 scene は `_ready()` → `_apply_snapshot()` で JSON から UI を再構築する
+  （schedule: `_fill_scroll_body` / `_add_upcoming_block`、roster: 行リスト再生成 等）
+
+### 2.2 詳細画面 BackButton は clear() 後に return_scene へ戻る
+
+**player_detail_view.gd `_on_back_button_pressed`:**
+```
+var ctx := _selection_context()
+if ctx != null:
+    ctx.call("clear")
+var err := get_tree().change_scene_to_file(_return_scene)
+```
+
+**game_detail_view.gd `_on_back_button_pressed`:**
+- 上記と同型（ctx.call("clear") → change_scene_to_file(_return_scene)）
+
+**HomeNavButton（両詳細画面）:**
+- ctx.call("clear") → change_scene_to_file(home_dashboard)
+
+### 2.3 ReadonlySelectionContext.clear() は選択状態を全消去
+
+**readonly_selection_context.gd `clear()`:**
+- `_kind`, `_payload`, `_return_scene`, `_source_label`, `_player_id`, `_event_id` をすべて空にする
+- **return_state / scroll 位置を保持するフィールドは存在しない**
+
+### 2.4 return_scene はあるが return_state はない
+
+- set_player / set_game 呼び出し時に return_scene（例: res://scenes/schedule_view.tscn）と
+  source_label（例: 「日程」）は Autoload に保存される
+- 詳細画面 `_ready()` で `ctx.call("get_return_scene")` を読み、Back 時にその path へ戻る
+- しかし **どの scroll_vertical に戻るべきか** を Autoload も接続元 scene も知る手段がない
+
+### 2.5 接続元の ScrollContainer 参照状況（.tscn 確認）
+
+| 画面 | ScrollContainer ノード | unique_name_in_owner | .gd 側の現状参照 |
+|------|-------------------------|----------------------|------------------|
+| schedule_view | Margin/RootCol/Scroll | **なし** | %ScrollContent のみ（Scroll 本体未参照） |
+| roster_view | Margin/RootCol/Scroll | **なし** | %RowList のみ（Scroll 本体未参照） |
+| contract_personnel_summary_view | Margin/RootCol/Scroll | **なし** | %ScrollContent 等 |
+| tactics_summary_view | Margin/RootCol/Scroll | **なし** | %ScrollContent / %PlayerRolesBody 等 |
+
+→ scroll_vertical を読むには ScrollContainer への参照追加が必要。
+  unique 化は .tscn 変更が要るため、初回実装では NodePath 明示取得も選択肢として比較する。
+
+
+================================================================================
+3. 解決方針候補
+================================================================================
+
+------------------------------------------------------------
+候補A: 詳細画面側で clear() をやめ、payload に scroll 位置を含めたまま戻る
+------------------------------------------------------------
+
+概要:
+- Back 時に clear() しない、または payload Dictionary に scroll_vertical を混ぜて保持
+
+良い点:
+- Autoload API 追加が不要に見える
+- 変更箇所が少なそう
+
+注意点:
+- 選択 payload が戻り先 scene でも stale なまま残る
+- Home へ戻った後も古い選択状態が残る危険
+- clear の責務（いつ消すか）が曖昧になる
+- player / game 混在時に scene 間で stale state が残りやすい
+- payload は詳細表示用 DTO であり、UI 復元状態と混ぜると将来の拡張が難しい
+
+評価: **非推奨**
+
+------------------------------------------------------------
+候補B: ReadonlySelectionContext に return_state を追加し、scene ごとに保存・復元
+------------------------------------------------------------
+
+概要:
+- return_scene と同じ Autoload 上に、scene_path キーの一時 UI 復元 state を持つ
+- 接続元は「画面」押下時に scroll を保存、戻り後に consume して復元
+- 詳細 Back は clear(true) で選択だけ消し return_state は残す
+
+良い点:
+- return_scene と同じ思想で一貫性がある
+- player_detail / game_detail の両方に使える
+- schedule / roster / contract / tactics に横展開しやすい
+- payload（詳細表示）と UI 復元 state を分離できる
+- 将来、選択行ハイライト・target_id 復元にも拡張可能
+
+注意点:
+- Autoload API 追加が必要（D-2.5b）
+- detail BackButton の clear タイミング設計が必要
+- 復元は `_apply_snapshot()` 完了後、`call_deferred` または process_frame 後が安全
+- Home 遷移時は return_state も消す必要がある
+
+評価: **最推奨**
+
+------------------------------------------------------------
+候補C: 各一覧画面ごとにグローバル変数や static で scroll を持つ
+------------------------------------------------------------
+
+概要:
+- schedule_view.gd / roster_view.gd 等がそれぞれ static var で前回 scroll を記憶
+
+良い点:
+- Autoload 変更が不要に見える
+
+注意点:
+- 画面ごとに実装がバラつく
+- clear / Home 遷移 / scene 再読込時の整理が難しい
+- 詳細画面横展開（game / 将来の別詳細）に弱い
+- テスト・デバッグ時に state の所在が分散する
+
+評価: **非推奨**
+
+
+================================================================================
+4. 推奨仕様
+================================================================================
+
+### 4.1 推奨方式
+
+**ReadonlySelectionContext に「return_state_by_scene」的な一時 UI 復元状態を追加する（候補B）。**
+
+payload（選手/試合データ）と UI 復元 state（scroll 等）を分離し、
+Back / Home で意味の異なる clear 動作を使い分ける。
+
+### 4.2 想定 API（readonly_selection_context.gd 追加）
+
+```gdscript
+# 内部: var _return_state_by_scene: Dictionary = {}  # scene_path -> Dictionary
+
+func set_return_state(scene_path: String, state: Dictionary) -> void
+func get_return_state(scene_path: String) -> Dictionary
+func consume_return_state(scene_path: String) -> Dictionary
+func clear_return_state(scene_path: String) -> void
+func clear(preserve_return_state: bool = false) -> void
+```
+
+**仕様:**
+- return_state は **scene_path ごと** に Dictionary で保存（キー例: res://scenes/schedule_view.tscn）
+- state は **shallow copy**（`state.duplicate()`）で保持・返却
+- `consume_return_state(scene_path)` は返却後に該当 scene の entry を削除（一度きり復元）
+- `clear(false)` または引数なし `clear()` — 選択状態 **と** return_state を **すべて** 削除（従来互換）
+- `clear(true)` — 選択状態（kind/payload/return_scene 等）のみ削除、**return_state は残す**
+- 既存の `ctx.call("clear")`（引数なし）は従来どおり全消去。**既存呼び出し互換を維持**
+- detail 画面 BackButton では `ctx.call("clear", true)` を使う
+- HomeNavButton では `ctx.call("clear")` のまま（return_state も消す）
+
+**代替案（互換性懸念時）:**
+- Godot の `ctx.call("clear", true)` で可変引数が問題になる場合は、
+  `clear_selection_preserving_return_state()` 専用メソッドを追加する
+- 本プロジェクトは player_detail / game_detail が既に `ctx.call(...)` パターンのため、
+  **第一案は `clear(preserve_return_state: bool = false)`**
+
+### 4.3 保存する state の例
+
+**schedule（game 詳細へ遷移時）:**
+```gdscript
+{
+    "scroll_vertical": 428,
+    "source": "schedule",
+    "target_kind": "game",
+    "target_id": "mock_r31_league_a"   # event_id（将来ハイライト用・今回必須ではない）
+}
+```
+
+**roster（player 詳細へ遷移時）:**
+```gdscript
+{
+    "scroll_vertical": 312,
+    "source": "roster",
+    "target_kind": "player",
+    "target_id": 416   # player_id（将来ハイライト用・今回必須ではない）
+}
+```
+
+**注意:**
+- 今回の実装目的は **scroll_vertical の復元** が中心
+- target_id は将来の選択行ハイライト用に保存してよいが、**初回実装では使わなくてよい**
+- event_id / player_id を製品 UI へ大きく表示する必要はない（既存方針維持）
+
+### 4.4 接続元画面側 — 保存仕様
+
+**対象優先順:**
+1. schedule_view
+2. roster_view
+3. contract_personnel_summary_view
+4. tactics_summary_view
+
+**最初の実装優先:** schedule_view + roster_view を先行。
+contract / tactics は同型で後続横展開（D-2.5e で必要性判断）。
+
+**保存タイミング:**
+- **「画面」ボタン押下時**、`set_game` / `set_player` の **直前**
+- ScrollContainer の `scroll_vertical` を読む
+- scene_path をキーに `ctx.call("set_return_state", scene_path, state)`
+
+**schedule 例:**
+- scene_path: `res://scenes/schedule_view.tscn`（既存 `_SCHEDULE_VIEW_SCENE_PATH`）
+- state:
+  - scroll_vertical: int
+  - source: `"schedule"`
+  - target_kind: `"game"`
+  - target_id: event_id（`_event_id_from_row` の戻り値）
+
+**roster 例:**
+- scene_path: `res://scenes/roster_view.tscn`（既存 `_ROSTER_VIEW_SCENE_PATH`）
+- state:
+  - scroll_vertical: int
+  - source: `"roster"`
+  - target_kind: `"player"`
+  - target_id: player_id
+
+**ScrollContainer 取得（.tscn 確認結果）:**
+
+| 画面 | 推奨 NodePath（初回） | unique 化案（別タスク可） |
+|------|----------------------|---------------------------|
+| schedule_view | `$Margin/RootCol/Scroll` | Scroll に unique_name_in_owner 追加 → `%Scroll` |
+| roster_view | `$Margin/RootCol/Scroll` | 同上 |
+| contract | `$Margin/RootCol/Scroll` | 同上 |
+| tactics | `$Margin/RootCol/Scroll` | 同上 |
+
+- 現状、ScrollContainer 自体に unique_name_in_owner **はない**（ScrollContent / RowList 等のみ unique）
+- **D-2.5c/d 初回:** .tscn 変更を避けるなら `@onready var _scroll := $Margin/RootCol/Scroll` 等の明示 NodePath
+- **将来:** Scroll に `%Scroll` unique 化を別コミットで行ってもよい
+
+**「詳細」ボタンでは保存しない:**
+- 上部カード / 行直下インライン詳細は scene 遷移しないため、scroll 保存対象外
+- **「画面」ボタンのみ** が保存トリガー（仕様固定）
+
+### 4.5 戻り先画面側 — 復元仕様
+
+**復元タイミング:**
+1. `_ready()` → `_apply_snapshot(...)` で行生成・ScrollContent 生成完了
+2. 直後に `_queue_restore_return_scroll()` を呼ぶ
+3. 内部で `call_deferred("_restore_return_scroll")` または `await get_tree().process_frame` 後に復元
+   （レイアウト確定前の scroll 設定は効かない可能性があるため）
+4. `_restore_return_scroll()` で `ctx.call("consume_return_state", _SCHEDULE_VIEW_SCENE_PATH)` 等
+5. `state.get("scroll_vertical", -1)` が 0 以上なら `_scroll.scroll_vertical = value`
+6. consume により **一度きり**（同 scene を Home 経由で再入場したときの誤復元を防ぐ）
+
+**schedule 例フロー:**
+```
+_ready()
+  → _apply_snapshot(_load_schedule_snapshot())
+  → _queue_restore_return_scroll()
+_restore_return_scroll() [deferred]
+  → state = ctx.call("consume_return_state", _SCHEDULE_VIEW_SCENE_PATH)
+  → if state non-empty and scroll_vertical >= 0: _scroll.scroll_vertical = value
+```
+
+**roster 例:** 上記と同型（scene_path = `_ROSTER_VIEW_SCENE_PATH`）
+
+**注意:**
+- JSON ロード失敗（`_error` snapshot）時は **復元しない**
+- ScrollContainer が null / 見つからない場合は **落とさず何もしない**（push_warning のみ可）
+- scroll 値が負なら無視
+- 内容量が短く最大 scroll 未満の場合は Godot 側が自然に丸める想定
+- 復元後に StatusLabel へ余計なメッセージは **出さない**
+
+### 4.6 detail 画面側 — Back / Home 仕様（固定）
+
+**BackButton（player_detail_view.gd / game_detail_view.gd）:**
+1. `_return_scene` が空 → 従来どおり「戻り先がありません」表示、遷移しない
+2. `_return_scene` がある場合:
+   - ctx があれば `ctx.call("clear", true)` — **選択状態のみ削除、return_state は保持**
+   - `get_tree().change_scene_to_file(_return_scene)`
+
+**HomeNavButton（両詳細画面）:**
+- `ctx.call("clear")` のまま（引数なし = 全消去）
+- Home へ戻る場合は return_state も消してよい（stale state を残さない）
+
+**ReadonlySelectionContext 直接参照禁止（既存ルール維持）:**
+- 詳細画面も `get_node_or_null("/root/ReadonlySelectionContext")` + `ctx.call(...)`
+
+
+================================================================================
+5. 実装分割案
+================================================================================
+
+------------------------------------------------------------
+D-2.5a: 本レポート作成のみ（今回）
+------------------------------------------------------------
+- reports/godot_phase4_detail_return_scroll_restore_design_2026-05.txt
+- コード変更なし
+
+------------------------------------------------------------
+D-2.5b: ReadonlySelectionContext に return_state API を追加
+------------------------------------------------------------
+変更:
+- godot/scripts/readonly_selection_context.gd
+
+内容:
+- set_return_state / get_return_state / consume_return_state / clear_return_state
+- clear(preserve_return_state: bool = false)
+- 既存 clear() 引数なし呼び出しは従来どおり全消去
+
+互換:
+- 各一覧画面・詳細画面への接続は **まだ行わない**
+- project.godot 変更なし（Autoload 既存のまま）
+
+想定コミット:
+- Godot詳細戻り用の復元状態を保持
+
+------------------------------------------------------------
+D-2.5c: schedule_view + game_detail_view のスクロール復元
+------------------------------------------------------------
+変更候補:
+- godot/scripts/schedule_view.gd — 保存・復元
+- godot/scripts/game_detail_view.gd — Back で clear(true)
+- （任意）godot/scenes/schedule_view.tscn — Scroll unique 化
+
+保存:
+- 「画面」押下時、set_game 直前に schedule scroll_vertical を set_return_state
+
+復元:
+- schedule _apply_snapshot 後に deferred 復元 + consume
+
+Back:
+- game_detail_view BackButton → ctx.call("clear", true)
+
+------------------------------------------------------------
+D-2.5d: roster_view + player_detail_view のスクロール復元
+------------------------------------------------------------
+変更候補:
+- godot/scripts/roster_view.gd — 保存・復元
+- godot/scripts/player_detail_view.gd — Back で clear(true)
+- （任意）godot/scenes/roster_view.tscn — Scroll unique 化
+
+保存:
+- ロスター「画面」押下時、set_player 直前に scroll_vertical 保存
+
+復元:
+- roster _apply_snapshot 後に deferred 復元 + consume
+
+Back:
+- player_detail_view BackButton → ctx.call("clear", true)
+
+------------------------------------------------------------
+D-2.5e: contract / tactics への横展開判断
+------------------------------------------------------------
+- contract_personnel_summary_view / tactics_summary_view も Scroll + 「画面」導線あり
+- ユーザー目視で必要性を確認してからでもよい
+- 将来的には schedule/roster と **同型**（set_return_state + consume + clear(true)）で対応可能
+- scene_path:
+  - res://scenes/contract_personnel_summary_view.tscn
+  - res://scenes/tactics_summary_view.tscn
+
+
+================================================================================
+6. リスクと確認項目
+================================================================================
+
+### 6.1 リスク
+
+| リスク | 内容 |
+|--------|------|
+| clear タイミング誤り | Back で clear()（引数なし）を使うと return_state も消え、復元不能 |
+| 復元タイミング过早 | call_deferred なしで scroll を設定するとレイアウト前で反映されない可能性 |
+| Scroll ノード参照 | 画面ごとに NodePath が異なる / unique 未設定 |
+| Home 後の stale state | clear(true) 後に Home せず別導線で再入場すると意図しない scroll 復元 |
+| scene key 誤り | 別画面の state が復元される（scene_path 定数の typo 防止） |
+| from_python upcoming=0 | 日程目視確認には mock または export 再生成が必要（D-2 既知） |
+
+### 6.2 確認項目（Godot 目視）
+
+- [ ] 日程で下の方の試合を「画面」で開く → 「一覧へ戻る」→ 同じ scroll 位置付近に戻る
+- [ ] ロスターで下の方の選手を「画面」で開く → 「一覧へ戻る」→ 同じ scroll 位置付近に戻る
+- [ ] Home へ戻った場合、次回その一覧を開いても **古い scroll が復元されない**
+- [ ] 「詳細」ボタン（上部カード / インライン詳細）は **従来どおり**（scroll 保存なし）
+- [ ] 「画面」ボタンのみ scroll 復元対象
+- [ ] game_detail / player_detail の表示内容・参照元ラベルは従来どおり
+- [ ] JSON / save / Python には触れない
+- [ ] export / tests には触れない（Godot 側変更のみ）
+- [ ] エラーなく起動・遷移できる
+
+
+================================================================================
+7. 推奨結論
+================================================================================
+
+**推奨:**
+1. ReadonlySelectionContext に **return_state API** を追加する方式（候補B）
+2. まず **schedule + game_detail** で実装（D-2.5c）
+3. 次に **roster + player_detail** で実装（D-2.5d）
+4. **contract / tactics** は必要性確認後に横展開（D-2.5e）
+5. 実装は **Autoload API 追加（D-2.5b）と画面接続（D-2.5c/d）を分ける**
+
+**理由:**
+- 詳細導線全体（player / game）で **再利用可能**
+- Back（return_state 保持）と Home（全消去）の意味を **明確に分離**できる
+- payload（詳細表示データ）と UI 復元 state を **分離**できる
+- 将来、選択行ハイライト（target_id）にも **拡張**できる
+- 日程・ロスターでは **実害が大きく**、早めに直す価値がある
+- clear() タイミングを設計段階で固定することで、実装時の取りこぼしを防げる
+
+
+================================================================================
+8. 次に行う具体的タスク
+================================================================================
+
+次に行う具体的タスク:
+**ReadonlySelectionContext に return_state API を追加する。**
+
+想定コミット:
+Godot詳細戻り用の復元状態を保持
+
+変更ファイル（想定）:
+- godot/scripts/readonly_selection_context.gd
+
+変更しない（D-2.5b 時点）:
+- schedule_view / roster_view / player_detail_view / game_detail_view
+- project.godot / JSON / Python / tests
+
+
+================================================================================
+付録: コード確認メモ（2026-05 grep 結果）
+================================================================================
+
+### ReadonlySelectionContext（現状フィールド）
+- _kind, _payload, _return_scene, _source_label, _player_id, _event_id
+- clear() は上記すべてを空にするのみ
+
+### 接続元「画面」→ Autoload（現状）
+- roster: ctx.call("set_player", ..., _ROSTER_VIEW_SCENE_PATH, "ロスター")
+- contract: ctx.call("set_player", ..., _CONTRACT_PERSONNEL_SUMMARY_VIEW_SCENE_PATH, "契約人事")
+- tactics: ctx.call("set_player", ..., _TACTICS_SUMMARY_VIEW_SCENE_PATH, "戦術")
+- schedule: ctx.call("set_game", ..., _SCHEDULE_VIEW_SCENE_PATH, "日程")
+
+### 詳細画面 Back（現状）
+- player_detail_view / game_detail_view とも ctx.call("clear") → change_scene_to_file
+
+### ScrollContainer（.tscn）
+- 4 画面とも node name `"Scroll"`、親 `Margin/RootCol/Scroll`
+- Scroll 自体は unique_name_in_owner 未設定
+
+================================================================================
+END
+================================================================================
