@@ -24,11 +24,13 @@ var _summary_style_error: StyleBoxFlat = null
 @onready var _footer_note_label: Label = %FooterNoteLabel
 @onready var _status_label: Label = %StatusLabel
 @onready var _row_list: VBoxContainer = %RowList
+@onready var _scroll: ScrollContainer = $Margin/RootCol/Scroll
 
 
 func _ready() -> void:
 	_setup_selected_player_summary_style()
 	_apply_snapshot(_load_roster_snapshot())
+	_queue_restore_return_scroll()
 
 
 func _selection_context() -> Node:
@@ -526,6 +528,17 @@ func _open_player_detail_view(player_row: Dictionary) -> void:
 		_show_roster_status_message("選択状態を保存できません", true)
 		return
 
+	ctx.call(
+		"set_return_state",
+		_ROSTER_VIEW_SCENE_PATH,
+		{
+			"scroll_vertical": _current_scroll_vertical(),
+			"source": "roster",
+			"target_kind": "player",
+			"target_id": player_id,
+		},
+	)
+
 	var payload := player_row.duplicate()
 	if not payload.has("player_id"):
 		payload["player_id"] = player_id
@@ -539,6 +552,34 @@ func _open_player_detail_view(player_row: Dictionary) -> void:
 			"[roster_view] change_scene_to_file failed: %s err=%s"
 			% [_PLAYER_DETAIL_VIEW_SCENE_PATH, err]
 		)
+
+
+func _queue_restore_return_scroll() -> void:
+	call_deferred("_restore_return_scroll")
+
+
+func _restore_return_scroll() -> void:
+	var ctx := _selection_context()
+	if ctx == null:
+		return
+	var state_v: Variant = ctx.call("consume_return_state", _ROSTER_VIEW_SCENE_PATH)
+	if typeof(state_v) != TYPE_DICTIONARY:
+		return
+	var state: Dictionary = state_v as Dictionary
+	if state.is_empty():
+		return
+	var scroll_y := _int_or(state.get("scroll_vertical", null), -1)
+	if scroll_y < 0:
+		return
+	if _scroll == null:
+		return
+	_scroll.scroll_vertical = scroll_y
+
+
+func _current_scroll_vertical() -> int:
+	if _scroll == null:
+		return 0
+	return int(_scroll.scroll_vertical)
 
 
 func _on_home_nav_button_pressed() -> void:
