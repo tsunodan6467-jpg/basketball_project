@@ -1,0 +1,409 @@
+================================================================================
+Python本体 — PBP / commentary 永続化 前段設計（2026-05）
+================================================================================
+
+調査日: 2026-05-19
+対象 commit: 93023e5 — CLI進行表示まわりの一区切りを整理
+目的: Match 内で生成される play-by-play / commentary / play sequence を、
+      将来「後から見返せる試合ログ」として save / export / CLI / Godot へ
+      つなげるための前段設計を整理する。
+コード変更: なし（本レポートのみ）
+
+
+================================================================================
+1. 現在地
+================================================================================
+
+CLI進行表示第1段は成立済み（choice "1"/"2"/"9" quiet + summary）。
+一方、試合の中身を **セーブ後・進行後に見返す** 導線は未整備。
+
+| 層 | 現状 |
+|---|---|
+| Match 内部 | PBP / commentary / play sequence **生成済み** |
+| quiet 時 | print 抑制のみ。**内部ログは残る**（テスト確認済み） |
+| Season | score のみ `game_results` に保存。**Match は破棄** |
+| save | `resume_season` を pickle。`game_results` 6キーのみ永続 |
+| export | 試合ログ export **なし**（schedule / standings / home 等のみ） |
+| CLI quiet | post summary は W/L のみ。試合深掘りなし |
+
+
+================================================================================
+2. 調査ファイル
+================================================================================
+
+- basketball_sim/models/match.py
+- basketball_sim/models/season.py
+- basketball_sim/models/match_event_schema.py
+- basketball_sim/persistence/save_load.py / save_payload.py
+- basketball_sim/export/*（godot_readonly_bundle 含む）
+- basketball_sim/systems/match_postgame_cli_display.py
+- basketball_sim/systems/post_advance_result_summary_cli_display.py
+- basketball_sim/tests/test_simulate_quiet_mode.py
+- basketball_sim/tests/test_match_postgame_cli_display.py
+- reports/python_core_cli_advance_display_milestone_2026-05.txt
+
+
+================================================================================
+3. PBP / commentary の現状（Match 内）
+================================================================================
+
+### 主要属性（match.py）
+
+| 属性 / API | 内容 | quiet 時 |
+|---|---|---|
+| `play_by_play_log` | 構造化イベント列（`_record_event` で append） | **残る** |
+| `get_commentary_entries()` / `get_commentary_lines()` | PBP から生成する実況テキスト | **取得可**（print しないだけ） |
+| `get_play_sequence_log()` | ポゼッション単位の play まとめ | **取得可** |
+| `commentary_log` | get_commentary_entries のキャッシュ | lazy 生成 |
+| `_print_*` 系 | debug preview（PBP/commentary/play/minutes） | **抑制** |
+
+### ログの違い
+
+| 種類 | 粒度 | 用途 |
+|---|---|---|
+| play_by_play_log | イベント単位（~300–400件/試合） | 構造化正本、postgame 集計の入力 |
+| commentary | PBP から生成する日本語実況行（~同数） | 「味わう」テキスト |
+| play_sequence | ポゼッション単位（~150–200/試合） | プレー要約、key plays 候補 |
+| minutes log | 出場時間（print のみ） | debug、永続候補は低 |
+
+### 1試合あたりの規模感（programmatic 確認）
+
+- quiet=True で simulate 後: **PBP ~363件 / commentary ~362行 / play_sequence ~174件**
+- full PBP を全試合保存するとシーズンで **数十万イベント** — Phase 1 では非推奨
+
+### 保存したいログ vs debug 専用
+
+| 保存候補 | debug 専用 |
+|---|---|
+| commentary excerpt（先頭+末尾 N 行） | `_print_play_by_play_debug_summary` 整形 |
+| key_plays（play_sequence から N 件） | minutes log print |
+| スコア・W/L・対戦カード | ACTIVE/STARTERS print |
+| event_id / round / competition 紐付け | 生 PBP 全件（Phase 1 外） |
+
+
+================================================================================
+4. Match 内で simulate 後に取得できる情報
+================================================================================
+
+**simulate 直後の Match インスタンスから取得可能:**
+
+- home/away team name, scores
+- competition_type, is_playoff
+- play_by_play_log（PlayByPlayEvent 形、match_event_schema.py 参照）
+- get_commentary_entries() — quarter, clock, text, player names, score
+- get_play_sequence_log() — play_no, result_type, scorer, commentary_text 等
+- format_match_postgame_cli_lines(match, user_team) — 試合直後サマリー（verbose 時のみ CLI 表示）
+
+**quiet=True でも上記はすべて Match 上に存在。** 失われるのは **stdout に print されなかった情報の「表示機会」** のみ。
+
+
+================================================================================
+5. Season 側で回収できる情報
+================================================================================
+
+### simulate_next_round 内の Match 生成（season.py L2912–2937）
+
+```python
+match = Match(..., quiet=quiet)
+_, home_score, away_score = match.simulate()
+# verbose かつ user_team 試合のみ:
+#   format_match_postgame_cli_lines(match, user_team)
+self.game_results.append({ 6 keys only })
+# match オブジェクトはここで参照終了 → GC
+```
+
+### SeasonEvent から取れるメタデータ（simulate ループ内で利用可能）
+
+| フィールド | 例 |
+|---|---|
+| event_id | `regular_season_r6_g3` |
+| round_number | 6 |
+| competition_type | `regular_season` / `emperor_cup` / `playoff` |
+| stage | `regular_season` 等 |
+| week, day_of_week | スケジュール表示用 |
+| home_team / away_team | Team 参照 |
+
+**重要:** event_id / round / competition_type は **SeasonEvent に既にある** が、
+現状 `game_results.append` には **渡していない**。
+
+### user_team 関与試合の規模
+
+- 1ラウンドあたり自チーム試合 ~2 試合
+- レギュラー33R で **~60–66 試合/シーズン**
+- 全リーグ試合 ~1440 試合/シーズン — 全保存は save 肥大化リスク大
+
+
+================================================================================
+6. game_results との関係
+================================================================================
+
+### 現状構造（変更なし）
+
+```python
+{
+  "home_team", "away_team",
+  "home_score", "away_score",
+  "score_diff", "total_score",
+}
+```
+
+- score 中心、**時系列 append**（post summary の slice に使用）
+- round / event_id / competition_type / match_id **なし**
+- game_results と match_logs の **ID 紐付けキーがない**
+
+### game_results 拡張 vs 別リスト
+
+| 方針 | コメント |
+|---|---|
+| game_results に metadata 追加 | 全1440件に round 等を付与 —  join 簡単、リスト肥大は軽微 |
+| game_results に excerpt 追加 | 1440件×excerpt — **非推奨** |
+| season.match_logs 新設 | 責務分離、user_team のみ保存可能 — **Phase 1 向き** |
+
+
+================================================================================
+7. save 構造への影響
+================================================================================
+
+### 現状
+
+- pickle 形式（SAVE_FORMAT_VERSION=1）
+- `resume_season` に Season 丸ごと（game_results 含む）
+- `normalize_payload` で optional key 補完パターンあり（tracked_player_name 等）
+
+### match_logs 追加時の方針
+
+| 項目 | 方針 |
+|---|---|
+| 追加場所 | `Season.match_logs: list[dict]`（新規属性） |
+| 旧 save | load 時 `match_logs = []` を normalize_payload で補完 |
+| 互換 | optional field 追加で対応可能 |
+| サイズ | **user_team 試合のみ + excerpt** なら ~60件×数KB ≒ 数百KB 程度（試算） |
+| full PBP | 60試合×363イベント ≒ 2万イベント — **Phase 1 禁止** |
+| versioning | payload_schema_version  increment を検討（実装時） |
+
+### リスク
+
+- pickle 全体サイズ増加（.sav が数MB → 数倍の可能性は full PBP 時）
+- Team/Player 参照を log に含めない（名前・ID のみ serializable dict）
+
+
+================================================================================
+8. export / Godot 接続への影響
+================================================================================
+
+### 現状 export（godot_readonly_bundle）
+
+10 JSON: home, roster, club_history, standings, schedule, facility, finance,
+owner_mission, tactics, contract_personnel — **試合ログなし**
+
+schedule_readonly は event_id を **予定** として export するが、
+**結果・ログとは未連結**。
+
+### Godot 将来必要データ（Phase 2 以降）
+
+- match_id / event_id（join キー）
+- round, competition_type, stage
+- home/away, score, W/L（user 視点）
+- summary_line, commentary_excerpt, key_plays
+- （optional）box score 要約
+
+### 順序
+
+1. **Python 側 save 設計・capture**（先）
+2. **match_logs_readonly export** 新規（次）
+3. godot_readonly_bundle 11番目として追加（後）
+4. Godot 試合詳細画面（後工程）
+
+export 時だけ生成（案E）は **reload 後にログ消失** のため Phase 1 非推奨。
+
+
+================================================================================
+9. CLI 導線への影響
+================================================================================
+
+| 段階 | 内容 |
+|---|---|
+| Phase 1 | **保存のみ**（quiet 進行後も match_logs に残る） |
+| Phase 2 | post summary 末尾に「直近試合: 詳細は match_log #N」 |
+| Phase 3 | choice "1" 直後に user 試合の commentary excerpt を数行表示（optional） |
+
+post summary から深掘りするには **event_id / match_log への参照** が必要。
+CLI 表示自体は Phase 1 実装に含めなくてよい（保存優先）。
+
+
+================================================================================
+10. 実装案比較表
+================================================================================
+
+| 案 | 内容 | 実装リスク | save影響 | 体験効果 | Godot | 今すぐ度 | コメント |
+|---|---|---:|---:|---:|---:|---:|---|
+| A | game_results metadata のみ | 中 | 小 | 中 | 高 | 中 | join 基盤、ログ本体なし |
+| B | game_results + excerpt | 中〜高 | 大 | 高 | 中 | 低 | 1440件肥大化 |
+| C | season.match_logs 新設 | 中〜高 | 中 | 高 | 高 | 中 | **責務分離◎** |
+| D | user_team 試合のみ match_logs | 中 | **小〜中** | 高 | 中 | **高** | **Phase 1 最有力** |
+| E | export 時のみ生成 | 低〜中 | なし | 低 | 低 | 低 | reload 後に弱い |
+| F | metadata 設計のみ先行 | 低 | なし | 中 | 高 | 高 | 安全だが1手増 |
+
+### 案別 変更ファイル（実装時）
+
+**案A:** season.py（append 拡張）, normalize_payload, tests
+
+**案D（推奨）:** season.py（capture helper + append）, 新規 `match_log_builder.py` または systems/,
+normalize_payload, test_save_roundtrip, export（後）
+
+**案C+D 合体（推奨）:** Season.match_logs + capture at simulate_next_round
+
+
+================================================================================
+11. 推奨案
+================================================================================
+
+**Phase 1: user_team 関与試合のみの軽量 match_logs 保存（案 D + C）**
+
+- `Season.match_logs` を新設
+- `simulate_next_round` の Match.simulate **直後** に capture
+- SeasonEvent から event_id / round_number / competition_type / stage を付与
+- Match から commentary excerpt + key_plays（play_sequence 由来）を抽出
+- **full PBP は保存しない**
+- game_results は Phase 1 では **触らない**（後続で metadata 追加可）
+
+### 推奨理由
+
+1. SeasonEvent に metadata は **既に存在** — game_results 拡張を待たず capture 可能
+2. Match API（get_commentary_lines / get_play_sequence_log）で excerpt 取得可能
+3. user_team のみ保存で save サイズを抑えられる
+4. quiet 進行後も「試合を味わう」材料が残る
+5. export / Godot / CLI 深掘りの共通正本になる
+
+
+================================================================================
+12. Phase 1 データ構造案
+================================================================================
+
+```python
+season.match_logs = [
+  {
+    "match_id": "regular_season_r6_g1_user",  # event_id ベース or 合成
+    "event_id": "regular_season_r6_g1",
+    "round": 6,
+    "competition_type": "regular_season",
+    "stage": "regular_season",
+    "week": 6,
+    "day_of_week": "Sat",
+    "home_team": "UserFC",
+    "away_team": "Opponent",
+    "home_score": 82,
+    "away_score": 76,
+    "user_team_involved": True,
+    "user_result": "W",  # W/L/D
+    "summary_line": "○ UserFC 82 - 76 Opponent",
+    "commentary_excerpt": {
+      "head": ["...", "..."],   # max 5
+      "tail": ["...", "..."],   # max 5
+      "total_lines": 362,
+    },
+    "key_plays": [
+      {
+        "play_no": 170,
+        "quarter": 4,
+        "result_type": "made_3",
+        "text": "...",
+        "home_score": 80,
+        "away_score": 75,
+      },
+      # max 8 plays（末尾優先）
+    ],
+    "postgame_edges": "...",  # optional: build_matchup_edges_summary 1行
+    "captured_at": "simulate_next_round",
+  },
+]
+```
+
+### 保存量制限（Phase 1 既定）
+
+| 項目 | 上限 |
+|---|---|
+| commentary head | 5 行 |
+| commentary tail | 5 行 |
+| key_plays | 8 件（4Q 末尾優先） |
+| 対象試合 | user_team 関与のみ |
+| full PBP | 0 件 |
+
+
+================================================================================
+13. save 互換方針
+================================================================================
+
+1. `Season.__init__` で `self.match_logs = []` 初期化
+2. `normalize_payload` または `rebind_resume_season_to_world` で旧 Season に `match_logs` 補完
+3. 旧 save load → match_logs 空リスト → 既存プレイ可能
+4. 新 save → match_logs 付きで pickle
+5. payload_schema_version を increment（実装時に判断）
+6. roundtrip テスト: save → load → match_logs 件数・先頭キー一致
+7. game_results 構造は Phase 1 変更なし
+
+
+================================================================================
+14. テスト方針（次実装時）
+================================================================================
+
+- Match.simulate(quiet=True) 後 play_by_play / commentary が非空
+- capture helper が excerpt / key_plays を返す
+- simulate_next_round 後 user 試合のみ match_logs に追加
+- 非 user 試合は match_logs に入らない
+- save/load roundtrip で match_logs 保持
+- 旧 save（match_logs なし）load で空リスト補完
+- max lines 制限が効く
+- 既存 quiet / summary テスト非回帰
+- main import ok
+
+
+================================================================================
+15. 任意 smoke（実施）
+================================================================================
+
+Match 1試合 quiet simulate:
+- PBP ~363 / commentary ~362 / play_sequence ~174
+- quiet でも内部ログは残る → **capture 可能**
+
+Season 側: simulate 後 Match 破棄 → **現状は capture なし**（設計上のギャップ）
+
+
+================================================================================
+16. 後工程へ回す項目
+================================================================================
+
+- full PBP 全試合保存
+- 全1440試合 match_logs
+- game_results への round/event_id 追加（Phase 2 metadata）
+- Godot 試合詳細画面
+- match_id 正式採番体系
+- commentary 品質改善 / 自然化
+- play sequence UI 化
+- box score 詳細永続化
+- 試合ログ検索・フィルタ
+- CLI「直近試合詳細」表示
+- Tk quiet + log 接続
+
+
+================================================================================
+17. 次に行う具体的タスク
+================================================================================
+
+**user_team 関与試合だけの軽量 match_logs 保存 Phase 1 実装指示書を作成する**
+
+理由:
+- SeasonEvent から metadata 取得可能（game_results 拡張を先に待つ必要なし）
+- Match から excerpt 安全取得可能（API 既存）
+- save 互換は optional list で対応可能
+- 設計調査の結論が「capture 地点は simulate_next_round 内」と明確
+
+実装指示書に含める内容:
+- season.py capture 挿入位置（L2921 直後）
+- match_log_builder モジュール新規
+- normalize_payload 補完
+- テスト一覧
+- export は Phase 2 として分離
+
+※ 調査の結果、**game_results metadata 先行は必須ではない**。
+  join 精度向上のため Phase 2 で game_results に round/event_id を追加するのは有益。
