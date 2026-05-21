@@ -1559,8 +1559,11 @@ class Season:
         if stage in self.emperor_cup_played_stages:
             return
 
-        print("\n--- 全日本カップ ---")
-        print(f"Stage: {stage}")
+        quiet = bool(getattr(self, "_simulate_quiet", False))
+
+        if not quiet:
+            print("\n--- 全日本カップ ---")
+            print(f"Stage: {stage}")
 
         stage_log_lines = []
 
@@ -1568,8 +1571,9 @@ class Season:
             pairings = self._pair_teams_randomly(self.emperor_cup_round1_teams)
             winners = []
 
-            print(f"BYE Teams: {len(self.emperor_cup_bye_teams)}")
-            print(f"Round 1 Teams: {len(self.emperor_cup_round1_teams)}")
+            if not quiet:
+                print(f"BYE Teams: {len(self.emperor_cup_bye_teams)}")
+                print(f"Round 1 Teams: {len(self.emperor_cup_round1_teams)}")
 
             bye_names = ", ".join(team.name for team in self.emperor_cup_bye_teams)
             stage_log_lines.append(f"BYE: {bye_names}")
@@ -1579,7 +1583,8 @@ class Season:
                     home_team=home_team,
                     away_team=away_team,
                     is_playoff=True,
-                    competition_type="emperor_cup"
+                    competition_type="emperor_cup",
+                    quiet=quiet,
                 ).simulate()
                 winners.append(winner)
                 loser = away_team if winner == home_team else home_team
@@ -1605,7 +1610,8 @@ class Season:
                     home_team=home_team,
                     away_team=away_team,
                     is_playoff=True,
-                    competition_type="emperor_cup"
+                    competition_type="emperor_cup",
+                    quiet=quiet,
                 ).simulate()
                 winners.append(winner)
                 loser = away_team if winner == home_team else home_team
@@ -1631,7 +1637,8 @@ class Season:
                     home_team=home_team,
                     away_team=away_team,
                     is_playoff=True,
-                    competition_type="emperor_cup"
+                    competition_type="emperor_cup",
+                    quiet=quiet,
                 ).simulate()
                 winners.append(winner)
                 loser = away_team if winner == home_team else home_team
@@ -1658,7 +1665,8 @@ class Season:
                     home_team=home_team,
                     away_team=away_team,
                     is_playoff=True,
-                    competition_type="emperor_cup"
+                    competition_type="emperor_cup",
+                    quiet=quiet,
                 ).simulate()
                 winners.append(winner)
                 loser = away_team if winner == home_team else home_team
@@ -1687,7 +1695,8 @@ class Season:
                     home_team=home_team,
                     away_team=away_team,
                     is_playoff=True,
-                    competition_type="emperor_cup"
+                    competition_type="emperor_cup",
+                    quiet=quiet,
                 ).simulate()
                 winners.append(winner)
                 loser = away_team if winner == home_team else home_team
@@ -1713,7 +1722,8 @@ class Season:
                     home_team=home_team,
                     away_team=away_team,
                     is_playoff=True,
-                    competition_type="emperor_cup"
+                    competition_type="emperor_cup",
+                    quiet=quiet,
                 ).simulate()
                 runner_up = away_team if winner == home_team else home_team
 
@@ -1732,8 +1742,9 @@ class Season:
                     )
                 )
 
-                print(f"全日本カップ優勝: {winner.name}")
-                print(f"全日本カップ準優勝: {runner_up.name}")
+                if not quiet:
+                    print(f"全日本カップ優勝: {winner.name}")
+                    print(f"全日本カップ準優勝: {runner_up.name}")
 
                 self._record_competition_team_result(
                     competition_id="emperor_cup",
@@ -1754,11 +1765,13 @@ class Season:
                     )
 
         self._store_emperor_cup_stage_log(stage, stage_log_lines)
-        self._print_emperor_cup_stage_summary(stage)
+        if not quiet:
+            self._print_emperor_cup_stage_summary(stage)
         self.emperor_cup_played_stages.add(stage)
 
         remain_count = len(self.emperor_cup_current_teams)
-        print(f"Remaining Teams after {stage}: {remain_count}")
+        if not quiet:
+            print(f"Remaining Teams after {stage}: {remain_count}")
 
     def _play_emperor_cup_round(self, round_number: int):
         stage_names = self._get_emperor_cup_stage_names(round_number)
@@ -2048,9 +2061,19 @@ class Season:
 
         return team
 
-    def _simulate_competition_match(self, home_team, away_team, competition_type: str) -> Tuple[object, int, int]:
+    def _simulate_competition_match(
+        self, home_team, away_team, competition_type: str, *, quiet: bool | None = None
+    ) -> Tuple[object, int, int]:
+        if quiet is None:
+            quiet = bool(getattr(self, "_simulate_quiet", False))
         if isinstance(home_team, Team) and isinstance(away_team, Team):
-            result = Match(home_team, away_team, is_playoff=True, competition_type=competition_type).simulate()
+            result = Match(
+                home_team,
+                away_team,
+                is_playoff=True,
+                competition_type=competition_type,
+                quiet=quiet,
+            ).simulate()
             if isinstance(result, tuple):
                 winner = result[0]
                 home_score = result[1] if len(result) > 1 else 0
@@ -2323,18 +2346,22 @@ class Season:
         if stage is None or stage in self.easl_played_stages:
             return
 
-        print("\n--- 東アジアトップリーグ ---")
-        print(f"Stage: {stage}")
+        quiet = bool(getattr(self, "_simulate_quiet", False))
+
+        if not quiet:
+            print("\n--- 東アジアトップリーグ ---")
+            print(f"Stage: {stage}")
 
         stage_lines = []
 
         if stage.startswith("group_md"):
             pairings = self.easl_matchdays.get(stage, [])
             for home_team, away_team in pairings:
-                print(
-                    f"[東アジアトップリーグ] stage={stage} | "
-                    f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
-                )
+                if not quiet:
+                    print(
+                        f"[東アジアトップリーグ] stage={stage} | "
+                        f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
+                    )
                 winner, home_score, away_score = self._simulate_competition_match(home_team, away_team, "easl")
                 loser = away_team if winner == home_team else home_team
 
@@ -2354,8 +2381,9 @@ class Season:
                     stage_lines.append(f"- {self._get_easl_team_name(team)}")
 
             self._store_easl_stage_log(stage, stage_lines)
-            self._print_easl_stage_summary(stage)
-            self._print_easl_group_tables()
+            if not quiet:
+                self._print_easl_stage_summary(stage)
+                self._print_easl_group_tables()
 
         elif stage == "semifinal":
             knockout = self.easl_knockout_teams[:]
@@ -2371,10 +2399,11 @@ class Season:
             losers = []
 
             for home_team, away_team in self.easl_semifinal_pairs:
-                print(
-                    f"[東アジアトップリーグ] stage={stage} | "
-                    f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
-                )
+                if not quiet:
+                    print(
+                        f"[東アジアトップリーグ] stage={stage} | "
+                        f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
+                    )
                 winner, home_score, away_score = self._simulate_competition_match(home_team, away_team, "easl")
                 loser = away_team if winner == home_team else home_team
                 winners.append(winner)
@@ -2396,15 +2425,17 @@ class Season:
                 )
 
             self._store_easl_stage_log(stage, stage_lines)
-            self._print_easl_stage_summary(stage)
+            if not quiet:
+                self._print_easl_stage_summary(stage)
 
         elif stage == "final":
             if len(self.easl_current_finalists) >= 2:
                 home_team, away_team = self.easl_current_finalists[0], self.easl_current_finalists[1]
-                print(
-                    f"[東アジアトップリーグ] stage={stage} | "
-                    f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
-                )
+                if not quiet:
+                    print(
+                        f"[東アジアトップリーグ] stage={stage} | "
+                        f"{self._get_easl_team_name(home_team)} vs {self._get_easl_team_name(away_team)}"
+                    )
                 winner, home_score, away_score = self._simulate_competition_match(home_team, away_team, "easl")
                 runner_up = away_team if winner == home_team else home_team
 
@@ -2418,8 +2449,9 @@ class Season:
                     )
                 )
 
-                print(f"東アジアトップリーグ 優勝: {self._get_easl_team_name(winner)}")
-                print(f"東アジアトップリーグ 準優勝: {self._get_easl_team_name(runner_up)}")
+                if not quiet:
+                    print(f"東アジアトップリーグ 優勝: {self._get_easl_team_name(winner)}")
+                    print(f"東アジアトップリーグ 準優勝: {self._get_easl_team_name(runner_up)}")
 
                 self.easl_top2_payloads = [
                     self._build_easl_top2_payload(winner, "easl_champion"),
@@ -2428,7 +2460,7 @@ class Season:
                 self.easl_results["top2_payloads"] = self.easl_top2_payloads[:]
                 self._broadcast_easl_top2_payloads()
 
-                if self.easl_acl_qualifiers:
+                if self.easl_acl_qualifiers and not quiet:
                     print("[オールアジアトーナメント出場チーム]")
                     for i, team in enumerate(self.easl_acl_qualifiers, 1):
                         print(f" {i}. {self._get_easl_team_name(team)}")
@@ -2445,7 +2477,8 @@ class Season:
                 )
 
                 self._store_easl_stage_log(stage, stage_lines)
-                self._print_easl_stage_summary(stage)
+                if not quiet:
+                    self._print_easl_stage_summary(stage)
 
         self.easl_played_stages.add(stage)
 
@@ -2562,13 +2595,14 @@ class Season:
             for team in semifinalists:
                 print(f"- {self._get_acl_team_name(team)}")
 
-    def _play_acl_competition(self):
+    def _play_acl_competition(self, *, quiet: bool = False):
         if not self.acl_enabled or self.acl_played:
             return
         if len(self.easl_acl_qualifiers) < 2:
             return
 
-        print("\n=== オールアジアトーナメント ===")
+        if not quiet:
+            print("\n=== オールアジアトーナメント ===")
 
         domestic_teams = self.get_acl_qualifiers_from_easl()[:2]
         foreign_teams = self._generate_acl_foreign_teams()
@@ -2583,9 +2617,10 @@ class Season:
                 result_type="acl_participant"
             )
 
-        print("\nオールアジアトーナメント出場チーム:")
-        for i, team in enumerate(participants, 1):
-            print(f"{i}. {self._get_acl_team_name(team)}")
+        if not quiet:
+            print("\nオールアジアトーナメント出場チーム:")
+            for i, team in enumerate(participants, 1):
+                print(f"{i}. {self._get_acl_team_name(team)}")
 
         easl_champ = domestic_teams[0]
         easl_runner = domestic_teams[1]
@@ -2604,7 +2639,8 @@ class Season:
             (china2, oce1),
         ]
 
-        print("\n--- オールアジアトーナメント 準々決勝 ---")
+        if not quiet:
+            print("\n--- オールアジアトーナメント 準々決勝 ---")
         qf_lines = []
         qf_winners = []
         qf_losers = []
@@ -2621,14 +2657,16 @@ class Season:
             )
 
         self._store_acl_stage_log("quarterfinal", qf_lines)
-        self._print_acl_stage_summary("quarterfinal")
+        if not quiet:
+            self._print_acl_stage_summary("quarterfinal")
 
         semifinals = [
             (qf_winners[0], qf_winners[1]),
             (qf_winners[2], qf_winners[3]),
         ]
 
-        print("\n--- オールアジアトーナメント 準決勝 ---")
+        if not quiet:
+            print("\n--- オールアジアトーナメント 準決勝 ---")
         sf_lines = []
         sf_winners = []
         sf_losers = []
@@ -2655,9 +2693,11 @@ class Season:
                 )
 
         self._store_acl_stage_log("semifinal", sf_lines)
-        self._print_acl_stage_summary("semifinal")
+        if not quiet:
+            self._print_acl_stage_summary("semifinal")
 
-        print("\n--- オールアジアトーナメント 決勝 ---")
+        if not quiet:
+            print("\n--- オールアジアトーナメント 決勝 ---")
         final_lines = []
 
         home_team, away_team = sf_winners[0], sf_winners[1]
@@ -2687,11 +2727,12 @@ class Season:
             )
 
         self._store_acl_stage_log("final", final_lines)
-        self._print_acl_stage_summary("final")
+        if not quiet:
+            self._print_acl_stage_summary("final")
 
-        print("\n[オールアジアトーナメント 最終結果]")
-        print(f"Champion: {self._get_acl_team_name(winner)}")
-        print(f"Runner-up: {self._get_acl_team_name(runner_up)}")
+            print("\n[オールアジアトーナメント 最終結果]")
+            print(f"Champion: {self._get_acl_team_name(winner)}")
+            print(f"Runner-up: {self._get_acl_team_name(runner_up)}")
 
         self.acl_played = True
 
@@ -2777,7 +2818,15 @@ class Season:
     # =========================
     # Simulation
     # =========================
-    def simulate_next_round(self):
+    def simulate_next_round(self, *, quiet: bool = False):
+        prev_quiet = bool(getattr(self, "_simulate_quiet", False))
+        self._simulate_quiet = quiet
+        try:
+            self._simulate_next_round_body(quiet=quiet)
+        finally:
+            self._simulate_quiet = prev_quiet
+
+    def _simulate_next_round_body(self, *, quiet: bool = False):
         if self.season_finished:
             print("\nシーズンはすでに終了しています。")
             return
@@ -2821,7 +2870,7 @@ class Season:
             if is_national_team_break and event.competition_type == "regular_season":
                 continue
 
-            if user_team is not None and (
+            if not quiet and user_team is not None and (
                 event.home_team is user_team or event.away_team is user_team
             ):
                 opp_team = event.away_team if event.home_team is user_team else event.home_team
@@ -2867,9 +2916,10 @@ class Season:
                 competition_type=event.competition_type,
                 reg_slot_home=reg_slot_home,
                 reg_slot_away=reg_slot_away,
+                quiet=quiet,
             )
             _, home_score, away_score = match.simulate()
-            if user_team is not None and (
+            if not quiet and user_team is not None and (
                 event.home_team is user_team or event.away_team is user_team
             ):
                 try:
@@ -2915,25 +2965,36 @@ class Season:
         print(f"ラウンド平均総得点: {avg_total:.1f}")
 
         if self.current_round >= self.total_rounds:
-            self._finalize_season()
+            self._finalize_season(compact=quiet)
 
-    def simulate_multiple_rounds(self, rounds: int):
+    def simulate_multiple_rounds(self, rounds: int, *, quiet: bool = False):
         if rounds <= 0:
             return
 
         for _ in range(rounds):
             if self.season_finished:
                 break
-            self.simulate_next_round()
+            self.simulate_next_round(quiet=quiet)
 
-    def simulate_to_end(self):
+    def simulate_to_end(self, *, quiet: bool = False):
         while not self.season_finished:
-            self.simulate_next_round()
+            self.simulate_next_round(quiet=quiet)
 
     def simulate_season(self):
         self.simulate_to_end()
 
-    def _finalize_season(self):
+    def _finalize_season(self, *, compact: bool = False):
+        if self._finalized:
+            return
+
+        prev_compact = bool(getattr(self, "_finalize_compact", False))
+        self._finalize_compact = compact
+        try:
+            self._finalize_season_body(compact=compact)
+        finally:
+            self._finalize_compact = prev_compact
+
+    def _finalize_season_body(self, *, compact: bool = False):
         if self._finalized:
             return
 
@@ -2949,43 +3010,50 @@ class Season:
             print(f"Games Played: {self.game_count}")
             print(f"Average Team Score: {avg_team_score:.1f}")
             print(f"Average Total Score: {avg_total_score:.1f}")
-            self._print_scoring_distribution_summary()
+            if not compact:
+                self._print_scoring_distribution_summary()
 
-        if self.easl_results["champion"] is not None:
-            print("\n--- 東アジアトップリーグ 結果 ---")
-            print(f"優勝: {self._get_easl_team_name(self.easl_results['champion'])}")
-            if self.easl_results["runner_up"] is not None:
-                print(f"準優勝: {self._get_easl_team_name(self.easl_results['runner_up'])}")
-            self._print_easl_summary()
+        if not compact:
+            if self.easl_results["champion"] is not None:
+                print("\n--- 東アジアトップリーグ 結果 ---")
+                print(f"優勝: {self._get_easl_team_name(self.easl_results['champion'])}")
+                if self.easl_results["runner_up"] is not None:
+                    print(f"準優勝: {self._get_easl_team_name(self.easl_results['runner_up'])}")
+                self._print_easl_summary()
 
-        if self.emperor_cup_results["champion"] is not None:
-            print("\n--- 全日本カップ 結果 ---")
-            print(f"Champion: {self.emperor_cup_results['champion'].name}")
-            if self.emperor_cup_results["runner_up"] is not None:
-                print(f"Runner-up: {self.emperor_cup_results['runner_up'].name}")
-            self._print_emperor_cup_bracket_summary()
+            if self.emperor_cup_results["champion"] is not None:
+                print("\n--- 全日本カップ 結果 ---")
+                print(f"Champion: {self.emperor_cup_results['champion'].name}")
+                if self.emperor_cup_results["runner_up"] is not None:
+                    print(f"Runner-up: {self.emperor_cup_results['runner_up'].name}")
+                self._print_emperor_cup_bracket_summary()
 
-        self._print_stat_leaders_by_division()
-        self._calculate_and_print_awards_by_division()
+            self._print_stat_leaders_by_division()
 
-        playoff_results = self._simulate_all_playoffs()
+        self._calculate_and_print_awards_by_division(print_results=not compact)
+
+        playoff_results = self._simulate_all_playoffs(quiet=compact)
         self.division_playoff_results = dict(playoff_results or {})
         self._record_playoff_results(playoff_results)
-        self._process_promotion_relegation(self.leagues, playoff_results)
+        self._process_promotion_relegation(self.leagues, playoff_results, compact=compact)
 
         self._set_phase("continental_postseason")
-        self._play_acl_competition()
+        self._play_acl_competition(quiet=compact)
 
-        if self.acl_results["champion"] is not None:
-            self._print_acl_summary()
+        if not compact:
+            if self.acl_results["champion"] is not None:
+                self._print_acl_summary()
 
-        self._update_popularity()
-        self._print_popularity_rankings()
+            self._update_popularity()
+            self._print_popularity_rankings()
+        else:
+            self._update_popularity()
 
         self._process_finances()
 
         self._record_division_season_history()
-        self._print_position_stat_profile()
+        if not compact:
+            self._print_position_stat_profile()
 
         self._apply_career_stats()
 
@@ -3101,13 +3169,15 @@ class Season:
         standings = self.get_standings(self.leagues[level])
         return standings[:8]
 
-    def _simulate_playoffs_for_division(self, level: int):
+    def _simulate_playoffs_for_division(self, level: int, *, quiet: bool = False):
         playoff_teams = self._get_playoff_teams_for_level(level)
 
-        print(f"\n--- Division {level} Playoffs ---")
+        if not quiet:
+            print(f"\n--- Division {level} Playoffs ---")
 
         if not playoff_teams:
-            print("対象チームなし")
+            if not quiet:
+                print("対象チームなし")
             return {
                 "champion": None,
                 "runner_up": None,
@@ -3117,10 +3187,11 @@ class Season:
         if len(playoff_teams) < 8:
             champion = playoff_teams[0]
             runner_up = playoff_teams[1] if len(playoff_teams) >= 2 else None
-            if champion:
-                print(f"Champion: {champion.name}")
-            if runner_up:
-                print(f"Runner-up: {runner_up.name}")
+            if not quiet:
+                if champion:
+                    print(f"Champion: {champion.name}")
+                if runner_up:
+                    print(f"Runner-up: {runner_up.name}")
             return {
                 "champion": champion,
                 "runner_up": runner_up,
@@ -3133,21 +3204,32 @@ class Season:
         for h_rank, a_rank in matchups:
             t1 = playoff_teams[h_rank]
             t2 = playoff_teams[a_rank]
-            winner, _, _ = Match(home_team=t1, away_team=t2, is_playoff=True, competition_type="playoff").simulate()
+            winner, _, _ = Match(
+                home_team=t1, away_team=t2, is_playoff=True, competition_type="playoff", quiet=quiet
+            ).simulate()
             qf_winners.append(winner)
 
         sf_winners = []
         for i in range(0, 4, 2):
             t1 = qf_winners[i]
             t2 = qf_winners[i + 1]
-            winner, _, _ = Match(home_team=t1, away_team=t2, is_playoff=True, competition_type="playoff").simulate()
+            winner, _, _ = Match(
+                home_team=t1, away_team=t2, is_playoff=True, competition_type="playoff", quiet=quiet
+            ).simulate()
             sf_winners.append(winner)
 
-        champion, _, _ = Match(home_team=sf_winners[0], away_team=sf_winners[1], is_playoff=True, competition_type="playoff").simulate()
+        champion, _, _ = Match(
+            home_team=sf_winners[0],
+            away_team=sf_winners[1],
+            is_playoff=True,
+            competition_type="playoff",
+            quiet=quiet,
+        ).simulate()
         runner_up = sf_winners[1] if champion == sf_winners[0] else sf_winners[0]
 
-        print(f"Champion: {champion.name}")
-        print(f"Runner-up: {runner_up.name}")
+        if not quiet:
+            print(f"Champion: {champion.name}")
+            print(f"Runner-up: {runner_up.name}")
 
         return {
             "champion": champion,
@@ -3155,10 +3237,10 @@ class Season:
             "playoff_teams": playoff_teams,
         }
 
-    def _simulate_all_playoffs(self):
+    def _simulate_all_playoffs(self, *, quiet: bool = False):
         results = {}
         for level in [1, 2, 3]:
-            results[level] = self._simulate_playoffs_for_division(level)
+            results[level] = self._simulate_playoffs_for_division(level, quiet=quiet)
         return results
 
     def _teams_below_payroll_floor(self, leagues: dict, level: int) -> List[Team]:
@@ -3209,24 +3291,26 @@ class Season:
                 break
         return promoted[:needed]
 
-    def _process_promotion_relegation(self, leagues: dict, playoff_results: dict):
-        print("\n--- Final Standings & Promotion/Relegation ---")
+    def _process_promotion_relegation(self, leagues: dict, playoff_results: dict, *, compact: bool = False):
+        if not compact:
+            print("\n--- Final Standings & Promotion/Relegation ---")
 
         d1_standings = self.get_standings(leagues[1])
         d2_standings = self.get_standings(leagues[2])
         d3_standings = self.get_standings(leagues[3])
 
-        print("\n[Division 1]")
-        for i, t in enumerate(d1_standings, 1):
-            print(f" {i}. {t.name:<25} ({t.regular_wins}-{t.regular_losses})")
+        if not compact:
+            print("\n[Division 1]")
+            for i, t in enumerate(d1_standings, 1):
+                print(f" {i}. {t.name:<25} ({t.regular_wins}-{t.regular_losses})")
 
-        print("\n[Division 2]")
-        for i, t in enumerate(d2_standings, 1):
-            print(f" {i}. {t.name:<25} ({t.regular_wins}-{t.regular_losses})")
+            print("\n[Division 2]")
+            for i, t in enumerate(d2_standings, 1):
+                print(f" {i}. {t.name:<25} ({t.regular_wins}-{t.regular_losses})")
 
-        print("\n[Division 3]")
-        for i, t in enumerate(d3_standings, 1):
-            print(f" {i}. {t.name:<25} ({t.regular_wins}-{t.regular_losses})")
+            print("\n[Division 3]")
+            for i, t in enumerate(d3_standings, 1):
+                print(f" {i}. {t.name:<25} ({t.regular_wins}-{t.regular_losses})")
 
         d1_floor_violators = self._teams_below_payroll_floor(leagues, 1)
         d2_floor_violators = self._teams_below_payroll_floor(leagues, 2)
@@ -3260,12 +3344,14 @@ class Season:
             playoff_results, d3_standings, 3, n_d2_down
         )
 
-        print("\n[League Changes for Next Season]")
+        if not compact:
+            print("\n[League Changes for Next Season]")
 
         for t in d1_relegated:
             t.league_level = 2
             tag = " [ペイロール下限未達]" if t in d1_floor_violators else ""
-            print(f"  v Relegated: {t.name} (D1 -> D2){tag}")
+            if not compact:
+                print(f"  v Relegated: {t.name} (D1 -> D2){tag}")
             extra = {"from_division": 1, "to_division": 2}
             if t in d1_floor_violators:
                 extra["reason"] = "payroll_floor"
@@ -3278,7 +3364,8 @@ class Season:
 
         for t in d2_promoted:
             t.league_level = 1
-            print(f"  ^ Promoted:  {t.name} (D2 -> D1)")
+            if not compact:
+                print(f"  ^ Promoted:  {t.name} (D2 -> D1)")
             self._record_competition_team_result(
                 competition_id="regular_season",
                 team=t,
@@ -3288,10 +3375,11 @@ class Season:
 
         for t in d2_relegated:
             t.league_level = 3
-            if t in d2_floor_violators:
-                print(f"  v Relegated: {t.name} (D2 -> D3) [ペイロール下限未達]")
-            else:
-                print(f"  v Relegated: {t.name} (D2 -> D3)")
+            if not compact:
+                if t in d2_floor_violators:
+                    print(f"  v Relegated: {t.name} (D2 -> D3) [ペイロール下限未達]")
+                else:
+                    print(f"  v Relegated: {t.name} (D2 -> D3)")
             extra = {"from_division": 2, "to_division": 3}
             if t in d2_floor_violators:
                 extra["reason"] = "payroll_floor"
@@ -3304,7 +3392,8 @@ class Season:
 
         for t in d3_promoted:
             t.league_level = 2
-            print(f"  ^ Promoted:  {t.name} (D3 -> D2)")
+            if not compact:
+                print(f"  ^ Promoted:  {t.name} (D3 -> D2)")
             self._record_competition_team_result(
                 competition_id="regular_season",
                 team=t,
@@ -3360,7 +3449,7 @@ class Season:
                 min_games=15
             )
 
-    def _calculate_and_print_awards_by_division(self):
+    def _calculate_and_print_awards_by_division(self, *, print_results: bool = True):
         target_games = self._regular_season_games_per_team_target()
         mvp_min_games = math.ceil(target_games * 0.8)
 
@@ -3434,6 +3523,9 @@ class Season:
             bucket["all_league_third"] = all_league_players[10:15]
 
             self.awards_by_division[level] = bucket
+
+            if not print_results:
+                continue
 
             print("\n==============================")
             print(f"      Division {level} シーズン表彰")
@@ -3728,26 +3820,28 @@ class Season:
                 "attendance": attendance
             })
 
-        print("\n[Richest Clubs]")
-        print("（参考: 下の Ticket/Sponsor/Profit は旧式試算。所持金ランキングは締め前残高・反映はオフシーズン財務が正本）")
-        top_teams_finances = sorted(finances_log, key=lambda x: x["team"].money, reverse=True)[:5]
+        compact = bool(getattr(self, "_finalize_compact", False))
+        if not compact:
+            print("\n[Richest Clubs]")
+            print("（参考: 下の Ticket/Sponsor/Profit は旧式試算。所持金ランキングは締め前残高・反映はオフシーズン財務が正本）")
+            top_teams_finances = sorted(finances_log, key=lambda x: x["team"].money, reverse=True)[:5]
 
-        for i, data in enumerate(top_teams_finances, 1):
-            t = data["team"]
-            avg_att = int(data["attendance"])
-            print(f"{i}. {t.name:<25} - {t.money:12,}円 | (Att: {avg_att:5d})")
-            print(f"      Ticket: {data['ticket_rev']:,}円 | Sponsor: {data['sponsor_rev']:,}円")
-            print(f"      Exp:    {data['expenses']:,}円 | Profit:  {data['profit']:,}円")
+            for i, data in enumerate(top_teams_finances, 1):
+                t = data["team"]
+                avg_att = int(data["attendance"])
+                print(f"{i}. {t.name:<25} - {t.money:12,}円 | (Att: {avg_att:5d})")
+                print(f"      Ticket: {data['ticket_rev']:,}円 | Sponsor: {data['sponsor_rev']:,}円")
+                print(f"      Exp:    {data['expenses']:,}円 | Profit:  {data['profit']:,}円")
 
-        print("\n[Poorest Clubs]")
-        bottom_teams_finances = sorted(finances_log, key=lambda x: x["team"].money)[:5]
+            print("\n[Poorest Clubs]")
+            bottom_teams_finances = sorted(finances_log, key=lambda x: x["team"].money)[:5]
 
-        for i, data in enumerate(bottom_teams_finances, 1):
-            t = data["team"]
-            avg_att = int(data["attendance"])
-            print(f"{i}. {t.name:<25} - {t.money:12,}円 | (Att: {avg_att:5d})")
-            print(f"      Ticket: {data['ticket_rev']:,}円 | Sponsor: {data['sponsor_rev']:,}円")
-            print(f"      Exp:    {data['expenses']:,}円 | Profit:  {data['profit']:,}円")
+            for i, data in enumerate(bottom_teams_finances, 1):
+                t = data["team"]
+                avg_att = int(data["attendance"])
+                print(f"{i}. {t.name:<25} - {t.money:12,}円 | (Att: {avg_att:5d})")
+                print(f"      Ticket: {data['ticket_rev']:,}円 | Sponsor: {data['sponsor_rev']:,}円")
+                print(f"      Exp:    {data['expenses']:,}円 | Profit:  {data['profit']:,}円")
 
     def _print_scoring_distribution_summary(self):
         if not self.game_results:

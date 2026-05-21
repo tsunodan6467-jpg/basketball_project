@@ -102,7 +102,10 @@ class Match:
         competition_type: str = "regular_season",
         reg_slot_home: RegSlot | None = None,
         reg_slot_away: RegSlot | None = None,
+        *,
+        quiet: bool = False,
     ):
+        self._quiet = bool(quiet)
         self.home_team = home_team
         self.away_team = away_team
         self.home_score = 0
@@ -118,14 +121,16 @@ class Match:
         self.home_active_players, self.home_inactive = self._select_active_roster(self.home_team)
         self.away_active_players, self.away_inactive = self._select_active_roster(self.away_team)
 
-        self._print_active_roster(self.home_team, self.home_active_players, self.home_inactive)
-        self._print_active_roster(self.away_team, self.away_active_players, self.away_inactive)
+        if not self._quiet:
+            self._print_active_roster(self.home_team, self.home_active_players, self.home_inactive)
+            self._print_active_roster(self.away_team, self.away_active_players, self.away_inactive)
 
         self.home_starters = self._resolve_match_starters(self.home_team, self.home_active_players)
         self.away_starters = self._resolve_match_starters(self.away_team, self.away_active_players)
 
-        self._print_starting_five(self.home_team, self.home_starters)
-        self._print_starting_five(self.away_team, self.away_starters)
+        if not self._quiet:
+            self._print_starting_five(self.home_team, self.home_starters)
+            self._print_starting_five(self.away_team, self.away_starters)
 
         self.home_current_lineup = list(self.home_starters)
         self.away_current_lineup = list(self.away_starters)
@@ -256,11 +261,15 @@ class Match:
             forfeiting_lineup = self.away_current_lineup
             winner_lineup = self.home_current_lineup
 
-        print(
-            f"[FORFEIT] {forfeiting_team.name} は登録可能選手不足のため不戦敗 | "
-            f"ACTIVE人数: {len(forfeiting_active)} / 必要人数: {self.minimum_active_players_required}"
-        )
-        print(f"[FORFEIT-RESULT] 勝者: {winner.name} | スコア: {self.home_team.name} {self.home_score} - {self.away_score} {self.away_team.name}")
+        if not self._quiet:
+            print(
+                f"[FORFEIT] {forfeiting_team.name} は登録可能選手不足のため不戦敗 | "
+                f"ACTIVE人数: {len(forfeiting_active)} / 必要人数: {self.minimum_active_players_required}"
+            )
+            print(
+                f"[FORFEIT-RESULT] 勝者: {winner.name} | スコア: "
+                f"{self.home_team.name} {self.home_score} - {self.away_score} {self.away_team.name}"
+            )
 
         self._record_event(
             event_type="forfeit",
@@ -318,11 +327,12 @@ class Match:
         except Exception:
             pass
 
-        self._print_minutes_log(self.home_team, self.home_active_players)
-        self._print_minutes_log(self.away_team, self.away_active_players)
-        self._print_play_by_play_debug_summary()
-        self._print_commentary_preview()
-        self._print_play_sequence_preview()
+        if not self._quiet:
+            self._print_minutes_log(self.home_team, self.home_active_players)
+            self._print_minutes_log(self.away_team, self.away_active_players)
+            self._print_play_by_play_debug_summary()
+            self._print_commentary_preview()
+            self._print_play_sequence_preview()
 
         return winner, self.home_score, self.away_score
 
@@ -415,7 +425,7 @@ class Match:
                     quarter=quarter,
                     clock_seconds=clock_seconds,
                 )
-                if line:
+                if line and not self._quiet:
                     print(f"  {line}")
             except Exception:
                 pass
@@ -1961,10 +1971,11 @@ class Match:
 
         quarter, possession_in_quarter, possessions_per_quarter = self._get_quarter_info(possession_index)
 
-        print(
-            f"[SUB][Q{quarter} {possession_in_quarter}/{possessions_per_quarter}] "
-            f"{team.name} | " + ", ".join(changes)
-        )
+        if not self._quiet:
+            print(
+                f"[SUB][Q{quarter} {possession_in_quarter}/{possessions_per_quarter}] "
+                f"{team.name} | " + ", ".join(changes)
+            )
 
         self._record_event(
             event_type="substitution",
@@ -3000,11 +3011,12 @@ class Match:
         except Exception:
             pass
 
-        self._print_minutes_log(self.home_team, self.home_active_players)
-        self._print_minutes_log(self.away_team, self.away_active_players)
-        self._print_play_by_play_debug_summary()
-        self._print_commentary_preview()
-        self._print_play_sequence_preview()
+        if not self._quiet:
+            self._print_minutes_log(self.home_team, self.home_active_players)
+            self._print_minutes_log(self.away_team, self.away_active_players)
+            self._print_play_by_play_debug_summary()
+            self._print_commentary_preview()
+            self._print_play_sequence_preview()
 
         winner = self.home_team if home_win else self.away_team
         return winner, self.home_score, self.away_score

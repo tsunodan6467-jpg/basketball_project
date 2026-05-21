@@ -2874,7 +2874,7 @@ def run_interactive_season(
                     except Exception:
                         pass
                     _game_results_before = len(getattr(season, "game_results", []) or [])
-                    season.simulate_next_round()
+                    season.simulate_next_round(quiet=True)
                     try:
                         from basketball_sim.systems.post_advance_result_summary_cli_display import (
                             format_post_advance_result_summary_lines,
