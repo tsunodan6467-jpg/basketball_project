@@ -1,0 +1,304 @@
+================================================================================
+Godot — match_logs 第1段 手動確認（2026-05）
+================================================================================
+
+確認日: 2026-05-21
+対象 commit:
+  - c24736e — Godotに試合ログ一覧の第1段を追加
+  - 2944a1a — match_logs詳細カードをスクロール表示に修正
+目的: Godot 試合ログ一覧画面（match_logs_view）第1段の実装到達点と、
+      ユーザーによる Godot エディタ手動確認結果を整理する。
+コード変更: なし（本レポートのみ）。
+
+================================================================================
+1. 現在地
+================================================================================
+
+Python 側 match_logs readonly export / bundle 11件化は成立済み（cf208fc 以降）。
+Godot 側第1段として以下が main に入っている。
+
+| commit | 内容 |
+|---|---|
+| c24736e | mock JSON / match_logs_view scene+script / home_dashboard 入口 |
+| 2944a1a | 詳細カード固定高さ + 内部 ScrollContainer（210px） |
+
+本レポート時点の HEAD: 2944a1a（push 済み / origin/main）。
+
+================================================================================
+2. 実装済みファイル
+================================================================================
+
+| ファイル | 役割 |
+|---|---|
+| godot/data/match_logs_mock.json | 正常系 mock（2件: W/L 各1） |
+| godot/scenes/match_logs_view.tscn | Phase 4 読み取り専用レイアウト |
+| godot/scripts/match_logs_view.gd | JSON 読込 / 一覧 / 詳細カード / ホーム復帰 |
+| godot/scenes/home_dashboard.tscn | ColLeague に「試合ログ」ボタン |
+| godot/scripts/home_dashboard.gd | match_logs_view への scene 遷移 |
+
+成立した機能:
+- match_logs_from_python.json 優先 → match_logs_mock.json fallback
+- 一覧 row（summary_line 中心）
+- 詳細ボタン → StatusLabel 詳細カード（excerpt / key plays のみ）
+- 詳細カード内部スクロール（_DETAIL_SCROLL_HEIGHT := 210）
+- HomeNavButton → home_dashboard 復帰
+- full PBP / full commentary 表示なし（現方針どおり）
+
+================================================================================
+3. 手動確認方法
+================================================================================
+
+| 層 | 内容 |
+|---|---|
+| Godot エディタ | match_logs_view.tscn を開く / Run Current Scene |
+| 遷移 | home_dashboard → ColLeague「試合ログ」→ match_logs_view |
+| 操作 | 一覧 2件表示 / 詳細ボタン / 詳細カード内スクロール / HomeNavButton |
+| static | git log / git show / Select-String / git diff（禁止パス） |
+
+解像度: 1280×720（ユーザー手動確認環境）
+Godot CLI: PATH 未検出のため CLI 自動検査は未実施
+
+================================================================================
+4. ユーザー手動確認結果
+================================================================================
+
+| 項目 | 結果 |
+|---|---|
+| Godot エディタで画面表示 | 確認済み |
+| match_logs_mock.json fallback で 2件表示 | 確認済み |
+| 試合行選択（詳細ボタン操作） | 確認済み |
+| 選択試合の詳細カード表示 | 確認済み |
+| 詳細カードが画面全体を圧迫しない | 確認済み（2944a1a 修正後） |
+| 詳細カード内スクロール | 確認済み |
+| HomeNavButton 表示 | 確認済み |
+| ホーム復帰可能 | 確認済み |
+
+================================================================================
+5. mock 2件表示確認
+================================================================================
+
+- screen_title: 試合ログ（閲覧）
+- team_name: 横浜ブルズ
+- season_label / summary が header に表示
+- DataSourceLabel が mock 読込を示す（from_python 未配置時）
+- 一覧 2行:
+  - R6 W: ○ 横浜ブルズ 74 - 72 大阪ウィングス
+  - R5 L: ● 横浜ブルズ 78 - 81 京都ナイツ
+- 各行に meta（R / competition / stage）、summary_line、
+  「実況 N 行 / key plays M 件」が表示
+
+================================================================================
+6. 詳細ボタン確認
+================================================================================
+
+- 各行の「詳細」ボタン押下で _show_match_log_detail() が呼ばれる
+- 中央の青い StatusLabel 詳細カードに内容が表示される
+- 詳細テキストは押下時のみ生成（一覧生成時には重くしない）
+
+================================================================================
+7. 詳細カード表示確認
+================================================================================
+
+表示内容（変更なし）:
+- 試合ログ詳細 / summary_line
+- ラウンド / competition / stage
+- 対戦 / スコア / user_result
+- --- 開始直後 ---（head excerpt）
+- --- 終盤 ---（tail excerpt）
+- 全 N 行中、先頭/末尾 excerpt のみ
+- --- Key plays ---
+- ※ full PBP ではありません。読み取り専用 excerpt です。
+
+================================================================================
+8. 詳細カード内部スクロール確認
+================================================================================
+
+2944a1a により runtime 構造:
+
+  PanelContainer (_detail_panel)
+    MarginContainer
+      ScrollContainer (_detail_scroll, min height 210px)
+        StatusLabel
+
+- horizontal_scroll_mode: DISABLED
+- vertical_scroll_mode: AUTO
+- 長文詳細でも Root VBox を押し広げず、カード内のみ縦スクロール可能
+- 1280×720 で Header / HomeNavButton / 一覧 Scroll の表示領域が残る
+
+================================================================================
+9. HomeNavButton 表示 / ホーム復帰確認
+================================================================================
+
+- HeaderNavRow の HomeNavButton（テキスト: ホームへ戻る（表示のみ））が見える
+- 押下で _on_home_nav_button_pressed() → home_dashboard.tscn
+- home_dashboard ColLeague「試合ログ」から再度 match_logs_view へ遷移可能
+
+================================================================================
+10. 詳細カード圧迫問題の解消確認
+================================================================================
+
+c24736e 時点:
+- 詳細本文が長いと StatusLabel が縦に伸び、1280×720 で画面を占有しやすかった
+
+2944a1a 修正後（ユーザー確認）:
+- 詳細カード高さが固定され、内部スクロールで全文読める
+- 一覧下部 / HomeNavButton が見えにくい問題は解消
+
+================================================================================
+11. static 確認結果
+================================================================================
+
+### git log --oneline -8
+```
+2944a1a match_logs詳細カードをスクロール表示に修正
+c24736e Godotに試合ログ一覧の第1段を追加
+60de336 Godot試合ログ一覧画面の設計を整理
+4ae47a1 match_logs readonly exportを実データ確認
+cf208fc match_logs readonly exportを追加
+8427486 match_logs readonly export設計を整理
+c49d9e4 軽量match_logs保存Phase1を実データ確認
+e0561dc user_team試合の軽量match_logs保存を追加
+```
+
+### git show --stat c24736e
+```
+ godot/data/match_logs_mock.json   | 120 ++++++++++
+ godot/scenes/home_dashboard.tscn  |   8 +
+ godot/scenes/match_logs_view.tscn | 174 ++++++++++++++
+ godot/scripts/home_dashboard.gd   |  11 +
+ godot/scripts/match_logs_view.gd  | 487 ++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 800 insertions(+)
+```
+
+### git show --stat 2944a1a
+```
+ godot/scripts/match_logs_view.gd | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+```
+
+### match_logs_view.gd（要点）
+- _match_logs_json_paths: from_python → mock の順
+- _DETAIL_SCROLL_HEIGHT := 210
+- _detail_scroll: ScrollContainer（runtime wrapping）
+- _show_match_log_detail: excerpt / key plays / full PBP 注記
+- _on_home_nav_button_pressed → home_dashboard.tscn
+
+### match_logs_view.tscn（要点）
+- MatchLogsView / HeaderCard / HomeNavButton / StatusLabel / ScrollContent
+- Unique Name: ScreenTitleLabel, TeamNameLabel, ContextMetaLabel,
+  DataSourceLabel, FooterNoteLabel, ScrollContent, StatusLabel
+
+### home_dashboard（要点）
+- MenuCardMatchLogsButton（text: 試合ログ）in ColLeague
+- _MATCH_LOGS_VIEW_SCENE_PATH / _on_match_logs_view_button_pressed()
+- change_scene_to_file("res://scenes/match_logs_view.tscn")
+
+### 禁止パス diff（レポート作成前）
+```
+git diff -- basketball_sim godot/... home_dashboard ... docs reports tests
+→ 差分なし（作業前クリーン）
+```
+
+================================================================================
+12. 触っていない範囲
+================================================================================
+
+- basketball_sim/**
+- godot/**（本レポート作成時点。コード変更なし）
+- schedule_view / game_detail_view / readonly_selection_context
+- match_logs_mock.json（変更なし）
+- home_dashboard（変更なし）
+- *_from_python.json（生成・commit なし）
+- .uid / .sav
+- docs/** / tests/**
+
+================================================================================
+13. 問題点
+================================================================================
+
+今回の手動確認範囲では **blocking な問題は確認されなかった**。
+
+未確認（問題ではなく後工程）:
+- 実データ match_logs_from_python.json 手動配置による優先読込
+- Godot 画面での from_python 実データ 2件以上の表示確認
+- schedule → event_id → match_logs 連携
+- CLI match_logs 閲覧導線
+- game_results metadata 拡張
+- full PBP 表示
+
+================================================================================
+14. 軽微所見
+================================================================================
+
+- Godot CLI は PATH 未検出のため、CLI 自動検査は未実施
+- 現時点の確認は mock JSON による表示確認のみ
+- 実データ match_logs_from_python.json の手動配置確認は次工程
+- HomeNavButton は Footer ではなく HeaderNavRow にあるが、
+  既存 Phase 4 画面（schedule_view 等）と整合するため許容
+- 詳細カード高さは _DETAIL_SCROLL_HEIGHT := 210
+- 将来は画面幅・解像度に応じた高さ調整も検討可
+- 現在は filter / search / reverse sort なし
+- schedule 連携は未実装
+
+================================================================================
+15. 判定
+================================================================================
+
+**合格**
+
+判定基準との対応:
+| 基準 | 結果 |
+|---|---|
+| match_logs_view が Godot エディタで開ける | OK |
+| mock 2件表示 | OK |
+| 一覧 row 表示 | OK |
+| 詳細ボタンで詳細カード表示 | OK |
+| 詳細カードが画面全体を圧迫しない | OK（2944a1a 後） |
+| 詳細カード内スクロール | OK |
+| HomeNavButton 表示 / ホーム復帰 | OK |
+| Python 側未変更 | OK |
+| schedule / game_detail / readonly_selection_context 未変更 | OK |
+| *_from_python.json 未 commit | OK |
+| .uid 未 commit | OK |
+
+================================================================================
+16. 後工程へ回す項目
+================================================================================
+
+- 実データ match_logs_from_python.json 手動配置確認
+- Godot 画面での Python 生成 JSON 優先読込確認
+- schedule から event_id で match_log へ飛ぶ導線
+- game_results metadata 拡張
+- CLI match_logs 閲覧メニュー
+- full PBP 保存 / export
+- box score 詳細
+- player 別スタッツ連携
+- key_plays 品質改善
+- commentary 文面改善
+- filter / search / reverse sort
+- 解像度別の詳細カード高さ調整
+
+================================================================================
+17. 次に行う具体的タスク（1件）
+================================================================================
+
+**実データ match_logs_from_python.json を手動配置して Godot 優先読込を確認する**
+
+理由:
+- mock 表示は成立した
+- Python 側 export / bundle は成立済み
+- 次は godot/data/ へ手動配置した Python 生成 JSON が
+  mock ではなく優先読込されるかを確認するのが自然
+- 生成 JSON は commit しない前提で確認する
+
+================================================================================
+18. 関連レポート
+================================================================================
+
+- reports/godot_match_logs_mock_and_readonly_list_design_2026-05.txt
+- reports/python_core_match_logs_readonly_export_design_2026-05.txt
+- reports/python_core_match_logs_readonly_export_bundle_smoke_2026-05.txt
+
+================================================================================
+END
+================================================================================
