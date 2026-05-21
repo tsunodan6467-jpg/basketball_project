@@ -11,6 +11,7 @@ var _return_scene: String = ""
 var _source_label: String = ""
 var _player_id: int = -1
 var _event_id: String = ""
+var _return_state_by_scene: Dictionary = {}
 
 
 func set_selection(
@@ -84,13 +85,51 @@ func get_event_id() -> String:
 	return _event_id
 
 
-func clear() -> void:
+func set_return_state(scene_path: String, state: Dictionary) -> void:
+	var key := scene_path.strip_edges()
+	if key.is_empty():
+		return
+	if state.is_empty():
+		_return_state_by_scene.erase(key)
+		return
+	_return_state_by_scene[key] = state.duplicate()
+
+
+func get_return_state(scene_path: String) -> Dictionary:
+	var key := scene_path.strip_edges()
+	if key.is_empty():
+		return {}
+	var state_v: Variant = _return_state_by_scene.get(key, {})
+	if typeof(state_v) != TYPE_DICTIONARY:
+		return {}
+	return (state_v as Dictionary).duplicate()
+
+
+func consume_return_state(scene_path: String) -> Dictionary:
+	var key := scene_path.strip_edges()
+	if key.is_empty():
+		return {}
+	var out := get_return_state(key)
+	_return_state_by_scene.erase(key)
+	return out
+
+
+func clear_return_state(scene_path: String) -> void:
+	var key := scene_path.strip_edges()
+	if key.is_empty():
+		return
+	_return_state_by_scene.erase(key)
+
+
+func clear(preserve_return_state: bool = false) -> void:
 	_kind = ""
 	_payload = {}
 	_return_scene = ""
 	_source_label = ""
 	_player_id = -1
 	_event_id = ""
+	if not preserve_return_state:
+		_return_state_by_scene.clear()
 
 
 func _apply_selection(
