@@ -1,0 +1,582 @@
+================================================================================
+Python本体 — match_logs readonly export 設計（2026-05）
+================================================================================
+
+調査日: 2026-05-21
+対象 commit: c49d9e4 — 軽量match_logs保存Phase1を実データ確認
+目的: 保存済み `Season.match_logs` を Godot / 将来の試合詳細画面 / readonly JSON
+      へ渡すための export 設計を固める。
+コード変更: なし（本レポートのみ）。
+
+================================================================================
+1. 現在地
+================================================================================
+
+Phase 1 保存は成立済み（commit c49d9e4 / e0561dc）:
+
+| 項目 | 状態 |
+|---|---|
+| 保存先 | `Season.match_logs`（user_team 関与試合のみ） |
+| commentary | head/tail excerpt のみ（各最大5行） |
+| key_plays | 最大8件（play_sequence 末尾） |
+| full PBP | 非保存 |
+| game_results | 6キー構造不変 |
+| save/load | normalize_payload で旧 save に `match_logs=[]` 補完 |
+| 実データ | fa_clip_test_04.sav で match_logs 0→2 確認済み |
+| export | **未実装**（godot_readonly_bundle 10 JSON のみ） |
+| Godot | schedule/game_detail は **予定試合** payload のみ。match_logs 未接続 |
+
+参照レポート:
+- reports/python_core_pbp_commentary_persistence_pre_design_2026-05.txt
+- reports/python_core_match_logs_phase1_smoke_2026-05.txt
+
+================================================================================
+2. 調査ファイル
+================================================================================
+
+### Python export / persistence
+- basketball_sim/export/godot_readonly_bundle.py
+- basketball_sim/export/schedule_readonly.py
+- basketball_sim/export/standings_readonly.py
+- basketball_sim/export/home_dashboard_readonly.py
+- basketball_sim/export/roster_readonly.py
+- basketball_sim/export/round_advance_preview_readonly.py（bundle 外・参考）
+- basketball_sim/models/season.py（match_logs capture）
+- basketball_sim/systems/match_log_builder.py
+- basketball_sim/persistence/save_load.py
+
+### テスト
+- basketball_sim/tests/test_godot_readonly_bundle_export.py
+- basketball_sim/tests/test_schedule_readonly_export.py
+- basketball_sim/tests/test_standings_readonly_export.py
+- basketball_sim/tests/test_match_log_builder.py
+
+### Godot（読取のみ）
+- godot/data/*_mock.json（10 本）
+- godot/scripts/schedule_view.gd
+- godot/scripts/game_detail_view.gd
+- godot/scripts/roster_view.gd 等（_from_python 優先パターン）
+
+================================================================================
+3. 既存 readonly export のパターン
+================================================================================
+
+### モジュール構成（10 画面分）
+
+| モジュール | 公開関数（典型） | bundle JSON 名 |
+|---|---|---|
+| home_dashboard_readonly | build_*_dict / write_*_json / export_*_json_from_world | home_dashboard_from_python.json |
+| roster_readonly | 同上 | roster_from_python.json |
+| club_history_readonly | 同上 | club_history_from_python.json |
+| standings_readonly | 同上 | standings_from_python.json |
+| schedule_readonly | 同上（max_upcoming 等） | schedule_from_python.json |
+| facility_summary_readonly | 同上 | facility_summary_from_python.json |
+| finance_summary_readonly | 同上（max_history） | finance_summary_from_python.json |
+| owner_mission_readonly | 同上（max_missions） | owner_mission_from_python.json |
+| tactics_summary_readonly | 同上（max_players） | tactics_summary_from_python.json |
+| contract_personnel_summary_readonly | 同上 | contract_personnel_summary_from_python.json |
+
+bundle 外: round_advance_preview_readonly（CLI/JSON 単体。godot bundle 未収載）
+
+### 共通作法
+
+1. **docstring 方針**: Tk/MainMenuView 非依存、save 書換禁止、load_world 読取のみ。
+2. **3 関数型**:
+   - `build_{screen}_readonly_dict(season, team, *, season_count, at_annual_menu, ...) -> dict`
+   - `write_{screen}_json(data, output_path) -> None | Path`
+   - `export_{screen}_json_from_world(save_path, output_path, ...) -> dict`
+3. **world 入口**（全 export 共通）:
+   ```python
+   payload = load_world(save_path)
+   validate_payload(payload)
+   user = find_user_team(teams, int(payload["user_team_id"]))
+   season = payload.get("resume_season")
+   # season_count / at_annual_menu を payload から optional 取得
+   ```
+4. **JSON 形式**: UTF-8、`json.dumps(..., ensure_ascii=False, indent=2) + "\n"`
+5. **metadata**: `schema_version` / `generated_at` / `kind` / `source` は **既存 10 export には無い**。
+   代わりに `screen_title`, `team_name`, `league_level`, `season_label`, `summary`, `notes` を使用。
+6. **empty 状態**:
+   - `resume_season is None` → `summary.has_season=False` + `empty_message`（schedule/standings 型）
+   - 部分 empty → ネスト内 `empty_message`（standings の division ブロック等）
+7. **CLI**: `--save` + `--output`（bundle は `--output-dir`）
+8. **テスト**: REQUIRED_KEYS 定数、build_* の unit、export_* の tmp save roundtrip、bundle は EXPECTED_JSON_NAMES 固定 10 件
+
+### godot_readonly_bundle
+
+- `export_godot_readonly_bundle(save, output_dir, ...)` が 10 タスクを順実行。
+- 各タスクは `(key, filename, lambda)` の 3 要素。
+- `continue_on_error` 対応。save_world 呼び出しなし。
+- テスト `EXPECTED_JSON_NAMES` が 10 件固定（追加時はここが主な更新点）。
+
+================================================================================
+4. match_logs export の入力
+================================================================================
+
+### 正本
+
+| 入力 | 用途 |
+|---|---|
+| `season.match_logs` | **主入力**（list[dict]、simulate_next_round で append 順） |
+| `payload["resume_season"]` | export_*_from_world 経由で season を取得 |
+| `find_user_team(...)` | `team_name` / `user_team` 表示用（entry 内 user_team との二重確認用） |
+| `payload["season_count"]` / `at_annual_menu` | `season_label` 生成（他 export と同型） |
+
+### 旧 save / 年度メニュー
+
+| 条件 | 扱い |
+|---|---|
+| `resume_season is None` | schedule/standings と同様、シーズン未接続 empty payload |
+| `match_logs` 属性なし | load_world → normalize_payload で `[]` 補完済み |
+| `match_logs=[]` | 有効。count=0 / has_logs=False |
+
+### 入力に含めないもの
+
+- Match インスタンス（simulate 後 GC 済み）
+- full PBP / full commentary
+- game_results からの再構築（event_id 欠落のため非推奨）
+- teams 全件走査による試合再シミュレーション
+
+### 既知のギャップ（修正は後工程）
+
+- `game_results` 6キーに event_id / round が無く、match_logs との join キーが save 内に片側のみ。
+- schedule export の upcoming は **未来試合**、match_logs は **消化済み user 試合** のみ。event_id 一致は「同一試合」の候補キーだが、schedule 側 upcoming に無い過去試合は schedule 詳細から直接飛べない。
+
+================================================================================
+5. match_logs export の JSON 構造案（最終案）
+================================================================================
+
+既存 10 export の **画面 DTO 型** に合わせつつ、match_logs 固有フィールドを追加する。
+`schema_version` / `kind` / `source` は Phase 1 export では **採用しない**
+（既存 JSON と Godot 読込パターンとの一貫性優先。将来 breaking change 時に検討）。
+
+### トップレベルキー
+
+```json
+{
+  "screen_title": "試合ログ（閲覧）",
+  "team_name": "自クラブ名",
+  "league_level": 1,
+  "season_label": "シーズン 1　…",
+  "summary": {
+    "has_season": true,
+    "has_logs": true,
+    "count": 2,
+    "exported_count": 2,
+    "latest_round": 6,
+    "current_round": 6,
+    "total_rounds": 33
+  },
+  "match_logs": [ /* 下記 entry */ ],
+  "empty_message": "",
+  "notes": [
+    "読み取り専用。操作は含みません。",
+    "commentary は試合時点の head/tail excerpt のみ。full PBP は含みません。"
+  ]
+}
+```
+
+### match_logs[] の 1 entry（export 正規化後）
+
+builder 出力をベースに、export 側で JSON-safe 整形:
+
+```json
+{
+  "match_id": "regular_season_r6_g3",
+  "event_id": "regular_season_r6_g3",
+  "round": 6,
+  "competition_type": "regular_season",
+  "stage": "regular_season",
+  "week": 6,
+  "day_of_week": "Sat",
+  "home_team": "UserFC",
+  "away_team": "Opponent",
+  "home_score": 74,
+  "away_score": 72,
+  "user_team_involved": true,
+  "user_team": "UserFC",
+  "user_result": "W",
+  "summary_line": "○ UserFC 74 - 72 Opponent",
+  "commentary_excerpt": {
+    "head": ["…"],
+    "tail": ["…"],
+    "total_lines": 363
+  },
+  "key_plays": [
+    {
+      "play_no": 1,
+      "quarter": 4,
+      "result_type": "made_2",
+      "text": "",
+      "commentary_text": "…",
+      "home_score": 74,
+      "away_score": 72
+    }
+  ],
+  "captured_at": "simulate_next_round"
+}
+```
+
+### entry 必須キー（export テストで固定）
+
+match_id, event_id, round, competition_type, stage,
+home_team, away_team, home_score, away_score,
+user_team, user_result, summary_line,
+commentary_excerpt, key_plays, captured_at
+
+optional: week, day_of_week, user_team_involved, text（key_plays 内）
+
+### 設計メモ
+
+- `user_team_involved` は save entry に既存。export でも維持（将来 filter 用）。
+- `match_id` は event_id 優先、無ければ builder の `{round}-{home}-{away}` フォールバック。
+- Godot 一覧表示の主行は `summary_line` + `round` + `competition_type` で足りる。
+
+================================================================================
+6. 0 件時 payload 案
+================================================================================
+
+### A. resume_season なし（年度メニュー等）
+
+```json
+{
+  "screen_title": "試合ログ（閲覧）",
+  "team_name": "自クラブ名",
+  "league_level": 1,
+  "season_label": "年度メニュー（シーズン 1）",
+  "summary": {
+    "has_season": false,
+    "has_logs": false,
+    "count": 0,
+    "exported_count": 0,
+    "latest_round": null,
+    "current_round": null,
+    "total_rounds": null
+  },
+  "match_logs": [],
+  "empty_message": "シーズン情報が未接続のため試合ログは表示できません。",
+  "notes": ["読み取り専用。操作は含みません。"]
+}
+```
+
+（文言は schedule_readonly の `_MSG_NO_SEASON` と同系統）
+
+### B. season あり・match_logs 空（新 save / 未進行 / 旧 save 補完）
+
+```json
+{
+  "summary": {
+    "has_season": true,
+    "has_logs": false,
+    "count": 0,
+    "exported_count": 0,
+    "latest_round": null,
+    "current_round": 3,
+    "total_rounds": 33
+  },
+  "match_logs": [],
+  "empty_message": "まだ保存済みの試合ログはありません。"
+}
+```
+
+### C. max_logs 制限で 0 件になるケース
+
+Phase 1 では max_logs 下限を 1 以上にし、0 指定は「全件」扱いにしない（既存 max_* パターンに合わせる）。
+異常入力は build 側で cap を clamp。
+
+================================================================================
+7. JSON ファイル名候補と最終案
+================================================================================
+
+| 候補 | 評価 |
+|---|---|
+| match_logs_from_python.json | **採用**（既存 `{screen}_from_python.json` と一致） |
+| match_log_from_python.json | 単数形。他画面と不一致 |
+| pbp_from_python.json | PBP 誤解。Phase 1 は excerpt のみ |
+
+Godot 同梱 mock: **match_logs_mock.json**
+（godot/data/ に他 10 本と同型で後工程追加。Phase 1 export 実装時は必須ではない）
+
+配置:
+- Python 出力: `godot/data/match_logs_from_python.json`（手動 or bundle CLI）
+- Godot 読込優先順: `res://data/match_logs_from_python.json` → `res://data/match_logs_mock.json`
+
+================================================================================
+8. export module 名候補と最終案
+================================================================================
+
+| 候補 | 評価 |
+|---|---|
+| basketball_sim/export/match_logs_readonly.py | **採用**（複数形 logs、他 module と *_readonly 一致） |
+| match_log_readonly.py | 単数形。save 属性 match_logs と不一致 |
+| schedule_readonly に混在 | 責務分離違反（案C 非推奨） |
+
+### 公開関数（最終案 — 既存命名に合わせる）
+
+```python
+SCREEN_TITLE = "試合ログ（閲覧）"
+DEFAULT_NOTES = [...]
+_MSG_NO_SEASON = "シーズン情報が未接続のため試合ログは表示できません。"
+_MSG_NO_LOGS = "まだ保存済みの試合ログはありません。"
+
+def build_match_logs_readonly_dict(
+    season, team, *,
+    season_count=None,
+    at_annual_menu=None,
+    max_logs=50,
+) -> dict: ...
+
+def write_match_logs_json(data, output_path) -> None: ...
+
+def export_match_logs_json_from_world(
+    save_path, output_path, *,
+    max_logs=50,
+) -> dict: ...
+```
+
+ユーザー案の `build_match_logs_readonly_payload` / `write_match_logs_readonly_json` は、
+既存が `build_*_readonly_dict` / `write_*_json` なので **rename して統一**。
+
+内部ヘルパ（実装時）:
+- `_normalize_log_entry(raw: dict) -> dict`（commentary_excerpt / key_plays 防御整形）
+- `_normalize_commentary_excerpt(raw) -> {head, tail, total_lines}`
+- `_normalize_key_plays(raw) -> list[dict]`
+- `_slice_logs(logs, max_logs) -> list`（末尾 N 件・保存順維持）
+
+================================================================================
+9. 件数制限・並び順
+================================================================================
+
+### 並び順
+
+| 層 | 方針 |
+|---|---|
+| save 正本 | simulate_next_round の **append 順**（ラウンド昇順が自然） |
+| export payload | **保存順のまま**（古い→新しい） |
+| Godot 表示 | 必要なら UI 側で逆順表示（export は正本を改変しない） |
+| latest_logs 別キー | Phase 1 では **作らない** |
+
+### 件数制限
+
+| 項目 | 最終案 |
+|---|---|
+| デフォルト max_logs | **50**（1 シーズン user 試合 ~66 件を想定し、ほぼ全件カバー） |
+| 上限の取り方 | 件数 > max_logs のとき **末尾 max_logs 件**（直近）を export。配列内順序は保存順 |
+| summary.count | season.match_logs の **全件数**（制限前） |
+| summary.exported_count | 実際に JSON に載せた件数 |
+| summary.latest_round | 全 match_logs 中の最大 round（制限前。None 可） |
+| Phase 1 実データ | fa_clip_test_04 は 2 件のみ → 制限は実質 no-op |
+
+100 件案: 将来シーズン延长や cup 増加に備え alternate として可だが、
+JSON サイズと Godot スクロールを考えると **50 で開始**、必要時 CLI/bundle 引数で上書き。
+
+================================================================================
+10. commentary_excerpt / key_plays の扱い
+================================================================================
+
+Phase 1 save は既に軽量化済み。**export でも builder 出力を基本そのまま使う**。
+ただし pickle 経路・手編集 save・将来 builder 変更に備え **export 側 defensive normalize 必須**。
+
+### commentary_excerpt
+
+| 入力 | export 出力 |
+|---|---|
+| 正常 dict | head/tail を list[str]、total_lines を int |
+| 欠損 / 非 dict | `{head:[], tail:[], total_lines:0}` |
+| head/tail 非 list | str 化して 1 要素 list、または drop |
+
+### key_plays
+
+| 入力 | export 出力 |
+|---|---|
+| list[dict] | 各 play を `_KEY_PLAY_FIELDS` 相当でフィルタ |
+| 非 JSON 値 | 除外（builder の `_plain_dict` と同思想） |
+| events ネスト | **除外**（builder 既存） |
+| 空 | `[]` |
+
+### Team/Player 混入防止
+
+- export normalize で `str/int/float/bool/None/list/dict` のみ許可。
+- オブジェクト検出時は str() または drop（テストで落ちないことを確認）。
+
+================================================================================
+11. save/load との関係
+================================================================================
+
+| 項目 | 内容 |
+|---|---|
+| 読込 | `load_world` のみ。save_world 禁止 |
+| normalize | `resume_season.match_logs` 無ければ `[]`（save_load.py L145-146） |
+| resume_season None | export は empty（has_season=False）。simulate 不可セーブでも安全 |
+| rebind | export 前処理不要（match_logs は plain dict list） |
+| payload_schema_version | Phase 1 export 追加では **increment 不要**（save 構造不変） |
+| 入口 | 単体 CLI / `export_match_logs_json_from_world` / 将来 bundle 11 番目 |
+
+annual menu save で resume_season が無いケースは、他 readonly と同様
+「空 JSON を返して Godot が empty_message 表示」で足りる。
+
+================================================================================
+12. Godot 将来接続の考え方
+================================================================================
+
+今回は Godot 実装しない。export JSON を先に固定する。
+
+### 将来画面候補
+
+1. **試合ログ一覧** — match_logs[] を Scroll、行見出し summary_line
+2. **試合詳細カード** — commentary head/tail、key_plays、スコア
+3. **schedule 連携** — event_id で match_log 検索（過去試合は schedule upcoming に無い点に注意）
+4. roster/player 連携 — Phase 1 外
+
+### Godot 読込パターン（既存踏襲）
+
+```gdscript
+var _paths = [
+  "res://data/match_logs_from_python.json",
+  "res://data/match_logs_mock.json",
+]
+```
+
+- StatusLabel + empty_message ブロック（schedule_view / standings_view 同型）
+- 詳細画面は **新規 match_log_detail_view** または game_detail_view 拡張（別工程）
+- 現 game_detail_view は ReadonlySelectionContext の **予定試合** payload 専用。
+  match_logs 接続時は payload 形状が異なるため **別 scene 推奨**
+
+### mock JSON
+
+- export 実装直後は **必須ではない**（from_python のみでも CLI/Godot 手動配置可）
+- Godot 画面実装開始時に match_logs_mock.json を追加（10 mock と同タイミング）
+
+================================================================================
+13. 実装案比較表
+================================================================================
+
+| 案 | 内容 | メリット | 懸念 | 評価 |
+|---|---|---|---|---|
+| A | match_logs_readonly 新設のみ。bundle 未追加 | 最小 diff、schema 固定しやすい | Godot data 自動生成に載らない | ○ |
+| B | 新設 + godot_readonly_bundle 11 番目 | 既存 Python→Godot 一括生成に乗る | テスト 10→11 更新 | ◎ |
+| C | schedule export に混在 | event_id が近い | 責務肥大、一覧/詳細用途混在 | × |
+| D | CLI formatter のみ | 即目視 | export 正本後回し | ×（目的外） |
+
+### bundle 追加コスト見積
+
+- godot_readonly_bundle.py: import 1 行 + tasks 1 要素 + docstring 10→11
+- test_godot_readonly_bundle_export.py: EXPECTED_JSON_NAMES + assert 更新
+- リスク: **低**（他 export と同一型。match_logs 空でも落ちない設計）
+
+================================================================================
+14. 推奨案
+================================================================================
+
+**案 B: match_logs_readonly.py 新設 + godot_readonly_bundle 追加**
+
+次実装を **1 タスク** でまとめてよい（export 単体 → bundle 追加の 2 段 PR に分割しても可）。
+
+================================================================================
+15. 推奨理由
+================================================================================
+
+1. Phase 1 save（c49d9e4）で entry 形状は builder テスト + 実データ smoke 済み。**schema 不確定要素が小さい**。
+2. 既存 export と **同一 3 関数パターン**で実装でき、bundle 追加は tasks 1 行 + テスト定数更新が中心。
+3. pre_design レポートでも「match_logs_readonly export → bundle 11 番目」が想定順序。
+4. export のみ（案 A）でもよいが、bundle 追加コストが低く、Godot 手動配置ミスを減らせる。
+5. schedule 混在（案 C）は責務分離に反する。
+6. save 構造・game_results は触らない。load_world 読取のみで安全。
+
+================================================================================
+16. 次実装時の変更対象ファイル候補
+================================================================================
+
+### 新規
+- basketball_sim/export/match_logs_readonly.py
+- basketball_sim/tests/test_match_logs_readonly_export.py
+
+### 変更
+- basketball_sim/export/godot_readonly_bundle.py（11 番目タスク、--max-logs 引数 optional）
+- basketball_sim/tests/test_godot_readonly_bundle_export.py（10→11、key match_logs）
+
+### 触らない（Phase 1）
+- basketball_sim/models/season.py
+- basketball_sim/systems/match_log_builder.py
+- basketball_sim/persistence/save_load.py
+- godot/**（mock / view は Godot 接続工程）
+- *.sav / *_from_python.json（生成物は commit しない）
+
+================================================================================
+17. テスト方針
+================================================================================
+
+### test_match_logs_readonly_export.py
+
+| テスト | 期待 |
+|---|---|
+| build 必須トップキー | screen_title, team_name, summary, match_logs, empty_message, notes |
+| resume_season None | has_season=False, match_logs=[], 未接続 empty_message |
+| match_logs なし season | has_logs=False, count=0, 未保存 empty_message |
+| match_logs あり | entry 必須キー、summary_line / user_result 維持 |
+| max_logs=1 | 末尾 1 件のみ、count は全件数 |
+| commentary 欠損 entry | head/tail/total_lines 補正 |
+| key_plays に events / オブジェクト | 落ちず JSON 化可能 play のみ |
+| export_*_from_world | tmp .sav roundtrip、write ファイルが parse 可能 |
+| normalize_payload 旧 save | match_logs 無し → export count=0 |
+| main import | 既存 smoke と同様 ok |
+
+### bundle 更新時
+
+- EXPECTED_JSON_NAMES に match_logs_from_python.json
+- success_count 11
+- keys に "match_logs"
+- max_logs 引数伝播テスト（schedule max_upcoming と同型）
+
+### 非回帰
+
+- 既存 10 export テスト + test_match_log_builder + test_godot_readonly_bundle 全 pass
+
+================================================================================
+18. 後工程へ回す項目
+================================================================================
+
+- Godot 試合ログ一覧画面（match_logs_view.gd）
+- Godot 試合ログ詳細画面（commentary / key_plays 表示）
+- schedule 詳細から event_id で match_log へ飛ぶ導線
+- game_detail_view と match_log 詳細の役割分離
+- CLI で match_logs を見返すメニュー
+- game_results metadata 拡張（event_id 追加）設計
+- full PBP export / 全試合ログ保存
+- commentary 品質改善、box score 詳細 export
+- player 別スタッツ連携、search/filter UI
+- export JSON への schema_version 導入（全画面横断時）
+
+================================================================================
+19. 既知の注意点（不具合ではないが設計上の制約）
+================================================================================
+
+1. game_results と match_logs に共通 join キーが無い（match_logs のみ event_id 保有）。
+2. schedule upcoming の event_id と match_logs の event_id は **同一試合で一致する想定**だが、
+   過去試合は schedule JSON の upcoming に含まれない。
+3. fa_clip_test_04.sav 実データは c49d9e4 確認時点で save 内 match_logs=0 のまま
+   （simulate はメモリ上 smoke）。export 実装後は **進行済み save** で再確認が必要。
+4. 既存 export に schema_version が無いため、ユーザー案の kind/source 付き envelope は Phase 1 では見送り。
+
+================================================================================
+20. 次に行う具体的タスク（1 件）
+================================================================================
+
+**match_logs readonly export + godot_readonly_bundle 追加を実装する**
+
+（単体 export → bundle 追加の順で 1 PR。max_logs デフォルト 50、JSON 名 match_logs_from_python.json）
+
+================================================================================
+付録: ユーザー案 schema（参考）との差分
+================================================================================
+
+ユーザー提示案の `schema_version` / `kind` / `source` / `has_logs` トップレベルは、
+既存 Godot 10 画面 JSON が screen_title 型のため、Phase 1 では
+`summary.has_logs` + `screen_title` に分解して吸収する。
+
+`count` は `summary.count`（全件）と `summary.exported_count`（export 件数）に分離し、
+max_logs 制限時の UI ズレを防ぐ。
+
+================================================================================
+END
+================================================================================
