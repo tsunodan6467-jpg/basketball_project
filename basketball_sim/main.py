@@ -2873,7 +2873,25 @@ def run_interactive_season(
                         print("")
                     except Exception:
                         pass
+                    _game_results_before = len(getattr(season, "game_results", []) or [])
                     season.simulate_next_round()
+                    try:
+                        from basketball_sim.systems.post_advance_result_summary_cli_display import (
+                            format_post_advance_result_summary_lines,
+                        )
+
+                        _game_results_after = getattr(season, "game_results", []) or []
+                        _new_results = _game_results_after[_game_results_before:]
+                        _round_label = f"ラウンド {season.current_round}/{season.total_rounds}"
+                        for _summary_ln in format_post_advance_result_summary_lines(
+                            user_team,
+                            _new_results,
+                            round_label=_round_label,
+                        ):
+                            print(_summary_ln)
+                        print("")
+                    except Exception:
+                        pass
                 elif choice == "2":
                     season.simulate_multiple_rounds(5)
                 elif choice == "3":
